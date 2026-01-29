@@ -77,102 +77,831 @@
 - **Scope columns**: where relevant, include **regional_office_id** and/or **branch_id**.
 - **Flexible fields**: use **JSONB** only for truly variable shapes (family, history, misc attributes). Keep query-heavy facts relational.
 
-### 3.2 Canonical tables (grouped)
+### 3.2 Canonical tables — full data dictionary
+
+> Types are Postgres-native. All UUIDs are `uuid` with `gen_random_uuid()` defaults unless stated. All tables include `org_id` for tenancy. Timestamp defaults use `now()` and are `timestamptz`.
 
 #### A) Organization & Scope
-- **organizations**(id, name, is_active, created_at)
-- **regions**(id, org_id, name)
-- **regional_offices**(id, org_id, region_id, name, short_name, address, is_head_office, created_at)
-- **regional_office_contacts**(id, regional_office_id, contact_type, contact_value)
+
+##### organizations
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Organization/tenant identifier. |
+| name | text | Unique per org | — | No | Legal/brand name. |
+| is_active | boolean | — | true | No | Controls tenant-level access. |
+| created_at | timestamptz | — | now() | No | Record creation time. |
+
+**Indexes/constraints**: `UNIQUE(name)`.
+
+##### regions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Region identifier. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | Unique per org | — | No | Region label. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### regional_offices
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Regional office identifier. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| region_id | uuid | FK → regions.id | — | No | Parent region. |
+| name | text | — | — | No | Office name. |
+| short_name | text | — | — | Yes | Short label for UI. |
+| address | text | — | — | Yes | Physical address. |
+| is_head_office | boolean | — | false | No | Marks the main office. |
+| created_at | timestamptz | — | now() | No | Creation time. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`, `INDEX(org_id, region_id)`.
+
+##### regional_office_contacts
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Contact row id. |
+| regional_office_id | uuid | FK → regional_offices.id | — | No | Office being contacted. |
+| contact_type | text | Check in ('phone','email','fax','other') | — | No | Type of contact. |
+| contact_value | text | — | — | No | Phone/email value. |
+
+**Indexes/constraints**: `INDEX(regional_office_id)`.
 
 #### B) IAM (Auth + RBAC)
-- **profiles**(id = auth.users.id, org_id, full_name, role_id, regional_office_id?, contact_no, is_active, last_login, created_at, updated_at)
-- **roles**(id, org_id, name, description)
-- **permissions**(id, module, action, UNIQUE(module, action))
-- **role_permissions**(role_id, permission_id, scope: 'all'|'regional'|'branch'|'own')
-- **user_scopes**(id, user_id, scope_type: 'regional'|'branch'|'client', scope_id)
-- **user_role_overrides**(optional: user_id, permission_id, allow/deny)
+
+##### profiles
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK, FK → auth.users.id | — | No | Tied to Supabase auth user. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| full_name | text | — | — | No | Staff display name. |
+| role_id | uuid | FK → roles.id | — | No | Primary role. |
+| regional_office_id | uuid | FK → regional_offices.id | — | Yes | Default regional scope. |
+| contact_no | text | — | — | Yes | Phone number. |
+| is_active | boolean | — | true | No | User enabled/disabled. |
+| last_login | timestamptz | — | — | Yes | Last sign-in. |
+| created_at | timestamptz | — | now() | No | Creation time. |
+| updated_at | timestamptz | — | now() | No | Updated time (trigger). |
+
+**Indexes/constraints**: `INDEX(org_id, role_id)`, `INDEX(regional_office_id)`.
+
+##### roles
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Role identifier. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Role name. |
+| description | text | — | — | Yes | Role notes. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### permissions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Permission identifier. |
+| module | text | — | — | No | Domain/module name. |
+| action | text | — | — | No | Action verb. |
+
+**Indexes/constraints**: `UNIQUE(module, action)`.
+
+##### role_permissions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| role_id | uuid | PK (composite), FK → roles.id | — | No | Role. |
+| permission_id | uuid | PK (composite), FK → permissions.id | — | No | Permission. |
+| scope | text | Check in ('all','regional','branch','own') | 'own' | No | Scope level granted. |
+
+**Indexes/constraints**: `PRIMARY KEY(role_id, permission_id)`.
+
+##### user_scopes
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Scope assignment id. |
+| user_id | uuid | FK → profiles.id | — | No | User being scoped. |
+| scope_type | text | Check in ('regional','branch','client') | — | No | Scope type. |
+| scope_id | uuid | — | — | No | Regional/branch/client id. |
+
+**Indexes/constraints**: `UNIQUE(user_id, scope_type, scope_id)`, `INDEX(scope_type, scope_id)`.
+
+##### user_role_overrides
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| user_id | uuid | PK (composite), FK → profiles.id | — | No | User. |
+| permission_id | uuid | PK (composite), FK → permissions.id | — | No | Permission override. |
+| is_allowed | boolean | — | true | No | Allow/deny toggle. |
+
+**Indexes/constraints**: `PRIMARY KEY(user_id, permission_id)`.
 
 #### C) Guard Lifecycle
-- **guard_statuses**(id, org_id, name, color, is_active)
-- **guard_designations**(id, org_id, name)
-- **guards**(
-  id, org_id,
-  parwest_id, name, cnic_no, contact_no, father_name, dob, gender, marital_status,
-  current_status_id, designation_id,
-  regional_office_id,
-  joining_date, termination_date,
-  personal_info JSONB,  -- education, blood group, ex-service, religion, etc
-  created_by, created_at, updated_at, deleted_at
-)
-- **guard_bank_accounts**(id, org_id, guard_id, bank_name, account_title, account_number, branch_code, is_primary)
-- **guard_family_members**(id, org_id, guard_id, relation, name, cnic?, contact?, occupation?, details JSONB)
-- **guard_employment_history**(id, org_id, guard_id, company_name, designation, from_date, to_date, leaving_reason)
-- **guard_documents**(id, org_id, guard_id, document_type_id, file_path, file_name, uploaded_by, created_at)
-- **document_types**(id, org_id, entity_type: 'guard'|'ticket'|'invoice', name, is_required, metadata JSONB)
-- **guard_verifications**(id, org_id, guard_id, verification_type, status, verified_date, document_path?, remarks, verified_by, created_at)
-- **guard_status_history**(id, org_id, guard_id, from_status_id, to_status_id, changed_by, changed_at, payload JSONB)
-- **guard_loans**(id, org_id, guard_id, loan_amount, installment_amount, remaining_amount, loan_date, purpose, status, approved_by, created_at)
-- **guard_clearance**(id, org_id, guard_id, clearance_date, final_salary, pending_loans, inventory_returned, documents_returned, remarks, processed_by, status)
+
+##### guard_statuses
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Status id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Status label (Active/Inactive/etc). |
+| color | text | — | — | Yes | UI color. |
+| is_active | boolean | — | true | No | Available for selection. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### guard_designations
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Designation id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Designation name. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### guards
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Guard identifier. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| parwest_id | text | Unique per org | — | No | Internal guard code. |
+| name | text | — | — | No | Full name. |
+| cnic_no | text | Unique per org | — | No | National ID. |
+| contact_no | text | — | — | Yes | Contact number. |
+| father_name | text | — | — | Yes | Father/guardian name. |
+| dob | date | — | — | Yes | Date of birth. |
+| gender | text | Check in ('male','female','other') | — | Yes | Gender. |
+| marital_status | text | Check in ('single','married','divorced','widowed') | — | Yes | Marital status. |
+| current_status_id | uuid | FK → guard_statuses.id | — | No | Current lifecycle status. |
+| designation_id | uuid | FK → guard_designations.id | — | Yes | Current designation. |
+| regional_office_id | uuid | FK → regional_offices.id | — | Yes | Owning office. |
+| joining_date | date | — | — | Yes | Start date. |
+| termination_date | date | — | — | Yes | End date if terminated. |
+| personal_info | jsonb | — | '{}'::jsonb | No | Variable attributes (education, etc). |
+| created_by | uuid | FK → profiles.id | — | Yes | Creator user. |
+| created_at | timestamptz | — | now() | No | Created time. |
+| updated_at | timestamptz | — | now() | No | Updated time. |
+| deleted_at | timestamptz | — | — | Yes | Soft-delete timestamp. |
+
+**Indexes/constraints**: `UNIQUE(org_id, parwest_id)`, `UNIQUE(org_id, cnic_no)`, `INDEX(org_id, regional_office_id)`, `INDEX(current_status_id)`.
+
+##### guard_bank_accounts
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Bank account id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| bank_name | text | — | — | No | Bank name. |
+| account_title | text | — | — | No | Account holder name. |
+| account_number | text | — | — | No | Bank account number. |
+| branch_code | text | — | — | Yes | Branch code. |
+| is_primary | boolean | — | false | No | Primary payment account. |
+
+**Indexes/constraints**: `UNIQUE(guard_id, account_number)`, `INDEX(guard_id)`, partial `UNIQUE(guard_id) WHERE is_primary`.
+
+##### guard_family_members
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Family member id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| relation | text | — | — | No | Relationship (spouse/child/etc). |
+| name | text | — | — | No | Full name. |
+| cnic | text | — | — | Yes | National ID. |
+| contact | text | — | — | Yes | Contact number. |
+| occupation | text | — | — | Yes | Occupation. |
+| details | jsonb | — | '{}'::jsonb | No | Extra info. |
+
+**Indexes/constraints**: `INDEX(guard_id)`, `UNIQUE(guard_id, relation, name)`.
+
+##### guard_employment_history
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Employment history id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| company_name | text | — | — | No | Previous employer. |
+| designation | text | — | — | Yes | Previous designation. |
+| from_date | date | — | — | Yes | Start date. |
+| to_date | date | — | — | Yes | End date. |
+| leaving_reason | text | — | — | Yes | Reason for leaving. |
+
+**Indexes/constraints**: `INDEX(guard_id)`.
+
+##### guard_documents
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Document row id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| document_type_id | uuid | FK → document_types.id | — | No | Document type. |
+| file_path | text | — | — | No | Storage path. |
+| file_name | text | — | — | No | Original filename. |
+| uploaded_by | uuid | FK → profiles.id | — | Yes | Uploader. |
+| created_at | timestamptz | — | now() | No | Upload time. |
+
+**Indexes/constraints**: `INDEX(guard_id, document_type_id)`.
+
+##### document_types
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Document type id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| entity_type | text | Check in ('guard','ticket','invoice') | — | No | Target entity. |
+| name | text | — | — | No | Display name. |
+| is_required | boolean | — | false | No | Required for completion. |
+| metadata | jsonb | — | '{}'::jsonb | No | Additional config. |
+
+**Indexes/constraints**: `UNIQUE(org_id, entity_type, name)`.
+
+##### guard_verifications
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Verification row id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| verification_type | text | — | — | No | Type (police/medical/etc). |
+| status | text | Check in ('pending','approved','rejected') | 'pending' | No | Verification status. |
+| verified_date | date | — | — | Yes | Verification date. |
+| document_path | text | — | — | Yes | Evidence document path. |
+| remarks | text | — | — | Yes | Remarks. |
+| verified_by | uuid | FK → profiles.id | — | Yes | Verifier user. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(guard_id, verification_type)`.
+
+##### guard_status_history
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | History id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| from_status_id | uuid | FK → guard_statuses.id | — | Yes | Previous status. |
+| to_status_id | uuid | FK → guard_statuses.id | — | No | New status. |
+| changed_by | uuid | FK → profiles.id | — | Yes | Actor. |
+| changed_at | timestamptz | — | now() | No | Change time. |
+| payload | jsonb | — | '{}'::jsonb | No | Additional data. |
+
+**Indexes/constraints**: `INDEX(guard_id, changed_at)`.
+
+##### guard_loans
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Loan id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| loan_amount | numeric(12,2) | — | 0 | No | Total loan amount. |
+| installment_amount | numeric(12,2) | — | 0 | No | Monthly deduction. |
+| remaining_amount | numeric(12,2) | — | 0 | No | Remaining balance. |
+| loan_date | date | — | — | No | Loan issued date. |
+| purpose | text | — | — | Yes | Purpose notes. |
+| status | text | Check in ('active','closed','defaulted') | 'active' | No | Loan status. |
+| approved_by | uuid | FK → profiles.id | — | Yes | Approver. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(guard_id, status)`.
+
+##### guard_clearance
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Clearance id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard owner. |
+| clearance_date | date | — | — | No | Final clearance date. |
+| final_salary | numeric(12,2) | — | 0 | No | Final payout. |
+| pending_loans | numeric(12,2) | — | 0 | No | Outstanding loan amount. |
+| inventory_returned | boolean | — | false | No | Whether assets returned. |
+| documents_returned | boolean | — | false | No | Whether docs returned. |
+| remarks | text | — | — | Yes | Notes. |
+| processed_by | uuid | FK → profiles.id | — | Yes | Processor. |
+| status | text | Check in ('pending','cleared','blocked') | 'pending' | No | Clearance status. |
+
+**Indexes/constraints**: `UNIQUE(guard_id)`, `INDEX(status)`.
 
 #### D) Client & Contracting
-- **client_types**(id, org_id, name)
-- **clients**(id, org_id, name, email, phone, address, client_type_id, is_active, enrollment_date, enrolled_by, created_at, updated_at)
-- **client_branches**(id, org_id, client_id, name, address, city, province, regional_office_id, is_active,
-  guard_capacity, day_cpo_capacity, night_cpo_capacity, so_capacity, aso_capacity,
-  supervisor_id?, manager_id?,
-  latitude?, longitude?,
-  enrollment_date, closing_date,
-  created_at, updated_at
-)
-- **client_contracts**(id, org_id, client_id, start_date, end_date, is_active, terms, created_at)
-- **contract_rates**(id, org_id, contract_id, guard_type, rate, overtime_rate?)
+
+##### client_types
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Client type id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Type label. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### clients
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Client id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Client name. |
+| email | text | — | — | Yes | Contact email. |
+| phone | text | — | — | Yes | Contact phone. |
+| address | text | — | — | Yes | Address. |
+| client_type_id | uuid | FK → client_types.id | — | Yes | Classification. |
+| is_active | boolean | — | true | No | Active flag. |
+| enrollment_date | date | — | — | Yes | Onboarding date. |
+| enrolled_by | uuid | FK → profiles.id | — | Yes | Creator. |
+| created_at | timestamptz | — | now() | No | Created time. |
+| updated_at | timestamptz | — | now() | No | Updated time. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`, `INDEX(client_type_id)`.
+
+##### client_branches
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Branch id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| client_id | uuid | FK → clients.id | — | No | Parent client. |
+| name | text | — | — | No | Branch name. |
+| address | text | — | — | Yes | Branch address. |
+| city | text | — | — | Yes | City. |
+| province | text | — | — | Yes | Province/state. |
+| regional_office_id | uuid | FK → regional_offices.id | — | Yes | Owning office. |
+| is_active | boolean | — | true | No | Active flag. |
+| guard_capacity | integer | — | 0 | No | Total guard slots. |
+| day_cpo_capacity | integer | — | 0 | No | Day CPO slots. |
+| night_cpo_capacity | integer | — | 0 | No | Night CPO slots. |
+| so_capacity | integer | — | 0 | No | SO slots. |
+| aso_capacity | integer | — | 0 | No | ASO slots. |
+| supervisor_id | uuid | FK → profiles.id | — | Yes | Assigned supervisor. |
+| manager_id | uuid | FK → profiles.id | — | Yes | Client manager. |
+| latitude | numeric(9,6) | — | — | Yes | Map latitude. |
+| longitude | numeric(9,6) | — | — | Yes | Map longitude. |
+| enrollment_date | date | — | — | Yes | Start date. |
+| closing_date | date | — | — | Yes | Closure date. |
+| created_at | timestamptz | — | now() | No | Created time. |
+| updated_at | timestamptz | — | now() | No | Updated time. |
+
+**Indexes/constraints**: `UNIQUE(client_id, name)`, `INDEX(org_id, regional_office_id)`, `INDEX(client_id)`.
+
+##### client_contracts
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Contract id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| client_id | uuid | FK → clients.id | — | No | Client. |
+| start_date | date | — | — | No | Contract start. |
+| end_date | date | — | — | Yes | Contract end. |
+| is_active | boolean | — | true | No | Active flag. |
+| terms | text | — | — | Yes | Contract terms. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(client_id, is_active)`.
+
+##### contract_rates
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Rate row id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| contract_id | uuid | FK → client_contracts.id | — | No | Contract. |
+| guard_type | text | — | — | No | Guard designation/type. |
+| rate | numeric(12,2) | — | 0 | No | Base rate. |
+| overtime_rate | numeric(12,2) | — | — | Yes | Overtime rate. |
+
+**Indexes/constraints**: `UNIQUE(contract_id, guard_type)`.
 
 #### E) Operations & Deployment
-- **guard_deployments**(id, org_id, guard_id, branch_id, contract_id?, shift_type, deployed_at, revoked_at?, deployed_by, revoked_by?, is_active)
-- **branch_capacity_history**(id, org_id, branch_id, changed_by, changed_at, from_capacity JSONB, to_capacity JSONB)
-- **rosters**(id, org_id, branch_id, roster_date, shift_type, created_by, created_at)
-- **roster_items**(id, org_id, roster_id, guard_id, expected_status: 'P'|'OFF', notes?)
+
+##### guard_deployments
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Deployment id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard. |
+| branch_id | uuid | FK → client_branches.id | — | No | Branch. |
+| contract_id | uuid | FK → client_contracts.id | — | Yes | Contract. |
+| shift_type | text | Check in ('day','night','rotational') | — | No | Shift type. |
+| deployed_at | timestamptz | — | now() | No | Deployment time. |
+| revoked_at | timestamptz | — | — | Yes | Revocation time. |
+| deployed_by | uuid | FK → profiles.id | — | Yes | Deployer. |
+| revoked_by | uuid | FK → profiles.id | — | Yes | Revoker. |
+| is_active | boolean | — | true | No | Active flag. |
+
+**Indexes/constraints**: `UNIQUE(guard_id) WHERE is_active`, `INDEX(branch_id, is_active)`, `INDEX(guard_id)`.
+
+##### branch_capacity_history
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Capacity history id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| branch_id | uuid | FK → client_branches.id | — | No | Branch. |
+| changed_by | uuid | FK → profiles.id | — | Yes | Actor. |
+| changed_at | timestamptz | — | now() | No | Change time. |
+| from_capacity | jsonb | — | '{}'::jsonb | No | Previous capacity snapshot. |
+| to_capacity | jsonb | — | '{}'::jsonb | No | New capacity snapshot. |
+
+**Indexes/constraints**: `INDEX(branch_id, changed_at)`.
+
+##### rosters
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Roster id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| branch_id | uuid | FK → client_branches.id | — | No | Branch. |
+| roster_date | date | — | — | No | Roster date. |
+| shift_type | text | Check in ('day','night','rotational') | — | No | Shift. |
+| created_by | uuid | FK → profiles.id | — | Yes | Creator. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `UNIQUE(branch_id, roster_date, shift_type)`, `INDEX(branch_id)`.
+
+##### roster_items
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Roster item id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| roster_id | uuid | FK → rosters.id | — | No | Parent roster. |
+| guard_id | uuid | FK → guards.id | — | No | Guard. |
+| expected_status | text | Check in ('P','OFF') | 'P' | No | Expected presence. |
+| notes | text | — | — | Yes | Notes. |
+
+**Indexes/constraints**: `UNIQUE(roster_id, guard_id)`, `INDEX(guard_id)`.
 
 #### F) Attendance & Leave
-- **guard_attendance**(id, org_id, guard_id, branch_id, attendance_date, status: 'P'|'A'|'L'|'H', shift, marked_by, source: 'web'|'mobile', created_at, UNIQUE(guard_id, attendance_date))
-- **leave_requests**(id, org_id, guard_id, from_date, to_date, leave_type, reason, status, requested_by, approved_by?, created_at)
-- **attendance_exceptions**(optional: id, org_id, branch_id, date, type, payload JSONB, created_at)
+
+##### guard_attendance
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Attendance row id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard. |
+| branch_id | uuid | FK → client_branches.id | — | No | Branch. |
+| attendance_date | date | — | — | No | Attendance date. |
+| status | text | Check in ('P','A','L','H') | 'P' | No | Present/Absent/Leave/Holiday. |
+| shift | text | Check in ('day','night','rotational') | — | Yes | Shift. |
+| marked_by | uuid | FK → profiles.id | — | Yes | Marker. |
+| source | text | Check in ('web','mobile') | 'web' | No | Source system. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `UNIQUE(guard_id, attendance_date)`, `INDEX(branch_id, attendance_date)`.
+
+##### leave_requests
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Leave request id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| guard_id | uuid | FK → guards.id | — | No | Guard. |
+| from_date | date | — | — | No | Leave start. |
+| to_date | date | — | — | No | Leave end. |
+| leave_type | text | — | — | No | Leave type. |
+| reason | text | — | — | Yes | Reason. |
+| status | text | Check in ('pending','approved','rejected','cancelled') | 'pending' | No | Workflow status. |
+| requested_by | uuid | FK → profiles.id | — | Yes | Requester. |
+| approved_by | uuid | FK → profiles.id | — | Yes | Approver. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(guard_id, status)`, `INDEX(from_date, to_date)`.
+
+##### attendance_exceptions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Exception id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| branch_id | uuid | FK → client_branches.id | — | No | Branch. |
+| date | date | — | — | No | Exception date. |
+| type | text | — | — | No | Exception type. |
+| payload | jsonb | — | '{}'::jsonb | No | Details. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(branch_id, date)`.
 
 #### G) Payroll & Finance
-- **payroll_runs**(id, org_id, month, year, regional_office_id?, status: 'draft'|'review'|'final', generated_by, generated_at, finalized_by?, finalized_at?)
-- **payroll_items**(id, org_id, payroll_run_id, guard_id, basic_salary, allowances JSONB, deductions JSONB, gross_salary, net_salary, payment_status, bank_account_id?, computed_payload JSONB)
-- **payslip_exports**(id, org_id, payroll_run_id, exported_by, exported_at, file_path?)
-- **loan_deductions**(id, org_id, payroll_item_id, loan_id, amount)
+
+##### payroll_runs
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Payroll run id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| month | smallint | Check 1-12 | — | No | Payroll month. |
+| year | smallint | — | — | No | Payroll year. |
+| regional_office_id | uuid | FK → regional_offices.id | — | Yes | Optional regional scope. |
+| status | text | Check in ('draft','review','final') | 'draft' | No | Run status. |
+| generated_by | uuid | FK → profiles.id | — | Yes | Generator. |
+| generated_at | timestamptz | — | now() | No | Generation time. |
+| finalized_by | uuid | FK → profiles.id | — | Yes | Finalizer. |
+| finalized_at | timestamptz | — | — | Yes | Finalization time. |
+
+**Indexes/constraints**: `UNIQUE(org_id, month, year, regional_office_id)`, `INDEX(status)`.
+
+##### payroll_items
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Payroll item id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| payroll_run_id | uuid | FK → payroll_runs.id | — | No | Run. |
+| guard_id | uuid | FK → guards.id | — | No | Guard. |
+| basic_salary | numeric(12,2) | — | 0 | No | Base salary. |
+| allowances | jsonb | — | '{}'::jsonb | No | Allowance breakdown. |
+| deductions | jsonb | — | '{}'::jsonb | No | Deduction breakdown. |
+| gross_salary | numeric(12,2) | — | 0 | No | Gross. |
+| net_salary | numeric(12,2) | — | 0 | No | Net. |
+| payment_status | text | Check in ('pending','paid','hold') | 'pending' | No | Payment state. |
+| bank_account_id | uuid | FK → guard_bank_accounts.id | — | Yes | Payout account. |
+| computed_payload | jsonb | — | '{}'::jsonb | No | Computation audit. |
+
+**Indexes/constraints**: `UNIQUE(payroll_run_id, guard_id)`, `INDEX(guard_id)`.
+
+##### payslip_exports
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Export id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| payroll_run_id | uuid | FK → payroll_runs.id | — | No | Run. |
+| exported_by | uuid | FK → profiles.id | — | Yes | Exporter. |
+| exported_at | timestamptz | — | now() | No | Export time. |
+| file_path | text | — | — | Yes | Storage path. |
+
+**Indexes/constraints**: `INDEX(payroll_run_id)`.
+
+##### loan_deductions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Deduction id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| payroll_item_id | uuid | FK → payroll_items.id | — | No | Payroll item. |
+| loan_id | uuid | FK → guard_loans.id | — | No | Loan. |
+| amount | numeric(12,2) | — | 0 | No | Deducted amount. |
+
+**Indexes/constraints**: `UNIQUE(payroll_item_id, loan_id)`.
 
 #### H) Billing & Payments
-- **invoices**(id, org_id, client_id, invoice_number, invoice_month, invoice_year, subtotal, tax_amount, total_amount, status: 'draft'|'sent'|'paid'|'overdue', due_date, generated_at, generated_by)
-- **invoice_line_items**(id, org_id, invoice_id, branch_id, description, guard_type, quantity, rate, amount)
-- **invoice_payments**(id, org_id, invoice_id, amount, payment_date, payment_method, reference_no, recorded_by, created_at)
-- **invoice_exports**(optional: id, org_id, invoice_id, file_path, exported_at)
+
+##### invoices
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Invoice id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| client_id | uuid | FK → clients.id | — | No | Client. |
+| invoice_number | text | Unique per org | — | No | Invoice identifier. |
+| invoice_month | smallint | Check 1-12 | — | No | Billing month. |
+| invoice_year | smallint | — | — | No | Billing year. |
+| subtotal | numeric(12,2) | — | 0 | No | Subtotal. |
+| tax_amount | numeric(12,2) | — | 0 | No | Tax. |
+| total_amount | numeric(12,2) | — | 0 | No | Total. |
+| status | text | Check in ('draft','sent','paid','overdue') | 'draft' | No | Invoice status. |
+| due_date | date | — | — | Yes | Payment due. |
+| generated_at | timestamptz | — | now() | No | Generation time. |
+| generated_by | uuid | FK → profiles.id | — | Yes | Generator. |
+
+**Indexes/constraints**: `UNIQUE(org_id, invoice_number)`, `INDEX(client_id, invoice_year, invoice_month)`.
+
+##### invoice_line_items
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Line item id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| invoice_id | uuid | FK → invoices.id | — | No | Invoice. |
+| branch_id | uuid | FK → client_branches.id | — | Yes | Branch billed. |
+| description | text | — | — | No | Line description. |
+| guard_type | text | — | — | Yes | Guard type for rate. |
+| quantity | integer | — | 0 | No | Units. |
+| rate | numeric(12,2) | — | 0 | No | Unit rate. |
+| amount | numeric(12,2) | — | 0 | No | Line total. |
+
+**Indexes/constraints**: `INDEX(invoice_id)`, `INDEX(branch_id)`.
+
+##### invoice_payments
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Payment id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| invoice_id | uuid | FK → invoices.id | — | No | Invoice. |
+| amount | numeric(12,2) | — | 0 | No | Payment amount. |
+| payment_date | date | — | — | No | Payment date. |
+| payment_method | text | — | — | Yes | Method (bank/cash/etc). |
+| reference_no | text | — | — | Yes | Reference. |
+| recorded_by | uuid | FK → profiles.id | — | Yes | Recorder. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(invoice_id, payment_date)`.
+
+##### invoice_exports
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Export id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| invoice_id | uuid | FK → invoices.id | — | No | Invoice. |
+| file_path | text | — | — | Yes | Storage path. |
+| exported_at | timestamptz | — | now() | No | Export time. |
+
+**Indexes/constraints**: `INDEX(invoice_id)`.
 
 #### I) Inventory & Assets
-- **inventory_categories**(id, org_id, name)
-- **inventory_product_types**(id, org_id, category_id, name)
-- **inventory_products**(id, org_id, category_id, product_type_id, serial_number, license_number?, license_expiry?, condition, status,
-  regional_office_id?, vendor_id?, purchase_date?, purchase_price?, metadata JSONB, created_at)
-- **inventory_assignments**(id, org_id, product_id, guard_id?, branch_id?, assigned_at, returned_at?, assigned_by, returned_by?, condition_on_return?)
-- **inventory_events**(optional: id, org_id, product_id, event_type, payload JSONB, created_at)
+
+##### inventory_categories
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Category id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Category name. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### inventory_product_types
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Product type id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| category_id | uuid | FK → inventory_categories.id | — | No | Category. |
+| name | text | — | — | No | Type name. |
+
+**Indexes/constraints**: `UNIQUE(category_id, name)`.
+
+##### inventory_products
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Inventory item id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| category_id | uuid | FK → inventory_categories.id | — | No | Category. |
+| product_type_id | uuid | FK → inventory_product_types.id | — | No | Type. |
+| serial_number | text | Unique per org | — | No | Serial number. |
+| license_number | text | — | — | Yes | License number. |
+| license_expiry | date | — | — | Yes | License expiry. |
+| condition | text | — | — | Yes | Condition notes. |
+| status | text | Check in ('available','assigned','retired','lost') | 'available' | No | Availability status. |
+| regional_office_id | uuid | FK → regional_offices.id | — | Yes | Owning office. |
+| vendor_id | uuid | — | — | Yes | Vendor reference (if tracked). |
+| purchase_date | date | — | — | Yes | Purchase date. |
+| purchase_price | numeric(12,2) | — | — | Yes | Purchase cost. |
+| metadata | jsonb | — | '{}'::jsonb | No | Extra data. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `UNIQUE(org_id, serial_number)`, `INDEX(category_id)`, `INDEX(product_type_id)`, `INDEX(status)`.
+
+##### inventory_assignments
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Assignment id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| product_id | uuid | FK → inventory_products.id | — | No | Product. |
+| guard_id | uuid | FK → guards.id | — | Yes | Guard assignment. |
+| branch_id | uuid | FK → client_branches.id | — | Yes | Branch assignment. |
+| assigned_at | timestamptz | — | now() | No | Assignment time. |
+| returned_at | timestamptz | — | — | Yes | Return time. |
+| assigned_by | uuid | FK → profiles.id | — | Yes | Issuer. |
+| returned_by | uuid | FK → profiles.id | — | Yes | Receiver. |
+| condition_on_return | text | — | — | Yes | Return condition. |
+
+**Indexes/constraints**: `UNIQUE(product_id) WHERE returned_at IS NULL`, `INDEX(guard_id)`, `INDEX(branch_id)`.
+
+##### inventory_events
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Inventory event id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| product_id | uuid | FK → inventory_products.id | — | No | Product. |
+| event_type | text | — | — | No | Event type. |
+| payload | jsonb | — | '{}'::jsonb | No | Event data. |
+| created_at | timestamptz | — | now() | No | Event time. |
+
+**Indexes/constraints**: `INDEX(product_id, created_at)`.
 
 #### J) Tickets & Support
-- **ticket_categories**(id, org_id, name)
-- **ticket_priorities**(id, org_id, name, color)
-- **ticket_statuses**(id, org_id, name)
-- **tickets**(id, org_id, title, description, category_id, priority_id, status_id, created_by, assigned_to?, closed_at?, created_at, updated_at)
-- **ticket_comments**(id, org_id, ticket_id, content, created_by, is_internal, created_at)
-- **ticket_attachments**(id, org_id, ticket_id, file_path, file_name, uploaded_by, created_at)
+
+##### ticket_categories
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Category id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Category name. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### ticket_priorities
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Priority id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Priority label. |
+| color | text | — | — | Yes | UI color. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### ticket_statuses
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Status id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Status label. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### tickets
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Ticket id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| title | text | — | — | No | Ticket title. |
+| description | text | — | — | Yes | Problem description. |
+| category_id | uuid | FK → ticket_categories.id | — | Yes | Category. |
+| priority_id | uuid | FK → ticket_priorities.id | — | Yes | Priority. |
+| status_id | uuid | FK → ticket_statuses.id | — | No | Current status. |
+| created_by | uuid | FK → profiles.id | — | Yes | Creator. |
+| assigned_to | uuid | FK → profiles.id | — | Yes | Assignee. |
+| closed_at | timestamptz | — | — | Yes | Closure time. |
+| created_at | timestamptz | — | now() | No | Created time. |
+| updated_at | timestamptz | — | now() | No | Updated time. |
+
+**Indexes/constraints**: `INDEX(status_id, priority_id)`, `INDEX(assigned_to)`.
+
+##### ticket_comments
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Comment id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| ticket_id | uuid | FK → tickets.id | — | No | Ticket. |
+| content | text | — | — | No | Comment body. |
+| created_by | uuid | FK → profiles.id | — | Yes | Author. |
+| is_internal | boolean | — | false | No | Internal only. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(ticket_id, created_at)`.
+
+##### ticket_attachments
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Attachment id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| ticket_id | uuid | FK → tickets.id | — | No | Ticket. |
+| file_path | text | — | — | No | Storage path. |
+| file_name | text | — | — | No | Original filename. |
+| uploaded_by | uuid | FK → profiles.id | — | Yes | Uploader. |
+| created_at | timestamptz | — | now() | No | Uploaded time. |
+
+**Indexes/constraints**: `INDEX(ticket_id)`.
 
 #### K) Workflow, Audit, Notifications
-- **workflow_transitions**(id, org_id, entity_type, from_status, to_status, required_roles TEXT[], required_fields TEXT[], validation_rules JSONB, is_active)
-- **audit_logs**(id, org_id, entity_type, entity_id, action, before JSONB, after JSONB, actor_user_id, actor_role?, created_at, ip?, user_agent?)
-- **notifications**(id, org_id, user_id, title, body, link?, severity, read_at?, created_at)
-- **scheduled_reports**(id, org_id, name, report_type, cron_expr, filters JSONB, recipients JSONB, is_active)
-- **export_jobs**(optional: id, org_id, job_type, params JSONB, status, file_path?, created_by, created_at)
+
+##### workflow_transitions
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Transition id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| entity_type | text | — | — | No | Entity name. |
+| from_status | text | — | — | Yes | From status. |
+| to_status | text | — | — | No | To status. |
+| required_roles | text[] | — | '{}' | No | Roles allowed. |
+| required_fields | text[] | — | '{}' | No | Required fields. |
+| validation_rules | jsonb | — | '{}'::jsonb | No | Custom rules. |
+| is_active | boolean | — | true | No | Enabled. |
+
+**Indexes/constraints**: `UNIQUE(org_id, entity_type, from_status, to_status)`.
+
+##### audit_logs
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Audit log id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| entity_type | text | — | — | No | Entity table. |
+| entity_id | uuid | — | — | No | Entity id. |
+| action | text | — | — | No | Action type (insert/update/delete). |
+| before | jsonb | — | '{}'::jsonb | No | Previous data. |
+| after | jsonb | — | '{}'::jsonb | No | New data. |
+| actor_user_id | uuid | FK → profiles.id | — | Yes | Actor. |
+| actor_role | text | — | — | Yes | Role at time of action. |
+| created_at | timestamptz | — | now() | No | Event time. |
+| ip | inet | — | — | Yes | Actor IP. |
+| user_agent | text | — | — | Yes | Actor user agent. |
+
+**Indexes/constraints**: `INDEX(entity_type, entity_id)`, `INDEX(actor_user_id, created_at)`.
+
+##### notifications
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Notification id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| user_id | uuid | FK → profiles.id | — | No | Recipient. |
+| title | text | — | — | No | Short title. |
+| body | text | — | — | No | Body content. |
+| link | text | — | — | Yes | Deep link. |
+| severity | text | Check in ('info','warning','critical') | 'info' | No | Severity. |
+| read_at | timestamptz | — | — | Yes | Read timestamp. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(user_id, read_at)`.
+
+##### scheduled_reports
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Scheduled report id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| name | text | — | — | No | Report name. |
+| report_type | text | — | — | No | Report kind. |
+| cron_expr | text | — | — | No | Cron schedule. |
+| filters | jsonb | — | '{}'::jsonb | No | Filters. |
+| recipients | jsonb | — | '{}'::jsonb | No | Recipient list. |
+| is_active | boolean | — | true | No | Enabled. |
+
+**Indexes/constraints**: `UNIQUE(org_id, name)`.
+
+##### export_jobs
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Export job id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| job_type | text | — | — | No | Job type. |
+| params | jsonb | — | '{}'::jsonb | No | Parameters. |
+| status | text | Check in ('queued','running','failed','completed') | 'queued' | No | Job status. |
+| file_path | text | — | — | Yes | Output file. |
+| created_by | uuid | FK → profiles.id | — | Yes | Creator. |
+| created_at | timestamptz | — | now() | No | Created time. |
+
+**Indexes/constraints**: `INDEX(status, created_at)`.
 
 ---
 
