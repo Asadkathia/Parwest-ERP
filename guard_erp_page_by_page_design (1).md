@@ -788,6 +788,35 @@ Category, Type, Serial, License, Expiry, Condition, Status, Location, Assigned T
 ## S4) Lookups — `/settings/lookups`
 **Purpose:** Manage statuses/designations/document types, ticket categories, etc.
 
+## S5) Approval Center — `/settings/approvals`
+**Purpose:** Central “main admin” approval window for system-wide gated actions.
+
+**Layout**
+- Full-width queue with module filter (Guards, Deployments, Attendance, Payroll, Billing, Inventory, Tickets).
+- Right context panel shows request diff + risk flags.
+
+**Components**
+- `ApprovalQueueTable` (entity, action, requested_by, requested_at, scope, risk)
+- `ApprovalDetailPanel` (diff viewer, attachments, audit context)
+- `ApproveRejectDrawer` with mandatory comment
+- `SuperAdminGateToggle` (enable/disable per module action)
+
+**Behavior**
+- Actions marked `requires_super_admin` are routed here and blocked elsewhere until approved.
+- Approve/Reject writes `approval_requests` and `audit_logs`.
+
+## S6) Broadcast Notifications — `/settings/broadcasts`
+**Purpose:** Allow Super Admin to publish a message that pushes to **all dashboards**.
+
+**Components**
+- `BroadcastComposer` (title, body, severity, optional link)
+- `AudiencePreview` (org-wide with optional role filter)
+- `BroadcastHistoryTable`
+
+**Behavior**
+- Creates org-wide `notifications` with `audience = 'org'` (or `role`).
+- Delivered via realtime/push so every dashboard shows a banner + bell badge.
+
 ---
 
 ## 4) Reusable UI Patterns (Implementation Notes)

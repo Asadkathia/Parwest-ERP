@@ -12,6 +12,8 @@ This plan outlines the complete migration of the Security Services ERP from Lara
 - Modernize the technology stack
 - Improve performance and maintainability
 
+**Pre-development readiness** is documented in `pre_development_requirements.md` and must be validated before engineering execution.
+
 ---
 
 ## Current State Summary

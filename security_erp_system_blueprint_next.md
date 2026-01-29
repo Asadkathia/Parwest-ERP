@@ -842,6 +842,25 @@
 
 **Indexes/constraints**: `UNIQUE(org_id, entity_type, from_status, to_status)`.
 
+##### approval_requests
+| Field | Type | Constraints | Default | Nullable | Business meaning |
+| --- | --- | --- | --- | --- | --- |
+| id | uuid | PK | gen_random_uuid() | No | Approval request id. |
+| org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
+| entity_type | text | — | — | No | Entity name (guard, deployment, invoice, etc). |
+| entity_id | uuid | — | — | No | Entity id. |
+| action | text | — | — | No | Requested action (approve_enrollment, payroll_finalize, etc). |
+| status | text | Check in ('pending','approved','rejected') | 'pending' | No | Approval state. |
+| requires_super_admin | boolean | — | false | No | Flag for main admin gate. |
+| requested_by | uuid | FK → profiles.id | — | Yes | Requestor. |
+| requested_at | timestamptz | — | now() | No | Requested time. |
+| reviewed_by | uuid | FK → profiles.id | — | Yes | Approver. |
+| reviewed_at | timestamptz | — | — | Yes | Decision time. |
+| review_notes | text | — | — | Yes | Approval/rejection notes. |
+| payload | jsonb | — | '{}'::jsonb | No | Extra metadata (diffs, risk flags). |
+
+**Indexes/constraints**: `INDEX(org_id, status)`, `INDEX(entity_type, entity_id)`.
+
 ##### audit_logs
 | Field | Type | Constraints | Default | Nullable | Business meaning |
 | --- | --- | --- | --- | --- | --- |
@@ -865,7 +884,9 @@
 | --- | --- | --- | --- | --- | --- |
 | id | uuid | PK | gen_random_uuid() | No | Notification id. |
 | org_id | uuid | FK → organizations.id | — | No | Tenant owner. |
-| user_id | uuid | FK → profiles.id | — | No | Recipient. |
+| user_id | uuid | FK → profiles.id | — | Yes | Recipient (required when audience = 'user'). |
+| audience | text | Check in ('user','role','org') | 'user' | No | Delivery scope. |
+| audience_role_id | uuid | FK → roles.id | — | Yes | Target role when audience = 'role'. |
 | title | text | — | — | No | Short title. |
 | body | text | — | — | No | Body content. |
 | link | text | — | — | Yes | Deep link. |
