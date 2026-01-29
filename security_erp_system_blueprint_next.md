@@ -422,3 +422,88 @@ Once this is locked, UI design becomes a controlled step:
 8. Tickets
 9. Reports + scheduled jobs + audit search
 
+---
+
+## 10) Environment, Supabase Setup, and Operations
+
+This section defines the **environment variables**, **Supabase project setup**, **RLS deployment**, **backup/restore**, and **operational monitoring** expectations. It is split by **local dev**, **staging**, and **production** to prevent drift and ensure safe deployments.
+
+### 10.1 Environment variables (shared catalog)
+Use consistent names across all environments. Local uses `.env.local`; staging/production use a secrets manager or hosting provider secrets.
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Public; safe to expose in browser. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Browser auth + RLS policies apply. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key | **Server-only** for admin jobs and migrations. Never expose to client. |
+| `DATABASE_URL` | Postgres connection string | Used for migrations/CLI; should use service role credentials. |
+| `SUPABASE_PROJECT_REF` | Supabase project ref | For CLI linking and deployment scripts. |
+| `SUPABASE_JWT_SECRET` | JWT signing secret | Needed for local auth emulation or custom auth flows. |
+| `SUPABASE_STORAGE_BUCKET` | Default storage bucket | For document uploads (guard docs, tickets, invoices). |
+| `LOG_LEVEL` | App log verbosity | e.g., `debug`, `info`, `warn`, `error`. |
+| `SENTRY_DSN` (or equivalent) | Error monitoring | Required for staging/prod observability. |
+
+### 10.2 Supabase project setup (baseline)
+1. **Create project** for each environment (separate Supabase projects for local, staging, production).
+2. **Enable Auth + Storage** and configure base settings (site URL, redirects, storage buckets).
+3. **Create roles and policies** via migrations (see RLS deployment below).
+4. **Configure secrets** (JWT secret, service role, project ref) in the environment manager.
+5. **Set up scheduled jobs** (e.g., payroll run generation, report exports) using Supabase cron or external schedulers.
+
+### 10.3 RLS deployment steps (safe rollout)
+1. **Migrations first**: apply schema migrations in a single transaction where possible.
+2. **Enable RLS** on new tables immediately: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`.
+3. **Create policies** for each table (read/write/owner/scoped access).
+4. **Validate with role simulation**:
+   - `anon` (web client) must be restricted to allowed reads and writes.
+   - `authenticated` should respect role/scope (org/regional/branch).
+   - `service_role` should bypass RLS only for internal jobs.
+5. **Add regression checks**: basic read/write tests per policy and an audit log smoke test.
+6. **Lock down**: remove any temporary policy grants after validation.
+
+### 10.4 Backup and restore expectations
+**Production** is the source of truth. Backups must be automated and tested.
+- **Backups**:
+  - Use Supabase automated backups (daily) and keep a rolling retention window.
+  - Export monthly snapshots to off-platform storage (e.g., S3/Blob).
+- **Restore drills**:
+  - Quarterly restore to a **staging clone** to validate backup integrity.
+  - Document restore steps and recovery times (RTO/RPO).
+- **Point-in-time recovery (PITR)**:
+  - Enable if available for production.
+  - Maintain WAL retention where supported.
+
+### 10.5 Monitoring, logging, and alerting (operational expectations)
+**Goal:** detect failures early, correlate incidents, and protect data integrity.
+- **Database monitoring**: query latency, connection saturation, replication health, and slow query logs.
+- **Application logging**: structured JSON logs with request IDs, user IDs, and org IDs (no PII).
+- **Audit trail monitoring**: alert if audit log insert rates drop unexpectedly.
+- **Error tracking**: client + server error monitoring (Sentry or equivalent).
+- **Alerting**: page on-call for:
+  - Elevated error rates (HTTP 5xx/4xx spikes).
+  - Failed cron jobs or missed scheduled payroll/invoice runs.
+  - Storage upload failures or permission errors.
+  - Database disk/CPU saturation or connection limits exceeded.
+
+### 10.6 Local development
+**Purpose:** fast iteration with safe defaults.
+- Use a **local Supabase stack** (CLI) or a dedicated dev project.
+- `.env.local` stores local URLs and keys only.
+- Keep RLS **enabled** even locally to prevent security drift.
+- Use seed data scripts for common scenarios (guard lifecycle, deployment, payroll).
+
+### 10.7 Staging environment
+**Purpose:** pre-prod validation with production-like constraints.
+- Separate Supabase project with staging data (sanitized or synthetic).
+- Full RLS policies enforced.
+- Run migration + RLS regression tests on each deployment.
+- Enable monitoring + error tracking at near-production thresholds.
+- Regularly restore **production backup snapshots** to staging for realistic QA.
+
+### 10.8 Production environment
+**Purpose:** stable, auditable, and secure operations.
+- Secrets stored in a managed vault; **no `.env` files** in the repo.
+- Production Supabase project isolated from dev/staging.
+- Strict RLS policies with minimal service role access.
+- Backups verified with restore drills.
+- Alerting and on-call escalation configured before go-live.
