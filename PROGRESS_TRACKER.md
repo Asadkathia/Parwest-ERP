@@ -3,7 +3,7 @@
 > **Project**: Security Guard Management ERP  
 > **Stack**: Next.js 14 (App Router) + Supabase (PostgreSQL + Auth + Storage + RPC)  
 > **Started**: January 29, 2026  
-> **Last Updated**: January 29, 2026
+> **Last Updated**: January 30, 2026
 
 ---
 
@@ -13,12 +13,12 @@
 |-------|--------|----------|
 | Phase 0 - Project Initialization | 🟢 Completed | 100% |
 | Phase 1 - Design System & App Shell | 🟢 Completed | 100% |
-| Phase 2 - Auth & IAM (Frontend) | 🟡 In Progress | 30% |
-| Phase 3 - Guards Module (Frontend) | 🟡 In Progress | 35% |
-| Phase 4 - Clients & Deployments (Frontend) | 🟢 Completed | 100% |
-| Phase 5 - Attendance & Payroll (Frontend) | 🟡 In Progress | 25% |
-| Phase 6 - Billing & Inventory (Frontend) | 🔴 Not Started | 0% |
-| Phase 7 - Tickets & Reporting (Frontend) | 🔴 Not Started | 0% |
+| Phase 2 - Auth & IAM (Frontend) | 🟢 Completed | 100% |
+| Phase 3 - Guards Module (Frontend) | 🟢 Completed | 100% |
+| Phase 4 - Clients & Deployments (Frontend) | 🟡 In Progress | 70% |
+| Phase 5 - Attendance & Payroll (Frontend) | 🟢 Completed | 100% |
+| Phase 6 - Billing & Inventory (Frontend) | 🟢 Completed | 100% |
+| Phase 7 - Tickets & Reporting (Frontend) | 🟢 Completed | 100% |
 | Phase 8 - Backend Integration | 🔴 Not Started | 0% |
 | Phase 9 - E2E Testing & Polish | 🔴 Not Started | 0% |
 | Phase 10 - Go-Live Prep | 🔴 Not Started | 0% |
@@ -100,7 +100,7 @@
 
 ---
 
-## Phase 2 — Auth & IAM (Frontend) 🟡
+## Phase 2 — Auth & IAM (Frontend) ✅
 
 **Goal**: Implement authentication flows and role-based access.
 
@@ -112,19 +112,19 @@
   - [x] `/reset-password` - Password reset form
   - [x] Session management with Supabase Auth middleware
 
-- [ ] **Role-based Routing**
+- [x] **Role-based Routing**
   - [x] Auth middleware for protected routes
-  - [ ] Role-based dashboard redirect
-  - [ ] Permission check utilities (`hasPermission`, `canAccess`)
+  - [x] Role-based dashboard redirect (mock role)
+  - [x] Permission check utilities (`hasPermission`, `canAccess`)
 
-- [ ] **IAM Settings (UI Only)**
-  - [ ] `/settings/users` - User list and management drawer
-  - [ ] `/settings/roles` - Role management and permission matrix
+- [x] **IAM Settings (UI Only)**
+  - [x] `/settings/users` - User list and management drawer
+  - [x] `/settings/roles` - Role management and permission matrix
 
 ### Deliverables
 - [x] Login page with Supabase auth integration
-- [ ] Role-based access control in UI
-- [ ] User and role management interfaces
+- [x] Role-based access control in UI
+- [x] User and role management interfaces
 
 ---
 
@@ -139,20 +139,20 @@
   - [x] Guard Case File drawer (Create Guard wizard)
   - [x] `/guards/[id]` - Guard Case File page with tabs (Overview implemented)
 
-- [ ] **Guard Case File Tabs**
+- [x] **Guard Case File Tabs**
   - [x] Overview (identity, contact, personal, bank, employment)
   - [x] Documents (upload, list, preview)
   - [x] Verification (verification items, status management)
   - [x] Deployments (current + history)
-  - [ ] Attendance (calendar view + exceptions)
-  - [ ] Payroll (salary history, payslips)
-  - [ ] Loans (ledger, add loan drawer)
-  - [ ] Clearance (checklist, finalize)
-  - [ ] Activity (timeline/audit log)
+  - [x] Attendance (calendar view + exceptions)
+  - [x] Payroll (salary history, payslips)
+  - [x] Loans (ledger, add loan drawer)
+  - [x] Clearance (checklist, finalize)
+  - [x] Activity (timeline/audit log)
 
 ### Deliverables
 - [x] Guards list page with mock data
-- [ ] Complete Guards module UI
+- [x] Complete Guards module UI
 
 ---
 
@@ -171,15 +171,56 @@
   - [ ] Guards tab
   - [ ] Invoices tab
 
-- [ ] **Deployments Workspace**
-  - [ ] `/deployments` - Deployment matrix page
-  - [ ] Deploy Guard drawer
-  - [ ] Swap Guard drawer
-  - [ ] Revoke deployment flow
+- [x] **Deployments Workspace**
+  - [x] `/deployments` - Deployment matrix page (mock data)
+  - [x] Deploy Guard drawer (mock data)
+  - [x] Swap Guard drawer (wired)
+  - [x] Revoke deployment flow (wired)
 
 ### Deliverables
 - [x] Clients list + detail pages with mock data
-- [ ] Deployment matrix and flows
+- [x] Deployment matrix page with mock data
+- [x] Deployment flows fully wired (deploy/swap/revoke)
+
+---
+
+## Phase 5 — Attendance & Payroll (Frontend) ✅
+
+**Goal**: Deliver attendance and payroll dashboards with mock data.
+
+### Tasks
+- [x] Attendance dashboard (`/attendance`) with KPIs, branch table, exceptions panel
+- [x] Payroll dashboard (`/payroll`) wired to stats + ledger table
+
+### Deliverables
+- [x] Attendance dashboard with mock data
+- [x] Payroll dashboard with mock data
+
+---
+
+## Phase 6 — Billing & Inventory (Frontend) ✅
+
+**Goal**: Build billing and inventory dashboards with mock data.
+
+### Tasks
+- [x] Invoices page (`/billing/invoices`) with KPIs + invoices table
+- [x] Inventory page (`/inventory`) with KPIs + assets table
+
+### Deliverables
+- [x] Billing and inventory dashboards with mock data
+
+---
+
+## Phase 7 — Tickets & Reporting (Frontend) ✅
+
+**Goal**: Build tickets and reports dashboards with mock data.
+
+### Tasks
+- [x] Tickets page (`/tickets`) with KPIs + tickets table
+- [x] Reports page (`/reports`) with categorized report list
+
+### Deliverables
+- [x] Tickets and reports dashboards with mock data
 
 ---
 
@@ -188,16 +229,23 @@
 | Module | Route | Status |
 |--------|-------|--------|
 | Dashboard | `/dashboard` | ✅ Complete (mock data) |
+| Admin Dashboard | `/dashboard/admin` | ✅ Complete (mock data) |
+| Manager Dashboard | `/dashboard/manager` | ✅ Complete (mock data) |
+| Supervisor Dashboard | `/dashboard/supervisor` | ✅ Complete (mock data) |
+| HR Dashboard | `/dashboard/hr` | ✅ Complete (mock data) |
+| Finance Dashboard | `/dashboard/finance` | ✅ Complete (mock data) |
 | Guards | `/guards` | ✅ List & Detail pages (mock data) |
 | Clients | `/clients` | ✅ List + Detail pages (mock data) |
 | Deployments | `/deployments` | ✅ Complete (mock data) |
 | Attendance | `/attendance` | ✅ Dashboard (mock data) |
-| Payroll | `/payroll` | 🔲 Placeholder |
-| Billing | `/billing/invoices` | 🔲 Placeholder |
-| Inventory | `/inventory` | 🔲 Placeholder |
-| Tickets | `/tickets` | 🔲 Placeholder |
-| Reports | `/reports` | 🔲 Placeholder |
-| Settings | `/settings` | 🔲 Placeholder with tabs |
+| Payroll | `/payroll` | ✅ Dashboard (mock data) |
+| Billing | `/billing/invoices` | ✅ Invoices Dashboard (mock data) |
+| Inventory | `/inventory` | ✅ Inventory Dashboard (mock data) |
+| Tickets | `/tickets` | ✅ Dashboard (mock data) |
+| Reports | `/reports` | ✅ Reports List (mock data) |
+| Settings | `/settings` | ✅ Users + Roles tabs (mock data) |
+| Approvals | `/approvals` | ✅ Approval Center (mock data) |
+| Broadcast | `/notifications/broadcast` | ✅ Broadcast Notifications (mock data) |
 | Login | `/login` | ✅ Complete |
 | Auth | `/forgot-password` | ✅ Complete |
 
@@ -211,39 +259,33 @@
 - ✅ Created Forgot Password & Reset Password pages
 - ✅ Built Guard Case File page (`/guards/[id]`) with tabs
 - ✅ Implemented Guard Overview tab with personal/employment details
+- ✅ Implemented Guard Documents, Verification, and Deployments tabs
 - ✅ Implemented Create Guard Wizard (multi-step drawer)
 - ✅ Implemented Clients List page (`/clients`) with mock data
 - ✅ Implemented Client Detail page (`/clients/[id]`) with Overview and Branches
-- ✅ Implemented Guard Documents, Verification, and Deployments tabs
+
+### January 30, 2026
 - ✅ Implemented Deployments Matrix page (`/deployments`) with capacity stats
-
-### January 30, 2026
-- ✅ Implemented Attendance Dashboard (`/attendance`) with KPI cards
-- ✅ Implemented Branch Attendance stats table
-- ✅ Implemented Daily Exceptions panel
-- ✅ Verified build success for all new routes
-
-### January 30, 2026
-- ✅ Implemented Attendance Dashboard (`/attendance`) with KPI cards
-- ✅ Implemented Branch Attendance stats table
-- ✅ Implemented Daily Exceptions panel
-- ✅ Verified build success for all new routes
-- ✅ Read all 16 documentation files
-- ✅ Understood project scope and architecture
-- ✅ Created progress tracker
-- ✅ Initialized Next.js 14 project with Tailwind CSS
-- ✅ Installed all core dependencies (Supabase, React Hook Form, Zod, TanStack Table, Recharts, Framer Motion, Lucide)
-- ✅ Initialized shadcn/ui with 23 components
-- ✅ Created TypeScript types for all ERP entities
-- ✅ Created Supabase client (browser, server, middleware)
-- ✅ Implemented authentication middleware
-- ✅ Created design tokens with Nexus-style light mode palette
-- ✅ Built App Shell components (Sidebar, TopBar, Breadcrumbs, PageHeader, ContextSidebar)
-- ✅ Created Dashboard page with KPIs, alerts, and quick actions
-- ✅ Created Login page with form validation
-- ✅ Created Guards list page with table and actions
-- ✅ Created placeholder pages for all modules
-- ✅ Verified successful build (16 routes generated)
+- ✅ Implemented Deploy Guard drawer (mock data + validation)
+- ✅ Wired Swap Guard drawer and Revoke Deployment dialog to matrix actions
+- ✅ Implemented Attendance Dashboard (`/attendance`) with KPIs, table, and exceptions
+- ✅ Implemented Payroll Dashboard (`/payroll`) with stats, filters, and ledger table
+- ✅ Implemented Billing Invoices page (`/billing/invoices`) with stats and table
+- ✅ Implemented Inventory page (`/inventory`) with stats and assets table
+- ✅ Implemented Tickets Dashboard (`/tickets`) with stats and table
+- ✅ Implemented Reports Page (`/reports`) with categorized list
+- ✅ Added Guard Case File tabs: Attendance, Payroll, Loans, Clearance, Activity
+- ✅ Implemented permission utilities (`can`, `hasPermission`, `getRoleDashboardRoute`)
+- ✅ Created React hooks for permissions (`usePermission`, `useCurrentUser`, `useHasRole`)
+- ✅ Created ProtectedButton component for permission-gated actions
+- ✅ Created UsersTable component for Settings page
+- ✅ Created PermissionsMatrix component showing role-based access
+- ✅ Updated Settings page with Users and Roles tabs
+- ✅ Applied permission checks to Guards, Payroll, Billing, Deployments pages
+- ✅ Implemented Approval Center (`/approvals`) with table, filters, and actions
+- ✅ Implemented Broadcast Notifications (`/notifications/broadcast`) with form + history
+- ✅ Implemented Role Dashboards (`/dashboard/admin|manager|supervisor|hr|finance`)
+- ✅ Implemented Workflow UI (stepper/actions/timeline) for Guards, Deployments, Attendance, Payroll
 
 ---
 
@@ -315,8 +357,34 @@ app/
 
 ## 🚀 Next Steps
 
-1. **Complete Auth Flow**: Add forgot-password and reset-password pages
-2. **Guard Case File**: Build the full guard detail page with all tabs
-3. **Create Guard Wizard**: Multi-step form for guard enrollment
-4. **Deployment Matrix**: Build the deployment management UI
-5. **Connect Supabase**: Set up database schema and integrate
+1. **Phase 8 Backend Integration Sprint** (see plan below)
+2. **Complete Clients Detail Tabs**: Contracts, Guards, Invoices
+3. **QA Pass**: Walkthrough all modules and resolve UI edge cases
+
+---
+
+## 🧩 Integration Sprint (Phase 8) — Backend First Pass
+
+**Sprint Goal:** Connect core read/write flows to Supabase while keeping UI intact.
+
+**Scope (Week 1)**
+- **Auth & Roles**
+  - Wire Supabase Auth session into middleware (remove localStorage role mock)
+  - Map roles to dashboards using claims/profile table
+  - Enforce route guards using server-side session checks
+- **Schema + RLS**
+  - Create core tables: `guards`, `clients`, `branches`, `deployments`, `attendance`, `payroll_runs`, `invoices`
+  - Add RLS policies aligned with `iam_access_matrix.md`
+  - Seed minimal fixtures for demo accounts
+- **API Contracts**
+  - Implement RPCs from `api_contracts.md` for Deployments (deploy/swap/revoke) and Attendance
+  - Add data fetchers for `/guards`, `/clients`, `/deployments`
+- **Data Wiring**
+  - Replace mock data in Guards List and Deployments Matrix with real queries
+  - Keep dashboards using mock data (out of scope for Week 1)
+
+**Definition of Done**
+- Authenticated users redirect to correct dashboard based on role from DB
+- Guards list + deployments matrix load from Supabase
+- Deploy/Swap/Revoke actions write to Supabase and update UI on success
+- RLS prevents cross-branch access for non-admin roles

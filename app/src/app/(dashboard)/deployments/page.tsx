@@ -2,9 +2,11 @@ import { Metadata } from 'next';
 import { PageHeader } from '@/components/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ProtectedButton } from '@/components/ui/protected-button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Filter, Download, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { DeploymentMatrix } from '@/components/deployments/deployment-matrix';
+import { DeployGuardDrawer } from '@/components/deployments/deploy-guard-drawer';
 
 export const metadata: Metadata = {
     title: 'Deployments',
@@ -20,14 +22,15 @@ export default function DeploymentsPage() {
                 breadcrumbs={[{ label: 'Deployments' }]}
                 actions={
                     <>
-                        <Button variant="outline">
+                        <ProtectedButton
+                            module="deployments"
+                            action="export"
+                            variant="outline"
+                        >
                             <Download className="h-4 w-4 mr-2" />
                             Export Roster
-                        </Button>
-                        <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Assignment
-                        </Button>
+                        </ProtectedButton>
+                        <DeployGuardDrawer />
                     </>
                 }
             />

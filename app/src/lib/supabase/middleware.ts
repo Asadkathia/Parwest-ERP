@@ -52,9 +52,30 @@ export async function updateSession(request: NextRequest) {
     // Redirect authenticated users away from auth pages
     if (user && isPublicRoute && request.nextUrl.pathname !== '/auth/callback') {
         const url = request.nextUrl.clone();
+
+        // Role-based redirect using mock role from localStorage
+        // TODO: Get user role from Supabase profile in Phase 8
+        const { getRoleDashboardRoute } = await import('@/lib/permissions');
+        url.pathname = getRoleDashboardRoute();
+        return NextResponse.redirect(url);
+    }
+
+    // Role-based dashboard redirect (when accessing root)
+    if (user && request.nextUrl.pathname === '/') {
+        const url = request.nextUrl.clone();
+        const { getRoleDashboardRoute } = await import('@/lib/permissions');
+        url.pathname = getRoleDashboardRoute();
+        return NextResponse.redirect(url);
+    }
+
+    // Role-based dashboard redirect (when accessing root)
+    if (user && request.nextUrl.pathname === '/') {
+        const url = request.nextUrl.clone();
+        // TODO: Implement getRoleDashboardRoute() with user profile data in Phase 8
         url.pathname = '/dashboard';
         return NextResponse.redirect(url);
     }
+
 
     return supabaseResponse;
 }

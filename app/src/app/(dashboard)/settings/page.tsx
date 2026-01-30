@@ -2,6 +2,8 @@ import { Metadata } from 'next';
 import { PageHeader } from '@/components/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UsersTable } from '@/components/settings/users-table';
+import { PermissionsMatrix } from '@/components/settings/permissions-matrix';
 
 export const metadata: Metadata = {
     title: 'Settings',
@@ -26,29 +28,11 @@ export default function SettingsPage() {
                 </TabsList>
 
                 <TabsContent value="users">
-                    <Card className="shadow-sm">
-                        <CardHeader>
-                            <CardTitle>User Management</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground">
-                                User management coming soon.
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <UsersTable />
                 </TabsContent>
 
                 <TabsContent value="roles">
-                    <Card className="shadow-sm">
-                        <CardHeader>
-                            <CardTitle>Roles & Permissions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground">
-                                Role and permission management coming soon.
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <PermissionsMatrix />
                 </TabsContent>
 
                 <TabsContent value="workflows">

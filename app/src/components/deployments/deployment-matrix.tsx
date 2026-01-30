@@ -11,13 +11,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Users, Sun, Moon, MoreHorizontal, ArrowUpRight } from 'lucide-react';
+import { MapPin, Users, Sun, Moon, MoreHorizontal, ArrowUpRight, Repeat, XCircle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SwapGuardDrawer } from './swap-guard-drawer';
+import { RevokeDeploymentDialog } from './revoke-deployment-dialog';
 
 // Mock Data
 const matrixData = [
@@ -158,9 +160,21 @@ export function DeploymentMatrix() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Adjust Roster</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                    <SwapGuardDrawer
+                                                        trigger={
+                                                            <span className="w-full cursor-pointer">Swap Guard</span>
+                                                        }
+                                                    />
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                    <RevokeDeploymentDialog
+                                                        trigger={
+                                                            <span className="w-full cursor-pointer">Revoke Deployment</span>
+                                                        }
+                                                    />
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem>View Schedule</DropdownMenuItem>
-                                                <DropdownMenuItem>Deploy Guard</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>

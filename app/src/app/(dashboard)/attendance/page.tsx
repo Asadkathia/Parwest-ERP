@@ -5,6 +5,7 @@ import { Download, Calendar as CalendarIcon, Filter } from 'lucide-react';
 import { AttendanceStats } from '@/components/attendance/attendance-stats';
 import { BranchAttendanceTable } from '@/components/attendance/branch-attendance-table';
 import { AttendanceExceptions } from '@/components/attendance/attendance-exceptions';
+import { AttendanceWorkflow } from '@/components/attendance/attendance-workflow';
 
 export const metadata: Metadata = {
     title: 'Attendance',

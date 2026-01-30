@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
+import { ProtectedButton } from '@/components/ui/protected-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -113,10 +114,14 @@ export default function GuardsPage() {
                 breadcrumbs={[{ label: 'Guards' }]}
                 actions={
                     <>
-                        <Button variant="outline">
+                        <ProtectedButton
+                            module="guards"
+                            action="export"
+                            variant="outline"
+                        >
                             <Download className="h-4 w-4 mr-2" />
                             Export
-                        </Button>
+                        </ProtectedButton>
                         <CreateGuardDrawer />
                     </>
                 }

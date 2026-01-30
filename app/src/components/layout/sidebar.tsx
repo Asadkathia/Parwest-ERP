@@ -18,6 +18,8 @@ import {
     Settings,
     ChevronLeft,
     ChevronRight,
+    CheckCircle2,
+    Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -69,6 +71,13 @@ const navigation: NavGroup[] = [
         label: 'Analytics',
         items: [
             { label: 'Reports', href: '/reports', icon: BarChart3 },
+        ],
+    },
+    {
+        label: 'Admin',
+        items: [
+            { label: 'Approvals', href: '/approvals', icon: CheckCircle2 },
+            { label: 'Broadcast', href: '/notifications/broadcast', icon: Bell },
         ],
     },
 ];

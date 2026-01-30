@@ -1,28 +1,35 @@
 import { Metadata } from 'next';
 import { PageHeader } from '@/components/layout';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { ReportsList } from '@/components/reports/reports-list';
 
 export const metadata: Metadata = {
     title: 'Reports',
-    description: 'View and generate reports',
+    description: 'Analytics and downloadable reports',
 };
 
 export default function ReportsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Reports"
-                description="View and generate reports"
+                title="Reports & Analytics"
+                description="Generate performance summaries and audit logs"
                 breadcrumbs={[{ label: 'Reports' }]}
+                actions={
+                    <>
+                        <Button variant="outline">
+                            <CalendarIcon className="h-4 w-4 mr-2" />
+                            Date Range: Last 30 Days
+                        </Button>
+                    </>
+                }
             />
 
-            <Card className="shadow-sm">
-                <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">
-                        Reports module coming soon. This will include attendance, payroll, billing, and deployment reports.
-                    </p>
-                </CardContent>
-            </Card>
+            {/* Main Reports Grid */}
+            <ReportsList />
         </div>
     );
 }

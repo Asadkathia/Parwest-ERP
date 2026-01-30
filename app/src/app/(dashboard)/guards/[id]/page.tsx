@@ -23,6 +23,12 @@ import { GuardOverview } from '@/components/guards/guard-overview';
 import { GuardDocuments } from '@/components/guards/guard-documents';
 import { GuardVerification } from '@/components/guards/guard-verification';
 import { GuardDeployments } from '@/components/guards/guard-deployments';
+import { GuardAttendance } from '@/components/guards/guard-attendance';
+import { GuardPayroll } from '@/components/guards/guard-payroll';
+import { GuardLoans } from '@/components/guards/guard-loans';
+import { GuardActivity } from '@/components/guards/guard-activity';
+import { GuardClearance } from '@/components/guards/guard-clearance';
+import { GuardWorkflow } from '@/components/guards/guard-workflow';
 
 export const metadata: Metadata = {
     title: 'Guard Case File',
@@ -108,7 +114,7 @@ export default function GuardCaseFilePage({ params }: { params: { id: string } }
 
             {/* Tabs */}
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8 h-auto p-1 bg-muted/50">
+                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10 h-auto p-1 bg-muted/50">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
                     <TabsTrigger value="verification">Verification</TabsTrigger>
@@ -116,6 +122,8 @@ export default function GuardCaseFilePage({ params }: { params: { id: string } }
                     <TabsTrigger value="attendance">Attendance</TabsTrigger>
                     <TabsTrigger value="payroll">Payroll</TabsTrigger>
                     <TabsTrigger value="loans">Loans</TabsTrigger>
+                    <TabsTrigger value="clearance">Clearance</TabsTrigger>
+                    <TabsTrigger value="workflow">Workflow</TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                 </TabsList>
 
@@ -139,16 +147,35 @@ export default function GuardCaseFilePage({ params }: { params: { id: string } }
                     <GuardDeployments />
                 </TabsContent>
 
-                {/* Placeholders for other tabs */}
-                {['attendance', 'payroll', 'loans', 'activity'].map((tab) => (
-                    <TabsContent key={tab} value={tab} className="mt-6">
-                        <Card>
-                            <CardContent className="py-12 text-center text-muted-foreground">
-                                <p className="capitalize">{tab} module coming soon.</p>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                ))}
+                {/* Attendance Tab */}
+                <TabsContent value="attendance" className="mt-6">
+                    <GuardAttendance />
+                </TabsContent>
+
+                {/* Payroll Tab */}
+                <TabsContent value="payroll" className="mt-6">
+                    <GuardPayroll />
+                </TabsContent>
+
+                {/* Loans Tab */}
+                <TabsContent value="loans" className="mt-6">
+                    <GuardLoans />
+                </TabsContent>
+
+                {/* Clearance Tab */}
+                <TabsContent value="clearance" className="mt-6">
+                    <GuardClearance />
+                </TabsContent>
+
+                {/* Workflow Tab */}
+                <TabsContent value="workflow" className="mt-6">
+                    <GuardWorkflow />
+                </TabsContent>
+
+                {/* Activity Tab */}
+                <TabsContent value="activity" className="mt-6">
+                    <GuardActivity />
+                </TabsContent>
             </Tabs>
         </div>
     );
