@@ -1,0 +1,219 @@
+# ERP Completion Plan (Strict Frontend-First)
+
+## Summary
+Execution is now strictly frontend-first:
+1. Build complete UI/routes/forms/flows for all documented screens.
+2. Freeze frontend parity against docs.
+3. Start backend/API/DB integration in a second pass.
+
+Source of truth:
+- `docs/erp_complete_documentation.md.resolved`
+- `docs/erp-form-fields-from-screens.md`
+
+## Status Legend
+- `✅` Complete
+- `🟡` Partial / in progress
+- `⬜` Not started
+
+Columns:
+- `Route`: page exists and is navigable
+- `UI Fields`: documented fields/sections visible in frontend
+- `UX Flow`: end-to-end front-end journey wired
+- `API/DB`: connected to real persistence (deferred by plan)
+- `Tests`: validated with checks/manual scenarios
+
+## KPI Baseline (Updated: February 10, 2026 - Pass 4)
+- Route Parity: **100%**
+- Field Parity: **73%**
+- Flow Parity: **60%**
+- API/DB Integration: **38%**
+- Test Completion: **28%**
+
+## Phase Order
+
+### Phase 0: Planning Baseline
+- [x] Replace old guards-only plan with full 12-module tracker
+- [x] Add checklist columns (`Route`, `UI Fields`, `UX Flow`, `API/DB`, `Tests`)
+- [x] Add KPI baseline and progress rules
+
+### Phase 1: Frontend Route Parity
+- [x] Create missing pages for Payroll, Inventory, Users subpages, Ticketing, Settings, Reports, Imports, Requisitions, Audit
+- [x] Fix sidebar targets and broken links (including `/clients/pricing`)
+- [x] Ensure every documented screen has a route
+
+### Phase 2: Frontend Form/Screen Parity
+- [x] Start documented fields implementation on newly created pages
+- [x] Expand Guard Add/Search frontend fields toward UI doc parity
+- [x] Expand Client Add/Profile frontend sections toward UI doc parity
+- [x] Expand OJT list/new forms with documented filters, action buttons, and table columns
+- [ ] Complete field-level parity for all screens
+
+### Phase 3: Frontend Flow and UX Completion
+- [x] Improve client search flows (legacy + V2) with real table behavior
+- [x] Implement interactive tabbed billing flows for client invoice prerequisites and invoiced billings
+- [ ] Complete page-to-page UX flows for all modules
+- [ ] Standardize validations/loading/empty/error states
+- [ ] Complete responsive behavior pass
+- [ ] Freeze frontend after docs parity review
+
+### Phase 4: Backend/API/DB Integration (deferred until frontend freeze)
+- [ ] Add/extend Prisma models for missing domains
+- [ ] Build missing APIs under module namespaces
+- [ ] Replace UI-only placeholders with real persistence
+- [ ] Add RBAC + audit logging on mutating operations
+
+### Phase 5: QA, UAT, Hardening
+- [ ] Full docs-to-app parity validation
+- [ ] Regression + role-based verification
+- [ ] Validate reports/imports/requisitions/audit behavior
+- [ ] Drive all KPI targets to 100%
+
+---
+
+## Module Checklist (One Row Per Documented Screen)
+
+### 1) Dashboard Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Home (Map View) | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Map/filter shell present, full map data pending |
+| Online Users | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | Route and table scaffold added |
+
+### 2) Guards Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Add New Guard | ✅ | 🟡 | ✅ | ✅ | 🟡 | Form expanded with UI-doc sections; extra fields currently UI-first |
+| Search Guard | ✅ | 🟡 | ✅ | 🟡 | 🟡 | Advanced filters expanded; partial backend filtering |
+| Export Guard | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI export config present |
+| Prerequisites | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Region/office + partial prerequisites management |
+| Black Listed | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed add/remove flow |
+| Inactive Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed list/reactivation |
+| Deploy Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed deployment flow |
+| Deployments Rate | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed rates save/list |
+| Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed attendance record/list |
+| Client Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed client attendance |
+| Residences | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed CRUD |
+| Assign Residence | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed assignment |
+| OnJob Trainings / V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 | New form expanded to include UI-doc fields |
+
+### 3) Payroll Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Operation Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Operations hub + links created |
+| Loan | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Add/finalize/export UI tabs scaffold |
+| Extra Hours | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| Other Deductions | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| Special Duty | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| Holidays | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| Salary (Calculate + History) | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI tabs + filters scaffold |
+| Salary V1 | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI placeholder route |
+| Salary V2 | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI placeholder route |
+| Bulk Salary Slips | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI generation flow scaffold |
+| Clearance | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| UnPaid Salaries | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
+| Reports Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Payroll reports export hub |
+| Settings Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Defaults/month init/limits tabs |
+
+### 4) Clients Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Add New Client | ✅ | 🟡 | ✅ | ✅ | 🟡 | Expanded with contact/referral/territory/branchless blocks |
+| Search Client | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI route added |
+| Search Client V2 | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI route added |
+| Types & Locations | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI tabs scaffold |
+| Black Listed | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI table/form scaffold |
+| Export Branches | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filter/table scaffold |
+| Invoice Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabs + default rates table behavior |
+| Invoiced Billings | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabbed billing/error invoice flows |
+
+### 5) Inventory Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Dashboard | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Dashboard cards/table scaffold |
+| Search | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Full filter shell from docs |
+| Define Categories | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
+| Define Vendors | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
+| Define Conditions | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
+| Demand | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Request flow scaffold |
+| Stock In | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Detailed stock-in fields scaffold |
+| Assign Item | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Client/guard assignment scaffold |
+| Condemned Items | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Condemn flow scaffold |
+
+### 6) Users Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Add New | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form scaffold |
+| Search | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Listing exists, dedicated search route added |
+| Permissions Management | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Matrix-style permissions UI scaffold |
+| M/S Relationship | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI assignment scaffold |
+| Switch Supervisor | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI switch scaffold |
+| C/S Relationship | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI assignment scaffold |
+
+### 7) Ticketing Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Listing (All Tickets) | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Filters/table scaffold |
+| Prerequisites | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Categories/priorities/statuses tabs |
+
+### 8) Settings Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Region | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Existing regions API available |
+| Regional Offices | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Existing offices API available |
+| Guard Pledgeable Document Types | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
+| User Types | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
+| Guard Bank Names | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
+
+### 9) Reports Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Scheduled Reports | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI schedule scaffold |
+| Guard Deployment Report | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
+| Day and Night Duty Guards | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
+| Client Enrolled Report | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
+
+### 10) Imports Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Users Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload/validate/import scaffold |
+| Guards Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Multi-tab import UI scaffold |
+| Clients Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload scaffold |
+| Inventory Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload scaffold |
+
+### 11) Requisitions Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Guard Approval By HO | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Pending/Accepted/Rejected tabs scaffold |
+
+### 12) Audit Module
+| Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Audit Search | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Audit filter/table scaffold |
+
+---
+
+## Public API / Interface Additions (Deferred to Phase 4)
+- [ ] Add module API namespaces:
+  - `/api/payroll/*`
+  - `/api/inventory/*`
+  - `/api/users/*`
+  - `/api/tickets/*`
+  - `/api/settings/*`
+  - `/api/reports/*`
+  - `/api/imports/*`
+  - `/api/requisitions/*`
+  - `/api/audit/*`
+- [ ] Add shared contracts (`PaginatedResponse<T>`, `ApiError`, `FilterQuery`, action DTOs)
+- [ ] Add workflow actions (approve/reject/finalize/activate/deactivate/blacklist/export/schedule/init-month)
+
+## Test Cases and Scenarios
+- [ ] Frontend parity pass: every documented screen exists and is reachable
+- [ ] Field parity pass: every documented field label/type/section is present
+- [ ] Frontend flow pass: navigable page-to-page user journeys
+- [ ] Integration pass (Phase 4+): real persistence for all UI actions
+- [ ] Regression pass: existing Guards/Clients/Deployments flows remain stable
+
+## Checklist Rules
+1. One row per documented screen in this file.
+2. Do not mark a row fully complete unless all five columns are `✅`.
+3. During frontend-first phases, only `Route`, `UI Fields`, and `UX Flow` are expected to advance.
+4. KPI updates are mandatory after each major merge.

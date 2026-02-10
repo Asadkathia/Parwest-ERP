@@ -1,0 +1,68 @@
+[
+  {
+    "module": "Dashboard",
+    "menu_label": "Home",
+    "route_url": "https://staging-erp.parwestgroup.com/map",
+    "file": "artifacts/screenshots/01-dashboard-home.png"
+  },
+  {
+    "module": "Guards",
+    "menu_label": "Add New",
+    "route_url": "https://staging-erp.parwestgroup.com/guard/create",
+    "file": "artifacts/screenshots/02-guards-add-new.png"
+  },
+  {
+    "module": "Payroll",
+    "menu_label": "Loan",
+    "route_url": "https://staging-erp.parwestgroup.com/guard/accountLoan",
+    "file": "artifacts/screenshots/03-payroll-loan.png"
+  },
+  {
+    "module": "Clients",
+    "menu_label": "Add New",
+    "route_url": "https://staging-erp.parwestgroup.com/client/create",
+    "file": "artifacts/screenshots/04-clients-add-new.png"
+  },
+  {
+    "module": "Inventory",
+    "menu_label": "Dashboard",
+    "route_url": "https://staging-erp.parwestgroup.com/inventory/dashboard",
+    "file": "artifacts/screenshots/05-inventory-dashboard.png"
+  },
+  {
+    "module": "Users",
+    "menu_label": "Add New",
+    "route_url": "https://staging-erp.parwestgroup.com/user/create",
+    "file": "artifacts/screenshots/06-users-add-new.png"
+  },
+  {
+    "module": "Ticketing",
+    "menu_label": "Prerequisites",
+    "route_url": "https://staging-erp.parwestgroup.com/prerequisites",
+    "file": "artifacts/screenshots/07-ticketing-prerequisites.png"
+  },
+  {
+    "module": "Settings",
+    "menu_label": "Region",
+    "route_url": "https://staging-erp.parwestgroup.com/regions",
+    "file": "artifacts/screenshots/08-settings-region.png"
+  },
+  {
+    "module": "Reports",
+    "menu_label": "Scheduled Reports",
+    "route_url": "https://staging-erp.parwestgroup.com/reports/scheduledreports",
+    "file": "artifacts/screenshots/09-reports-scheduled-reports.png"
+  },
+  {
+    "module": "Imports",
+    "menu_label": "Add User",
+    "route_url": "https://staging-erp.parwestgroup.com/bulkImport/users/addUserBulkImport",
+    "file": "artifacts/screenshots/10-imports-add-user.png"
+  },
+  {
+    "module": "Requisitions",
+    "menu_label": "Requisitions",
+    "route_url": "https://staging-erp.parwestgroup.com/guard/acceptedRejectedByCol",
+    "file": "artifacts/screenshots/11-requisitions-requisitions.png"
+  }
+]

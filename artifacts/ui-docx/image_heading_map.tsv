@@ -1,0 +1,27 @@
+idx	rid	image	heading
+1	rId4	media/image1.png	Dashboard :
+2	rId5	media/image2.png	Add Guard Screen (FORMS):
+3	rId6	media/image3.png	Search Guard Screen (check and List ):
+4	rId7	media/image4.png	Each Guard Profile Screen (will available in the search guard) [18 Sub screens]:
+5	rId8	media/image5.png	Prerequisites Selection and Activation Screen (Super Admin):
+6	rId9	media/image6.png	Export Guards to Excel Screen:
+7	rId10	media/image7.png	Black Listed Guards to Display Screen:
+8	rId11	media/image8.png	Inactive Guards Display Screen:
+9	rId12	media/image9.png	Deploy Guard Screen (FORM):
+10	rId13	media/image10.png	Deployment Rates Setting Screen (guard settings):
+11	rId14	media/image11.png	Guard Attendance Screen (admin):
+12	rId15	media/image12.png	Client Attendance Screen:
+13	rId16	media/image13.png	Guard Residencies List (add new residency location form):
+14	rId17	media/image14.png	Assign a Residency to Guard Screen:
+15	rId18	media/image15.png	Guard Training Module:
+16	rId19	media/image16.png	Add New Training Screen (Training Module’s Sub screen):
+17	rId20	media/image17.png	System generated branch code if branch less (non branch cilent) (in future can have branches)
+18	rId21	media/image18.png	System generated branch code if branch less (non branch cilent) (in future can have branches)
+19	rId22	media/image19.png	Client filtering based on thier pricings, no of guards etc
+20	rId23	media/image20.png	On pressing each client  Client Profile Screen  comes [7 tabs]:
+21	rId24	media/image21.png	Client Types and Locations:
+22	rId25	media/image22.png	Black Listed Clients Screen (ADD this as a button in the Search Clients Screen)(consolidation need here to avoid a separate route):
+23	rId26	media/image23.png	Export Clients List in Excel Screen (give the export option with all the filters in search and export screen in the Search Client Screen):
+24	rId27	media/image24.png	Client Invoice Pre-requisites [5 Tabs additional in it]:
+25	rId28	media/image25.png	Invoiced Billing Screen of Clients:
+26	rId29	media/image26.png	Error invoices Tab:

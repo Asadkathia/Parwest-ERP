@@ -1,0 +1,19 @@
+{
+  "route_inventory": {
+    "expected": 103,
+    "csv_rows": 103,
+    "all_routes_present": true
+  },
+  "docx_mapping": {
+    "expected_items": 25,
+    "mapped_items_detected": 25
+  },
+  "flow_spec": {
+    "flow_blocks": 25
+  },
+  "status_summary": {
+    "ok": 98,
+    "error_exception": 2,
+    "download_trigger": 3
+  }
+}

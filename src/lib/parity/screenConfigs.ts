@@ -1,0 +1,328 @@
+import type { UiSection, UiTable } from "@/components/parity/UiDocScreen"
+
+export type ScreenConfig = {
+  title: string
+  description?: string
+  tabs?: string[]
+  sections?: UiSection[]
+  table?: UiTable
+  actions?: string[]
+}
+
+const payrollLoanSections: UiSection[] = [
+  {
+    title: "Add Loan",
+    fields: [
+      { label: "Month", type: "month", required: true },
+      { label: "Parwest ID", required: true },
+      { label: "Guard Name", required: true },
+      { label: "Phone" },
+      { label: "Client/Branch" },
+      { label: "Deployment Days", type: "number" },
+      { label: "Current Supervisor/Manager" },
+      { label: "Amount Paid", type: "number", required: true },
+    ],
+  },
+]
+
+export const payrollOperationScreens: Record<string, ScreenConfig> = {
+  loan: {
+    title: "Payroll Loan",
+    description: "Loan operations with add/finalize/export tabs.",
+    tabs: ["Add Loans", "Finalize Loans", "Export Finalised History"],
+    sections: payrollLoanSections,
+    actions: ["Save Loan", "Finalize Selected", "Export Finalised History"],
+    table: {
+      title: "Loan Records",
+      columns: ["Month", "Parwest ID", "Guard", "Client/Branch", "Amount", "Status", "Action"],
+    },
+  },
+  "extra-hours": {
+    title: "Extra Hours",
+    sections: [
+      {
+        title: "Record Extra Hours",
+        fields: [
+          { label: "Parwest ID", required: true },
+          { label: "Branch", required: true },
+          { label: "Hours", type: "number", required: true },
+          { label: "Creation Date", type: "date", required: true },
+        ],
+      },
+    ],
+    actions: ["Save Extra Hours"],
+    table: { columns: ["Parwest ID", "Branch", "Hours", "Creation Date", "Action"] },
+  },
+  "other-deductions": {
+    title: "Other Deductions",
+    sections: [
+      {
+        title: "Record Miscellaneous Deductions",
+        fields: [
+          { label: "Parwest ID", required: true },
+          { label: "Month", type: "month", required: true },
+          { label: "Amount", type: "number", required: true },
+          { label: "Reason", type: "textarea", required: true },
+        ],
+      },
+    ],
+    actions: ["Save Deduction"],
+    table: { columns: ["Parwest ID", "Month", "Amount", "Reason", "Action"] },
+  },
+  "special-duty": {
+    title: "Special Duty",
+    sections: [
+      {
+        title: "Special Duty Record",
+        fields: [
+          { label: "Secure Ops ID", required: true },
+          { label: "From Date", type: "date", required: true },
+          { label: "To Date", type: "date", required: true },
+          { label: "Hours", type: "number", required: true },
+          { label: "Cost Per Hour", type: "number", required: true },
+          { label: "Comments", type: "textarea" },
+        ],
+      },
+    ],
+    actions: ["Save Special Duty"],
+    table: { columns: ["Secure Ops ID", "Date Range", "Hours", "Cost/Hour", "Comments", "Action"] },
+  },
+  holidays: {
+    title: "Holidays",
+    sections: [
+      {
+        title: "Holiday Calendar",
+        fields: [
+          { label: "Holiday Name", required: true },
+          { label: "Date", type: "date", required: true },
+          { label: "Notes", type: "textarea" },
+        ],
+      },
+    ],
+    actions: ["Add Holiday"],
+    table: { columns: ["Holiday", "Date", "Notes", "Action"] },
+  },
+  salary: {
+    title: "Calculate Salary",
+    tabs: ["Calculate Salary", "Salary History"],
+    sections: [
+      {
+        title: "Salary Filters",
+        fields: [
+          { label: "Region", type: "select", required: true },
+          { label: "Select Client", type: "select" },
+          { label: "Branch", type: "select" },
+          { label: "Month", type: "month", required: true },
+        ],
+      },
+    ],
+    actions: ["Calculate Salary"],
+    table: { columns: ["Parwest ID", "Guard", "Client/Branch", "Days", "Amount", "Status"] },
+  },
+  "salary-v1": {
+    title: "Salary V1",
+    sections: [{ title: "Legacy Salary View", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }] }],
+    actions: ["Search"],
+    table: { columns: ["Parwest ID", "Guard", "Net Salary", "Payment Status"] },
+  },
+  "salary-v2": {
+    title: "Salary V2",
+    sections: [{ title: "Salary V2 Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
+    actions: ["Search", "Export Summary"],
+    table: { columns: ["Parwest ID", "Guard", "Base", "Deductions", "Net Salary", "Status"] },
+  },
+  "bulk-salary-slips": {
+    title: "Bulk Salary Slips",
+    sections: [{ title: "Mass Slip Generation", fields: [{ label: "Month", type: "month", required: true }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
+    actions: ["Generate Slips", "Download Zip"],
+    table: { columns: ["Cycle", "Employees", "Generated At", "Generated By", "Action"] },
+  },
+  clearance: {
+    title: "Clearance",
+    sections: [{ title: "Final Settlement", fields: [{ label: "Parwest ID" }, { label: "Last Working Date", type: "date" }, { label: "Pending Dues", type: "number" }, { label: "Notes", type: "textarea" }] }],
+    actions: ["Process Clearance"],
+    table: { columns: ["Parwest ID", "Name", "Final Amount", "Status", "Action"] },
+  },
+  "unpaid-salaries": {
+    title: "UnPaid Salaries",
+    sections: [{ title: "Unpaid Salary Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
+    actions: ["Search", "Export Unpaid Report"],
+    table: { columns: ["Parwest ID", "Guard", "Month", "Amount", "Reason", "Action"] },
+  },
+}
+
+export const inventoryScreens: Record<string, ScreenConfig> = {
+  search: {
+    title: "Inventory Search",
+    description: "Central management hub for inventory.",
+    sections: [
+      {
+        title: "Filters",
+        fields: [
+          { label: "Category", type: "select" },
+          { label: "Product Type", type: "select" },
+          { label: "Status", type: "select" },
+          { label: "Vendor", type: "select" },
+          { label: "Unique Number" },
+          { label: "Serial Number" },
+          { label: "Purchase Date From", type: "date" },
+          { label: "Purchase Date To", type: "date" },
+          { label: "Price", type: "number" },
+          { label: "License Details" },
+          { label: "Size" },
+          { label: "Insured", type: "checkbox" },
+          { label: "Duplicate", type: "checkbox" },
+        ],
+      },
+    ],
+    actions: ["Search", "Export In Excel File"],
+    table: { columns: ["Category", "Item", "PPS #", "Secure Ops Number", "Vendor", "Status", "License Number", "Serial Number"] },
+  },
+  categories: {
+    title: "Define Categories",
+    sections: [{ title: "Category", fields: [{ label: "Category Name", placeholder: "WEAPON / UNIFORM / EQUIPMENT / AMMUNITION" }] }],
+    actions: ["Create", "Update", "Delete"],
+    table: { columns: ["Name", "Created At", "Action"] },
+  },
+  vendors: {
+    title: "Define Vendors",
+    sections: [{ title: "Vendor", fields: [{ label: "Vendor Name" }, { label: "Contact" }] }],
+    actions: ["Create", "Update", "Delete"],
+    table: { columns: ["Name", "Contact", "Action"] },
+  },
+  conditions: {
+    title: "Define Conditions",
+    sections: [{ title: "Condition", fields: [{ label: "Condition Name", placeholder: "NEW / OLD" }] }],
+    actions: ["Create", "Update", "Delete"],
+    table: { columns: ["Condition", "Action"] },
+  },
+  demand: {
+    title: "Inventory Demand",
+    sections: [{ title: "Demand Request", fields: [{ label: "Regional Office", type: "select" }, { label: "Category", type: "select" }, { label: "Item", type: "select" }, { label: "Requested Quantity", type: "number" }, { label: "Notes", type: "textarea" }] }],
+    actions: ["Checkout", "Track Requests"],
+    table: { columns: ["Request ID", "Regional Office", "Category", "Item", "Requested", "Fulfilled", "Status"] },
+  },
+  "stock-in": {
+    title: "Stock In",
+    sections: [{ title: "Register New Inventory", fields: [{ label: "Order ID" }, { label: "Category", type: "select" }, { label: "Item", type: "select" }, { label: "Vendor", type: "select" }, { label: "Price", type: "number" }, { label: "Purchase Date", type: "date" }, { label: "Date of Expiry", type: "date" }, { label: "Warranty Time" }, { label: "Warranty Type" }, { label: "Size" }, { label: "Weight" }, { label: "Length" }, { label: "Width" }, { label: "Color" }, { label: "Is Insured", type: "checkbox" }, { label: "Is Non Unique", type: "checkbox" }, { label: "Quantity of Non Unique Items", type: "number" }] }],
+    actions: ["Save Stock In"],
+  },
+  "assign-item": {
+    title: "Assign Item",
+    sections: [{ title: "Assign Inventory", fields: [{ label: "Assign To", type: "select", options: ["Client", "Guard"] }, { label: "Select Regional Office", type: "select" }, { label: "Select Category", type: "select" }, { label: "Select Client/Guard", type: "select" }, { label: "Secure Ops Unique Number" }, { label: "Serial Number" }] }],
+    actions: ["Checkout"],
+    table: { columns: ["Item", "Assigned To", "Assigned At", "Returned At", "Status"] },
+  },
+  condemned: {
+    title: "Condemned Items",
+    sections: [{ title: "Condemn Item", fields: [{ label: "Unique ID" }, { label: "Condemned Date", type: "date" }, { label: "Reason", type: "textarea" }] }],
+    actions: ["Mark as Condemned"],
+    table: { columns: ["Unique ID", "Product Type", "Category", "Vendor", "Regional Office", "Purchase Date", "Condemned Date"] },
+  },
+}
+
+export const reportScreens: Record<string, ScreenConfig> = {
+  scheduled: {
+    title: "Scheduled Reports",
+    sections: [{ title: "Schedule Configuration", fields: [{ label: "Report Type", type: "select" }, { label: "Frequency", type: "select" }, { label: "Region", type: "select" }, { label: "Recipient Email addresses", type: "textarea" }] }],
+    actions: ["Save Schedule"],
+    table: { columns: ["Report Type", "Frequency", "Region", "Recipients", "Status", "Action"] },
+  },
+  "guard-deployment": {
+    title: "Guard Deployment Report",
+    sections: [{ title: "Filters", fields: [{ label: "Start Date", type: "date" }, { label: "End Date", type: "date" }, { label: "Regional Offices", type: "select" }, { label: "Client Types", type: "select" }, { label: "Specific Clients", type: "select" }] }],
+    actions: ["Generate Report", "Export"],
+  },
+  "day-night-duty": {
+    title: "Day and Night Duty Guards",
+    sections: [{ title: "Filters", fields: [{ label: "Date From", type: "date" }, { label: "Date To", type: "date" }, { label: "Regional Office", type: "select" }, { label: "Client Type", type: "select" }, { label: "Client", type: "select" }, { label: "Report Type", type: "select", options: ["Day", "Night", "Both"] }] }],
+    actions: ["Generate Report", "Export"],
+  },
+  "client-enrolled": {
+    title: "Client Enrolled Report",
+    sections: [{ title: "Filters", fields: [{ label: "Start Date", type: "date" }, { label: "End Date", type: "date" }, { label: "Regional Offices", type: "select" }, { label: "Branch Types", type: "select" }] }],
+    actions: ["Generate Report", "Export"],
+  },
+}
+
+export const importScreens: Record<string, ScreenConfig> = {
+  users: {
+    title: "Users Import",
+    sections: [{ title: "Upload User File", fields: [{ label: "Name" }, { label: "Secure Ops Domain Email", type: "email" }, { label: "User Role", type: "select" }, { label: "Regional Office Series" }, { label: "Contact Number" }] }],
+    actions: ["Choose File", "Validate", "Import"],
+    table: { columns: ["Row", "Name", "Email", "Role", "Result"] },
+  },
+  guards: {
+    title: "Guards Import",
+    tabs: ["Registration", "Verification", "Training", "Experience", "Family", "Placement", "References"],
+    sections: [{ title: "Upload Guard File", fields: [{ label: "Import Type", type: "select" }, { label: "Upload File" }] }],
+    actions: ["Validate", "Import"],
+    table: { columns: ["Row", "Guard", "Type", "Result"] },
+  },
+  clients: {
+    title: "Clients Import",
+    sections: [{ title: "Bulk Client/Branch Upload", fields: [{ label: "Upload File" }] }],
+    actions: ["Validate", "Import"],
+    table: { columns: ["Row", "Client", "Branch", "Result"] },
+  },
+  inventory: {
+    title: "Inventory Import",
+    sections: [{ title: "Bulk Inventory Upload", fields: [{ label: "Upload File" }] }],
+    actions: ["Validate", "Import"],
+    table: { columns: ["Row", "Item", "Category", "Result"] },
+  },
+}
+
+export const payrollReportExports = [
+  "Export Bank Salary",
+  "Export Cash Salary",
+  "Bank Transfer Sheet",
+  "Mobile Account",
+  "EOBI List",
+  "EOBI Export",
+  "ESSI List",
+  "ESSI Export",
+  "Salary Summary Report",
+  "Region-wise Report",
+  "Salary Detail Report",
+  "Unpaid Salary Report",
+]
+
+export const payrollOperationLinks = [
+  { label: "Loan", href: "/payroll/operations/loan" },
+  { label: "Extra Hours", href: "/payroll/operations/extra-hours" },
+  { label: "Other Deductions", href: "/payroll/operations/other-deductions" },
+  { label: "Special Duty", href: "/payroll/operations/special-duty" },
+  { label: "Holidays", href: "/payroll/operations/holidays" },
+  { label: "Salary", href: "/payroll/operations/salary" },
+  { label: "Salary V1", href: "/payroll/operations/salary-v1" },
+  { label: "Salary V2", href: "/payroll/operations/salary-v2" },
+  { label: "Bulk Slips", href: "/payroll/operations/bulk-salary-slips" },
+  { label: "Clearance", href: "/payroll/operations/clearance" },
+  { label: "UnPaid", href: "/payroll/operations/unpaid-salaries" },
+]
+
+export const inventoryLinks = [
+  { label: "Search", href: "/inventory/search" },
+  { label: "Categories", href: "/inventory/categories" },
+  { label: "Vendors", href: "/inventory/vendors" },
+  { label: "Conditions", href: "/inventory/conditions" },
+  { label: "Demand", href: "/inventory/demand" },
+  { label: "Stock In", href: "/inventory/stock-in" },
+  { label: "Assign Item", href: "/inventory/assign-item" },
+  { label: "Condemned", href: "/inventory/condemned" },
+]
+
+export const reportLinks = [
+  { label: "Scheduled", href: "/reports/scheduled" },
+  { label: "Guard Deployment", href: "/reports/guard-deployment" },
+  { label: "Day & Night", href: "/reports/day-night-duty" },
+  { label: "Client Enrolled", href: "/reports/client-enrolled" },
+]
+
+export const importLinks = [
+  { label: "Users Import", href: "/imports/users" },
+  { label: "Guards Import", href: "/imports/guards" },
+  { label: "Clients Import", href: "/imports/clients" },
+  { label: "Inventory Import", href: "/imports/inventory" },
+]

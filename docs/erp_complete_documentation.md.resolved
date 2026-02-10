@@ -1,0 +1,1856 @@
+# Parwest ERP - Complete Guard Management System Documentation
+
+> **Purpose**: Comprehensive documentation for replicating the Parwest ERP Guard Management System using modern technology stack.
+> 
+> **System URL**: https://staging-erp.parwestgroup.com/
+> 
+> **Login Credentials**: admin@parwestgroup.com / admin123@
+
+---
+
+## Table of Contents
+
+1. [System Overview](#system-overview)
+2. [Authentication & Authorization](#authentication--authorization)
+3. [Module Documentation](#module-documentation)
+4. [Data Models & Relationships](#data-models--relationships)
+5. [Key Workflows](#key-workflows)
+6. [UI/UX Design Patterns](#uiux-design-patterns)
+7. [Technology Stack Recommendations](#technology-stack-recommendations)
+8. [Implementation Roadmap](#implementation-roadmap)
+
+---
+
+## System Overview
+
+### Purpose
+Parwest ERP is a comprehensive guard management system designed for security service companies. It manages the complete lifecycle of security guards from recruitment to deployment, payroll, and performance tracking.
+
+### Core Business Functions
+1. **Guard Lifecycle Management** - Recruitment, onboarding, training, deployment
+2. **Client & Site Management** - Client onboarding, branch management, contract tracking
+3. **Deployment Operations** - Guard-to-site assignments, shift management
+4. **Payroll Processing** - Salary calculation, loans, deductions, statutory compliance
+5. **Inventory Management** - Weapons, uniforms, equipment tracking
+6. **Reporting & Analytics** - Operational reports, compliance reports
+7. **Support & Ticketing** - Internal issue tracking
+
+### System Architecture
+- **Multi-tenant**: Regional offices with hierarchical management
+- **Role-based Access Control**: Granular permissions by module and action
+- **Audit Trail**: Complete activity logging for compliance
+- **Real-time Tracking**: Online users, guard locations via map
+
+---
+
+## Authentication & Authorization
+
+### Login Flow
+- **URL**: `/login`
+- **Fields**: Email, Password
+- **Authentication**: Session-based authentication
+- **Post-login**: Redirects to `/map` (Dashboard Home)
+
+### User Roles
+Identified roles in the system:
+- **Super User** - Full system access
+- **Admin** - Administrative functions
+- **Manager** - Regional/operational management
+- **Manager Admin** - Enhanced manager permissions
+- **Supervisor** - Field supervision
+- **Assistant Operations Controller** - Operations support
+- **IC Documentation Enrollment** - Documentation processing
+- **Inventory Incharge** - Inventory management
+
+### Permission System
+- **Granular Control**: Permissions set per module and action
+- **Actions**: CREATE, VIEW, UPDATE, DELETE, REQUISITIONS
+- **Modules**: Guards, Payroll, Clients, Inventory, Users, Ticketing, Settings, Reports, Imports, Requisitions, Audit
+
+---
+
+## Module Documentation
+
+### 1. Dashboard Module
+
+#### 1.1 Home (Map View)
+**URL**: `/map`
+
+**Features**:
+- Interactive map showing guard/client locations
+- Client filter dropdown
+- System-wide alerts (e.g., "Update Guard CNIC Record")
+- Real-time status indicators
+
+**UI Components**:
+- Alert banner (red background for critical alerts)
+- Map container with loading state
+- Filter controls (dropdown + GO button)
+
+#### 1.2 Online Users
+**URL**: `/user/onlineUsers`
+
+**Features**:
+- Real-time list of active system users
+- Total count display (e.g., "Online Users: 53")
+- User details: Name (clickable), Email, Role
+
+**Table Columns**:
+- NAME (link to user profile)
+- EMAIL
+- ROLE
+
+---
+
+### 2. Guards Module
+
+**Primary Module** - Most comprehensive with 12+ sub-pages
+
+#### 2.1 Add New Guard
+**URL**: `/guard/create`
+
+**Form Sections**:
+
+**Pre-Requisites Checklist**:
+- NADRA Verification
+- Health Certificate
+- Police Verification
+- Eyesight Certificate
+- Character Verification
+- Mental Health Check
+- 3rd Guarantor Verification
+- Company Card & CNIC
+
+**Regional Office**:
+- Assignment to administrative branch
+
+**Personal Information**:
+- Name, CNIC, Contact
+- Date of Birth, Age
+- Father's Name, Religion
+- Marital Status, Education
+- Address (Permanent, Current)
+- Emergency Contact
+
+**Ex-Service Details** (for veterans):
+- Rank
+- Regiment
+- Service Period
+- Discharge Type
+
+**Educational Details**:
+- Qualification
+- Institution
+- Year
+
+**Bank Details**:
+- Bank Name
+- Account Number
+- Account Type
+- Branch Code
+
+#### 2.2 Search Guard
+**URL**: `/guard/search`
+
+**Search Filters**:
+- Parwest ID (text input)
+- Name (text input)
+- CNIC# (text input)
+- Phone Number (text input)
+- Education (dropdown)
+- Religion (dropdown)
+- Status (dropdown: Pending, Active, etc.)
+- Client (dropdown)
+- Supervisor (dropdown)
+- Ex-Service (dropdown)
+- Verification Type (dropdown)
+- Verification Status (dropdown)
+- Created From/To (date range)
+- Bank Name (dropdown)
+- Bank Account Status (dropdown)
+- Bank Card Status (dropdown)
+- Bank Account Type (dropdown)
+- Residence (dropdown)
+- Over Staying (checkbox)
+- On Night Duty (checkbox)
+- Terminated Records (checkbox)
+
+**Table Columns**:
+- Parwest ID
+- Name (clickable)
+- CNIC Number
+- Joining Date
+- Status
+
+**Actions**:
+- View (eye icon)
+- Edit (pencil icon)
+- Delete (trash icon)
+
+**Export Options**:
+- Export Short Role in Excel
+- Export in Bank Details
+- Export in Excel
+
+#### 2.3 Export Guard
+**URL**: `/guard/export`
+
+**Purpose**: Bulk export of guard data with custom filters
+
+#### 2.4 Prerequisites
+**URL**: `/guard/prerequisites/index`
+
+**Management of**:
+- NADRA verification records
+- Health certificates
+- Police verification
+- Other prerequisite documents
+
+#### 2.5 Black Listed
+**URL**: `/guard/blacklist`
+
+**Features**:
+- Search by CNIC
+- Add to blacklist
+- Record who blacklisted and when
+- Reason for blacklisting
+
+#### 2.6 Inactive Guards
+**URL**: `/guard/inactive-guards`
+
+**Purpose**: List of guards no longer active in the system
+
+#### 2.7 Deploy Guards
+**URL**: `/guard/deploy`
+
+**Deployment Workflow**:
+1. Select Region
+2. Select Client
+3. Select Branch
+4. Select Designation (e.g., Security Guard)
+5. Select Guard
+6. Confirm deployment
+
+**Key Fields**:
+- Deployment Date
+- Shift Type (Day/Night)
+- Rate/Pricing
+
+#### 2.8 Deployments Rate
+**URL**: `/guard/deployments-rate`
+
+**Purpose**: Monitor deployment efficiency and rates
+
+#### 2.9 Attendance
+**URL**: `/guard/attendance`
+
+**Purpose**: Track guard physical presence at assigned sites
+
+#### 2.10 Client Attendance
+**URL**: `/guard/client-attendance`
+
+**Purpose**: Client-specific attendance tracking
+
+#### 2.11 Residences
+**URL**: `/guard/residences`
+
+**Purpose**: Management of guard housing
+
+#### 2.12 Assign Residence
+**URL**: `/guard/assign-residence`
+
+**Purpose**: Allocate housing to guards
+
+#### 2.13 OnJob Trainings / V2
+**URL**: `/guard/trainings`
+
+**Purpose**: Training module tracking and management
+
+---
+
+### 3. Payroll Module
+
+**Three Main Sections**: Operation, Reports, Settings
+
+#### 3.1 Operation Sub-Menu
+
+##### 3.1.1 Loan
+**URL**: `/guard/loan`
+
+**Tabs**:
+- **Add Loans**: Record new loans
+- **Finalize Loans**: Approve/process pending loans
+- **Export Finalised History**: Audit past loans
+
+**Add Loan Form Fields**:
+- Month
+- Parwest ID
+- Guard Name
+- Phone
+- Client/Branch
+- Deployment Days
+- Current Supervisor/Manager
+- Amount Paid
+
+##### 3.1.2 Extra Hours
+**URL**: `/guard/extra-hours`
+
+**Purpose**: Record additional work hours
+
+**Fields**:
+- Parwest ID
+- Branch
+- Hours
+- Creation Date
+
+##### 3.1.3 Other Deductions
+**Purpose**: Record miscellaneous deductions
+
+##### 3.1.4 Special Duty
+**URL**: `/guard/special-duty`
+
+**Purpose**: Manage atypical assignments
+
+**Fields**:
+- Secure Ops ID
+- Date range (From/To)
+- Hours
+- Cost Per Hour
+- Comments
+
+##### 3.1.5 Holidays
+**Purpose**: Holiday calendar management
+
+##### 3.1.6 Salary (Calculate Salary)
+**URL**: `/guard/accountSalary`
+
+**Main Payroll Engine**
+
+**Tabs**:
+- **Calculate Salary**: Trigger salary computation
+- **Salary History**: Track processed payroll cycles
+
+**Calculate Salary Filters**:
+- Region (dropdown)
+- Select Client (dropdown)
+- Branch (dropdown)
+- Month (date picker)
+
+**Action**: CALCULATE SALARY button
+
+**Display**: Pending Managers Loans for Finalise
+
+##### 3.1.7 Salary V1
+**Purpose**: Legacy salary view
+
+##### 3.1.8 Salary V2
+**URL**: `/salary-v2`
+
+**Purpose**: Updated salary summary interface
+
+##### 3.1.9 Bulk Salary Slips
+**Purpose**: Mass generate and download pay slips
+
+##### 3.1.10 Clearance
+**Purpose**: Final settlement for departing guards
+
+##### 3.1.11 UnPaid Salaries
+**Purpose**: Track and manage unpaid disbursements
+
+#### 3.2 Reports Sub-Menu
+
+**Export and Analytics Tools**:
+
+- **Export Bank Salary** - Excel format for bank transfers
+- **Export Cash Salary** - Cash payment records
+- **Bank Transfer Sheet** - Bank-specific format
+- **Mobile Account** - EasyPaisa/JazzCash sheets
+- **EOBI List** - Employees' Old-Age Benefits Institution
+- **EOBI Export** - Statutory compliance export
+- **ESSI List** - Employees' Social Security Institution
+- **ESSI Export** - Statutory compliance export
+- **Salary Summary Report** - High-level overview
+- **Region-wise Report** - Regional breakdown
+- **Salary Detail Report** - Detailed salary components
+- **Unpaid Salary Report** - Outstanding payments
+
+#### 3.3 Settings Sub-Menu
+
+##### 3.3.1 Payroll Defaults
+**Purpose**: Regional configuration for standard deductions
+
+**Fields**:
+- Training School Fees
+- CWF (Contribution Welfare Fund)
+- Age thresholds
+- Deployment thresholds
+
+##### 3.3.2 Month Initialise
+**URL**: `/guard/monthInitialise`
+
+**Critical Workflow**: Transition from current payroll month to next
+
+**Process**:
+1. Identify unposted regions
+2. Close current month
+3. Initialize next month
+4. Rollover balances
+
+##### 3.3.3 Limits
+**Purpose**: Settings for Guard Age Limits and Mental Health Limits
+
+---
+
+### 4. Clients Module
+
+**8 Sub-Pages** for client lifecycle management
+
+#### 4.1 Add New Client
+**URL**: `/client/create`
+
+**Client Enrolment Form Sections**:
+
+**Basic & Contact Info**:
+- Name
+- Email
+- Type (dropdown)
+- Enrollment Date
+- Branchless (checkbox)
+- Head Office Address
+
+**Referral**:
+- Introducer details
+- Referral source
+
+**Documents Upload** (Compliance):
+- Logo
+- Bank Account Details
+- Contract Copy
+- NTN (National Tax Number)
+- STRN (Sales Tax Registration Number)
+- SECP Copy (Securities & Exchange Commission)
+- Certificate of Incorporation
+
+**Assign Weapon**:
+- License Number
+- Serial Number
+
+**Operational Territory**:
+- Provinces where client operates
+
+#### 4.2 Search Client
+**URL**: `/client/search`
+
+**Legacy search interface**
+
+#### 4.3 Search Client V2
+**URL**: `/client/searchV2`
+
+**Modern Search Interface**
+
+**Filters**:
+- Client Name (text input)
+- Select Client Type (dropdown)
+- Select City (dropdown)
+
+**Table Columns**:
+- Client ID
+- Logo
+- Name (clickable)
+- Type
+- City/Address
+- Is Branchless
+- Status
+- Actions (View/Edit, Delete)
+
+**Client Profile Tabs** (when viewing):
+- **General Information**: Basic details, status, logo
+- **Assigned Guards**: Real-time list of deployed guards with shift, contact, start date
+- **Branches**: Multiple sites/branches management
+- **Pricing**: Contractual pricing and billing configurations
+- **Inventory**: Equipment assigned to client
+- **Contact Information**: Detailed contact person and location
+
+#### 4.4 Types & Locations
+**URL**: `/client/types-locations`
+
+**Configuration for**:
+- Client types (e.g., Bank, Manufacturer)
+- Document types
+
+#### 4.5 Black Listed
+**URL**: `/client/blacklist`
+
+**Purpose**: Manage blacklisted clients
+
+#### 4.6 Export Branches
+**URL**: `/client/export-branches`
+
+**Purpose**: Export client branch data
+
+**Filters**:
+- Manager
+- Client
+
+#### 4.7 Invoice Prerequisites
+**URL**: `/client/invoice-prerequisites`
+
+**Invoicing Configurations**:
+- Default rates
+- Provinces
+- Cities
+- Guard types
+
+#### 4.8 Invoiced Billings
+**URL**: `/client/invoiced-billings`
+
+**Features**:
+- Billing management
+- Status tracking
+- Error logs
+
+---
+
+### 5. Inventory Module
+
+**9 Sub-Pages** for asset management
+
+#### 5.1 Dashboard
+**URL**: `/inventory/dashboard`
+
+**Display Cards** for each product type:
+- Total Available
+- Issued (assigned to guards/clients)
+- Remaining (in stock)
+
+#### 5.2 Search
+**URL**: `/inventory/searchCustom`
+
+**Central Management Hub**
+
+**Filters**:
+- Category (dropdown)
+- Product Type (dropdown)
+- Status (dropdown)
+- Vendor (dropdown)
+- Unique Number (text)
+- Serial Number (text)
+- Purchase Date Range (date picker)
+- Price (number)
+- License Details (text)
+- Size (text)
+- Insured (checkbox)
+- Duplicate (checkbox)
+
+**Table Columns**:
+- Category
+- Item
+- PPS #
+- Secure Ops Number
+- Vendor
+- Status
+- License Number
+- Serial Number
+
+**Export**: "Export In Excel File" button
+
+#### 5.3 Define Categories
+**URL**: `/inventory/categoryList`
+
+**Standard Categories**:
+- WEAPON
+- UNIFORM
+- EQUIPMENT
+- AMMUNITION
+
+**CRUD Interface**: Create, Read, Update, Delete categories
+
+#### 5.4 Define Vendors
+**URL**: `/inventory/vendorList`
+
+**Purpose**: Manage suppliers
+
+**Example Vendors**:
+- Haji Muhammad Mushtaq
+- Restocking Vendor
+
+#### 5.5 Define Conditions
+**URL**: `/inventory/conditionList`
+
+**Item States**:
+- NEW
+- OLD
+
+#### 5.6 Demand
+**URL**: `/inventory/demandInventoryForm`
+
+**Purpose**: Regional offices request items
+
+**Features**:
+- Checkout system
+- Track requested vs. fulfilled
+
+#### 5.7 Stock In
+**URL**: `/inventory/createProduct`
+
+**Register New Inventory**
+
+**Primary Fields**:
+- Order ID
+- Category (dropdown)
+- Item (dropdown)
+- Vendor (dropdown)
+- Price
+- Purchase Date
+- Date of Expiry
+
+**Detailed Specifications**:
+- Warranty Time/Type
+- Size
+- Weight
+- Length
+- Width
+- Color
+
+**Tracking/Insurance**:
+- Is Insured (checkbox)
+- Is Non Unique (checkbox)
+- Quantity of Non Unique Items (if non-unique)
+
+#### 5.8 Assign Item
+**URL**: `/inventory/assignProductFormNew`
+
+**Toggle Interface**: Client or Guard
+
+**Workflow**:
+1. Select Regional Office
+2. Select Category
+3. Select specific Client/Guard
+4. Checkout
+
+**Tracking**:
+- Secure Ops Unique Number
+- Serial Number
+
+#### 5.9 Condemned Items
+**URL**: `/inventory/condemnedItems`
+
+**Purpose**: Retired/obsolete items
+
+**Table Columns**:
+- Unique ID (link to detail)
+- Product Type
+- Category
+- Vendor
+- Regional Office
+- Purchase Date
+- Condemned Date
+
+---
+
+### 6. Users Module
+
+**5 Sub-Pages** for user management
+
+#### 6.1 Add New
+**URL**: `/user/create`
+
+**User Enrolment Form**:
+- User's Name
+- Email (Required)
+- User Role (dropdown)
+- Select Region
+- Regional Office
+- Contact # (Format: +92-300-1234567)
+- Password
+
+#### 6.2 Search
+**URL**: `/user/searchForm`
+
+**Filters**:
+- Name
+- User Role
+
+**Table Columns**:
+- ID
+- Photo
+- Name (link to profile)
+- Email
+- Role
+- Regional Office
+
+**Actions**:
+- Edit (click name)
+- Export in Excel
+
+**User Profile Tabs**:
+- **General Information**: Basic details, password reset
+- **Permissions**: Granular access control (see below)
+- **Status History**: Audit log of status changes with reasons and dates
+
+#### 6.3 Permissions Management
+
+**Granular Control** - Module-based permissions:
+
+**Modules**:
+- Guard
+- Payroll
+- Inventory
+- Users
+- Clients
+- Ticketing
+- Settings
+- Reports
+- Imports
+- Requisitions
+- Audit
+
+**Actions per Module**:
+- CREATE (checkbox)
+- VIEW (checkbox)
+- UPDATE (checkbox)
+- DELETE (checkbox)
+- REQUISITIONS (checkbox)
+
+#### 6.4 M/S Relationship
+**URL**: `/user/assignManagerToSupervisorForm`
+
+**Purpose**: Assign Managers to Supervisors (hierarchy management)
+
+#### 6.5 Switch Supervisor
+**URL**: `/user/switchManagerForm`
+
+**Purpose**: Bulk transfer tool to switch supervisors between managers or locations
+
+#### 6.6 C/S Relationship
+**URL**: `/user/assignClientsBranchToSupervisorForm`
+
+**Purpose**: Assign Client branches to specific Supervisors
+
+---
+
+### 7. Ticketing Module
+
+**2 Sub-Pages** for internal support
+
+#### 7.1 Listing (All Tickets)
+**URL**: `/ticketing/listing`
+
+**Search Filters**:
+- Category (dropdown)
+- Priority (dropdown)
+- Status (dropdown)
+- Supervisor (dropdown)
+- Created Date (date picker)
+
+**Table Columns**:
+- ID
+- Subject
+- Sender
+- Category
+- Priority
+- Status
+- Assigned To
+- Created At
+
+#### 7.2 Prerequisites
+**URL**: `/ticketing/prerequisites`
+
+**Configuration Tabs**:
+
+**Categories**:
+- Name
+- Description
+- Color (for visual tracking)
+- Examples: General, Server, Uninstall
+
+**Priorities**:
+- Name
+- Color coding
+- Examples: Low, Normal, High, Middle
+
+**Statuses**:
+- Name
+- Color identifiers
+- Examples: New, Open, In-Progress, Closed Unresolved, Closed Successfully
+
+---
+
+### 8. Settings Module
+
+**5 Sub-Pages** for system configuration
+
+#### 8.1 Region
+**URL**: `/regions`
+
+**Purpose**: Manage broad geographical regions
+
+**CRUD Operations**: Create, edit, delete region names
+
+#### 8.2 Regional Offices
+**URL**: `/regional-offices`
+
+**Purpose**: Specific offices within regions
+
+**Fields**:
+- Office Head
+- Series Code (for record-keeping)
+- Phone
+- Mobile
+- Fax
+- Region (parent)
+
+#### 8.3 Guard Pledgeable Document Types
+**URL**: `/guard-pledgeable-document-types`
+
+**Purpose**: Define document types guards can submit during onboarding
+
+**Examples**:
+- Matric/Inter Results
+- CNIC
+
+#### 8.4 User Types
+**URL**: `/user-types`
+
+**Purpose**: Manage user roles and permission levels
+
+**Examples**:
+- Super User
+- Admin
+- Supervisor
+- Manager
+- Manager Admin
+
+#### 8.5 Guard Bank Names
+**Note**: Currently has SQL error in staging (missing table)
+
+---
+
+### 9. Reports Module
+
+**4+ Report Types** for analytics
+
+#### 9.1 Scheduled Reports
+**URL**: `/reports/scheduledreports`
+
+**Purpose**: Automate report delivery
+
+**Filters**:
+- Report Type (dropdown: e.g., Guard Status Report By Region)
+- Frequency (Daily, Weekly, etc.)
+- Region
+- Recipient Email addresses
+
+#### 9.2 Guard Deployment Report
+**URL**: `/reports/guardDeploymentreports`
+
+**Purpose**: Track guard station assignments
+
+**Filters**:
+- Start Date
+- End Date
+- Regional Offices
+- Client Types
+- Specific Clients
+
+#### 9.3 Day and Night Duty Guards
+**URL**: `/reports/dayNightDutyGuards`
+
+**Purpose**: Performance and attendance across shifts
+
+**Filters**:
+- Date range
+- Regional Office
+- Client Type
+- Client
+- Report Type (Day/Night/Both)
+
+#### 9.4 Client Enrolled Report
+**URL**: `/reports/clientEnrolledreports`
+
+**Purpose**: Client onboarding summary
+
+**Filters**:
+- Start/End Date
+- Regional Offices
+- Branch Types
+
+---
+
+### 10. Imports Module
+
+**Bulk Operations** via Excel/CSV
+
+#### 10.1 Users Import
+**URL**: `/bulkImport/users/addUserBulkImport`
+
+**Required Fields**:
+- Name
+- Secure Ops Domain Email
+- User Role
+- Regional Office Series (e.g., 'L' for Lahore)
+- Contact Number
+
+#### 10.2 Guards Import
+
+**Multiple Import Types**:
+- **Registration**: Central guard profile registration
+- **Verification**: Bulk update verification statuses
+- **Training**: Training session records
+- **Experience**: Employment history
+- **Family**: Family background data
+- **Placement**: Deployment history
+- **References**: Professional references
+
+#### 10.3 Clients Import
+
+**Purpose**: Bulk client and branch onboarding
+
+#### 10.4 Inventory Import
+
+**Purpose**: Bulk inventory upload
+
+---
+
+### 11. Requisitions Module
+
+**Guard Approval Workflow** - "Guard Approval By HO" (Head Office)
+
+**URL**: `/guard/acceptedRejectedByCol`
+
+**Three Tabs**:
+- **Pending**: New registrations awaiting review
+- **Accepted**: Successfully approved profiles
+- **Rejected**: Profiles that failed criteria
+
+**Table Columns**:
+- Secure Ops ID
+- Name
+- Current Status
+- Over Age (indicator)
+- Pic (photo)
+
+**Actions**:
+- Approve
+- Reject
+
+**Export**: Excel export for all lists
+
+---
+
+### 12. Audit Module
+
+**Activity Tracking** for compliance
+
+**URL**: `/audit/auditSearch`
+
+**Audit Search Page**:
+
+**Tracked Data**:
+- Date
+- User Name
+- Event (e.g., Updated, Created)
+- Module
+- IP Address
+- Description (including session IDs)
+
+**Purpose**: Complete system-wide activity logging
+
+---
+
+## Data Models & Relationships
+
+### Core Entities
+
+#### Guard
+```
+- id (Primary Key)
+- parwest_id (Unique Identifier)
+- name
+- cnic (National ID)
+- phone
+- email
+- date_of_birth
+- age
+- father_name
+- religion
+- marital_status
+- education
+- address_permanent
+- address_current
+- emergency_contact
+- regional_office_id (Foreign Key)
+- status (Pending, Active, Inactive, Terminated)
+- is_ex_service (Boolean)
+- ex_service_rank
+- ex_service_regiment
+- bank_name
+- bank_account_number
+- bank_account_type
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Regional Office
+- Has many Deployments
+- Has many Attendance Records
+- Has many Payroll Records
+- Has many Inventory Assignments
+- Has many Prerequisites
+- Has one Residence Assignment
+
+#### Client
+```
+- id (Primary Key)
+- name
+- email
+- type (Bank, Manufacturer, etc.)
+- enrollment_date
+- is_branchless (Boolean)
+- head_office_address
+- city
+- status (Active, Inactive)
+- logo_url
+- ntn (National Tax Number)
+- strn (Sales Tax Registration)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Has many Branches
+- Has many Deployments
+- Has many Pricing Configurations
+- Has many Inventory Assignments
+- Has many Invoices
+
+#### Branch
+```
+- id (Primary Key)
+- client_id (Foreign Key)
+- name
+- address
+- city
+- contact_person
+- contact_number
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Client
+- Has many Deployments
+
+#### Deployment
+```
+- id (Primary Key)
+- guard_id (Foreign Key)
+- client_id (Foreign Key)
+- branch_id (Foreign Key)
+- regional_office_id (Foreign Key)
+- designation
+- deployment_date
+- shift_type (Day, Night)
+- rate
+- status (Active, Inactive)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Guard
+- Belongs to Client
+- Belongs to Branch
+- Belongs to Regional Office
+
+#### Payroll
+```
+- id (Primary Key)
+- guard_id (Foreign Key)
+- month
+- year
+- regional_office_id (Foreign Key)
+- client_id (Foreign Key)
+- branch_id (Foreign Key)
+- deployment_days
+- base_salary
+- extra_hours
+- extra_hours_amount
+- special_duty_hours
+- special_duty_amount
+- loans
+- other_deductions
+- training_school_fees
+- cwf
+- eobi
+- essi
+- net_salary
+- payment_status (Pending, Paid, Unpaid)
+- payment_method (Bank, Cash, Mobile)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Guard
+- Belongs to Regional Office
+- Belongs to Client
+- Belongs to Branch
+
+#### Inventory
+```
+- id (Primary Key)
+- category_id (Foreign Key)
+- product_type_id (Foreign Key)
+- vendor_id (Foreign Key)
+- unique_number
+- serial_number
+- order_id
+- price
+- purchase_date
+- expiry_date
+- warranty_time
+- warranty_type
+- size
+- weight
+- length
+- width
+- color
+- is_insured (Boolean)
+- is_non_unique (Boolean)
+- quantity
+- status (Available, Issued, Condemned)
+- license_number
+- regional_office_id (Foreign Key)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Category
+- Belongs to Product Type
+- Belongs to Vendor
+- Belongs to Regional Office
+- Has many Assignments (to Guards or Clients)
+
+#### User
+```
+- id (Primary Key)
+- name
+- email (Unique)
+- password (Hashed)
+- role_id (Foreign Key)
+- regional_office_id (Foreign Key)
+- region_id (Foreign Key)
+- contact_number
+- photo_url
+- status (Active, Inactive)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Role
+- Belongs to Regional Office
+- Belongs to Region
+- Has many Permissions
+- Has many Status History Records
+
+#### Ticket
+```
+- id (Primary Key)
+- subject
+- description
+- sender_id (Foreign Key to User)
+- assigned_to_id (Foreign Key to User)
+- category_id (Foreign Key)
+- priority_id (Foreign Key)
+- status_id (Foreign Key)
+- created_at
+- updated_at
+```
+
+**Relationships**:
+- Belongs to Sender (User)
+- Belongs to Assigned User
+- Belongs to Category
+- Belongs to Priority
+- Belongs to Status
+
+### Lookup Tables
+
+- **Regional Offices**
+- **Regions**
+- **User Roles**
+- **Client Types**
+- **Inventory Categories**
+- **Inventory Product Types**
+- **Inventory Vendors**
+- **Inventory Conditions**
+- **Ticket Categories**
+- **Ticket Priorities**
+- **Ticket Statuses**
+- **Guard Pledgeable Document Types**
+
+---
+
+## Key Workflows
+
+### 1. Guard Onboarding Workflow
+
+```mermaid
+graph TD
+    A[Start: Add New Guard] --> B[Fill Personal Information]
+    B --> C[Upload Prerequisites Documents]
+    C --> D[Verify Prerequisites]
+    D --> E{All Prerequisites Met?}
+    E -->|No| F[Mark as Pending]
+    E -->|Yes| G[Submit to Requisitions]
+    G --> H[Head Office Review]
+    H --> I{Approved?}
+    I -->|No| J[Rejected]
+    I -->|Yes| K[Mark as Active]
+    K --> L[Assign to Regional Office]
+    L --> M[Ready for Deployment]
+```
+
+### 2. Guard Deployment Workflow
+
+```mermaid
+graph TD
+    A[Start: Deploy Guards] --> B[Select Region]
+    B --> C[Select Client]
+    C --> D[Select Branch]
+    D --> E[Select Designation]
+    E --> F[Select Guard from Active Pool]
+    F --> G[Set Deployment Date]
+    G --> H[Set Shift Type]
+    H --> I[Set Rate/Pricing]
+    I --> J[Confirm Deployment]
+    J --> K[Update Guard Status]
+    K --> L[Notify Supervisor]
+```
+
+### 3. Payroll Processing Workflow
+
+```mermaid
+graph TD
+    A[Start: Month Initialise] --> B[Close Previous Month]
+    B --> C[Initialize New Month]
+    C --> D[Record Extra Hours]
+    D --> E[Record Special Duties]
+    E --> F[Record Loans]
+    F --> G[Record Other Deductions]
+    G --> H[Calculate Salary]
+    H --> I[Select Region/Client/Branch]
+    I --> J[Run Salary Calculation]
+    J --> K[Review Salary Summary]
+    K --> L{Approve?}
+    L -->|No| M[Adjust Entries]
+    M --> H
+    L -->|Yes| N[Finalize Payroll]
+    N --> O[Generate Salary Slips]
+    O --> P[Export Bank Transfer Sheet]
+    P --> Q[Process Payments]
+    Q --> R[Mark as Paid]
+```
+
+### 4. Client Onboarding Workflow
+
+```mermaid
+graph TD
+    A[Start: Add New Client] --> B[Fill Basic Information]
+    B --> C[Upload Compliance Documents]
+    C --> D[Define Operational Territory]
+    D --> E{Is Branchless?}
+    E -->|Yes| F[Single Location Setup]
+    E -->|No| G[Add Multiple Branches]
+    G --> H[Configure Pricing per Branch]
+    F --> I[Configure Pricing]
+    H --> I
+    I --> J[Assign Weapons if Required]
+    J --> K[Set Invoice Prerequisites]
+    K --> L[Activate Client]
+    L --> M[Ready for Guard Deployment]
+```
+
+### 5. Inventory Assignment Workflow
+
+```mermaid
+graph TD
+    A[Start: Assign Item] --> B{Assign to Client or Guard?}
+    B -->|Client| C[Select Regional Office]
+    B -->|Guard| D[Select Regional Office]
+    C --> E[Select Category]
+    D --> E
+    E --> F[Select Specific Client/Guard]
+    F --> G[Select Item from Available Stock]
+    G --> H[Record Assignment]
+    H --> I[Update Item Status to Issued]
+    I --> J[Generate Assignment Receipt]
+```
+
+### 6. Ticket Management Workflow
+
+```mermaid
+graph TD
+    A[Create Ticket] --> B[Set Subject & Description]
+    B --> C[Select Category]
+    C --> D[Set Priority]
+    D --> E[Submit Ticket]
+    E --> F[Status: New]
+    F --> G[Assign to User]
+    G --> H[Status: Open]
+    H --> I[Work on Ticket]
+    I --> J[Status: In-Progress]
+    J --> K{Resolved?}
+    K -->|Yes| L[Status: Closed Successfully]
+    K -->|No| M[Status: Closed Unresolved]
+```
+
+---
+
+## UI/UX Design Patterns
+
+### Layout Structure
+
+#### Top Navigation Bar
+- **Left**: Hamburger menu toggle
+- **Center**: Page title (in main content area)
+- **Right**: 
+  - Notification bell icon with badge counter
+  - User profile dropdown with photo and name
+
+#### Left Sidebar
+- **Header**: Company logo (Parwest)
+- **Navigation**: 
+  - Collapsible module sections
+  - Icons for each module
+  - Sub-menu items indented
+  - Active state highlighting
+- **Scrollable**: For long navigation lists
+
+#### Main Content Area
+- **Alert Banner**: System-wide notifications (top)
+- **Page Title**: H1 heading
+- **Content**: Forms, tables, dashboards
+- **Actions**: Buttons aligned right
+
+### Color Scheme
+
+**Primary Colors**:
+- **Navy Blue**: `#2A3F54` - Sidebar background
+- **Primary Blue**: `#4A90E2` - Buttons, active states, icons
+- **Light Blue**: `#73879C` - Hover states
+
+**Semantic Colors**:
+- **Red**: `#E74C3C` - Alerts, warnings, delete actions
+- **Green**: `#26B99A` - Success, active status, export buttons
+- **Yellow**: `#F39C12` - Pending status
+- **Gray**: `#ECF0F1` - Borders, disabled states
+
+**Background Colors**:
+- **White**: `#FFFFFF` - Main content background
+- **Light Gray**: `#F7F7F7` - Table headers, input backgrounds
+
+### Typography
+
+**Font Family**: Sans-serif (likely Arial, Helvetica, or similar)
+
+**Font Sizes**:
+- **H1**: 24px - Page titles
+- **H2**: 20px - Section headings
+- **Body**: 14px - Regular text
+- **Small**: 12px - Labels, meta information
+
+**Font Weights**:
+- **Bold**: 600 - Headings, labels
+- **Regular**: 400 - Body text
+
+### Component Patterns
+
+#### Buttons
+
+**Primary Button**:
+- Background: Blue (#4A90E2)
+- Text: White
+- Padding: 10px 20px
+- Border-radius: 3px
+- Examples: "CALCULATE SALARY", "GO", "SEARCH"
+
+**Success Button**:
+- Background: Green (#26B99A)
+- Text: White
+- Examples: "Export Short Role In Excel", "Export In Excel"
+
+**Danger Button**:
+- Background: Red (#E74C3C)
+- Text: White
+- Examples: Delete actions
+
+**Secondary Button**:
+- Background: White
+- Border: 1px solid gray
+- Text: Dark gray
+- Examples: "Clear Filter"
+
+#### Forms
+
+**Input Fields**:
+- Border: 1px solid #ccc
+- Border-radius: 3px
+- Padding: 8px 12px
+- Font-size: 14px
+- Placeholder: Light gray text
+
+**Dropdowns**:
+- Same styling as input fields
+- Dropdown arrow on right
+- Examples: "--Select Region--", "--Select Client--"
+
+**Date Pickers**:
+- Calendar icon on right
+- Format: YYYY-MM-DD or DD/MM/YYYY
+
+**Checkboxes**:
+- Square boxes
+- Blue checkmark when selected
+- Label on right
+
+**Radio Buttons**:
+- Circular
+- Blue fill when selected
+
+#### Tables
+
+**Table Header**:
+- Background: Dark blue (#2A3F54)
+- Text: White
+- Font-weight: Bold
+- Padding: 12px
+
+**Table Rows**:
+- Alternating: White and light gray (#F9F9F9)
+- Hover: Light blue background
+- Padding: 10px
+
+**Table Actions**:
+- Icons: Eye (view), Pencil (edit), Trash (delete)
+- Color: Blue for view/edit, Red for delete
+
+#### Cards
+
+**Dashboard Cards**:
+- White background
+- Box-shadow: 0 2px 4px rgba(0,0,0,0.1)
+- Border-radius: 3px
+- Padding: 20px
+- Title: Bold, 16px
+- Value: Large, 24px, Blue
+
+#### Tabs
+
+**Tab Navigation**:
+- Horizontal layout
+- Active tab: Blue bottom border, bold text
+- Inactive tabs: Gray text
+- Examples: "CALCULATE SALARY" / "SALARY HISTORY"
+
+#### Alerts/Notifications
+
+**Critical Alert**:
+- Background: Red (#E74C3C)
+- Text: White
+- Full-width banner
+- Example: "Update Guard CNIC Record (Restriction will be applied on Guard Deployment Soon - 5 Days Remaining)"
+
+**Success Message**:
+- Background: Green (#26B99A)
+- Text: White
+- Example: "Online Users : 53"
+
+#### Icons
+
+**Module Icons** (in sidebar):
+- Dashboard: Speedometer
+- Guards: Shield with person
+- Payroll: Shield with dollar
+- Clients: People/network
+- Inventory: Stacked layers
+- Users: Person
+- Ticketing: Ticket
+- Settings: Gear
+- Reports: Chart/graph
+- Imports: Upload/import
+- Requisitions: Clipboard
+- Audit: Document/log
+
+### Responsive Behavior
+
+**Desktop** (Primary):
+- Sidebar: Fixed left, always visible
+- Content: Full width minus sidebar
+
+**Tablet/Mobile**:
+- Sidebar: Collapsible via hamburger menu
+- Content: Full width
+- Tables: Horizontal scroll
+
+---
+
+## Technology Stack Recommendations
+
+### Frontend
+
+**Framework**: **Next.js 14+** (React)
+- Server-side rendering for performance
+- App Router for modern routing
+- Built-in API routes
+
+**UI Library**: **shadcn/ui** + **Tailwind CSS**
+- Pre-built accessible components
+- Customizable design system
+- Utility-first CSS
+
+**State Management**: **Zustand** or **React Query**
+- Zustand for global state
+- React Query for server state and caching
+
+**Form Handling**: **React Hook Form** + **Zod**
+- Type-safe form validation
+- Performance optimized
+
+**Data Tables**: **TanStack Table** (React Table v8)
+- Powerful table features
+- Sorting, filtering, pagination
+
+**Charts**: **Recharts** or **Chart.js**
+- For dashboard analytics
+
+**Maps**: **Leaflet** or **Google Maps API**
+- For guard/client location tracking
+
+**File Upload**: **react-dropzone**
+- Drag-and-drop file uploads
+
+**Date Picker**: **react-day-picker**
+- Accessible date selection
+
+**Icons**: **Lucide React**
+- Modern icon library
+
+### Backend
+
+**Framework**: **Node.js** with **Express** or **Fastify**
+- RESTful API
+- Fast and lightweight
+
+**Alternative**: **Next.js API Routes**
+- Unified frontend/backend
+
+**ORM**: **Prisma**
+- Type-safe database access
+- Migration management
+- Multi-database support
+
+**Authentication**: **NextAuth.js** or **Clerk**
+- Session management
+- Role-based access control
+
+**File Storage**: **AWS S3** or **Cloudinary**
+- Document and image storage
+
+**PDF Generation**: **PDFKit** or **Puppeteer**
+- For salary slips, reports
+
+**Excel Export**: **ExcelJS**
+- Generate Excel files
+
+**Email**: **Nodemailer** or **SendGrid**
+- Email notifications
+
+### Database
+
+**Primary Database**: **PostgreSQL**
+- Robust relational database
+- ACID compliance
+- JSON support for flexible data
+
+**Alternative**: **MySQL** or **MariaDB**
+- If already in use
+
+**Caching**: **Redis**
+- Session storage
+- Query caching
+- Real-time features
+
+### DevOps & Infrastructure
+
+**Hosting**: **Vercel** (for Next.js) or **AWS**
+- Vercel: Easy deployment, serverless
+- AWS: Full control, scalability
+
+**CI/CD**: **GitHub Actions** or **GitLab CI**
+- Automated testing and deployment
+
+**Monitoring**: **Sentry** (error tracking) + **LogRocket** (session replay)
+
+**Analytics**: **Plausible** or **Google Analytics**
+
+### Development Tools
+
+**Package Manager**: **pnpm** or **npm**
+
+**Code Quality**: **ESLint** + **Prettier**
+
+**Testing**: **Jest** + **React Testing Library** + **Playwright**
+
+**Version Control**: **Git** + **GitHub**
+
+**Documentation**: **Storybook** (component library)
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: Foundation (Weeks 1-4)
+
+**Week 1-2: Setup & Core Infrastructure**
+- [ ] Initialize Next.js project with TypeScript
+- [ ] Setup Tailwind CSS and shadcn/ui
+- [ ] Configure PostgreSQL database
+- [ ] Setup Prisma ORM
+- [ ] Create database schema for core entities
+- [ ] Setup authentication (NextAuth.js)
+- [ ] Implement role-based access control
+- [ ] Create base layout components (sidebar, navbar)
+
+**Week 3-4: User Management**
+- [ ] User CRUD operations
+- [ ] User roles and permissions
+- [ ] User profile management
+- [ ] Permission assignment UI
+- [ ] User status history tracking
+- [ ] M/S and C/S relationship management
+
+### Phase 2: Core Modules (Weeks 5-12)
+
+**Week 5-6: Guards Module**
+- [ ] Guard enrollment form (all sections)
+- [ ] Guard search with advanced filters
+- [ ] Guard profile view/edit
+- [ ] Prerequisites management
+- [ ] Blacklist functionality
+- [ ] Inactive guards tracking
+- [ ] Guard export functionality
+
+**Week 7-8: Clients Module**
+- [ ] Client enrollment form
+- [ ] Client search (V1 and V2)
+- [ ] Client profile with tabs
+- [ ] Branch management
+- [ ] Pricing configuration
+- [ ] Types & locations setup
+- [ ] Invoice prerequisites
+- [ ] Invoiced billings
+
+**Week 9-10: Deployment Module**
+- [ ] Deploy guards interface
+- [ ] Deployment rate tracking
+- [ ] Attendance tracking
+- [ ] Client attendance
+- [ ] Residence management
+- [ ] Training module
+
+**Week 11-12: Inventory Module**
+- [ ] Inventory dashboard
+- [ ] Inventory search and filters
+- [ ] Stock in/out operations
+- [ ] Category, vendor, condition management
+- [ ] Assign item to guard/client
+- [ ] Demand management
+- [ ] Condemned items tracking
+
+### Phase 3: Payroll & Financial (Weeks 13-16)
+
+**Week 13-14: Payroll Operations**
+- [ ] Loan management (add, finalize, export)
+- [ ] Extra hours tracking
+- [ ] Special duty management
+- [ ] Other deductions
+- [ ] Holiday calendar
+- [ ] Salary calculation engine
+- [ ] Salary V1 and V2 views
+- [ ] Bulk salary slips
+- [ ] Clearance processing
+- [ ] Unpaid salaries tracking
+
+**Week 15-16: Payroll Reports & Settings**
+- [ ] Export bank salary
+- [ ] Export cash salary
+- [ ] Bank transfer sheets
+- [ ] Mobile account sheets
+- [ ] EOBI list and export
+- [ ] ESSI list and export
+- [ ] Salary summary reports
+- [ ] Region-wise reports
+- [ ] Payroll defaults configuration
+- [ ] Month initialize workflow
+- [ ] Age and mental health limits
+
+### Phase 4: Supporting Modules (Weeks 17-20)
+
+**Week 17: Ticketing**
+- [ ] Ticket listing with filters
+- [ ] Ticket creation
+- [ ] Ticket assignment
+- [ ] Ticket status management
+- [ ] Prerequisites (categories, priorities, statuses)
+
+**Week 18: Settings**
+- [ ] Region management
+- [ ] Regional offices management
+- [ ] Guard pledgeable document types
+- [ ] User types management
+- [ ] Guard bank names
+
+**Week 19: Reports**
+- [ ] Scheduled reports
+- [ ] Guard deployment report
+- [ ] Day and night duty guards report
+- [ ] Client enrolled report
+- [ ] Report scheduling and email delivery
+
+**Week 20: Imports & Requisitions**
+- [ ] Users bulk import
+- [ ] Guards bulk import (all types)
+- [ ] Clients bulk import
+- [ ] Inventory bulk import
+- [ ] Requisitions workflow (pending/accepted/rejected)
+- [ ] Guard approval by HO
+
+### Phase 5: Dashboard & Analytics (Weeks 21-22)
+
+**Week 21: Dashboard**
+- [ ] Map view with guard/client locations
+- [ ] Online users tracking
+- [ ] System-wide alerts
+- [ ] Dashboard cards and metrics
+
+**Week 22: Audit & Analytics**
+- [ ] Audit log tracking
+- [ ] Audit search and filters
+- [ ] User activity monitoring
+- [ ] System analytics dashboard
+
+### Phase 6: Testing & Refinement (Weeks 23-26)
+
+**Week 23-24: Testing**
+- [ ] Unit tests for critical functions
+- [ ] Integration tests for workflows
+- [ ] End-to-end tests for user journeys
+- [ ] Performance testing
+- [ ] Security testing
+
+**Week 25: Bug Fixes & Optimization**
+- [ ] Fix identified bugs
+- [ ] Optimize database queries
+- [ ] Improve page load times
+- [ ] Enhance mobile responsiveness
+
+**Week 26: Documentation & Training**
+- [ ] User documentation
+- [ ] Admin documentation
+- [ ] API documentation
+- [ ] Training materials
+- [ ] Video tutorials
+
+### Phase 7: Deployment & Launch (Week 27-28)
+
+**Week 27: Pre-Production**
+- [ ] Setup production environment
+- [ ] Data migration from old system
+- [ ] Final security audit
+- [ ] Performance optimization
+- [ ] Backup and recovery setup
+
+**Week 28: Launch**
+- [ ] Soft launch with limited users
+- [ ] Monitor for issues
+- [ ] Gather feedback
+- [ ] Full launch
+- [ ] Post-launch support
+
+---
+
+## Additional Considerations
+
+### Security
+
+- **Authentication**: Secure session management
+- **Authorization**: Role-based access control at API level
+- **Data Encryption**: Encrypt sensitive data (passwords, bank details)
+- **SQL Injection**: Use parameterized queries (Prisma handles this)
+- **XSS Protection**: Sanitize user inputs
+- **CSRF Protection**: Implement CSRF tokens
+- **Rate Limiting**: Prevent abuse
+- **Audit Logging**: Track all sensitive operations
+
+### Performance
+
+- **Database Indexing**: Index frequently queried fields
+- **Query Optimization**: Use joins efficiently, avoid N+1 queries
+- **Caching**: Cache frequently accessed data (Redis)
+- **Lazy Loading**: Load data on demand
+- **Pagination**: Implement server-side pagination for large datasets
+- **CDN**: Use CDN for static assets
+
+### Scalability
+
+- **Horizontal Scaling**: Design for multiple server instances
+- **Database Replication**: Master-slave setup for read scaling
+- **Microservices**: Consider splitting into services if needed
+- **Queue System**: Use message queues for background jobs (Bull, BullMQ)
+
+### Compliance
+
+- **GDPR**: If applicable, implement data privacy features
+- **Data Retention**: Define and implement data retention policies
+- **Backup**: Regular automated backups
+- **Disaster Recovery**: Plan for system recovery
+
+### Maintenance
+
+- **Logging**: Comprehensive application logging
+- **Monitoring**: Real-time system monitoring
+- **Alerts**: Automated alerts for critical issues
+- **Updates**: Regular dependency updates
+- **Documentation**: Keep documentation up-to-date
+
+---
+
+## Conclusion
+
+This documentation provides a comprehensive blueprint for replicating the Parwest ERP Guard Management System. The system is complex with 12 major modules, extensive data relationships, and critical business workflows.
+
+**Key Success Factors**:
+1. **Phased Approach**: Build incrementally, starting with core modules
+2. **User Feedback**: Involve stakeholders early and often
+3. **Testing**: Comprehensive testing at each phase
+4. **Documentation**: Maintain clear documentation throughout
+5. **Training**: Prepare users for the new system
+
+**Next Steps**:
+1. Review and approve this documentation
+2. Finalize technology stack choices
+3. Setup development environment
+4. Begin Phase 1 implementation
+5. Establish regular review cycles
+
+---
+
+**Document Version**: 1.0  
+**Last Updated**: February 9, 2026  
+**Prepared By**: AI Assistant  
+**Status**: Ready for Review

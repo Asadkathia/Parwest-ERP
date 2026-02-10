@@ -1,0 +1,537 @@
+[
+  {
+    "topLabel": "Dashboard",
+    "text": "Home",
+    "href": "https://staging-erp.parwestgroup.com/map"
+  },
+  {
+    "topLabel": "Dashboard",
+    "text": "Online Users",
+    "href": "https://staging-erp.parwestgroup.com/user/onlineUsers"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Add New",
+    "href": "https://staging-erp.parwestgroup.com/guard/create"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Search Guard",
+    "href": "https://staging-erp.parwestgroup.com/guard/search"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Export Guard",
+    "href": "https://staging-erp.parwestgroup.com/searchByDataTable"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Prerequisites",
+    "href": "https://staging-erp.parwestgroup.com/guard/mergedOptions"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Black Listed",
+    "href": "https://staging-erp.parwestgroup.com/guard/blackListedGuards"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Inactive Guards",
+    "href": "https://staging-erp.parwestgroup.com/guard/softDeletedGuardList"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Deploy Guards",
+    "href": "https://staging-erp.parwestgroup.com/guard/GuardDeployment"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Deployments Rate",
+    "href": "https://staging-erp.parwestgroup.com/guard/GuardDeploymentRate"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Attendance",
+    "href": "https://staging-erp.parwestgroup.com/guard/attendance"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Client Attendance",
+    "href": "https://staging-erp.parwestgroup.com/guard/clientAttendance"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Residences",
+    "href": "https://staging-erp.parwestgroup.com/guard/residences"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Assign Residence",
+    "href": "https://staging-erp.parwestgroup.com/guard/residences/assign"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Onjob Trainings",
+    "href": "https://staging-erp.parwestgroup.com/guard/onjob-trainings"
+  },
+  {
+    "topLabel": "Guards",
+    "text": "Onjob Trainings V2",
+    "href": "https://staging-erp.parwestgroup.com/guard/onjob-trainings-v2"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Loan",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountLoan"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Extra Hours",
+    "href": "https://staging-erp.parwestgroup.com/guard/payrollExtraHours"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Other Deductions",
+    "href": "https://staging-erp.parwestgroup.com/guard/payrollOtherDeductions"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Special Duty",
+    "href": "https://staging-erp.parwestgroup.com/guard/payrollSpecialDuty"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Holidays",
+    "href": "https://staging-erp.parwestgroup.com/guard/payrollHolidays"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Salary",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountSalary"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Salary v1",
+    "href": "https://staging-erp.parwestgroup.com/guard/salarySummary"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Salary V2",
+    "href": "https://staging-erp.parwestgroup.com/salary-v2"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Bulk Salary Slips",
+    "href": "https://staging-erp.parwestgroup.com/guard/bulk-salary-slip"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Clearance",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountClearance"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "UnPaid Salaries",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountUnPaid"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Salary Reports",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountSalaryExport"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Unpaid Salary Report",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountSalaryExportUnpaid"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Salary Status Reports",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountBulkExportUnpaid"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Clearance Reports",
+    "href": "https://staging-erp.parwestgroup.com/guard/accountClearanceExport"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Payroll Defaults",
+    "href": "https://staging-erp.parwestgroup.com/guard/payrollDefaults"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Month Initialise",
+    "href": "https://staging-erp.parwestgroup.com/guard/monthInitialise"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Guard Age Limit",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardAgeLimitForm"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Mental Health Limit",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardMentalHealthForm"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Onjob Training Settings",
+    "href": "https://staging-erp.parwestgroup.com/guard/onjob-training-intervals"
+  },
+  {
+    "topLabel": "Payroll",
+    "text": "Guard Status Update",
+    "href": "https://staging-erp.parwestgroup.com/guard/status-update"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Add New",
+    "href": "https://staging-erp.parwestgroup.com/client/create"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Search Client",
+    "href": "https://staging-erp.parwestgroup.com/client/searchResult"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Search Client V2",
+    "href": "https://staging-erp.parwestgroup.com/client/v2/search"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Types & Locations",
+    "href": "https://staging-erp.parwestgroup.com/client/typeList"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Black Listed",
+    "href": "https://staging-erp.parwestgroup.com/client/blackListedClients"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Export Branches",
+    "href": "https://staging-erp.parwestgroup.com/client/exportClientBranches"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Invoice Prerequisites",
+    "href": "https://staging-erp.parwestgroup.com/client/invoicePrerequisites"
+  },
+  {
+    "topLabel": "Clients",
+    "text": "Invoiced Billings",
+    "href": "https://staging-erp.parwestgroup.com/client/invoicedBillings"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Dashboard",
+    "href": "https://staging-erp.parwestgroup.com/inventory/dashboard"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Search",
+    "href": "https://staging-erp.parwestgroup.com/inventory/searchCustom"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Define Categories",
+    "href": "https://staging-erp.parwestgroup.com/inventory/categoryList"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Define Vendors",
+    "href": "https://staging-erp.parwestgroup.com/inventory/vendorList"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Define Conditions",
+    "href": "https://staging-erp.parwestgroup.com/inventory/conditionList"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Demand",
+    "href": "https://staging-erp.parwestgroup.com/inventory/demandInventoryForm"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Stock In",
+    "href": "https://staging-erp.parwestgroup.com/inventory/createProduct"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Assign Item",
+    "href": "https://staging-erp.parwestgroup.com/inventory/assignProductFormNew"
+  },
+  {
+    "topLabel": "Inventory",
+    "text": "Condemned Items",
+    "href": "https://staging-erp.parwestgroup.com/inventory/condemnedItems"
+  },
+  {
+    "topLabel": "Users",
+    "text": "Add New",
+    "href": "https://staging-erp.parwestgroup.com/user/create"
+  },
+  {
+    "topLabel": "Users",
+    "text": "Search",
+    "href": "https://staging-erp.parwestgroup.com/user/searchForm"
+  },
+  {
+    "topLabel": "Users",
+    "text": "M/S Relationship",
+    "href": "https://staging-erp.parwestgroup.com/user/assignManagerToSupervisorForm"
+  },
+  {
+    "topLabel": "Users",
+    "text": "Switch Supervisor",
+    "href": "https://staging-erp.parwestgroup.com/user/switchManagerForm"
+  },
+  {
+    "topLabel": "Users",
+    "text": "C/S Relationship",
+    "href": "https://staging-erp.parwestgroup.com/user/assignClientsBranchToSupervisorForm"
+  },
+  {
+    "topLabel": "Ticketing",
+    "text": "Listing",
+    "href": "https://staging-erp.parwestgroup.com/ticket"
+  },
+  {
+    "topLabel": "Ticketing",
+    "text": "Prerequisites",
+    "href": "https://staging-erp.parwestgroup.com/prerequisites"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Region",
+    "href": "https://staging-erp.parwestgroup.com/regions"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Regional Offices",
+    "href": "https://staging-erp.parwestgroup.com/guard/regionalOffices"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Pledgeable Document Types",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardPledgeableDocumentTypeList"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Bank Names",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardBankNames"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "User Types",
+    "href": "https://staging-erp.parwestgroup.com/user/allUserTypes"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "System Logos",
+    "href": "https://staging-erp.parwestgroup.com/user/updateLogos"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Verification Types",
+    "href": "https://staging-erp.parwestgroup.com/user/guardVerificationTypesList"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Verification Statuses",
+    "href": "https://staging-erp.parwestgroup.com/user/guardVerificationStatusesList"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Age Limit",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardAgeLimitForm"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Mental Health Limit",
+    "href": "https://staging-erp.parwestgroup.com/guard/guardMentalHealthForm"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Onjob Training Settings",
+    "href": "https://staging-erp.parwestgroup.com/guard/onjob-training-intervals"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Guard Status Update",
+    "href": "https://staging-erp.parwestgroup.com/guard/status-update"
+  },
+  {
+    "topLabel": "Settings",
+    "text": "Client Insurance Settings",
+    "href": "https://staging-erp.parwestgroup.com/client/clientInsuranceSettings"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Scheduled Reports",
+    "href": "https://staging-erp.parwestgroup.com/reports/scheduledreports"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Guard Deployment Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/guardDeploymentreports"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Day and Night duty guards",
+    "href": "https://staging-erp.parwestgroup.com/reports/dayNightDutyGuards"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Client Enrolled Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/clientEnrolledreports"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Guard Enrolled Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/guardEnrolledreports"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Unassign Inventry Guards",
+    "href": "https://staging-erp.parwestgroup.com/reports/unassignguards"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Short Deployee Guards",
+    "href": "https://staging-erp.parwestgroup.com/reports/shortdeployment"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Guards",
+    "href": "https://staging-erp.parwestgroup.com/reports/guards"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Daily Deployment Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/dailydeploymentreport"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Client / Branch Deactive report",
+    "href": "https://staging-erp.parwestgroup.com/reports/client-branch-deactive-report"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Client / Branch Increase-Decrease report",
+    "href": "https://staging-erp.parwestgroup.com/reports/clients/client-branch-increase-decrease-report"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Client Summary Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/client-summary"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Daily User Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/dailyUserReport"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Managers, Supervisors, Guards",
+    "href": "https://staging-erp.parwestgroup.com/reports/managers-supervisors-guards"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Inventory",
+    "href": "https://staging-erp.parwestgroup.com/inventory/inventory-report"
+  },
+  {
+    "topLabel": "Reports",
+    "text": "Finalized Paid Loan Report",
+    "href": "https://staging-erp.parwestgroup.com/reports/finalized-paid-loan"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "Add User",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/users/addUserBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD BANK DETAILS",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addBankDetailsBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD LOAN DETAILS",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addLoanDetailsBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "Mark Attendance",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/markAttendanceBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD EMPLOYMENT HISTORY",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addEmploymentHistoryBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD NEAREST RELATIVE",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addNearestRelativeBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD FAMILY",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addFamilyBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD JUDICIAL CASES",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addJudicialCasesBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD PLEDGED DOCUMENT",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addPledgedDocumentBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD VERIFICATIONS",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/guards/addVerificationsBulkImport"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD CLIENTS",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/clients/addClients"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADDD BRANCHES",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/clients/addBranches"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ADD INVENTORY",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/inventory/inventoryBulkImportPage"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "ASSIGN INVENTORY",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/inventory/inventoryBulkAssignPage"
+  },
+  {
+    "topLabel": "Imports",
+    "text": "Update INVENTORY",
+    "href": "https://staging-erp.parwestgroup.com/bulkImport/inventory/inventoryBulkUpdatePage"
+  },
+  {
+    "topLabel": "Requisitions",
+    "text": "Requisitions",
+    "href": "https://staging-erp.parwestgroup.com/guard/acceptedRejectedByCol"
+  },
+  {
+    "topLabel": "Audit",
+    "text": "Audit Report",
+    "href": "https://staging-erp.parwestgroup.com/audit/auditSearch"
+  }
+]

@@ -1,0 +1,96 @@
+{
+  "guard_profile_flow": {
+    "list_url": "https://staging-erp.parwestgroup.com/guard/search",
+    "detail_url": "https://staging-erp.parwestgroup.com/guard/show/31367",
+    "detail_title": "",
+    "detail_heading": "Whoops, looks like something went wrong.",
+    "detail_tabs": [],
+    "status": "error_exception",
+    "notes": "Guard profile route opens Laravel exception page for sampled records in read-only exploration."
+  },
+  "client_profile_flow": {
+    "list_url": "https://staging-erp.parwestgroup.com/client/searchResult",
+    "detail_url": "https://staging-erp.parwestgroup.com/client/show/327",
+    "detail_title": "::.. Parwest ..::",
+    "detail_heading": "Kothi No 11 Nisar Colony Samnabad Faisalabad 's Profile",
+    "detail_tabs": [
+      "General Information",
+      "Assigned Guards",
+      "Extra Guards",
+      "Branches",
+      "Pricing",
+      "Attachments",
+      "Inventory",
+      "Contact Information",
+      "Client Invoicing",
+      "Basic Information",
+      "Contact Person Info",
+      "Branch Manager's Information",
+      "Operations Manager's Information",
+      "Supervisor's Information"
+    ],
+    "status": "ok",
+    "notes": ""
+  },
+  "client_profile_flow_v2": {
+    "list_url": "https://staging-erp.parwestgroup.com/client/v2/search",
+    "detail_url": "https://staging-erp.parwestgroup.com/client/v2/show/327",
+    "detail_title": "::.. Parwest ..::",
+    "detail_heading": "Kothi No 11 Nisar Colony Samnabad Faisalabad - Profile V2",
+    "detail_tabs": [
+      "General Information",
+      "Assigned Guards",
+      "Extra Guards",
+      "Branches",
+      "Pricing",
+      "Inventory",
+      "Contact Information",
+      "Basic Information",
+      "Contact Person Info",
+      "Branch Manager's Information",
+      "Operations Manager's Information",
+      "Supervisor's Information"
+    ],
+    "status": "ok",
+    "notes": ""
+  },
+  "guard_prerequisites": {
+    "url": "https://staging-erp.parwestgroup.com/guard/mergedOptions",
+    "title": "::.. Parwest ..::",
+    "heading": "Guard Statuses",
+    "tabs": [],
+    "forms": 1,
+    "tables": 5,
+    "status": "ok",
+    "notes": ""
+  },
+  "client_invoice_prerequisites": {
+    "url": "https://staging-erp.parwestgroup.com/client/invoicePrerequisites",
+    "title": "::.. Parwest ..::",
+    "heading": "Contract Default Rates",
+    "tabs": [
+      "Default Rates",
+      "Client Provinces",
+      "Client Cities",
+      "Guard Types",
+      "Invoice Header"
+    ],
+    "forms": 0,
+    "tables": 4,
+    "status": "ok",
+    "notes": ""
+  },
+  "client_invoiced_billings": {
+    "url": "https://staging-erp.parwestgroup.com/client/invoicedBillings",
+    "title": "::.. Parwest ..::",
+    "heading": "Invoices",
+    "tabs": [
+      "Invoiced Billings",
+      "Error Invoices"
+    ],
+    "forms": 4,
+    "tables": 3,
+    "status": "ok",
+    "notes": ""
+  }
+}
