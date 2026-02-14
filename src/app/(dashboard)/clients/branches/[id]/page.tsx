@@ -6,7 +6,6 @@ import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "
 import SectionTitle from "@/components/ui/section-title"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import StatusChip from "@/components/ui/status-chip"
-import DataTable from "@/components/shared/DataTable"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -150,43 +149,50 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               </Link>
             </CardHeader>
             <CardBody>
-              <DataTable
-                rows={branch.deployments}
-                columns={[
-                  {
-                    key: "guard",
-                    header: "Guard",
-                    render: (deployment) => (
-                      <Link href={`/guards/${deployment.guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
-                        {deployment.guard.name}
-                      </Link>
-                    ),
-                  },
-                  { key: "parwestId", header: "Parwest ID", render: (deployment) => deployment.guard.parwestId },
-                  { key: "designation", header: "Designation", render: (deployment) => deployment.designation || "—" },
-                  {
-                    key: "status",
-                    header: "Status",
-                    render: (deployment) => (
-                      <StatusChip label={deployment.status} variant={deployment.status === "ACTIVE" ? "success" : "warning"} />
-                    ),
-                  },
-                  { key: "date", header: "Since", render: (deployment) => formatDate(deployment.deploymentDate) },
-                  {
-                    key: "view",
-                    header: "View",
-                    render: (deployment) => (
-                      <Link href={`/deployments/${deployment.id}`} className="text-[var(--brand)] hover:underline">
-                        Open
-                      </Link>
-                    ),
-                  },
-                ]}
-                getRowKey={(row) => row.id}
-                emptyText="No deployments at this branch yet."
-                searchable={false}
-                density="compact"
-              />
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Guard</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Parwest ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Designation</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Since</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">View</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {branch.deployments.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-[var(--text-muted)]">
+                          No deployments at this branch yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      branch.deployments.map((deployment) => (
+                        <tr key={deployment.id} className="hover:bg-[var(--surface-muted)]">
+                          <td className="px-6 py-4 text-sm">
+                            <Link href={`/guards/${deployment.guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
+                              {deployment.guard.name}
+                            </Link>
+                          </td>
+                          <td className="px-6 py-4 text-sm">{deployment.guard.parwestId}</td>
+                          <td className="px-6 py-4 text-sm">{deployment.designation || "—"}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <StatusChip label={deployment.status} variant={deployment.status === "ACTIVE" ? "success" : "warning"} />
+                          </td>
+                          <td className="px-6 py-4 text-sm">{formatDate(deployment.deploymentDate)}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <Link href={`/deployments/${deployment.id}`} className="text-[var(--brand)] hover:underline">
+                              Open
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </CardBody>
           </Card>
         </div>

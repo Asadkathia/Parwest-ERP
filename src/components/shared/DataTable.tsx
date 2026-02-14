@@ -13,7 +13,8 @@ type Column<T> = {
 interface DataTableProps<T> {
     rows: T[]
     columns: Column<T>[]
-    getRowKey: (row: T, index: number) => string
+    getRowKey?: (row: T, index: number) => string
+    rowKey?: keyof T | string
     searchable?: boolean
     searchPlaceholder?: string
     emptyText?: string
@@ -28,6 +29,7 @@ export default function DataTable<T extends Record<string, any>>({
     rows,
     columns,
     getRowKey,
+    rowKey,
     searchable = true,
     searchPlaceholder = "Search...",
     emptyText = "No records found.",
@@ -76,6 +78,13 @@ export default function DataTable<T extends Record<string, any>>({
         }
         setSortKey(key)
         setSortDir("asc")
+    }
+
+    const resolveRowKey = (row: T, index: number) => {
+        if (getRowKey) return getRowKey(row, index)
+        if (rowKey && row[rowKey as keyof T] != null) return String(row[rowKey as keyof T])
+        if (row.id != null) return String(row.id)
+        return String(index)
     }
 
     return (
@@ -127,7 +136,7 @@ export default function DataTable<T extends Record<string, any>>({
                             </tr>
                         ) : (
                             currentRows.map((row, index) => (
-                                <tr key={getRowKey(row, index)} className={rowHover ? "hover:bg-[var(--surface-muted)]" : ""}>
+                                <tr key={resolveRowKey(row, index)} className={rowHover ? "hover:bg-[var(--surface-muted)]" : ""}>
                                     {columns.map((column) => (
                                         <td
                                             key={String(column.key)}

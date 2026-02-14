@@ -7,7 +7,6 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import SectionTitle from "@/components/ui/section-title"
 import StatusChip from "@/components/ui/status-chip"
 import ActionButton from "@/components/ui/action-button"
-import DataTable from "@/components/shared/DataTable"
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -179,19 +178,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <p className="mt-1 text-sm text-[var(--text-muted)]">Real-time assigned/deployed guard snapshot for this client.</p>
             </CardHeader>
             <CardBody>
-              <DataTable
-                rows={[]}
-                columns={[
-                  { key: "guard", header: "Guard" },
-                  { key: "shift", header: "Shift" },
-                  { key: "contact", header: "Contact" },
-                  { key: "startDate", header: "Start Date" },
-                ]}
-                getRowKey={(_row, index) => String(index)}
-                emptyText="Assigned guards will appear here."
-                searchable={false}
-                density="compact"
-              />
+              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">
+                Assigned guards will appear here.
+              </div>
             </CardBody>
           </Card>
         </div>

@@ -5,7 +5,6 @@ import Link from "next/link"
 import { Building, MapPin, Building2, BriefcaseBusiness } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
-import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
 
 export default async function BranchesPage() {
@@ -43,54 +42,59 @@ export default async function BranchesPage() {
         <StatCard label="With Deployments" value={stats.withDeployments} icon={<BriefcaseBusiness className="h-5 w-5" />} tone="danger" />
       </div>
 
-      <DataTable
-        rows={branches}
-        columns={[
-          {
-            key: "client",
-            header: "Client",
-            sortable: true,
-            render: (branch) => (
-              <Link href={`/clients/${branch.clientId}`} className="font-medium text-[var(--brand)] hover:underline">
-                {branch.client.name}
-              </Link>
-            ),
-          },
-          {
-            key: "name",
-            header: "Branch Name",
-            sortable: true,
-            render: (branch) => (
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-[var(--text)]">{branch.name}</span>
-                {branch.isHeadOffice ? <StatusChip label="Head Office" variant="success" /> : null}
-              </div>
-            ),
-          },
-          { key: "code", header: "Code", render: (branch) => branch.code || "—" },
-          { key: "city", header: "City", render: (branch) => branch.city || "—", sortable: true },
-          { key: "province", header: "Province", render: (branch) => branch.province || "—", sortable: true },
-          { key: "clientType", header: "Type", render: (branch) => branch.client.type, sortable: true },
-          {
-            key: "deployments",
-            header: "Deployments",
-            render: (branch) => <StatusChip label={String(branch.deployments.length)} variant="neutral" />,
-          },
-          {
-            key: "actions",
-            header: "Actions",
-            render: (branch) => (
-              <Link href={`/clients/branches/${branch.id}`} className="text-[var(--brand)] hover:underline">
-                View Branch
-              </Link>
-            ),
-          },
-        ]}
-        getRowKey={(row) => row.id}
-        emptyText="No branches found. Branches will appear here once clients add them."
-        searchPlaceholder="Search branches..."
-        stickyHeader
-      />
+      <section className="ui-card overflow-x-auto">
+        <table className="w-full min-w-[1100px]">
+          <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Client</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Branch Name</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Code</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">City</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Province</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Deployments</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {branches.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                  No branches found. Branches will appear here once clients add them.
+                </td>
+              </tr>
+            ) : (
+              branches.map((branch) => (
+                <tr key={branch.id} className="hover:bg-[var(--surface-muted)]">
+                  <td className="px-6 py-4 text-sm">
+                    <Link href={`/clients/${branch.clientId}`} className="font-medium text-[var(--brand)] hover:underline">
+                      {branch.client.name}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[var(--text)]">{branch.name}</span>
+                      {branch.isHeadOffice ? <StatusChip label="Head Office" variant="success" /> : null}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm">{branch.code || "—"}</td>
+                  <td className="px-6 py-4 text-sm">{branch.city || "—"}</td>
+                  <td className="px-6 py-4 text-sm">{branch.province || "—"}</td>
+                  <td className="px-6 py-4 text-sm">{branch.client.type}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <StatusChip label={String(branch.deployments.length)} variant="neutral" />
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <Link href={`/clients/branches/${branch.id}`} className="text-[var(--brand)] hover:underline">
+                      View Branch
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </section>
     </div>
   )
 }
