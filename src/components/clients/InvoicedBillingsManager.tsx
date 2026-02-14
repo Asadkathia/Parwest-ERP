@@ -1,6 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import FilterBar from "@/components/ui/filter-bar"
+import SectionTitle from "@/components/ui/section-title"
+import DataTable from "@/components/shared/DataTable"
+import StatusChip from "@/components/ui/status-chip"
 
 type InvoiceRow = {
   id: string
@@ -73,58 +78,54 @@ export default function InvoicedBillingsManager() {
     setInvoiceStatus("")
   }
 
+  const tabClass = (tab: "Invoiced Billings" | "Error Invoices") =>
+    `px-3 py-1.5 text-sm rounded-full border transition ${
+      activeTab === tab
+        ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+        : "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]"
+    }`
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Invoiced Billings</h1>
-        <p className="text-gray-600 mt-1">Invoice billing management with error invoice tracking.</p>
-      </div>
+      <SectionTitle title="Invoiced Billings" subtitle="Invoice billing management with error invoice tracking." />
 
-      <div className="bg-white rounded-lg border p-4">
-        <div className="flex flex-wrap gap-2 mb-4">
-          {["Invoiced Billings", "Error Invoices"].map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab as "Invoiced Billings" | "Error Invoices")}
-              className={`px-3 py-1.5 text-sm rounded-full border ${activeTab === tab ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700"}`}
-            >
-              {tab}
-            </button>
-          ))}
+      <FilterBar className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setActiveTab("Invoiced Billings")} className={tabClass("Invoiced Billings")}>Invoiced Billings</button>
+          <button type="button" onClick={() => setActiveTab("Error Invoices")} className={tabClass("Error Invoices")}>Error Invoices</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-            <input value={client} onChange={(e) => setClient(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="--Select Client--" />
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Client</label>
+            <input value={client} onChange={(e) => setClient(e.target.value)} className="ui-input" placeholder="--Select Client--" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Select Branch</label>
-            <input value={branch} onChange={(e) => setBranch(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="--Select Branch--" />
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Branch</label>
+            <input value={branch} onChange={(e) => setBranch(e.target.value)} className="ui-input" placeholder="--Select Branch--" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Select Invoice Month</label>
-            <input type="month" value={invoiceMonth} onChange={(e) => setInvoiceMonth(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoice Month</label>
+            <input type="month" value={invoiceMonth} onChange={(e) => setInvoiceMonth(e.target.value)} className="ui-input" />
           </div>
 
           {activeTab === "Invoiced Billings" ? (
             <>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select Invoices From</label>
-                <input type="date" value={invoicesFrom} onChange={(e) => setInvoicesFrom(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoices From</label>
+                <input type="date" value={invoicesFrom} onChange={(e) => setInvoicesFrom(e.target.value)} className="ui-input" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select Invoices To</label>
-                <input type="date" value={invoicesTo} onChange={(e) => setInvoicesTo(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoices To</label>
+                <input type="date" value={invoicesTo} onChange={(e) => setInvoicesTo(e.target.value)} className="ui-input" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Invoice Due Date</label>
-                <input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Invoice Due Date</label>
+                <input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} className="ui-input" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select Invoice Status</label>
-                <select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoice Status</label>
+                <select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value)} className="ui-select">
                   <option value="">--Select Invoice Status--</option>
                   <option value="Pending">Pending</option>
                   <option value="Posted">Posted</option>
@@ -134,77 +135,51 @@ export default function InvoicedBillingsManager() {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-4">
-          <button className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">SEARCH</button>
-          <button onClick={clearFilters} className="border px-3 py-2 rounded-md text-sm hover:bg-gray-50">Clear</button>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton>SEARCH</ActionButton>
+          <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
         </div>
-      </div>
+      </FilterBar>
 
-      <div className="bg-white rounded-lg border overflow-x-auto">
-        {activeTab === "Invoiced Billings" ? (
-          <table className="w-full min-w-[1100px]">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Invoice Number</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Client</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Branch</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Total</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Paid</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Balance</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Status</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">View</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Download</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredInvoices.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-500">No invoice records found.</td></tr>
-              ) : (
-                filteredInvoices.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{row.invoiceNumber}</td>
-                    <td className="px-4 py-3 text-sm">{row.client}</td>
-                    <td className="px-4 py-3 text-sm">{row.branch}</td>
-                    <td className="px-4 py-3 text-sm">{row.total.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">{row.paid.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">{row.balance.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">{row.status}</td>
-                    <td className="px-4 py-3 text-sm text-blue-600">View</td>
-                    <td className="px-4 py-3 text-sm text-green-600">Download</td>
-                    <td className="px-4 py-3 text-sm text-emerald-600">Edit</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        ) : (
-          <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Client</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Branch</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Reason</th>
-                <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Month</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredErrors.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">No error invoices found.</td></tr>
-              ) : (
-                filteredErrors.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">{row.client}</td>
-                    <td className="px-4 py-3 text-sm">{row.branch}</td>
-                    <td className="px-4 py-3 text-sm">{row.reason}</td>
-                    <td className="px-4 py-3 text-sm">{row.month}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {activeTab === "Invoiced Billings" ? (
+        <DataTable
+          rows={filteredInvoices}
+          columns={[
+            { key: "invoiceNumber", header: "Invoice Number", sortable: true },
+            { key: "client", header: "Client", sortable: true },
+            { key: "branch", header: "Branch", sortable: true },
+            { key: "total", header: "Total", render: (row) => row.total.toLocaleString(), sortable: true },
+            { key: "paid", header: "Paid", render: (row) => row.paid.toLocaleString(), sortable: true },
+            { key: "balance", header: "Balance", render: (row) => row.balance.toLocaleString(), sortable: true },
+            {
+              key: "status",
+              header: "Status",
+              render: (row) => <StatusChip label={row.status} variant={row.status === "Posted" ? "success" : "warning"} />,
+            },
+            { key: "view", header: "View", render: () => <span className="text-[var(--brand)]">View</span> },
+            { key: "download", header: "Download", render: () => <span className="text-emerald-700">Download</span> },
+            { key: "action", header: "Action", render: () => <span className="text-emerald-700">Edit</span> },
+          ]}
+          getRowKey={(row) => row.id}
+          emptyText="No invoice records found."
+          searchable={false}
+          stickyHeader
+        />
+      ) : (
+        <DataTable
+          rows={filteredErrors}
+          columns={[
+            { key: "client", header: "Client", sortable: true },
+            { key: "branch", header: "Branch", sortable: true },
+            { key: "reason", header: "Reason" },
+            { key: "month", header: "Month", sortable: true },
+          ]}
+          getRowKey={(row) => row.id}
+          emptyText="No error invoices found."
+          searchable={false}
+          stickyHeader
+        />
+      )}
     </div>
   )
 }

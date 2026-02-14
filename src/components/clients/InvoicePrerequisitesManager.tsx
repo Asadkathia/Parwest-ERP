@@ -1,6 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import EmptyState from "@/components/ui/empty-state"
+import FilterBar from "@/components/ui/filter-bar"
+import SectionTitle from "@/components/ui/section-title"
+import DataTable from "@/components/shared/DataTable"
 
 type RateRow = {
   id: string
@@ -51,35 +56,37 @@ export default function InvoicePrerequisitesManager() {
     setRatePerMonth("")
   }
 
+  const tabClass = (tab: (typeof TABS)[number]) =>
+    `px-3 py-1.5 text-sm rounded-full border transition ${
+      activeTab === tab
+        ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+        : "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]"
+    }`
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Client Invoice Prerequisites</h1>
-        <p className="text-gray-600 mt-1">Manage default rates, provinces, cities, guard types, and invoice header settings.</p>
-      </div>
+      <SectionTitle
+        title="Client Invoice Prerequisites"
+        subtitle="Manage default rates, provinces, cities, guard types, and invoice header settings."
+      />
 
-      <div className="bg-white rounded-lg border p-4">
+      <FilterBar className="space-y-4">
         <div className="flex flex-wrap gap-2">
           {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 text-sm rounded-full border ${activeTab === tab ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700"}`}
-            >
+            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={tabClass(tab)}>
               {tab}
             </button>
           ))}
         </div>
-      </div>
+      </FilterBar>
 
       {activeTab === "Default Rates" ? (
         <>
-          <div className="bg-white rounded-lg border p-4 space-y-4">
+          <FilterBar className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select Province</label>
-                <select value={province} onChange={(e) => setProvince(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Province</label>
+                <select value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">
                   <option value="">All Provinces</option>
                   <option value="Punjab">Punjab</option>
                   <option value="Sindh">Sindh</option>
@@ -88,12 +95,12 @@ export default function InvoicePrerequisitesManager() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select City</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="City" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
+                <input value={city} onChange={(e) => setCity(e.target.value)} className="ui-input" placeholder="City" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Select Guard Type</label>
-                <select value={guardType} onChange={(e) => setGuardType(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Guard Type</label>
+                <select value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
                   <option value="">All Types</option>
                   <option value="Guard">Guard</option>
                   <option value="Supervisor">Supervisor</option>
@@ -101,51 +108,41 @@ export default function InvoicePrerequisitesManager() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Rate/Month</label>
-                <input type="number" value={ratePerMonth} onChange={(e) => setRatePerMonth(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Rate" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Rate/Month</label>
+                <input
+                  type="number"
+                  value={ratePerMonth}
+                  onChange={(e) => setRatePerMonth(e.target.value)}
+                  className="ui-input"
+                  placeholder="Rate"
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">SEARCH!</button>
-              <button onClick={onSave} className="bg-green-600 text-white px-3 py-2 rounded-md text-sm hover:bg-green-700">SAVE</button>
+              <ActionButton>SEARCH!</ActionButton>
+              <ActionButton variant="secondary" onClick={onSave}>SAVE</ActionButton>
             </div>
-          </div>
+          </FilterBar>
 
-          <div className="bg-white rounded-lg border overflow-x-auto">
-            <table className="w-full min-w-[760px]">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Client Province</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Client City</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Guard Type</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Rate/Month</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-600">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">No rates found.</td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{row.province}</td>
-                      <td className="px-4 py-3 text-sm">{row.city}</td>
-                      <td className="px-4 py-3 text-sm">{row.guardType}</td>
-                      <td className="px-4 py-3 text-sm">{row.ratePerMonth.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-blue-600">Edit</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={filteredRows}
+            columns={[
+              { key: "province", header: "Client Province", sortable: true },
+              { key: "city", header: "Client City", sortable: true },
+              { key: "guardType", header: "Guard Type", sortable: true },
+              { key: "ratePerMonth", header: "Rate/Month", render: (row) => row.ratePerMonth.toLocaleString(), sortable: true },
+              { key: "action", header: "Action", render: () => <span className="text-[var(--brand)]">Edit</span> },
+            ]}
+            getRowKey={(row) => row.id}
+            emptyText="No rates found."
+            searchable={false}
+          />
         </>
       ) : (
-        <div className="bg-white rounded-lg border p-10 text-center text-sm text-gray-500">
-          {activeTab} UI scaffold is ready for frontend parity and can be fully wired in the next pass.
-        </div>
+        <EmptyState
+          title={`${activeTab} UI scaffold is ready`}
+          description="This section is styled and prepared for full frontend parity wiring in the next pass."
+        />
       )}
     </div>
   )

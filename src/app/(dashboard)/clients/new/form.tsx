@@ -48,9 +48,9 @@ export default function ClientEnrollmentForm({ regions }: Props) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
@@ -58,29 +58,29 @@ export default function ClientEnrollmentForm({ regions }: Props) {
             <div className="space-y-8">
                 {/* Basic Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Basic Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Client Name <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
                                 name="name"
                                 required
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter client name"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Client Type <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="type"
                                 required
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select type</option>
                                 <option value="BANK">Bank</option>
@@ -94,35 +94,35 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Email
                             </label>
                             <input
                                 type="email"
                                 name="email"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="client@example.com"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Enrollment Date
                             </label>
                             <input
                                 type="date"
                                 name="enrollmentDate"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Region
                             </label>
                             <select
                                 name="regionId"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select region</option>
                                 {regions.map((region) => (
@@ -134,25 +134,25 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 City
                             </label>
                             <input
                                 type="text"
                                 name="city"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter city"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Status
                             </label>
                             <select
                                 name="status"
                                 defaultValue="ACTIVE"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="ACTIVE">Active</option>
                                 <option value="INACTIVE">Inactive</option>
@@ -165,9 +165,9 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                                     type="checkbox"
                                     name="isBranchless"
                                     value="true"
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="h-4 w-4 accent-[var(--brand)]"
                                 />
-                                <span className="text-sm font-medium text-gray-700">Branchless Client</span>
+                                <span className="text-sm text-[var(--text)]">Branchless Client</span>
                             </label>
                         </div>
                     </div>
@@ -175,16 +175,16 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Address Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Address Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Address Information</h2>
                     <div className="grid grid-cols-1 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Head Office Address
                             </label>
                             <textarea
                                 name="headOfficeAddress"
                                 rows={3}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-textarea"
                                 placeholder="Enter head office address"
                             />
                         </div>
@@ -193,41 +193,41 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Contact Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Contact Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact Person</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person</label>
                             <input
                                 type="text"
                                 name="contactPerson"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Contact person"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
                             <input
                                 type="text"
                                 name="contactNumber"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Contact number"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Client Location</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client Location</label>
                             <input
                                 type="text"
                                 name="clientLocation"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Client location"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Client Postal Code</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client Postal Code</label>
                             <input
                                 type="text"
                                 name="clientPostalCode"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Postal code"
                             />
                         </div>
@@ -236,75 +236,75 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Introducer/Referral */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Introducer / Referral</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Introducer / Referral</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Name</label>
-                            <input type="text" name="introducerName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Name" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Name</label>
+                            <input type="text" name="introducerName" className="ui-input" placeholder="Name" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Contact Number</label>
-                            <input type="text" name="introducerContactNumber" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Contact number" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Contact Number</label>
+                            <input type="text" name="introducerContactNumber" className="ui-input" placeholder="Contact number" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Address</label>
-                            <input type="text" name="introducerAddress" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Address" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Address</label>
+                            <input type="text" name="introducerAddress" className="ui-input" placeholder="Address" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer CNIC Number</label>
-                            <input type="text" name="introducerCnicNumber" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="CNIC number" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer CNIC Number</label>
+                            <input type="text" name="introducerCnicNumber" className="ui-input" placeholder="CNIC number" />
                         </div>
                     </div>
                 </div>
 
                 {/* Tax & Legal Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Tax & Legal Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Tax & Legal Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 NTN (National Tax Number)
                             </label>
                             <input
                                 type="text"
                                 name="ntn"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter NTN"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 STRN (Sales Tax Registration)
                             </label>
                             <input
                                 type="text"
                                 name="strn"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter STRN"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contract Document URL
                             </label>
                             <input
                                 type="url"
                                 name="contractUrl"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="https://..."
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Logo URL
                             </label>
                             <input
                                 type="url"
                                 name="logoUrl"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="https://..."
                             />
                         </div>
@@ -313,26 +313,26 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Assign Weapon */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Assign Weapon</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Assign Weapon</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">License Number</label>
-                            <input type="text" name="licenseNumber" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="License number" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">License Number</label>
+                            <input type="text" name="licenseNumber" className="ui-input" placeholder="License number" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Serial Number</label>
-                            <input type="text" name="serialNumber" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Serial number" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Serial Number</label>
+                            <input type="text" name="serialNumber" className="ui-input" placeholder="Serial number" />
                         </div>
                     </div>
                 </div>
 
                 {/* Operational Territory */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Operational Territory</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Operational Territory</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Operational Provinces</label>
-                            <select name="operationalProvinces" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Operational Provinces</label>
+                            <select name="operationalProvinces" className="ui-select">
                                 <option value="">Select operational territory</option>
                                 <option value="Punjab">Punjab</option>
                                 <option value="Sindh">Sindh</option>
@@ -346,15 +346,15 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Branchless Location Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Branchless Location Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Location Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Location Name</label>
-                            <input type="text" name="locationName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Location name" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Location Name</label>
+                            <input type="text" name="locationName" className="ui-input" placeholder="Location name" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Select Regional Office</label>
-                            <select name="locationRegionalOffice" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
+                            <select name="locationRegionalOffice" className="ui-select">
                                 <option value="">Select regional office</option>
                                 {regions.map((region) => (
                                     <option key={region.id} value={region.id}>{region.name}</option>
@@ -362,63 +362,63 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
-                            <input type="text" name="latitude" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="(-90 to 90)" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Latitude</label>
+                            <input type="text" name="latitude" className="ui-input" placeholder="(-90 to 90)" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
-                            <input type="text" name="longitude" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="(-180 to 180)" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Longitude</label>
+                            <input type="text" name="longitude" className="ui-input" placeholder="(-180 to 180)" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Day Guard Capacity</label>
-                            <input type="number" name="dayGuardCapacity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Day Guard Capacity</label>
+                            <input type="number" name="dayGuardCapacity" className="ui-input" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Night Guard Capacity</label>
-                            <input type="number" name="nightGuardCapacity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Night Guard Capacity</label>
+                            <input type="number" name="nightGuardCapacity" className="ui-input" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Day Supervisor Capacity</label>
-                            <input type="number" name="daySupervisorCapacity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Day Supervisor Capacity</label>
+                            <input type="number" name="daySupervisorCapacity" className="ui-input" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Night Supervisor Capacity</label>
-                            <input type="number" name="nightSupervisorCapacity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Night Supervisor Capacity</label>
+                            <input type="number" name="nightSupervisorCapacity" className="ui-input" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">CPO Capacity</label>
-                            <input type="number" name="cpoCapacity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">CPO Capacity</label>
+                            <input type="number" name="cpoCapacity" className="ui-input" placeholder="0" />
                         </div>
                     </div>
                 </div>
 
                 {/* Branchless Client Contract */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Branchless Client Contract</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Client Contract</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contract Start</label>
-                            <input type="date" name="contractStart" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Start</label>
+                            <input type="date" name="contractStart" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contract End</label>
-                            <input type="date" name="contractEnd" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract End</label>
+                            <input type="date" name="contractEnd" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contract Rate Start</label>
-                            <input type="date" name="contractRateStart" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate Start</label>
+                            <input type="date" name="contractRateStart" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contract Rate End</label>
-                            <input type="date" name="contractRateEnd" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate End</label>
+                            <input type="date" name="contractRateEnd" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-                            <input type="text" name="contractCity" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="City" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">City</label>
+                            <input type="text" name="contractCity" className="ui-input" placeholder="City" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Guard Type</label>
-                            <select name="contractGuardType" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Type</label>
+                            <select name="contractGuardType" className="ui-select">
                                 <option value="">Select guard type</option>
                                 <option value="Guard">Guard</option>
                                 <option value="Supervisor">Supervisor</option>
@@ -426,8 +426,8 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Guard Ex Service</label>
-                            <select name="contractGuardExService" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
+                            <select name="contractGuardExService" className="ui-select">
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
@@ -435,8 +435,8 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Price</label>
-                            <input type="number" name="contractPrice" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Price" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Price</label>
+                            <input type="number" name="contractPrice" className="ui-input" placeholder="Price" />
                         </div>
                     </div>
                 </div>
@@ -446,7 +446,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link
                     href="/clients"
-                    className="flex items-center gap-2 px-6 py-2 border rounded-md hover:bg-gray-50"
+                    className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Cancel
@@ -454,7 +454,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="h-4 w-4" />
                     {loading ? "Saving..." : "Save Client"}

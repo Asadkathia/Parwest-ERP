@@ -2,7 +2,10 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
-import { ArrowLeft, Edit, MapPin, Building, User, Calendar, FileText } from "lucide-react"
+import { ArrowLeft, Edit, Building, User, Calendar, FileText } from "lucide-react"
+import SectionTitle from "@/components/ui/section-title"
+import { Card, CardBody, CardHeader } from "@/components/ui/card"
+import StatusChip from "@/components/ui/status-chip"
 
 export default async function DeploymentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -30,232 +33,109 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
     })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-green-100 text-green-800"
-      case "INACTIVE":
-        return "bg-gray-100 text-gray-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Link
-            href="/deployments"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Deployments
-          </Link>
-          <h1 className="text-3xl font-bold">Deployment Details</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          {deployment.status === "ACTIVE" && (
-            <Link
-              href={`/deployments/${deployment.id}/end`}
-              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-            >
-              End Deployment
+      <SectionTitle
+        title="Deployment Details"
+        subtitle={`${deployment.guard.name} deployed at ${deployment.client.name}${deployment.branch ? ` - ${deployment.branch.name}` : ""}`}
+        action={
+          <div className="flex items-center gap-2">
+            <Link href="/deployments" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </Link>
-          )}
-          <Link
-            href={`/deployments/${deployment.id}/edit`}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            <Edit className="h-4 w-4" />
-            Edit Deployment
-          </Link>
-        </div>
-      </div>
+            {deployment.status === "ACTIVE" ? (
+              <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger">
+                End Deployment
+              </Link>
+            ) : null}
+            <Link href={`/deployments/${deployment.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+              <Edit className="h-4 w-4" />
+              Edit
+            </Link>
+          </div>
+        }
+      />
 
-      {/* Summary Card */}
-      <div className="bg-white rounded-lg border p-6">
-        <div className="flex items-start justify-between">
+      <Card>
+        <CardBody className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-2xl font-bold">{deployment.guard.name}</h2>
-            <p className="text-gray-600 mt-1">
-              Deployed at {deployment.client.name}{deployment.branch && ` - ${deployment.branch.name}`}
-            </p>
+            <h2 className="text-xl font-semibold text-[var(--text)]">{deployment.guard.name}</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">{deployment.client.name}{deployment.branch ? ` - ${deployment.branch.name}` : ""}</p>
           </div>
-          <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(deployment.status)}`}>
-            {deployment.status}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div>
-            <p className="text-sm text-gray-600">Deployment Date</p>
-            <p className="font-medium mt-1">{formatDate(deployment.deploymentDate)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Designation</p>
-            <p className="font-medium mt-1">{deployment.designation || "—"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Guard ID</p>
-            <p className="font-medium mt-1">{deployment.guard.parwestId}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Branch Code</p>
-            <p className="font-medium mt-1">{deployment.branch?.code || "—"}</p>
-          </div>
-        </div>
-      </div>
+          <StatusChip label={deployment.status} variant={deployment.status === "ACTIVE" ? "success" : "warning"} />
+        </CardBody>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Guard Information */}
-          <div className="bg-white rounded-lg border p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <User className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-semibold">Guard Information</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Name</p>
-                <Link
-                  href={`/guards/${deployment.guard.id}`}
-                  className="font-medium text-blue-600 hover:text-blue-800 mt-1 block"
-                >
-                  {deployment.guard.name}
-                </Link>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Parwest ID</p>
-                <p className="font-medium mt-1">{deployment.guard.parwestId}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">CNIC</p>
-                <p className="font-medium mt-1">{deployment.guard.cnic}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-medium mt-1">{deployment.guard.phone || "—"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium mt-1">{deployment.guard.email || "—"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Status</p>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium inline-block mt-1 ${getStatusColor(deployment.guard.status)}`}>
-                  {deployment.guard.status}
-                </span>
-              </div>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Guard Information
+              </h3>
+            </CardHeader>
+            <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div><p className="text-[var(--text-muted)]">Name</p><Link href={`/guards/${deployment.guard.id}`} className="font-medium text-[var(--brand)] hover:underline">{deployment.guard.name}</Link></div>
+              <div><p className="text-[var(--text-muted)]">Parwest ID</p><p className="font-medium text-[var(--text)]">{deployment.guard.parwestId}</p></div>
+              <div><p className="text-[var(--text-muted)]">CNIC</p><p className="font-medium text-[var(--text)]">{deployment.guard.cnic}</p></div>
+              <div><p className="text-[var(--text-muted)]">Phone</p><p className="font-medium text-[var(--text)]">{deployment.guard.phone || "—"}</p></div>
+              <div><p className="text-[var(--text-muted)]">Email</p><p className="font-medium text-[var(--text)]">{deployment.guard.email || "—"}</p></div>
+              <div><p className="text-[var(--text-muted)]">Status</p><StatusChip label={deployment.guard.status} variant={deployment.guard.status === "ACTIVE" ? "success" : "warning"} /></div>
+            </CardBody>
+          </Card>
 
-          {/* Client & Branch Information */}
-          <div className="bg-white rounded-lg border p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Building className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-semibold">Client & Branch Information</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Client</p>
-                <Link
-                  href={`/clients/${deployment.client.id}`}
-                  className="font-medium text-blue-600 hover:text-blue-800 mt-1 block"
-                >
-                  {deployment.client.name}
-                </Link>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Client Type</p>
-                <p className="font-medium mt-1">{deployment.client.type}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Branch Name</p>
-                <p className="font-medium mt-1">{deployment.branch?.name || "—"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Branch Code</p>
-                <p className="font-medium mt-1">{deployment.branch?.code || "—"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">City</p>
-                <p className="font-medium mt-1">{deployment.branch?.city || "—"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Province</p>
-                <p className="font-medium mt-1">{deployment.branch?.province || "—"}</p>
-              </div>
-              {deployment.branch?.address && (
-                <div className="md:col-span-2">
-                  <p className="text-sm text-gray-600">Branch Address</p>
-                  <p className="font-medium mt-1">{deployment.branch.address}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Client & Branch Information
+              </h3>
+            </CardHeader>
+            <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div><p className="text-[var(--text-muted)]">Client</p><Link href={`/clients/${deployment.client.id}`} className="font-medium text-[var(--brand)] hover:underline">{deployment.client.name}</Link></div>
+              <div><p className="text-[var(--text-muted)]">Client Type</p><p className="font-medium text-[var(--text)]">{deployment.client.type}</p></div>
+              <div><p className="text-[var(--text-muted)]">Branch Name</p><p className="font-medium text-[var(--text)]">{deployment.branch?.name || "—"}</p></div>
+              <div><p className="text-[var(--text-muted)]">Branch Code</p><p className="font-medium text-[var(--text)]">{deployment.branch?.code || "—"}</p></div>
+              <div><p className="text-[var(--text-muted)]">City</p><p className="font-medium text-[var(--text)]">{deployment.branch?.city || "—"}</p></div>
+              <div><p className="text-[var(--text-muted)]">Province</p><p className="font-medium text-[var(--text)]">{deployment.branch?.province || "—"}</p></div>
+              {deployment.branch?.address ? <div className="md:col-span-2"><p className="text-[var(--text-muted)]">Address</p><p className="font-medium text-[var(--text)]">{deployment.branch.address}</p></div> : null}
+            </CardBody>
+          </Card>
 
-          {/* Additional Information */}
-          {deployment.notes && (
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="h-5 w-5 text-gray-600" />
-                <h3 className="text-lg font-semibold">Notes</h3>
-              </div>
-              <p className="text-gray-700">{deployment.notes}</p>
-            </div>
-          )}
+          {deployment.notes ? (
+            <Card>
+              <CardHeader>
+                <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2"><FileText className="h-4 w-4" />Notes</h3>
+              </CardHeader>
+              <CardBody><p className="text-sm text-[var(--text)]">{deployment.notes}</p></CardBody>
+            </Card>
+          ) : null}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Deployment Timeline */}
-          <div className="bg-white rounded-lg border p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-semibold">Timeline</h3>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600">Deployment Date</p>
-                <p className="font-medium mt-1">{formatDate(deployment.deploymentDate)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Created</p>
-                <p className="text-sm text-gray-700 mt-1">{formatDate(deployment.createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Last Updated</p>
-                <p className="text-sm text-gray-700 mt-1">{formatDate(deployment.updatedAt)}</p>
-              </div>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2"><Calendar className="h-4 w-4" />Timeline</h3>
+            </CardHeader>
+            <CardBody className="space-y-3 text-sm">
+              <div><p className="text-[var(--text-muted)]">Deployment Date</p><p className="font-medium text-[var(--text)]">{formatDate(deployment.deploymentDate)}</p></div>
+              <div><p className="text-[var(--text-muted)]">Created</p><p className="font-medium text-[var(--text)]">{formatDate(deployment.createdAt)}</p></div>
+              <div><p className="text-[var(--text-muted)]">Last Updated</p><p className="font-medium text-[var(--text)]">{formatDate(deployment.updatedAt)}</p></div>
+            </CardBody>
+          </Card>
 
-          {/* Quick Actions */}
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-            <div className="space-y-2">
-              <Link
-                href={`/guards/${deployment.guard.id}`}
-                className="block w-full text-left px-4 py-2 border rounded-md hover:bg-gray-50"
-              >
-                View Guard Profile
-              </Link>
-              <Link
-                href={`/clients/${deployment.client.id}`}
-                className="block w-full text-left px-4 py-2 border rounded-md hover:bg-gray-50"
-              >
-                View Client Details
-              </Link>
-              <button
-                className="w-full text-left px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50"
-              >
-                End Deployment
-              </button>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)]">Quick Actions</h3>
+            </CardHeader>
+            <CardBody className="space-y-2">
+              <Link href={`/guards/${deployment.guard.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Guard Profile</Link>
+              <Link href={`/clients/${deployment.client.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Client Details</Link>
+              {deployment.status === "ACTIVE" ? <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger w-full text-left">End Deployment</Link> : null}
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>

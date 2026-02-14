@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import GuardEnrollmentForm from "./form"
+import SectionTitle from "@/components/ui/section-title"
 
 export default async function NewGuardPage() {
     const session = await auth()
@@ -19,10 +20,7 @@ export default async function NewGuardPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Add New Guard</h1>
-                <p className="text-gray-600 mt-1">Enroll a new security guard into the system</p>
-            </div>
+            <SectionTitle title="Add New Guard" subtitle="Enroll a new security guard into the system" />
 
             <GuardEnrollmentForm regions={regions} regionalOffices={regionalOffices} />
         </div>

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
 import { inventoryLinks, inventoryScreens } from "@/lib/parity/screenConfigs"
 
 export default async function InventoryScreenPage({ params }: { params: Promise<{ screen: string }> }) {
@@ -10,5 +10,5 @@ export default async function InventoryScreenPage({ params }: { params: Promise<
     notFound()
   }
 
-  return <UiDocScreen {...config} links={inventoryLinks} />
+  return <ConfiguredInteractiveScreen config={config} links={inventoryLinks} />
 }

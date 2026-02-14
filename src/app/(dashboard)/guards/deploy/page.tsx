@@ -9,9 +9,5 @@ export default async function DeployGuardPage() {
         redirect("/login")
     }
 
-    return (
-        <div className="p-8">
-            <DeployGuardForm />
-        </div>
-    )
+    return <DeployGuardForm />
 }

@@ -1,112 +1,129 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { BellRing, Building2, MapPinned, MessageSquareMore, ShieldCheck, Sparkles, Users } from "lucide-react"
+import StatCard from "@/components/ui/stat-card"
+import { Card, CardBody, CardHeader } from "@/components/ui/card"
+import SectionTitle from "@/components/ui/section-title"
+import Panel from "@/components/ui/panel"
+import ActionButton from "@/components/ui/action-button"
+import { Select } from "@/components/ui/form-controls"
+import StatusChip from "@/components/ui/status-chip"
 
 export default async function DashboardPage() {
-    const session = await auth()
+  const session = await auth()
+  if (!session) redirect("/login")
 
-    if (!session) {
-        redirect("/login")
-    }
+  return (
+    <div className="space-y-6">
+      <SectionTitle
+        title="Dashboard"
+        subtitle={`Welcome back, ${session.user?.name || "Admin"}.`}
+        action={
+          <Link
+            href="/dashboard/ai-chat"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-xs)]"
+          >
+            <Sparkles className="h-4 w-4" />
+            AI Chat
+          </Link>
+        }
+      />
 
-    return (
-        <div className="p-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground mt-2">
-                    Welcome back, {session.user?.name}!
-                </p>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Guards" value={0} tone="brand" icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Active Deployments" value={0} tone="success" icon={<MapPinned className="h-5 w-5" />} />
+        <StatCard label="Total Clients" value={0} tone="warning" icon={<Building2 className="h-5 w-5" />} />
+        <StatCard label="Pending Tickets" value={0} tone="danger" icon={<MessageSquareMore className="h-5 w-5" />} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <Card>
+          <CardHeader>
+            <SectionTitle
+              title="Things To Do"
+              subtitle="Today's events"
+              action={
+                <div className="flex items-center gap-2">
+                  <Select className="w-40">
+                    <option>All Clients</option>
+                  </Select>
+                  <ActionButton>New To Do</ActionButton>
+                </div>
+              }
+            />
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[linear-gradient(180deg,#f8faff_0%,#f4f7ff_100%)] p-4">
+              <div className="grid grid-cols-6 gap-3 text-center text-xs text-[var(--text-muted)] mb-4">
+                {["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26"].map((day, idx) => (
+                  <div key={day} className={idx === 1 ? "font-semibold text-[var(--brand)]" : ""}>{day}</div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                  <p className="font-medium">Fire Inspection today</p>
+                  <p className="text-xs text-[var(--text-muted)]">2:00 pm</p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                  <p className="font-medium">Waste pickup scheduled</p>
+                  <p className="text-xs text-[var(--text-muted)]">2:00 to 4:00 pm</p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                  <p className="font-medium">Night supervisor briefing</p>
+                  <p className="text-xs text-[var(--text-muted)]">8:00 pm</p>
+                </div>
+              </div>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Total Guards</p>
-                            <h3 className="text-2xl font-bold mt-2">0</h3>
-                        </div>
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <svg className="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="rounded-lg border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Active Deployments</p>
-                            <h3 className="text-2xl font-bold mt-2">0</h3>
-                        </div>
-                        <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                            <svg className="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="rounded-lg border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
-                            <h3 className="text-2xl font-bold mt-2">0</h3>
-                        </div>
-                        <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                            <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="rounded-lg border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Pending Tickets</p>
-                            <h3 className="text-2xl font-bold mt-2">0</h3>
-                        </div>
-                        <div className="h-12 w-12 rounded-full bg-orange-500/10 flex items-center justify-center">
-                            <svg className="h-6 w-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
+            <div className="flex items-center justify-between">
+              <StatusChip variant="success" label="Online Users : 53" />
+              <Link href="/dashboard/online-users" className="text-sm font-semibold text-[var(--brand)] hover:underline">
+                Open Online Users
+              </Link>
             </div>
+          </CardBody>
+        </Card>
 
-            <div className="mt-8 rounded-lg border bg-card p-6 shadow-sm">
-                <h2 className="text-xl font-semibold mb-4">User Information</h2>
-                <div className="space-y-2">
-                    <p><span className="font-medium">Name:</span> {session.user?.name}</p>
-                    <p><span className="font-medium">Email:</span> {session.user?.email}</p>
-                    <p><span className="font-medium">Role:</span> {session.user?.role}</p>
-                </div>
+        <div className="space-y-4">
+          <Panel>
+            <SectionTitle title="Compliance" subtitle="Alerts and upcoming expiries" />
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+                <p><strong>5 new</strong> contracts are due to expire this week.</p>
+              </div>
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+                <p>Dr. Kang&apos;s CDS license expires in 30 days.</p>
+              </div>
             </div>
+          </Panel>
 
-            <div className="mt-8 rounded-lg border bg-card p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                    <h2 className="text-xl font-semibold">Home (Map View)</h2>
-                    <div className="flex items-center gap-2">
-                        <select className="border rounded-md px-3 py-2 text-sm">
-                            <option>All Clients</option>
-                        </select>
-                        <button className="bg-blue-600 text-white rounded-md px-4 py-2 text-sm hover:bg-blue-700">GO</button>
-                    </div>
-                </div>
-                <div className="h-72 rounded-lg border bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center text-sm text-gray-600">
-                    Map placeholder for deployment/client markers
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">
-                        Online Users : 53
-                    </span>
-                    <Link href="/dashboard/online-users" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                        Open Online Users →
-                    </Link>
-                </div>
+          <Panel>
+            <SectionTitle title="Reminder" subtitle="Today's reminders" />
+            <div className="mt-3 space-y-3 text-sm">
+              <div className="flex items-start gap-2">
+                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
+                <p>3 chat messages not acknowledged.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
+                <p>3 tasks due today.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
+                <p>2 overdue tickets need action.</p>
+              </div>
             </div>
+          </Panel>
+
+          <Panel>
+            <SectionTitle title="Celebration" subtitle="This week" />
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <ShieldCheck className="h-4 w-4 text-[var(--brand)]" />
+              <p>Dr. John Smith&apos;s birthday on 24 May.</p>
+            </div>
+          </Panel>
         </div>
-    )
+      </div>
+    </div>
+  )
 }

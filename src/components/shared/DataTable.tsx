@@ -18,6 +18,10 @@ interface DataTableProps<T> {
     searchPlaceholder?: string
     emptyText?: string
     pageSize?: number
+    density?: "compact" | "comfortable"
+    stickyHeader?: boolean
+    rowHover?: boolean
+    emptyVariant?: "plain" | "card"
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -28,6 +32,10 @@ export default function DataTable<T extends Record<string, any>>({
     searchPlaceholder = "Search...",
     emptyText = "No records found.",
     pageSize = 10,
+    density = "comfortable",
+    stickyHeader = false,
+    rowHover = true,
+    emptyVariant = "plain",
 }: DataTableProps<T>) {
     const [query, setQuery] = useState("")
     const [page, setPage] = useState(1)
@@ -71,9 +79,9 @@ export default function DataTable<T extends Record<string, any>>({
     }
 
     return (
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="ui-card overflow-hidden">
             {searchable && (
-                <div className="p-4 border-b">
+                <div className="p-4 border-b border-[var(--border)] bg-[var(--surface-muted)]">
                     <input
                         value={query}
                         onChange={(e) => {
@@ -81,17 +89,17 @@ export default function DataTable<T extends Record<string, any>>({
                             setPage(1)
                         }}
                         placeholder={searchPlaceholder}
-                        className="w-full md:w-80 border rounded-md px-3 py-2"
+                        className="ui-input w-full md:w-80"
                     />
                 </div>
             )}
 
             <div className="overflow-x-auto">
                 <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className={`bg-[var(--surface-muted)] border-b border-[var(--border)] ${stickyHeader ? "sticky top-0 z-10" : ""}`}>
                         <tr>
                             {columns.map((column) => (
-                                <th key={String(column.key)} className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${column.className || ""}`}>
+                                <th key={String(column.key)} className={`px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase ${column.className || ""}`}>
                                     {column.sortable ? (
                                         <button className="inline-flex items-center gap-1" onClick={() => toggleSort(String(column.key))}>
                                             <span>{column.header}</span>
@@ -104,18 +112,27 @@ export default function DataTable<T extends Record<string, any>>({
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-[var(--border)]">
                         {currentRows.length === 0 ? (
                             <tr>
-                                <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-gray-500">
-                                    {emptyText}
+                                <td colSpan={columns.length} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">
+                                    {emptyVariant === "card" ? (
+                                        <div className="inline-block rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+                                            {emptyText}
+                                        </div>
+                                    ) : (
+                                        emptyText
+                                    )}
                                 </td>
                             </tr>
                         ) : (
                             currentRows.map((row, index) => (
-                                <tr key={getRowKey(row, index)} className="hover:bg-gray-50">
+                                <tr key={getRowKey(row, index)} className={rowHover ? "hover:bg-[var(--surface-muted)]" : ""}>
                                     {columns.map((column) => (
-                                        <td key={String(column.key)} className="px-6 py-4 text-sm">
+                                        <td
+                                            key={String(column.key)}
+                                            className={`${density === "compact" ? "px-6 py-2.5" : "px-6 py-4"} text-sm`}
+                                        >
                                             {column.render ? column.render(row) : String(row[column.key] ?? "—")}
                                         </td>
                                     ))}
@@ -126,20 +143,20 @@ export default function DataTable<T extends Record<string, any>>({
                 </table>
             </div>
 
-            <div className="px-4 py-3 border-t flex items-center justify-between text-sm">
+            <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-muted)] flex items-center justify-between text-sm">
                 <span>
                     Showing {currentRows.length === 0 ? 0 : start + 1} to {Math.min(start + currentRows.length, sortedRows.length)} of {sortedRows.length}
                 </span>
                 <div className="flex gap-2">
                     <button
-                        className="border px-3 py-1 rounded-md disabled:opacity-50"
+                        className="ui-btn ui-btn-secondary py-1.5 disabled:opacity-50"
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={safePage <= 1}
                     >
                         Previous
                     </button>
                     <button
-                        className="border px-3 py-1 rounded-md disabled:opacity-50"
+                        className="ui-btn ui-btn-secondary py-1.5 disabled:opacity-50"
                         onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                         disabled={safePage >= pageCount}
                     >

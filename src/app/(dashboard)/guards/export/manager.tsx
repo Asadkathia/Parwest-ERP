@@ -3,6 +3,9 @@
 import { useState } from "react"
 import { FileDown } from "lucide-react"
 import ExportDialog from "@/components/shared/ExportDialog"
+import SectionTitle from "@/components/ui/section-title"
+import FilterBar from "@/components/ui/filter-bar"
+import ActionButton from "@/components/ui/action-button"
 
 export default function ExportGuardsManager() {
     const [exportType, setExportType] = useState("summary")
@@ -33,48 +36,45 @@ export default function ExportGuardsManager() {
 
     return (
         <div className="space-y-6 max-w-4xl">
-            <div>
-                <h1 className="text-3xl font-bold">Export Guards</h1>
-                <p className="text-gray-600 mt-1">Generate guard exports with custom fields and date range filters</p>
-            </div>
+            <SectionTitle title="Export Guards" subtitle="Generate guard exports with custom fields and date range filters" />
 
-            <div className="bg-white rounded-lg border p-6 space-y-4">
+            <FilterBar className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Export Type</label>
-                        <select value={exportType} onChange={(e) => setExportType(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Export Type</label>
+                        <select value={exportType} onChange={(e) => setExportType(e.target.value)} className="ui-select">
                             <option value="summary">Summary Export</option>
                             <option value="detailed">Detailed Export</option>
                             <option value="verification">Verification Export</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Format</label>
-                        <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Format</label>
+                        <select value={format} onChange={(e) => setFormat(e.target.value)} className="ui-select">
                             <option value="excel">Excel</option>
                             <option value="pdf">PDF</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Date From</label>
-                        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Date From</label>
+                        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="ui-input" />
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Date To</label>
-                        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Date To</label>
+                        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="ui-input" />
                     </div>
                 </div>
 
                 <div>
-                    <p className="text-sm text-gray-600 mb-2">Include Fields</p>
+                    <p className="text-sm text-[var(--text-muted)] mb-2">Include Fields</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                         {allFields.map((field) => (
-                            <label key={field} className="inline-flex items-center gap-2">
+                            <label key={field} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1.5">
                                 <input
                                     type="checkbox"
                                     checked={selectedFields.includes(field)}
                                     onChange={() => toggleField(field)}
-                                    className="rounded"
+                                    className="h-4 w-4 accent-[var(--brand)]"
                                 />
                                 <span>{field}</span>
                             </label>
@@ -82,11 +82,11 @@ export default function ExportGuardsManager() {
                     </div>
                 </div>
 
-                <button onClick={() => setOpenDialog(true)} className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                <ActionButton onClick={() => setOpenDialog(true)} className="inline-flex items-center gap-2">
                     <FileDown className="h-4 w-4" />
                     Generate Export
-                </button>
-            </div>
+                </ActionButton>
+            </FilterBar>
 
             <ExportDialog
                 open={openDialog}

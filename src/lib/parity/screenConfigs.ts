@@ -326,3 +326,352 @@ export const importLinks = [
   { label: "Clients Import", href: "/imports/clients" },
   { label: "Inventory Import", href: "/imports/inventory" },
 ]
+
+export const dashboardScreens: Record<string, ScreenConfig> = {
+  "online-users": {
+    title: "Online Users",
+    description: "Current active users with filters and session activity snapshot.",
+    sections: [
+      {
+        title: "Online User Filters",
+        fields: [
+          { label: "Regional Office", type: "select" },
+          { label: "Role", type: "select" },
+          { label: "User Name" },
+          { label: "Last Activity From", type: "date" },
+          { label: "Last Activity To", type: "date" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear", "Export In Excel"],
+    table: { columns: ["User", "Role", "Regional Office", "IP Address", "Last Activity", "Session ID"] },
+  },
+}
+
+export const userScreens: Record<string, ScreenConfig> = {
+  new: {
+    title: "Add New User",
+    description: "User enrolment form from UI docs.",
+    sections: [
+      {
+        title: "User Enrolment",
+        fields: [
+          { label: "User's Name", required: true },
+          { label: "Email", type: "email", required: true },
+          { label: "User Role", type: "select", required: true },
+          { label: "Select Region", type: "select" },
+          { label: "Regional Office", type: "select" },
+          { label: "Contact #", required: true },
+          { label: "Password", required: true },
+          { label: "Status", type: "select", options: ["Active", "Inactive"] },
+        ],
+      },
+    ],
+    actions: ["Submit", "Reset"],
+    table: { columns: ["Name", "Email", "Role", "Regional Office", "Status"] },
+  },
+  search: {
+    title: "Search Users",
+    sections: [
+      {
+        title: "Filters",
+        fields: [
+          { label: "Name" },
+          { label: "Email" },
+          { label: "User Role", type: "select" },
+          { label: "Regional Office", type: "select" },
+          { label: "Status", type: "select" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear", "Export in Excel"],
+    table: { columns: ["ID", "Photo", "Name", "Email", "Role", "Regional Office", "Status", "Action"] },
+  },
+  "ms-relationship": {
+    title: "M/S Relationship",
+    description: "Assign managers to supervisors.",
+    sections: [
+      {
+        title: "Assign Relationship",
+        fields: [
+          { label: "Manager", type: "select", required: true },
+          { label: "Supervisor", type: "select", required: true },
+          { label: "Effective Date", type: "date" },
+          { label: "Notes", type: "textarea" },
+        ],
+      },
+    ],
+    actions: ["Assign", "Clear"],
+    table: { columns: ["Manager", "Supervisor", "Effective Date", "Status", "Action"] },
+  },
+  "cs-relationship": {
+    title: "C/S Relationship",
+    description: "Assign client branches to supervisors.",
+    sections: [
+      {
+        title: "Assign Client Branch",
+        fields: [
+          { label: "Client", type: "select", required: true },
+          { label: "Branch", type: "select", required: true },
+          { label: "Supervisor", type: "select", required: true },
+          { label: "Effective Date", type: "date" },
+          { label: "Notes", type: "textarea" },
+        ],
+      },
+    ],
+    actions: ["Assign", "Clear"],
+    table: { columns: ["Client", "Branch", "Supervisor", "Effective Date", "Status", "Action"] },
+  },
+  "switch-supervisor": {
+    title: "Switch Supervisor",
+    description: "Bulk transfer supervisors between managers or locations.",
+    sections: [
+      {
+        title: "Switch Tool",
+        fields: [
+          { label: "From Supervisor", type: "select", required: true },
+          { label: "To Supervisor", type: "select", required: true },
+          { label: "Region", type: "select" },
+          { label: "Regional Office", type: "select" },
+          { label: "Reason", type: "textarea" },
+        ],
+      },
+    ],
+    actions: ["Preview", "Switch", "Clear"],
+    table: { columns: ["From Supervisor", "To Supervisor", "Region", "Regional Office", "Result"] },
+  },
+}
+
+export const userLinks = [
+  { label: "Add New", href: "/users/new" },
+  { label: "Search", href: "/users/search" },
+  { label: "Permissions", href: "/users/permissions" },
+  { label: "M/S Relationship", href: "/users/ms-relationship" },
+  { label: "Switch Supervisor", href: "/users/switch-supervisor" },
+  { label: "C/S Relationship", href: "/users/cs-relationship" },
+]
+
+export const ticketScreens: Record<string, ScreenConfig> = {
+  listing: {
+    title: "Ticketing Listing",
+    description: "All tickets listing with documented filters and columns.",
+    sections: [
+      {
+        title: "Search Filters",
+        fields: [
+          { label: "Category", type: "select" },
+          { label: "Priority", type: "select" },
+          { label: "Status", type: "select" },
+          { label: "Supervisor", type: "select" },
+          { label: "Created Date", type: "date" },
+          { label: "Ticket ID" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear", "Export in Excel"],
+    table: { columns: ["ID", "Subject", "Sender", "Category", "Priority", "Status", "Assigned To", "Created At", "Action"] },
+  },
+}
+
+export const requisitionScreens: Record<string, ScreenConfig> = {
+  approvals: {
+    title: "Requisitions",
+    description: "Guard Approval By HO with Pending / Accepted / Rejected tabs.",
+    tabs: ["Pending", "Accepted", "Rejected"],
+    sections: [
+      {
+        title: "Guard Approval Filters",
+        fields: [
+          { label: "Secure Ops ID" },
+          { label: "Name" },
+          { label: "Current Status", type: "select" },
+          { label: "Over Age", type: "select", options: ["Yes", "No"] },
+          { label: "From Date", type: "date" },
+          { label: "To Date", type: "date" },
+        ],
+      },
+    ],
+    actions: ["Search", "Approve", "Reject", "Export Excel"],
+    table: { columns: ["Secure Ops ID", "Name", "Current Status", "Over Age", "Pic", "Requested At", "Action"] },
+  },
+}
+
+export const auditScreens: Record<string, ScreenConfig> = {
+  search: {
+    title: "Audit Search",
+    description: "System-wide activity tracking and compliance log.",
+    sections: [
+      {
+        title: "Audit Filters",
+        fields: [
+          { label: "Date From", type: "date" },
+          { label: "Date To", type: "date" },
+          { label: "User Name" },
+          { label: "Event", type: "select" },
+          { label: "Module", type: "select" },
+          { label: "IP Address" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear", "Export Excel"],
+    table: { columns: ["Date", "User Name", "Event", "Module", "IP Address", "Description"] },
+  },
+}
+
+export const payrollScreens: Record<string, ScreenConfig> = {
+  operationsHub: {
+    title: "Payroll Operations",
+    description: "Frontend parity screen for payroll operational workflows from UI docs.",
+    sections: [
+      {
+        title: "Operation Overview",
+        fields: [
+          { label: "Month", type: "month" },
+          { label: "Region", type: "select" },
+          { label: "Select Client", type: "select" },
+          { label: "Branch", type: "select" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear"],
+    table: { columns: ["Operation", "Month", "Region", "Client", "Branch", "Action"] },
+  },
+  reportsHub: {
+    title: "Payroll Reports",
+    description: "Export and analytics tools listed in payroll report submenu.",
+    sections: [
+      {
+        title: "Export Set",
+        fields: payrollReportExports.map((name) => ({ label: name, type: "checkbox" })),
+      },
+    ],
+    actions: ["Run Selected Report", "Export"],
+    table: { columns: ["Report", "Frequency", "Last Run", "Status", "Action"] },
+  },
+  settingsHub: {
+    title: "Payroll Settings",
+    description: "Payroll defaults, month initialize, and limits from UI docs.",
+    tabs: ["Payroll Defaults", "Month Initialise", "Limits"],
+    sections: [
+      {
+        title: "Payroll Defaults",
+        fields: [
+          { label: "Training School Fees", type: "number" },
+          { label: "CWF", type: "number" },
+          { label: "Age Threshold", type: "number" },
+          { label: "Deployment Threshold", type: "number" },
+        ],
+      },
+      {
+        title: "Month Initialise",
+        fields: [
+          { label: "Current Month", type: "month" },
+          { label: "Next Month", type: "month" },
+          { label: "Unposted Regions", type: "select" },
+        ],
+      },
+      {
+        title: "Limits",
+        fields: [
+          { label: "Guard Age Limit", type: "number" },
+          { label: "Mental Health Limit", type: "number" },
+        ],
+      },
+    ],
+    actions: ["Save Defaults", "Initialize Month", "Save Limits"],
+    table: { columns: ["Setting Group", "Key", "Value", "Updated At"] },
+  },
+}
+
+export const moduleHubScreens: Record<string, ScreenConfig> = {
+  inventoryDashboard: {
+    title: "Inventory Dashboard",
+    description: "Asset dashboard with availability, issued, and remaining counts.",
+    sections: [
+      {
+        title: "Dashboard Cards",
+        fields: [
+          { label: "Total Available", type: "number" },
+          { label: "Issued", type: "number" },
+          { label: "Remaining", type: "number" },
+        ],
+      },
+    ],
+    actions: ["Search", "Clear"],
+    table: { columns: ["Product Type", "Total Available", "Issued", "Remaining"] },
+  },
+  reportsHub: {
+    title: "Reports",
+    description: "Frontend route hub for all documented report screens.",
+    sections: [
+      {
+        title: "Report Hub",
+        fields: [
+          { label: "Date From", type: "date" },
+          { label: "Date To", type: "date" },
+          { label: "Region", type: "select" },
+        ],
+      },
+    ],
+    actions: ["Generate", "Export", "Clear"],
+    table: { columns: ["Report", "Date Range", "Region", "Generated At", "Status"] },
+  },
+  importsHub: {
+    title: "Imports",
+    description: "Bulk operations hub for users, guards, clients, and inventory.",
+    sections: [{ title: "Import Workflow", fields: [{ label: "Import Type", type: "select" }, { label: "Upload File" }] }],
+    actions: ["Validate", "Import", "Clear"],
+    table: { columns: ["Import Type", "Uploaded By", "Uploaded At", "Status", "Action"] },
+  },
+  ticketNew: {
+    title: "Create Ticket",
+    description: "Frontend-only ticket creation flow.",
+    sections: [
+      {
+        title: "Ticket Form",
+        fields: [
+          { label: "Subject", required: true },
+          { label: "Description", type: "textarea", required: true },
+          { label: "Category", type: "select", required: true },
+          { label: "Priority", type: "select", required: true },
+          { label: "Assign To", type: "select" },
+        ],
+      },
+    ],
+    actions: ["Submit", "Reset"],
+    table: { columns: ["Subject", "Category", "Priority", "Assign To", "Status"] },
+  },
+  clientPricing: {
+    title: "Client Pricing",
+    description: "Contractual pricing and billing configurations.",
+    sections: [
+      {
+        title: "Pricing Configuration",
+        fields: [
+          { label: "Client", type: "select", required: true },
+          { label: "Guard Type", type: "select", required: true },
+          { label: "Rate", type: "number", required: true },
+          { label: "Effective From", type: "date" },
+        ],
+      },
+    ],
+    actions: ["Save", "Update", "Clear"],
+    table: { columns: ["Client", "Guard Type", "Rate", "Effective From", "Action"] },
+  },
+  systemSettings: {
+    title: "System Settings",
+    description: "Frontend placeholder for global system settings.",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { label: "Application Name" },
+          { label: "Timezone", type: "select" },
+          { label: "Default Currency", type: "select" },
+        ],
+      },
+    ],
+    actions: ["Save Settings", "Clear"],
+    table: { columns: ["Setting", "Value", "Updated At"] },
+  },
+}

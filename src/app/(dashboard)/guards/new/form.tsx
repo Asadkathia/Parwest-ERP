@@ -55,9 +55,9 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                     {error}
                 </div>
             )}
@@ -65,7 +65,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
             <div className="space-y-8">
                 {/* Basic Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Basic Information</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Basic Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -75,7 +75,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                 type="text"
                                 name="name"
                                 required
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter full name"
                             />
                         </div>
@@ -89,7 +89,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                 name="cnic"
                                 required
                                 pattern="[0-9]{5}-[0-9]{7}-[0-9]{1}"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="12345-1234567-1"
                             />
                         </div>
@@ -101,7 +101,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="tel"
                                 name="phone"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="03XX-XXXXXXX"
                             />
                         </div>
@@ -113,7 +113,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="email"
                                 name="email"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="guard@example.com"
                             />
                         </div>
@@ -125,7 +125,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="date"
                                 name="dateOfBirth"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
@@ -138,7 +138,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                 name="age"
                                 min="18"
                                 max="65"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Age"
                             />
                         </div>
@@ -150,7 +150,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="fatherName"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Father's name"
                             />
                         </div>
@@ -162,7 +162,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="motherName"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Mother's name"
                             />
                         </div>
@@ -173,7 +173,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="religion"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select religion</option>
                                 <option value="Islam">Islam</option>
@@ -189,7 +189,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="maritalStatus"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select status</option>
                                 <option value="Single">Single</option>
@@ -205,7 +205,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="education"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select education</option>
                                 <option value="Primary">Primary</option>
@@ -224,7 +224,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="nationality"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Pakistani"
                             />
                         </div>
@@ -236,7 +236,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="nextOfKin"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Next of kin"
                             />
                         </div>
@@ -248,7 +248,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="date"
                                 name="cnicIssueDate"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
@@ -259,7 +259,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="date"
                                 name="cnicExpiryDate"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
@@ -270,7 +270,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="guardingDuration"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="e.g., 5 years"
                             />
                         </div>
@@ -282,7 +282,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="disability"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="None"
                             />
                         </div>
@@ -291,7 +291,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Address Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Address Information</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Address Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -300,7 +300,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <textarea
                                 name="addressPermanent"
                                 rows={3}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter permanent address"
                             />
                         </div>
@@ -312,7 +312,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <textarea
                                 name="addressCurrent"
                                 rows={3}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter current address"
                             />
                         </div>
@@ -324,7 +324,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="emergencyContact"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Emergency contact number"
                             />
                         </div>
@@ -336,7 +336,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="district"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="District"
                             />
                         </div>
@@ -348,7 +348,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="city"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="City"
                             />
                         </div>
@@ -360,7 +360,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="state"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="State"
                             />
                         </div>
@@ -372,7 +372,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="postalCode"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Postal code"
                             />
                         </div>
@@ -384,7 +384,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="country"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Country"
                             />
                         </div>
@@ -393,7 +393,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Employment Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Employment Information</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Employment Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -401,7 +401,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="regionId"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select region</option>
                                 {regions.map((region) => (
@@ -418,7 +418,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="regionalOfficeId"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select office</option>
                                 {regionalOffices.map((office) => (
@@ -436,7 +436,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="date"
                                 name="joiningDate"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
@@ -447,7 +447,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <select
                                 name="status"
                                 defaultValue="PENDING"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="PENDING">Pending</option>
                                 <option value="ACTIVE">Active</option>
@@ -459,7 +459,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Ex-Service Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Ex-Service Information</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Ex-Service Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
                             <label className="flex items-center gap-2">
@@ -467,7 +467,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                     type="checkbox"
                                     name="isExService"
                                     value="true"
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="h-4 w-4 accent-[var(--brand)]"
                                 />
                                 <span className="text-sm font-medium text-gray-700">Ex-Service Personnel</span>
                             </label>
@@ -480,7 +480,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="exServiceRank"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="e.g., Sepoy, Naik, Havildar"
                             />
                         </div>
@@ -492,7 +492,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="exServiceRegiment"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="e.g., Punjab Regiment"
                             />
                         </div>
@@ -501,7 +501,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Banking Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Banking Information</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Banking Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -510,7 +510,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="bankName"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="e.g., HBL, MCB, UBL"
                             />
                         </div>
@@ -522,7 +522,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             <input
                                 type="text"
                                 name="bankAccountNumber"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Account number"
                             />
                         </div>
@@ -533,7 +533,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                             </label>
                             <select
                                 name="bankAccountType"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select type</option>
                                 <option value="Savings">Savings</option>
@@ -545,7 +545,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Verification Details */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Verification Details</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Verification Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[
                             "NADRA Verification",
@@ -566,62 +566,62 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
 
                 {/* Introducer and Relative Details */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Introducer / Relative Details</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Introducer / Relative Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Name</label>
-                            <input type="text" name="introducerName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Introducer name" />
+                            <input type="text" name="introducerName" className="ui-input" placeholder="Introducer name" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Address</label>
-                            <input type="text" name="introducerAddress" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Introducer address" />
+                            <input type="text" name="introducerAddress" className="ui-input" placeholder="Introducer address" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Relation</label>
-                            <input type="text" name="introducerRelation" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Relation" />
+                            <input type="text" name="introducerRelation" className="ui-input" placeholder="Relation" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Relative Name</label>
-                            <input type="text" name="relativeName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Relative name" />
+                            <input type="text" name="relativeName" className="ui-input" placeholder="Relative name" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Relative CNIC #</label>
-                            <input type="text" name="relativeCnic" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="12345-1234567-1" />
+                            <input type="text" name="relativeCnic" className="ui-input" placeholder="12345-1234567-1" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Relative Address</label>
-                            <input type="text" name="relativeAddress" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Relative address" />
+                            <input type="text" name="relativeAddress" className="ui-input" placeholder="Relative address" />
                         </div>
                     </div>
                 </div>
 
                 {/* Manager Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Office / Regional Manager Info</h2>
+                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Office / Regional Manager Info</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Manager Name</label>
-                            <input type="text" name="managerName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Manager name" />
+                            <input type="text" name="managerName" className="ui-input" placeholder="Manager name" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Manager Contact #</label>
-                            <input type="text" name="managerContact" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="03XX-XXXXXXX" />
+                            <input type="text" name="managerContact" className="ui-input" placeholder="03XX-XXXXXXX" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Manager Email</label>
-                            <input type="email" name="managerEmail" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="manager@example.com" />
+                            <input type="email" name="managerEmail" className="ui-input" placeholder="manager@example.com" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Name</label>
-                            <input type="text" name="supervisorName" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Supervisor name" />
+                            <input type="text" name="supervisorName" className="ui-input" placeholder="Supervisor name" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Contact #</label>
-                            <input type="text" name="supervisorContact" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="03XX-XXXXXXX" />
+                            <input type="text" name="supervisorContact" className="ui-input" placeholder="03XX-XXXXXXX" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Email</label>
-                            <input type="email" name="supervisorEmail" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="supervisor@example.com" />
+                            <input type="email" name="supervisorEmail" className="ui-input" placeholder="supervisor@example.com" />
                         </div>
                     </div>
                 </div>
@@ -631,7 +631,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link
                     href="/guards"
-                    className="flex items-center gap-2 px-6 py-2 border rounded-md hover:bg-gray-50"
+                    className="ui-btn ui-btn-secondary flex items-center gap-2"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Cancel
@@ -639,7 +639,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ui-btn ui-btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="h-4 w-4" />
                     {loading ? "Saving..." : "Save Guard"}

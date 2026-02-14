@@ -137,9 +137,9 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
@@ -147,17 +147,17 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
             <div className="space-y-8">
                 {/* Deployment Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Deployment Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Deployment Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Guard <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="guardId"
                                 required
                                 defaultValue={deployment.guardId}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select guard</option>
                                 {guards.map((guard) => (
@@ -169,7 +169,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Client <span className="text-red-500">*</span>
                             </label>
                             <select
@@ -177,7 +177,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 required
                                 value={selectedClientId}
                                 onChange={(e) => handleClientChange(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             >
                                 <option value="">Select client</option>
                                 {clients.map((client) => (
@@ -189,7 +189,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Branch <span className="text-red-500">*</span>
                             </label>
                             <select
@@ -198,7 +198,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 disabled={!selectedClientId}
                                 value={selectedBranchId}
                                 onChange={(e) => setSelectedBranchId(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                className="ui-select disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <option value="">Select branch</option>
                                 {availableBranches.map((branch) => (
@@ -210,7 +210,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Deployment Date <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -218,19 +218,19 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 name="deploymentDate"
                                 required
                                 defaultValue={formatDateForInput(deployment.deploymentDate)}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Regional Office <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="regionalOfficeId"
                                 required
                                 defaultValue={deployment.regionalOfficeId}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select regional office</option>
                                 {regionalOffices.map((office) => (
@@ -242,14 +242,14 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Shift Type <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="shiftType"
                                 required
                                 defaultValue={deployment.shiftType}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="DAY">Day Shift</option>
                                 <option value="NIGHT">Night Shift</option>
@@ -258,7 +258,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Rate (Monthly)
                             </label>
                             <input
@@ -268,12 +268,12 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 step="100"
                                 defaultValue={deployment.rate || ""}
                                 placeholder="e.g., 25000"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Designation
                             </label>
                             <input
@@ -281,18 +281,18 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 name="designation"
                                 defaultValue={deployment.designation || ""}
                                 placeholder="e.g., Security Guard, Supervisor"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Guard Type
                             </label>
                             <select
                                 name="guardType"
                                 defaultValue={deployment.guardType || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select guard type</option>
                                 <option value="Security Guard">Security Guard</option>
@@ -303,13 +303,13 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Status
                             </label>
                             <select
                                 name="status"
                                 defaultValue={deployment.status}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="ACTIVE">Active</option>
                                 <option value="INACTIVE">Inactive</option>
@@ -320,10 +320,10 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
 
                 {/* Financial Details */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Financial Details</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Financial Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Salary (Monthly)
                             </label>
                             <input
@@ -333,12 +333,12 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 step="100"
                                 defaultValue={deployment.salary || ""}
                                 placeholder="25000"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Overtime (Per Hour)
                             </label>
                             <input
@@ -348,12 +348,12 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 step="10"
                                 defaultValue={deployment.overtime || ""}
                                 placeholder="100"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Extra Hours
                             </label>
                             <input
@@ -363,12 +363,12 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 step="0.5"
                                 defaultValue={deployment.extraHours || ""}
                                 placeholder="0"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Post Allowance
                             </label>
                             <input
@@ -378,7 +378,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 step="100"
                                 defaultValue={deployment.postAllowance || ""}
                                 placeholder="0"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
                     </div>
@@ -386,53 +386,53 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
 
                 {/* Shift Details */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Shift Details</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Shift Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Day Shift Start
                             </label>
                             <input
                                 type="time"
                                 name="dayShiftStart"
                                 defaultValue={deployment.dayShiftStart || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Day Shift End
                             </label>
                             <input
                                 type="time"
                                 name="dayShiftEnd"
                                 defaultValue={deployment.dayShiftEnd || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Night Shift Start
                             </label>
                             <input
                                 type="time"
                                 name="nightShiftStart"
                                 defaultValue={deployment.nightShiftStart || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Night Shift End
                             </label>
                             <input
                                 type="time"
                                 name="nightShiftEnd"
                                 defaultValue={deployment.nightShiftEnd || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
                     </div>
@@ -440,16 +440,16 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
 
                 {/* Additional Options */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Additional Options</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Additional Options</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Deployment Type
                             </label>
                             <select
                                 name="deploymentType"
                                 defaultValue={deployment.deploymentType || "REGULAR"}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="REGULAR">Regular</option>
                                 <option value="OVERTIME">Overtime</option>
@@ -462,15 +462,15 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 name="isExtraGuard"
                                 id="isExtraGuard"
                                 defaultChecked={deployment.isExtraGuard}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                className="h-4 w-4 accent-[var(--brand)]"
                             />
-                            <label htmlFor="isExtraGuard" className="ml-2 block text-sm text-gray-700">
+                            <label htmlFor="isExtraGuard" className="ml-2 block text-sm text-[var(--text)]">
                                 Extra Guard
                             </label>
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Comment
                             </label>
                             <textarea
@@ -478,12 +478,12 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 rows={3}
                                 defaultValue={deployment.comment || ""}
                                 placeholder="Additional comments..."
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-textarea"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Notes
                             </label>
                             <textarea
@@ -491,7 +491,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                                 rows={4}
                                 defaultValue={deployment.notes || ""}
                                 placeholder="Any additional notes about this deployment..."
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-textarea"
                             />
                         </div>
                     </div>
@@ -502,7 +502,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link
                     href={`/deployments/${deployment.id}`}
-                    className="flex items-center gap-2 px-6 py-2 border rounded-md hover:bg-gray-50"
+                    className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Cancel
@@ -510,7 +510,7 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="h-4 w-4" />
                     {loading ? "Saving..." : "Save Changes"}

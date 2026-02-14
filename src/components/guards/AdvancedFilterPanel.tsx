@@ -1,6 +1,8 @@
 "use client"
 
 import { ReactNode } from "react"
+import { Card, CardBody } from "@/components/ui/card"
+import SectionTitle from "@/components/ui/section-title"
 
 interface AdvancedFilterPanelProps {
     title?: string
@@ -10,10 +12,12 @@ interface AdvancedFilterPanelProps {
 
 export default function AdvancedFilterPanel({ title = "Filters", children, actions }: AdvancedFilterPanelProps) {
     return (
-        <div className="bg-white rounded-lg border p-6 space-y-4">
-            <h2 className="font-semibold">{title}</h2>
-            {children}
-            {actions && <div className="flex gap-3">{actions}</div>}
-        </div>
+        <Card>
+            <CardBody className="space-y-4">
+                <SectionTitle title={title} />
+                {children}
+                {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+            </CardBody>
+        </Card>
     )
 }

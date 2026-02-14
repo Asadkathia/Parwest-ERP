@@ -1,23 +1,6 @@
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
+import { userLinks, userScreens } from "@/lib/parity/screenConfigs"
 
 export default function UsersCsRelationshipPage() {
-  return (
-    <UiDocScreen
-      title="C/S Relationship"
-      description="Assign client branches to supervisors."
-      sections={[
-        {
-          title: "Assign Client Branch",
-          fields: [
-            { label: "Client", type: "select", required: true },
-            { label: "Branch", type: "select", required: true },
-            { label: "Supervisor", type: "select", required: true },
-            { label: "Effective Date", type: "date" },
-          ],
-        },
-      ]}
-      actions={["Assign", "Clear"]}
-      table={{ columns: ["Client", "Branch", "Supervisor", "Effective Date", "Action"] }}
-    />
-  )
+  return <ConfiguredInteractiveScreen config={userScreens["cs-relationship"]} links={userLinks} />
 }

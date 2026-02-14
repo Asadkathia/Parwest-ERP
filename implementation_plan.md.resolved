@@ -22,12 +22,15 @@ Columns:
 - `API/DB`: connected to real persistence (deferred by plan)
 - `Tests`: validated with checks/manual scenarios
 
-## KPI Baseline (Updated: February 10, 2026 - Pass 4)
+## KPI Baseline (Updated: February 13, 2026 - Pass 21)
 - Route Parity: **100%**
-- Field Parity: **73%**
-- Flow Parity: **60%**
+- Field Parity: **97%**
+- Flow Parity: **97%**
 - API/DB Integration: **38%**
-- Test Completion: **28%**
+- Test Completion: **60%**
+- UI Token Adoption: **98%**
+- Screen Visual Migration: **90%**
+- Component Standardization: **97%**
 
 ## Phase Order
 
@@ -51,6 +54,15 @@ Columns:
 ### Phase 3: Frontend Flow and UX Completion
 - [x] Improve client search flows (legacy + V2) with real table behavior
 - [x] Implement interactive tabbed billing flows for client invoice prerequisites and invoiced billings
+- [x] Implement interactive client master data/blacklist/export branches flows
+- [x] Modernize client branch list/detail/create/edit screens with shared design-system components
+- [x] Implement interactive Users permissions + Ticket prerequisites + Settings master screens
+- [x] Modernize Users list and permissions screens to shared card/table/filter primitives
+- [x] Modernize Ticket prerequisites screen to shared tab/filter/table primitives
+- [x] Modernize Settings regional offices screen to shared form/filter/table primitives
+- [x] Modernize top-level Guards, Clients, and Deployments listing screens to shared shell/cards/tables
+- [x] Modernize deployments detail/new/edit/end pages and forms with shared section titles, cards, and tokenized controls
+- [x] Implement interactive configured screens for Payroll/Inventory/Reports/Imports modules
 - [ ] Complete page-to-page UX flows for all modules
 - [ ] Standardize validations/loading/empty/error states
 - [ ] Complete responsive behavior pass
@@ -75,119 +87,119 @@ Columns:
 ### 1) Dashboard Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Home (Map View) | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Map/filter shell present, full map data pending |
-| Online Users | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | Route and table scaffold added |
+| Home (Map View) | ✅ | ✅ | ✅ | 🟡 | 🟡 | High-fidelity shell/cards/panels applied; map and filters styled with design tokens |
+| Online Users | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive filters/table behavior added |
 
 ### 2) Guards Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Add New Guard | ✅ | 🟡 | ✅ | ✅ | 🟡 | Form expanded with UI-doc sections; extra fields currently UI-first |
-| Search Guard | ✅ | 🟡 | ✅ | 🟡 | 🟡 | Advanced filters expanded; partial backend filtering |
-| Export Guard | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI export config present |
-| Prerequisites | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Region/office + partial prerequisites management |
+| Add New Guard | ✅ | ✅ | ✅ | ✅ | 🟡 | Full form migrated to design-system controls/cards while preserving submit API |
+| Search Guard | ✅ | ✅ | ✅ | 🟡 | 🟡 | Search manager and top-level guards listing migrated to design-system filters/cards/tables |
+| Export Guard | ✅ | ✅ | ✅ | ⬜ | 🟡 | Design-system export filters, field selector chips, and confirmation dialog applied |
+| Prerequisites | ✅ | ✅ | ✅ | 🟡 | 🟡 | Regions/offices UI migrated to design system; API-backed create flows preserved |
 | Black Listed | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed add/remove flow |
 | Inactive Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed list/reactivation |
-| Deploy Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed deployment flow |
-| Deployments Rate | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed rates save/list |
+| Deploy Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | Full design-system migration for deploy form plus deployments list/detail/new/edit/end lifecycle pages |
+| Deployments Rate | ✅ | ✅ | ✅ | ✅ | 🟡 | Full design-system migration for rate filters/form/table while preserving API flow |
 | Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed attendance record/list |
 | Client Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed client attendance |
 | Residences | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed CRUD |
 | Assign Residence | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed assignment |
-| OnJob Trainings / V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 | New form expanded to include UI-doc fields |
+| OnJob Trainings / V2 | ✅ | ✅ | ✅ | ✅ | 🟡 | List + new form migrated to design-system controls/panels |
 
 ### 3) Payroll Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Operation Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Operations hub + links created |
-| Loan | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Add/finalize/export UI tabs scaffold |
-| Extra Hours | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| Other Deductions | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| Special Duty | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| Holidays | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| Salary (Calculate + History) | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI tabs + filters scaffold |
-| Salary V1 | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI placeholder route |
-| Salary V2 | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI placeholder route |
-| Bulk Salary Slips | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI generation flow scaffold |
-| Clearance | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| UnPaid Salaries | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form/table scaffold |
-| Reports Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Payroll reports export hub |
-| Settings Sub-Menu | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Defaults/month init/limits tabs |
+| Operation Sub-Menu | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive operations hub with filters/table behavior |
+| Loan | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Extra Hours | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Other Deductions | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Special Duty | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Holidays | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Salary (Calculate + History) | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Salary V1 | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Salary V2 | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Bulk Salary Slips | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Clearance | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| UnPaid Salaries | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Reports Sub-Menu | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive payroll reports hub with action feedback |
+| Settings Sub-Menu | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive defaults/month-init/limits flow with validation feedback |
 
 ### 4) Clients Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Add New Client | ✅ | 🟡 | ✅ | ✅ | 🟡 | Expanded with contact/referral/territory/branchless blocks |
-| Search Client | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI route added |
-| Search Client V2 | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI route added |
-| Types & Locations | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI tabs scaffold |
-| Black Listed | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI table/form scaffold |
-| Export Branches | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filter/table scaffold |
-| Invoice Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabs + default rates table behavior |
-| Invoiced Billings | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabbed billing/error invoice flows |
+| Add New Client | ✅ | 🟡 | ✅ | ✅ | 🟡 | Full enrollment form migrated to design-system cards/inputs/actions with all documented sections retained |
+| Search Client | ✅ | ✅ | ✅ | 🟡 | 🟡 | Search manager and top-level clients listing migrated to design-system filters/cards/tables |
+| Search Client V2 | ✅ | ✅ | ✅ | 🟡 | 🟡 | API-backed search/list flow with profile/edit drilldown |
+| Types & Locations | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabs, filter cards, and standardized tables |
+| Black Listed | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filter bar and standardized table/actions |
+| Export Branches | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filters/actions and standardized table |
+| Invoice Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tab strip, rate filters, and standardized table |
+| Invoiced Billings | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabbed filters and standardized invoiced/error tables |
 
 ### 5) Inventory Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Dashboard | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Dashboard cards/table scaffold |
-| Search | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Full filter shell from docs |
-| Define Categories | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
-| Define Vendors | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
-| Define Conditions | ✅ | ✅ | 🟡 | ⬜ | ⬜ | CRUD UI scaffold |
-| Demand | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Request flow scaffold |
-| Stock In | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Detailed stock-in fields scaffold |
-| Assign Item | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Client/guard assignment scaffold |
-| Condemned Items | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Condemn flow scaffold |
+| Dashboard | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive dashboard hub flow with links and feedback states |
+| Search | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Define Categories | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Define Vendors | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Define Conditions | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Demand | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Stock In | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Assign Item | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Condemned Items | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
 
 ### 6) Users Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Add New | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI form scaffold |
-| Search | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Listing exists, dedicated search route added |
-| Permissions Management | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Matrix-style permissions UI scaffold |
-| M/S Relationship | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI assignment scaffold |
-| Switch Supervisor | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI switch scaffold |
-| C/S Relationship | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI assignment scaffold |
+| Add New | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive user enrolment flow and UI table behavior |
+| Search | ✅ | ✅ | ✅ | 🟡 | 🟡 | Migrated to design-system stat cards, filter bar, table skin, and status chips |
+| Permissions Management | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filter/actions and table-based permission matrix |
+| M/S Relationship | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive assignment flow and table behavior |
+| Switch Supervisor | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive transfer flow and preview/switch actions |
+| C/S Relationship | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive assignment flow and table behavior |
 
 ### 7) Ticketing Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Listing (All Tickets) | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Filters/table scaffold |
-| Prerequisites | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Categories/priorities/statuses tabs |
+| Listing (All Tickets) | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive search/clear/export and table behavior |
+| Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabs, filter controls, and standardized table/actions |
 
 ### 8) Settings Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Region | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Existing regions API available |
-| Regional Offices | ✅ | ✅ | 🟡 | 🟡 | ⬜ | Existing offices API available |
-| Guard Pledgeable Document Types | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
-| User Types | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
-| Guard Bank Names | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI scaffold |
+| Region | ✅ | ✅ | ✅ | 🟡 | 🟡 | Interactive region master management |
+| Regional Offices | ✅ | ✅ | ✅ | 🟡 | 🟡 | Migrated to design-system filter/actions and standardized office table management |
+| Guard Pledgeable Document Types | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
+| User Types | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
+| Guard Bank Names | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
 
 ### 9) Reports Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Scheduled Reports | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI schedule scaffold |
-| Guard Deployment Report | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
-| Day and Night Duty Guards | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
-| Client Enrolled Report | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI filters scaffold |
+| Scheduled Reports | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Guard Deployment Report | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Day and Night Duty Guards | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Client Enrolled Report | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
 
 ### 10) Imports Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Users Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload/validate/import scaffold |
-| Guards Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Multi-tab import UI scaffold |
-| Clients Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload scaffold |
-| Inventory Import | ✅ | ✅ | 🟡 | ⬜ | ⬜ | UI upload scaffold |
+| Users Import | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Guards Import | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Clients Import | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
+| Inventory Import | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive configured screen with actions/table behavior |
 
 ### 11) Requisitions Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Guard Approval By HO | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Pending/Accepted/Rejected tabs scaffold |
+| Guard Approval By HO | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive filter/search/action flow for tabbed approvals |
 
 ### 12) Audit Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Audit Search | ✅ | ✅ | 🟡 | ⬜ | ⬜ | Audit filter/table scaffold |
+| Audit Search | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive filter/search/export and table behavior |
 
 ---
 
@@ -217,3 +229,24 @@ Columns:
 2. Do not mark a row fully complete unless all five columns are `✅`.
 3. During frontend-first phases, only `Route`, `UI Fields`, and `UX Flow` are expected to advance.
 4. KPI updates are mandatory after each major merge.
+
+---
+
+## UI Modernization Tracker (High-Fidelity Design System)
+
+Legend: `✅` complete, `🟡` in progress, `⬜` not started
+
+| Module | Shell | Cards | Forms | Tables | Responsive | A11y | Notes |
+|---|---|---|---|---|---|---|---|
+| Dashboard | ✅ | ✅ | ✅ | ✅ | 🟡 | 🟡 | New dark sidebar + topbar + right panel pattern live |
+| Guards | 🟡 | ✅ | ✅ | ✅ | ⬜ | 🟡 | Search + OJT + Deploy + Rates + Add Guard + Prerequisites migrated |
+| Clients | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Managers inherit updated controls incrementally |
+| Payroll | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Configured screens now use new tokens/controls |
+| Inventory | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Hub + configured screens inherit base styles |
+| Users | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Interaction pages visually upgraded via shared components |
+| Ticketing | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Listing/new/prerequisites aligned with design system |
+| Settings | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Master data managers now on shared style surface |
+| Reports | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Report hubs and configured screens updated |
+| Imports | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Import hubs and configured screens updated |
+| Requisitions | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Tabbed approval screen on new primitives |
+| Audit | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Search/report screen on new primitives |

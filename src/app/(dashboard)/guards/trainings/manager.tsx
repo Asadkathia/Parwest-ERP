@@ -2,6 +2,10 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
+import SectionTitle from "@/components/ui/section-title"
+import FilterBar from "@/components/ui/filter-bar"
+import ActionButton from "@/components/ui/action-button"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type TrainingRow = {
     id: string
@@ -134,73 +138,70 @@ export default function TrainingsManager() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold">OnJob Trainings</h1>
-                    <p className="text-gray-600 mt-1">Track OJT sessions and completion status by guard</p>
-                </div>
-                <Link href="/guards/trainings/new" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Add New Training</Link>
+                <SectionTitle title="OnJob Trainings" subtitle="Track OJT sessions and completion status by guard" />
+                <Link href="/guards/trainings/new" className="ui-btn ui-btn-primary">Add New Training</Link>
             </div>
 
-            <div className="bg-white rounded-lg border p-4 space-y-4">
+            <FilterBar className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
-                        <input value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Regional office" />
+                        <input value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-input" placeholder="Regional office" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-                        <input value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Client" />
+                        <input value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-input" placeholder="Client" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch</label>
-                        <input value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Branch" />
+                        <input value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-input" placeholder="Branch" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">From Date</label>
-                        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="ui-input" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">To Date</label>
-                        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="ui-input" />
                     </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <button onClick={() => undefined} className="bg-green-600 text-white px-3 py-2 rounded-md text-sm hover:bg-green-700">Filter</button>
-                    <button onClick={clearFilters} className="border px-3 py-2 rounded-md text-sm hover:bg-gray-50">Clear</button>
-                    <button className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">Export All OJT Report</button>
-                    <button className="bg-yellow-500 text-white px-3 py-2 rounded-md text-sm hover:bg-yellow-600">Export Filtered OJT Report</button>
-                    <button className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm hover:bg-indigo-700">Branch Training Report</button>
-                    <button className="bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700">Missing Training Report</button>
+                    <ActionButton>Filter</ActionButton>
+                    <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
+                    <ActionButton>Export All OJT Report</ActionButton>
+                    <ActionButton>Export Filtered OJT Report</ActionButton>
+                    <ActionButton>Branch Training Report</ActionButton>
+                    <ActionButton variant="danger">Missing Training Report</ActionButton>
                 </div>
-            </div>
+            </FilterBar>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {error && <InlineAlert type="error" message={error} />}
 
-            <div className="bg-white rounded-lg border overflow-x-auto">
+            <div className="ui-card overflow-x-auto">
                 <table className="w-full min-w-[1500px]">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Date</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Date of OJT</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Regional Office</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Client</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Branch</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Guards</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Branch Supervisor</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Supervisor Uniform</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Branch Manager</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Armorer</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Conducted By</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Due Date</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Remarks</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Date</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Date of OJT</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Regional Office</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Client</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Branch</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Guards</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Branch Supervisor</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Supervisor Uniform</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Branch Manager</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Armorer</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Conducted By</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Due Date</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Remarks</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-[var(--border)]">
                         {loading ? (
-                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
+                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">Loading...</td></tr>
                         ) : filteredRows.length === 0 ? (
-                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-gray-500">No training records found.</td></tr>
+                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">No training records found.</td></tr>
                         ) : (
                             filteredRows.map((training) => {
                                 const notes = parseNotes(training.notes)
@@ -209,7 +210,7 @@ export default function TrainingsManager() {
                                 due.setMonth(due.getMonth() + 1)
 
                                 return (
-                                    <tr key={training.id} className="hover:bg-gray-50">
+                                    <tr key={training.id} className="hover:bg-[var(--surface-muted)]">
                                         <td className="px-6 py-4 text-sm">{created.toLocaleDateString("en-US")}</td>
                                         <td className="px-6 py-4 text-sm">{created.toLocaleDateString("en-US")}</td>
                                         <td className="px-6 py-4 text-sm">{notes.regionalOffice || training.guard.regionalOffice?.name || "—"}</td>

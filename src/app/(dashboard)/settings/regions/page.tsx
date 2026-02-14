@@ -1,13 +1,16 @@
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import MasterDataManager from "@/components/shared/MasterDataManager"
 
 export default function SettingsRegionsPage() {
   return (
-    <UiDocScreen
+    <MasterDataManager
       title="Settings: Regions"
-      description="Manage broad geographical regions."
-      sections={[{ title: "Region", fields: [{ label: "Region Name", required: true }] }]}
-      actions={["Create", "Update", "Delete"]}
-      table={{ columns: ["Region", "Created At", "Action"] }}
+      subtitle="Manage broad geographical regions."
+      label="Region Name"
+      rows={[
+        { id: "1", name: "Lahore", createdAt: "2026-02-01", createdBy: "ADMIN" },
+        { id: "2", name: "Sindh", createdAt: "2026-02-01", createdBy: "ADMIN" },
+      ]}
+      columns={["Region", "Created At", "Created By", "Action"]}
     />
   )
 }

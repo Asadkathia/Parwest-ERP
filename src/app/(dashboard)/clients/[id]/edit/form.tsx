@@ -68,9 +68,9 @@ export default function ClientEditForm({ client, regions }: Props) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
@@ -78,10 +78,10 @@ export default function ClientEditForm({ client, regions }: Props) {
             <div className="space-y-8">
                 {/* Basic Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Basic Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Client Name <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -89,20 +89,20 @@ export default function ClientEditForm({ client, regions }: Props) {
                                 name="name"
                                 required
                                 defaultValue={client.name}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter client name"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Client Type <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="type"
                                 required
                                 defaultValue={client.type}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select type</option>
                                 <option value="BANK">Bank</option>
@@ -116,26 +116,26 @@ export default function ClientEditForm({ client, regions }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Email
                             </label>
                             <input
                                 type="email"
                                 name="email"
                                 defaultValue={client.email || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="client@example.com"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Region
                             </label>
                             <select
                                 name="regionId"
                                 defaultValue={client.regionId || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select region</option>
                                 {regions.map((region) => (
@@ -147,26 +147,26 @@ export default function ClientEditForm({ client, regions }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 City
                             </label>
                             <input
                                 type="text"
                                 name="city"
                                 defaultValue={client.city || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter city"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Status
                             </label>
                             <select
                                 name="status"
                                 defaultValue={client.status}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="ACTIVE">Active</option>
                                 <option value="INACTIVE">Inactive</option>
@@ -179,9 +179,9 @@ export default function ClientEditForm({ client, regions }: Props) {
                                     type="checkbox"
                                     name="isBranchless"
                                     defaultChecked={client.isBranchless}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="h-4 w-4 accent-[var(--brand)]"
                                 />
-                                <span className="text-sm font-medium text-gray-700">
+                                <span className="text-sm text-[var(--text)]">
                                     Branchless Client
                                 </span>
                             </label>
@@ -191,17 +191,17 @@ export default function ClientEditForm({ client, regions }: Props) {
 
                 {/* Address Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Address Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Address Information</h2>
                     <div className="grid grid-cols-1 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Head Office Address
                             </label>
                             <textarea
                                 name="headOfficeAddress"
                                 rows={3}
                                 defaultValue={client.headOfficeAddress || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-textarea"
                                 placeholder="Enter head office address"
                             />
                         </div>
@@ -210,56 +210,56 @@ export default function ClientEditForm({ client, regions }: Props) {
 
                 {/* Tax & Legal Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Tax & Legal Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Tax & Legal Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 NTN (National Tax Number)
                             </label>
                             <input
                                 type="text"
                                 name="ntn"
                                 defaultValue={client.ntn || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter NTN"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 STRN (Sales Tax Registration)
                             </label>
                             <input
                                 type="text"
                                 name="strn"
                                 defaultValue={client.strn || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="Enter STRN"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contract Document URL
                             </label>
                             <input
                                 type="url"
                                 name="contractUrl"
                                 defaultValue={client.contractUrl || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="https://example.com/contract.pdf"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Logo URL
                             </label>
                             <input
                                 type="url"
                                 name="logoUrl"
                                 defaultValue={client.logoUrl || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                                 placeholder="https://example.com/logo.png"
                             />
                         </div>
@@ -271,7 +271,7 @@ export default function ClientEditForm({ client, regions }: Props) {
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link
                     href={`/clients/${client.id}`}
-                    className="flex items-center gap-2 px-6 py-2 border rounded-md hover:bg-gray-50"
+                    className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Cancel
@@ -279,7 +279,7 @@ export default function ClientEditForm({ client, regions }: Props) {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="h-4 w-4" />
                     {loading ? "Updating..." : "Update Client"}

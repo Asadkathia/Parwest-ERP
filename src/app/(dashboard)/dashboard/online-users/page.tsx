@@ -1,19 +1,6 @@
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
+import { dashboardScreens } from "@/lib/parity/screenConfigs"
 
 export default function OnlineUsersPage() {
-  return (
-    <UiDocScreen
-      title="Online Users"
-      description="Current active users view from dashboard module."
-      sections={[
-        {
-          title: "Online Snapshot",
-          fields: [
-            { label: "Online Users Count", type: "number" },
-          ],
-        },
-      ]}
-      table={{ columns: ["User", "Role", "Regional Office", "Last Activity", "Session ID"] }}
-    />
-  )
+  return <ConfiguredInteractiveScreen config={dashboardScreens["online-users"]} />
 }

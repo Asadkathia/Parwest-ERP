@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import DeploymentForm from "./form"
+import SectionTitle from "@/components/ui/section-title"
 
 export default async function NewDeploymentPage() {
     const session = await auth()
@@ -40,10 +41,7 @@ export default async function NewDeploymentPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">New Deployment</h1>
-                <p className="text-gray-600 mt-1">Assign a guard to a client location</p>
-            </div>
+            <SectionTitle title="New Deployment" subtitle="Assign a guard to a client location" />
 
             <DeploymentForm guards={guards} clients={clients} regionalOffices={regionalOffices} />
         </div>

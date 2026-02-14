@@ -64,9 +64,9 @@ export default function BranchEditForm({ branch }: Props) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
@@ -74,10 +74,10 @@ export default function BranchEditForm({ branch }: Props) {
             <div className="space-y-8">
                 {/* Basic Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Basic Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Branch Name <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -86,12 +86,12 @@ export default function BranchEditForm({ branch }: Props) {
                                 required
                                 defaultValue={branch.name}
                                 placeholder="e.g., Main Branch, Gulberg Branch"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Branch Code
                             </label>
                             <input
@@ -99,7 +99,7 @@ export default function BranchEditForm({ branch }: Props) {
                                 name="code"
                                 defaultValue={branch.code || ""}
                                 placeholder="e.g., LHR-001, ISB-002"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
@@ -109,9 +109,9 @@ export default function BranchEditForm({ branch }: Props) {
                                     type="checkbox"
                                     name="isHeadOffice"
                                     defaultChecked={branch.isHeadOffice}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="h-4 w-4 accent-[var(--brand)]"
                                 />
-                                <span className="text-sm font-medium text-gray-700">
+                                <span className="text-sm text-[var(--text)]">
                                     This is the head office
                                 </span>
                             </label>
@@ -121,10 +121,10 @@ export default function BranchEditForm({ branch }: Props) {
 
                 {/* Location Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Location Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Location Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Address
                             </label>
                             <textarea
@@ -132,12 +132,12 @@ export default function BranchEditForm({ branch }: Props) {
                                 rows={3}
                                 defaultValue={branch.address || ""}
                                 placeholder="Enter complete address"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-textarea"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 City
                             </label>
                             <input
@@ -145,18 +145,18 @@ export default function BranchEditForm({ branch }: Props) {
                                 name="city"
                                 defaultValue={branch.city || ""}
                                 placeholder="e.g., Lahore, Karachi"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Province
                             </label>
                             <select
                                 name="province"
                                 defaultValue={branch.province || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-select"
                             >
                                 <option value="">Select province</option>
                                 <option value="Punjab">Punjab</option>
@@ -171,10 +171,10 @@ export default function BranchEditForm({ branch }: Props) {
 
                 {/* Contact Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Contact Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contact Person
                             </label>
                             <input
@@ -182,12 +182,12 @@ export default function BranchEditForm({ branch }: Props) {
                                 name="contactPerson"
                                 defaultValue={branch.contactPerson || ""}
                                 placeholder="Name of contact person"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contact Phone
                             </label>
                             <input
@@ -195,12 +195,12 @@ export default function BranchEditForm({ branch }: Props) {
                                 name="contactPhone"
                                 defaultValue={branch.contactPhone || ""}
                                 placeholder="0300-1234567"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contact Email
                             </label>
                             <input
@@ -208,7 +208,7 @@ export default function BranchEditForm({ branch }: Props) {
                                 name="contactEmail"
                                 defaultValue={branch.contactEmail || ""}
                                 placeholder="branch@example.com"
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="ui-input"
                             />
                         </div>
                     </div>
@@ -219,7 +219,7 @@ export default function BranchEditForm({ branch }: Props) {
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link
                     href={`/clients/branches/${branch.id}`}
-                    className="flex items-center gap-2 px-6 py-2 border rounded-md hover:bg-gray-50"
+                    className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Cancel
@@ -227,7 +227,7 @@ export default function BranchEditForm({ branch }: Props) {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="h-4 w-4" />
                     {loading ? "Saving..." : "Save Changes"}

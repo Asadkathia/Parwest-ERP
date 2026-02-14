@@ -1,23 +1,6 @@
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
+import { userLinks, userScreens } from "@/lib/parity/screenConfigs"
 
 export default function UsersSwitchSupervisorPage() {
-  return (
-    <UiDocScreen
-      title="Switch Supervisor"
-      description="Bulk transfer supervisors between managers or locations."
-      sections={[
-        {
-          title: "Switch Tool",
-          fields: [
-            { label: "From Supervisor", type: "select", required: true },
-            { label: "To Supervisor", type: "select", required: true },
-            { label: "Region", type: "select" },
-            { label: "Regional Office", type: "select" },
-            { label: "Reason", type: "textarea" },
-          ],
-        },
-      ]}
-      actions={["Preview", "Switch"]}
-    />
-  )
+  return <ConfiguredInteractiveScreen config={userScreens["switch-supervisor"]} links={userLinks} />
 }

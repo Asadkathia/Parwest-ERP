@@ -1,7 +1,5 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
     LayoutDashboard,
@@ -17,26 +15,21 @@ import {
     ClipboardList,
     History,
     Search,
-    ChevronDown,
+    Sparkles,
     Menu,
     X,
 } from "lucide-react"
 import { useState } from "react"
+import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
 
-interface NavItem {
-    title: string
-    href?: string
-    icon: React.ComponentType<{ className?: string }>
-    children?: NavItem[]
-}
-
-const navItems: NavItem[] = [
+const navItems: NavNode[] = [
     {
         title: "Dashboard",
         icon: LayoutDashboard,
         children: [
             { title: "Home", href: "/dashboard", icon: LayoutDashboard },
             { title: "Online Users", href: "/dashboard/online-users", icon: Users },
+            { title: "AI Chat", href: "/dashboard/ai-chat", icon: Sparkles },
         ],
     },
     {
@@ -148,8 +141,14 @@ const navItems: NavItem[] = [
     },
     {
         title: "Reports",
-        href: "/reports",
         icon: FileText,
+        children: [
+            { title: "Overview", href: "/reports", icon: FileText },
+            { title: "Scheduled", href: "/reports/scheduled", icon: FileText },
+            { title: "Guard Deployment", href: "/reports/guard-deployment", icon: FileText },
+            { title: "Day & Night", href: "/reports/day-night-duty", icon: FileText },
+            { title: "Client Enrolled", href: "/reports/client-enrolled", icon: FileText },
+        ],
     },
     {
         title: "Imports",
@@ -169,7 +168,6 @@ const navItems: NavItem[] = [
 ]
 
 export function Sidebar() {
-    const pathname = usePathname()
     const [openSections, setOpenSections] = useState<string[]>(["Dashboard", "Guards", "Clients"])
     const [isMobileOpen, setIsMobileOpen] = useState(false)
 
@@ -181,74 +179,21 @@ export function Sidebar() {
         )
     }
 
-    const isActive = (href: string) => {
-        return pathname === href || pathname.startsWith(href + "/")
-    }
-
     const sidebarContent = (
         <div className="flex h-full flex-col">
-            <div className="flex h-16 items-center border-b px-6">
-                <h2 className="text-lg font-semibold">Parwest ERP</h2>
+            <div className="flex h-16 items-center border-b border-[var(--sidebar-border)] px-6">
+                <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Parwest</p>
+                    <h2 className="text-lg font-semibold text-white">ERP Console</h2>
+                </div>
             </div>
             <nav className="flex-1 overflow-y-auto p-4">
-                <ul className="space-y-1">
-                    {navItems.map((item) => (
-                        <li key={item.title}>
-                            {item.children ? (
-                                <div>
-                                    <button
-                                        onClick={() => toggleSection(item.title)}
-                                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <item.icon className="h-5 w-5" />
-                                            <span>{item.title}</span>
-                                        </div>
-                                        <ChevronDown
-                                            className={cn(
-                                                "h-4 w-4 transition-transform",
-                                                openSections.includes(item.title) && "rotate-180"
-                                            )}
-                                        />
-                                    </button>
-                                    {openSections.includes(item.title) && (
-                                        <ul className="ml-4 mt-1 space-y-1 border-l pl-4">
-                                            {item.children.map((child) => (
-                                                <li key={child.title}>
-                                                    <Link
-                                                        href={child.href!}
-                                                        className={cn(
-                                                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-gray-100",
-                                                            isActive(child.href!) &&
-                                                            "bg-blue-50 text-blue-600 font-medium"
-                                                        )}
-                                                        onClick={() => setIsMobileOpen(false)}
-                                                    >
-                                                        <child.icon className="h-4 w-4" />
-                                                        <span>{child.title}</span>
-                                                    </Link>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            ) : (
-                                <Link
-                                    href={item.href!}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100",
-                                        isActive(item.href!) &&
-                                        "bg-blue-50 text-blue-600 font-medium"
-                                    )}
-                                    onClick={() => setIsMobileOpen(false)}
-                                >
-                                    <item.icon className="h-5 w-5" />
-                                    <span>{item.title}</span>
-                                </Link>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+                <SidebarNav
+                    items={navItems}
+                    openSections={openSections}
+                    onToggleSection={toggleSection}
+                    onNavigate={() => setIsMobileOpen(false)}
+                />
             </nav>
         </div>
     )
@@ -258,7 +203,7 @@ export function Sidebar() {
             {/* Mobile toggle button */}
             <button
                 onClick={() => setIsMobileOpen(!isMobileOpen)}
-                className="fixed left-4 top-4 z-50 rounded-md bg-white p-2 shadow-md lg:hidden"
+                className="fixed left-4 top-4 z-50 rounded-[var(--radius-md)] bg-[var(--surface)] p-2 shadow-[var(--shadow-sm)] lg:hidden"
             >
                 {isMobileOpen ? (
                     <X className="h-6 w-6" />
@@ -278,7 +223,7 @@ export function Sidebar() {
             {/* Sidebar */}
             <aside
                 className={cn(
-                    "fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white transition-transform lg:translate-x-0",
+                    "fixed left-0 top-0 z-40 h-screen w-[17rem] border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] transition-transform lg:translate-x-0",
                     isMobileOpen ? "translate-x-0" : "-translate-x-full"
                 )}
             >

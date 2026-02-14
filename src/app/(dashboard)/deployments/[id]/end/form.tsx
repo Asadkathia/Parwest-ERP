@@ -64,9 +64,9 @@ export default function EndDeploymentForm({ deployment }: Props) {
     }
 
     return (
-        <div className="bg-white rounded-lg border p-6">
+        <div className="ui-card p-6">
             {/* Warning Banner */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
+            <div className="mb-6 rounded-[var(--radius-md)] border border-yellow-200 bg-yellow-50 p-4">
                 <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div>
@@ -80,27 +80,27 @@ export default function EndDeploymentForm({ deployment }: Props) {
             </div>
 
             {/* Deployment Summary */}
-            <div className="bg-gray-50 rounded-md p-4 mb-6">
-                <h3 className="font-medium text-gray-900 mb-3">Deployment Summary</h3>
+            <div className="mb-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                <h3 className="mb-3 font-medium text-[var(--text)]">Deployment Summary</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                        <p className="text-gray-600">Guard</p>
+                        <p className="text-[var(--text-muted)]">Guard</p>
                         <p className="font-medium">{deployment.guard.name} ({deployment.guard.parwestId})</p>
                     </div>
                     <div>
-                        <p className="text-gray-600">Client</p>
+                        <p className="text-[var(--text-muted)]">Client</p>
                         <p className="font-medium">{deployment.client.name}</p>
                     </div>
                     <div>
-                        <p className="text-gray-600">Branch</p>
+                        <p className="text-[var(--text-muted)]">Branch</p>
                         <p className="font-medium">{deployment.branch?.name || "—"}</p>
                     </div>
                     <div>
-                        <p className="text-gray-600">Designation</p>
+                        <p className="text-[var(--text-muted)]">Designation</p>
                         <p className="font-medium">{deployment.designation || "—"}</p>
                     </div>
                     <div>
-                        <p className="text-gray-600">Deployment Date</p>
+                        <p className="text-[var(--text-muted)]">Deployment Date</p>
                         <p className="font-medium">
                             {new Date(deployment.deploymentDate).toLocaleDateString("en-US", {
                                 year: "numeric",
@@ -115,13 +115,13 @@ export default function EndDeploymentForm({ deployment }: Props) {
             {/* End Deployment Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {error}
                     </div>
                 )}
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm text-[var(--text-muted)] mb-1">
                         End Date <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -130,15 +130,15 @@ export default function EndDeploymentForm({ deployment }: Props) {
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
                         max={new Date().toISOString().split("T")[0]}
-                        className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="ui-textarea"
                     />
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
                         The date when this deployment ended (cannot be in the future)
                     </p>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm text-[var(--text-muted)] mb-1">
                         Reason for Ending
                     </label>
                     <textarea
@@ -146,7 +146,7 @@ export default function EndDeploymentForm({ deployment }: Props) {
                         onChange={(e) => setReason(e.target.value)}
                         rows={4}
                         placeholder="Optional: Provide a reason for ending this deployment..."
-                        className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="ui-input"
                     />
                 </div>
 
@@ -154,13 +154,13 @@ export default function EndDeploymentForm({ deployment }: Props) {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
+                        className="ui-btn ui-btn-danger disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {loading ? "Ending Deployment..." : "End Deployment"}
                     </button>
                     <Link
                         href={`/deployments/${deployment.id}`}
-                        className="px-6 py-2 border rounded-md hover:bg-gray-50"
+                        className="ui-btn ui-btn-secondary"
                     >
                         Cancel
                     </Link>

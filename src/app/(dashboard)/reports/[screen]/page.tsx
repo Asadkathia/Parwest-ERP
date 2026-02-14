@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
 import { reportLinks, reportScreens } from "@/lib/parity/screenConfigs"
 
 export default async function ReportScreenPage({ params }: { params: Promise<{ screen: string }> }) {
@@ -10,5 +10,5 @@ export default async function ReportScreenPage({ params }: { params: Promise<{ s
     notFound()
   }
 
-  return <UiDocScreen {...config} links={reportLinks} />
+  return <ConfiguredInteractiveScreen config={config} links={reportLinks} />
 }

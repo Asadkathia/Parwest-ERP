@@ -1,20 +1,6 @@
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
+import { userLinks, userScreens } from "@/lib/parity/screenConfigs"
 
 export default function UsersSearchPage() {
-  return (
-    <UiDocScreen
-      title="Search Users"
-      sections={[
-        {
-          title: "Filters",
-          fields: [
-            { label: "Name" },
-            { label: "User Role", type: "select" },
-          ],
-        },
-      ]}
-      actions={["Search", "Export in Excel"]}
-      table={{ columns: ["ID", "Photo", "Name", "Email", "Role", "Regional Office", "Action"] }}
-    />
-  )
+  return <ConfiguredInteractiveScreen config={userScreens.search} links={userLinks} />
 }

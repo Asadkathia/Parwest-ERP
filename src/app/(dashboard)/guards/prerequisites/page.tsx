@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import PrerequisitesManager from "./manager"
+import SectionTitle from "@/components/ui/section-title"
 
 export default async function PrerequisitesPage() {
     const session = await auth()
@@ -21,12 +22,10 @@ export default async function PrerequisitesPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Prerequisites Management</h1>
-                <p className="text-gray-600 mt-1">
-                    Manage regions and regional offices for the guard management system
-                </p>
-            </div>
+            <SectionTitle
+                title="Prerequisites Management"
+                subtitle="Manage regions and regional offices for the guard management system"
+            />
 
             <PrerequisitesManager regions={regions} regionalOffices={regionalOffices} />
         </div>

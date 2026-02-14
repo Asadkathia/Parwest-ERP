@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import UiDocScreen from "@/components/parity/UiDocScreen"
+import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
 import { payrollOperationLinks, payrollOperationScreens } from "@/lib/parity/screenConfigs"
 
 export default async function PayrollOperationDetailPage({
@@ -14,5 +14,5 @@ export default async function PayrollOperationDetailPage({
     notFound()
   }
 
-  return <UiDocScreen {...config} links={payrollOperationLinks} />
+  return <ConfiguredInteractiveScreen config={config} links={payrollOperationLinks} />
 }

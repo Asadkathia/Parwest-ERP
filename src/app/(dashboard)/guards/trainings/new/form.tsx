@@ -3,6 +3,10 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import SectionTitle from "@/components/ui/section-title"
+import ActionButton from "@/components/ui/action-button"
+import FilterBar from "@/components/ui/filter-bar"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type GuardOption = {
     id: string
@@ -94,40 +98,38 @@ export default function NewTrainingForm() {
     return (
         <div className="space-y-6 max-w-4xl">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Add OnJob Training</h1>
-                    <p className="text-gray-600 mt-1">Create a new OJT training record</p>
-                </div>
-                <Link href="/guards/trainings" className="border px-4 py-2 rounded-md hover:bg-gray-50">Return to List</Link>
+                <SectionTitle title="Add OnJob Training" subtitle="Create a new OJT training record" />
+                <Link href="/guards/trainings" className="ui-btn ui-btn-secondary">Return to List</Link>
             </div>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {error && <InlineAlert type="error" message={error} />}
 
-            <form onSubmit={onSubmit} className="bg-white rounded-lg border p-6 space-y-5">
+            <form onSubmit={onSubmit} className="space-y-5">
+                <FilterBar>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
-                        <input value={regionalOffice} onChange={(e) => setRegionalOffice(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Regional office" />
+                        <input value={regionalOffice} onChange={(e) => setRegionalOffice(e.target.value)} className="ui-input" placeholder="Regional office" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-                        <input value={client} onChange={(e) => setClient(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Client" />
+                        <input value={client} onChange={(e) => setClient(e.target.value)} className="ui-input" placeholder="Client" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch</label>
-                        <input value={branch} onChange={(e) => setBranch(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Branch" />
+                        <input value={branch} onChange={(e) => setBranch(e.target.value)} className="ui-input" placeholder="Branch" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch Supervisor</label>
-                        <input value={branchSupervisor} onChange={(e) => setBranchSupervisor(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Branch supervisor" />
+                        <input value={branchSupervisor} onChange={(e) => setBranchSupervisor(e.target.value)} className="ui-input" placeholder="Branch supervisor" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch Manager</label>
-                        <input value={branchManager} onChange={(e) => setBranchManager(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Branch manager" />
+                        <input value={branchManager} onChange={(e) => setBranchManager(e.target.value)} className="ui-input" placeholder="Branch manager" />
                     </div>
                     <div className="md:col-span-2">
                         <label className="block text-sm text-gray-600 mb-1">Select Guard</label>
-                        <select value={guardId} onChange={(e) => setGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2" required>
+                        <select value={guardId} onChange={(e) => setGuardId(e.target.value)} className="ui-select" required>
                             <option value="">--Select Guard--</option>
                             {guards.map((guard) => (
                                 <option key={guard.id} value={guard.id}>{guard.parwestId} - {guard.name} ({guard.cnic})</option>
@@ -136,21 +138,21 @@ export default function NewTrainingForm() {
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Date</label>
-                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border rounded-md px-3 py-2" required />
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ui-input" required />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Conducted By</label>
-                        <input value={conductedBy} onChange={(e) => setConductedBy(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                        <input value={conductedBy} onChange={(e) => setConductedBy(e.target.value)} className="ui-input" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Upload Files</label>
-                        <input type="file" multiple className="w-full border rounded-md px-3 py-2" />
+                        <input type="file" multiple className="ui-input" />
                     </div>
                 </div>
 
                 <div>
                     <label className="block text-sm text-gray-600 mb-1">Remarks</label>
-                    <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full border rounded-md px-3 py-2 min-h-24" />
+                    <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className="ui-textarea min-h-24" />
                 </div>
 
                 <div className="flex flex-wrap gap-6">
@@ -165,8 +167,9 @@ export default function NewTrainingForm() {
                 </div>
 
                 <div className="flex justify-end gap-3">
-                    <button
+                    <ActionButton
                         type="button"
+                        variant="secondary"
                         onClick={() => {
                             setRegionalOffice("")
                             setClient("")
@@ -180,12 +183,12 @@ export default function NewTrainingForm() {
                             setArmorer(false)
                             setSupervisorWithUniform(false)
                         }}
-                        className="border px-4 py-2 rounded-md hover:bg-gray-50"
                     >
                         Reset
-                    </button>
-                    <button disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-60">{loading ? "Submitting..." : "Submit"}</button>
+                    </ActionButton>
+                    <ActionButton disabled={loading}>{loading ? "Submitting..." : "Submit"}</ActionButton>
                 </div>
+                </FilterBar>
             </form>
         </div>
     )

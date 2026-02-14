@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { Sidebar } from "@/components/sidebar"
+import AppShell from "@/components/ui/app-shell"
+import ActionButton from "@/components/ui/action-button"
 
 export default async function DashboardLayout({
     children,
@@ -14,40 +15,23 @@ export default async function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Sidebar />
-
-            <div className="lg:pl-64">
-                <nav className="bg-white border-b">
-                    <div className="px-4 sm:px-6 lg:px-8">
-                        <div className="flex justify-between h-16 items-center">
-                            <div className="lg:hidden">
-                                {/* Space for mobile menu button */}
-                            </div>
-                            <div className="flex-1" />
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-600">
-                                    {session.user?.name} ({session.user?.role})
-                                </span>
-                                <form
-                                    action={async () => {
-                                        "use server"
-                                        await signOut()
-                                    }}
-                                >
-                                    <button
-                                        type="submit"
-                                        className="text-sm text-red-600 hover:text-red-700 font-medium"
-                                    >
-                                        Sign Out
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
-                <main className="p-8">{children}</main>
-            </div>
-        </div>
+        <AppShell
+            name={session.user?.name}
+            role={session.user?.role}
+            signOutSlot={
+                <form
+                    action={async () => {
+                        "use server"
+                        await signOut()
+                    }}
+                >
+                    <ActionButton type="submit" variant="secondary">
+                        Sign Out
+                    </ActionButton>
+                </form>
+            }
+        >
+            {children}
+        </AppShell>
     )
 }
