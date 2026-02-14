@@ -7,23 +7,38 @@ import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
+import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
 export default async function UsersPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const users = await prisma.user.findMany({
-    take: 20,
-    orderBy: { createdAt: "desc" },
-    include: {
-      role: true,
-    },
-  })
+  let users: Awaited<ReturnType<typeof prisma.user.findMany>> = []
+  let dbWarning = ""
+  const stats = { total: 0, active: 0, inactive: 0 }
 
-  const stats = {
-    total: await prisma.user.count(),
-    active: await prisma.user.count({ where: { status: "ACTIVE" } }),
-    inactive: await prisma.user.count({ where: { status: "INACTIVE" } }),
+  try {
+    const [rows, total, active, inactive] = await Promise.all([
+      prisma.user.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count(),
+      prisma.user.count({ where: { status: "ACTIVE" } }),
+      prisma.user.count({ where: { status: "INACTIVE" } }),
+    ])
+    users = rows
+    stats.total = total
+    stats.active = active
+    stats.inactive = inactive
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. User data is temporarily unavailable."
+    } else {
+      dbWarning = `Unable to load user data: ${toErrorMessage(error, "Unknown database error")}`
+    }
+    console.error("UsersPage query failed:", error)
   }
 
   return (
@@ -38,6 +53,7 @@ export default async function UsersPage() {
           </Link>
         }
       />
+      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Total Users" value={stats.total} icon={<UsersIcon className="h-5 w-5" />} tone="brand" />
@@ -72,22 +88,30 @@ export default async function UsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-[var(--surface-muted)]">
-                <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{user.name}</td>
-                <td className="px-6 py-4 text-sm text-[var(--text)]">{user.email}</td>
-                <td className="px-6 py-4 text-sm text-[var(--text)]">{user.role?.name || "—"}</td>
-                <td className="px-6 py-4 text-sm">
-                  <StatusChip label={user.status} variant={user.status === "ACTIVE" ? "success" : "warning"} />
-                </td>
-                <td className="px-6 py-4 text-sm text-[var(--text-muted)]">—</td>
-                <td className="px-6 py-4 text-sm">
-                  <Link href={`/users/${user.id}`} className="text-[var(--brand)] hover:underline font-medium">
-                    View
-                  </Link>
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                  <p className="text-base font-medium text-[var(--text)]">No users found.</p>
                 </td>
               </tr>
-            ))}
+            ) : (
+              users.map((user) => (
+                <tr key={user.id} className="hover:bg-[var(--surface-muted)]">
+                  <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{user.name}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{user.email}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{user.roleId || "—"}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <StatusChip label={user.status} variant={user.status === "ACTIVE" ? "success" : "warning"} />
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[var(--text-muted)]">—</td>
+                  <td className="px-6 py-4 text-sm">
+                    <Link href={`/users/${user.id}`} className="text-[var(--brand)] hover:underline font-medium">
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>

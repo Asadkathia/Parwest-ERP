@@ -7,24 +7,40 @@ import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
+import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
 export default async function GuardsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const guards = await prisma.guard.findMany({
-    take: 20,
-    orderBy: { createdAt: "desc" },
-    include: {
-      region: true,
-    },
-  })
+  let guards: Awaited<ReturnType<typeof prisma.guard.findMany>> = []
+  let dbWarning = ""
+  const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
 
-  const stats = {
-    total: await prisma.guard.count(),
-    active: await prisma.guard.count({ where: { status: "ACTIVE" } }),
-    pending: await prisma.guard.count({ where: { status: "PENDING" } }),
-    inactive: await prisma.guard.count({ where: { status: "INACTIVE" } }),
+  try {
+    const [guardRows, total, active, pending, inactive] = await Promise.all([
+      prisma.guard.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.guard.count(),
+      prisma.guard.count({ where: { status: "ACTIVE" } }),
+      prisma.guard.count({ where: { status: "PENDING" } }),
+      prisma.guard.count({ where: { status: "INACTIVE" } }),
+    ])
+    guards = guardRows
+    stats.total = total
+    stats.active = active
+    stats.pending = pending
+    stats.inactive = inactive
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Guard data is temporarily unavailable."
+    } else {
+      dbWarning = `Unable to load guard data: ${toErrorMessage(error, "Unknown database error")}`
+    }
+    console.error("GuardsPage query failed:", error)
   }
 
   return (
@@ -39,6 +55,8 @@ export default async function GuardsPage() {
           </Link>
         }
       />
+
+      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Guards" value={stats.total} icon={<Shield className="h-5 w-5" />} tone="brand" />
@@ -90,7 +108,7 @@ export default async function GuardsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.name}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.cnic}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.phone || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.region?.name || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.regionId || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip
                       label={guard.status}

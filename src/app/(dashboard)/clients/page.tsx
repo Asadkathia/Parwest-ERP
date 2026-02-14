@@ -7,27 +7,40 @@ import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
+import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
 export default async function ClientsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const clients = await prisma.client.findMany({
-    take: 20,
-    orderBy: { createdAt: "desc" },
-    include: {
-      region: true,
-      _count: {
-        select: { branches: true },
-      },
-    },
-  })
+  let clients: Awaited<ReturnType<typeof prisma.client.findMany>> = []
+  let dbWarning = ""
+  const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
 
-  const stats = {
-    total: await prisma.client.count(),
-    active: await prisma.client.count({ where: { status: "ACTIVE" } }),
-    inactive: await prisma.client.count({ where: { status: "INACTIVE" } }),
-    totalBranches: await prisma.branch.count(),
+  try {
+    const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
+      prisma.client.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.client.count(),
+      prisma.client.count({ where: { status: "ACTIVE" } }),
+      prisma.client.count({ where: { status: "INACTIVE" } }),
+      prisma.branch.count(),
+    ])
+    clients = clientRows
+    stats.total = total
+    stats.active = active
+    stats.inactive = inactive
+    stats.totalBranches = totalBranches
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Client data is temporarily unavailable."
+    } else {
+      dbWarning = `Unable to load client data: ${toErrorMessage(error, "Unknown database error")}`
+    }
+    console.error("ClientsPage query failed:", error)
   }
 
   return (
@@ -42,6 +55,7 @@ export default async function ClientsPage() {
           </Link>
         }
       />
+      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
@@ -90,8 +104,8 @@ export default async function ClientsPage() {
                   <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{client.name}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.type}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.city || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client._count.branches}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.region?.name || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">—</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionId || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />
                   </td>

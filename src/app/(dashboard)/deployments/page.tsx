@@ -7,29 +7,38 @@ import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
+import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
 export default async function DeploymentsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const deployments = await prisma.deployment.findMany({
-    take: 20,
-    orderBy: { createdAt: "desc" },
-    include: {
-      guard: true,
-      branch: {
-        include: {
-          client: true,
-        },
-      },
-      client: true,
-    },
-  })
+  let deployments: Awaited<ReturnType<typeof prisma.deployment.findMany>> = []
+  let dbWarning = ""
+  const stats = { total: 0, active: 0, inactive: 0 }
 
-  const stats = {
-    total: await prisma.deployment.count(),
-    active: await prisma.deployment.count({ where: { status: "ACTIVE" } }),
-    inactive: await prisma.deployment.count({ where: { status: "INACTIVE" } }),
+  try {
+    const [rows, total, active, inactive] = await Promise.all([
+      prisma.deployment.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.deployment.count(),
+      prisma.deployment.count({ where: { status: "ACTIVE" } }),
+      prisma.deployment.count({ where: { status: "INACTIVE" } }),
+    ])
+    deployments = rows
+    stats.total = total
+    stats.active = active
+    stats.inactive = inactive
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Deployment data is temporarily unavailable."
+    } else {
+      dbWarning = `Unable to load deployment data: ${toErrorMessage(error, "Unknown database error")}`
+    }
+    console.error("DeploymentsPage query failed:", error)
   }
 
   return (
@@ -44,6 +53,7 @@ export default async function DeploymentsPage() {
           </Link>
         }
       />
+      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Total Deployments" value={stats.total} icon={<MapPin className="h-5 w-5" />} tone="brand" />
@@ -89,9 +99,9 @@ export default async function DeploymentsPage() {
             ) : (
               deployments.map((deployment) => (
                 <tr key={deployment.id} className="hover:bg-[var(--surface-muted)]">
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.guard?.name || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.client?.name || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.branch?.name || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.guardId || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.clientId || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.branchId || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{new Date(deployment.deploymentDate).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">—</td>
                   <td className="px-6 py-4 text-sm">

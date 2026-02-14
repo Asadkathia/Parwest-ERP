@@ -19,18 +19,15 @@ Columns:
 - `Route`: page exists and is navigable
 - `UI Fields`: documented fields/sections visible in frontend
 - `UX Flow`: end-to-end front-end journey wired
-- `API/DB`: connected to real persistence (deferred by plan)
+ - `API/DB`: connected to real persistence (deferred by plan)
 - `Tests`: validated with checks/manual scenarios
 
-## KPI Baseline (Updated: February 13, 2026 - Pass 21)
+## KPI Baseline (Updated: February 10, 2026 - Pass 9)
 - Route Parity: **100%**
-- Field Parity: **97%**
-- Flow Parity: **97%**
+- Field Parity: **90%**
+- Flow Parity: **92%**
 - API/DB Integration: **38%**
-- Test Completion: **60%**
-- UI Token Adoption: **98%**
-- Screen Visual Migration: **90%**
-- Component Standardization: **97%**
+- Test Completion: **45%**
 
 ## Phase Order
 
@@ -55,13 +52,7 @@ Columns:
 - [x] Improve client search flows (legacy + V2) with real table behavior
 - [x] Implement interactive tabbed billing flows for client invoice prerequisites and invoiced billings
 - [x] Implement interactive client master data/blacklist/export branches flows
-- [x] Modernize client branch list/detail/create/edit screens with shared design-system components
 - [x] Implement interactive Users permissions + Ticket prerequisites + Settings master screens
-- [x] Modernize Users list and permissions screens to shared card/table/filter primitives
-- [x] Modernize Ticket prerequisites screen to shared tab/filter/table primitives
-- [x] Modernize Settings regional offices screen to shared form/filter/table primitives
-- [x] Modernize top-level Guards, Clients, and Deployments listing screens to shared shell/cards/tables
-- [x] Modernize deployments detail/new/edit/end pages and forms with shared section titles, cards, and tokenized controls
 - [x] Implement interactive configured screens for Payroll/Inventory/Reports/Imports modules
 - [ ] Complete page-to-page UX flows for all modules
 - [ ] Standardize validations/loading/empty/error states
@@ -87,25 +78,25 @@ Columns:
 ### 1) Dashboard Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Home (Map View) | ✅ | ✅ | ✅ | 🟡 | 🟡 | High-fidelity shell/cards/panels applied; map and filters styled with design tokens |
+| Home (Map View) | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Map/filter shell present, full map data pending |
 | Online Users | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive filters/table behavior added |
 
 ### 2) Guards Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Add New Guard | ✅ | ✅ | ✅ | ✅ | 🟡 | Full form migrated to design-system controls/cards while preserving submit API |
-| Search Guard | ✅ | ✅ | ✅ | 🟡 | 🟡 | Search manager and top-level guards listing migrated to design-system filters/cards/tables |
-| Export Guard | ✅ | ✅ | ✅ | ⬜ | 🟡 | Design-system export filters, field selector chips, and confirmation dialog applied |
-| Prerequisites | ✅ | ✅ | ✅ | 🟡 | 🟡 | Regions/offices UI migrated to design system; API-backed create flows preserved |
+| Add New Guard | ✅ | 🟡 | ✅ | ✅ | 🟡 | Form expanded with UI-doc sections; extra fields currently UI-first |
+| Search Guard | ✅ | 🟡 | ✅ | 🟡 | 🟡 | Advanced filters expanded; partial backend filtering |
+| Export Guard | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | UI export config present |
+| Prerequisites | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | Region/office + partial prerequisites management |
 | Black Listed | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed add/remove flow |
 | Inactive Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed list/reactivation |
-| Deploy Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | Full design-system migration for deploy form plus deployments list/detail/new/edit/end lifecycle pages |
-| Deployments Rate | ✅ | ✅ | ✅ | ✅ | 🟡 | Full design-system migration for rate filters/form/table while preserving API flow |
+| Deploy Guards | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed deployment flow |
+| Deployments Rate | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed rates save/list |
 | Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed attendance record/list |
 | Client Attendance | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed client attendance |
 | Residences | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed CRUD |
 | Assign Residence | ✅ | ✅ | ✅ | ✅ | 🟡 | API-backed assignment |
-| OnJob Trainings / V2 | ✅ | ✅ | ✅ | ✅ | 🟡 | List + new form migrated to design-system controls/panels |
+| OnJob Trainings / V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 | New form expanded to include UI-doc fields |
 
 ### 3) Payroll Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
@@ -128,14 +119,14 @@ Columns:
 ### 4) Clients Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
-| Add New Client | ✅ | 🟡 | ✅ | ✅ | 🟡 | Full enrollment form migrated to design-system cards/inputs/actions with all documented sections retained |
-| Search Client | ✅ | ✅ | ✅ | 🟡 | 🟡 | Search manager and top-level clients listing migrated to design-system filters/cards/tables |
+| Add New Client | ✅ | 🟡 | ✅ | ✅ | 🟡 | Expanded with contact/referral/territory/branchless blocks |
+| Search Client | ✅ | ✅ | ✅ | 🟡 | 🟡 | API-backed search/list flow with clear/error/loading states |
 | Search Client V2 | ✅ | ✅ | ✅ | 🟡 | 🟡 | API-backed search/list flow with profile/edit drilldown |
-| Types & Locations | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabs, filter cards, and standardized tables |
-| Black Listed | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filter bar and standardized table/actions |
-| Export Branches | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filters/actions and standardized table |
-| Invoice Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tab strip, rate filters, and standardized table |
-| Invoiced Billings | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabbed filters and standardized invoiced/error tables |
+| Types & Locations | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabs + add/search/delete table behavior |
+| Black Listed | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive add/search/delete blacklist flow |
+| Export Branches | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive manager/client filters + results table |
+| Invoice Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabs + default rates table behavior |
+| Invoiced Billings | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive tabbed billing/error invoice flows |
 
 ### 5) Inventory Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
@@ -154,8 +145,8 @@ Columns:
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
 | Add New | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive user enrolment flow and UI table behavior |
-| Search | ✅ | ✅ | ✅ | 🟡 | 🟡 | Migrated to design-system stat cards, filter bar, table skin, and status chips |
-| Permissions Management | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system filter/actions and table-based permission matrix |
+| Search | ✅ | ✅ | ✅ | 🟡 | 🟡 | Interactive filters/export/table behavior added |
+| Permissions Management | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive permission matrix with toggles/search |
 | M/S Relationship | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive assignment flow and table behavior |
 | Switch Supervisor | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive transfer flow and preview/switch actions |
 | C/S Relationship | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive assignment flow and table behavior |
@@ -164,13 +155,13 @@ Columns:
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
 | Listing (All Tickets) | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive search/clear/export and table behavior |
-| Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Migrated to design-system tabs, filter controls, and standardized table/actions |
+| Prerequisites | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive category/priority/status management |
 
 ### 8) Settings Module
 | Screen | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
 |---|---|---|---|---|---|---|
 | Region | ✅ | ✅ | ✅ | 🟡 | 🟡 | Interactive region master management |
-| Regional Offices | ✅ | ✅ | ✅ | 🟡 | 🟡 | Migrated to design-system filter/actions and standardized office table management |
+| Regional Offices | ✅ | ✅ | ✅ | 🟡 | 🟡 | Interactive office master management |
 | Guard Pledgeable Document Types | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
 | User Types | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
 | Guard Bank Names | ✅ | ✅ | ✅ | ⬜ | 🟡 | Interactive master data manager |
@@ -229,24 +220,3 @@ Columns:
 2. Do not mark a row fully complete unless all five columns are `✅`.
 3. During frontend-first phases, only `Route`, `UI Fields`, and `UX Flow` are expected to advance.
 4. KPI updates are mandatory after each major merge.
-
----
-
-## UI Modernization Tracker (High-Fidelity Design System)
-
-Legend: `✅` complete, `🟡` in progress, `⬜` not started
-
-| Module | Shell | Cards | Forms | Tables | Responsive | A11y | Notes |
-|---|---|---|---|---|---|---|---|
-| Dashboard | ✅ | ✅ | ✅ | ✅ | 🟡 | 🟡 | New dark sidebar + topbar + right panel pattern live |
-| Guards | 🟡 | ✅ | ✅ | ✅ | ⬜ | 🟡 | Search + OJT + Deploy + Rates + Add Guard + Prerequisites migrated |
-| Clients | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Managers inherit updated controls incrementally |
-| Payroll | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Configured screens now use new tokens/controls |
-| Inventory | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Hub + configured screens inherit base styles |
-| Users | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Interaction pages visually upgraded via shared components |
-| Ticketing | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Listing/new/prerequisites aligned with design system |
-| Settings | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Master data managers now on shared style surface |
-| Reports | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Report hubs and configured screens updated |
-| Imports | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Import hubs and configured screens updated |
-| Requisitions | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Tabbed approval screen on new primitives |
-| Audit | 🟡 | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Search/report screen on new primitives |

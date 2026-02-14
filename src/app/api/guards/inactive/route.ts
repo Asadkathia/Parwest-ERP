@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 
 export async function GET(request: NextRequest) {
     try {
@@ -24,6 +25,9 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(guards)
     } catch (error: any) {
+        if (isPrismaMissingSchemaError(error)) {
+            return NextResponse.json([])
+        }
         console.error("Error fetching inactive guards:", error)
         return NextResponse.json({ message: "Failed to fetch inactive guards" }, { status: 500 })
     }
