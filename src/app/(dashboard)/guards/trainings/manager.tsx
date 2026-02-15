@@ -13,12 +13,12 @@ type TrainingRow = {
     completedAt: string
     instructor: string | null
     notes: string | null
-    guard: {
+    guard?: {
         id: string
         name: string
         parwestId: string
         regionalOffice: { name: string } | null
-    }
+    } | null
 }
 
 type ParsedNotes = {
@@ -102,8 +102,9 @@ export default function TrainingsManager() {
         return rows.filter((row) => {
             const notes = parseNotes(row.notes)
             const completed = new Date(row.completedAt)
+            const guardRegionalOffice = row.guard?.regionalOffice?.name || ""
 
-            if (regionalOfficeFilter && !((notes.regionalOffice || row.guard.regionalOffice?.name || "").toLowerCase().includes(regionalOfficeFilter.toLowerCase()))) {
+            if (regionalOfficeFilter && !((notes.regionalOffice || guardRegionalOffice).toLowerCase().includes(regionalOfficeFilter.toLowerCase()))) {
                 return false
             }
 
@@ -208,15 +209,17 @@ export default function TrainingsManager() {
                                 const created = new Date(training.completedAt)
                                 const due = new Date(created)
                                 due.setMonth(due.getMonth() + 1)
+                                const guardName = training.guard?.name || "Unknown Guard"
+                                const guardRegionalOffice = training.guard?.regionalOffice?.name
 
                                 return (
                                     <tr key={training.id} className="hover:bg-[var(--surface-muted)]">
                                         <td className="px-6 py-4 text-sm">{created.toLocaleDateString("en-US")}</td>
                                         <td className="px-6 py-4 text-sm">{created.toLocaleDateString("en-US")}</td>
-                                        <td className="px-6 py-4 text-sm">{notes.regionalOffice || training.guard.regionalOffice?.name || "—"}</td>
+                                        <td className="px-6 py-4 text-sm">{notes.regionalOffice || guardRegionalOffice || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.client || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.branch || "—"}</td>
-                                        <td className="px-6 py-4 text-sm">{training.guard.name}</td>
+                                        <td className="px-6 py-4 text-sm">{guardName}</td>
                                         <td className="px-6 py-4 text-sm">{notes.branchSupervisor || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.supervisorWithUniform || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.branchManager || "—"}</td>

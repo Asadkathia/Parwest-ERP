@@ -25,7 +25,7 @@ export default async function BranchesPage() {
     total: branches.length,
     headOffices: branches.filter((b) => b.isHeadOffice).length,
     cities: new Set(branches.map((b) => b.city).filter(Boolean)).size,
-    withDeployments: branches.filter((b) => b.deployments.length > 0).length,
+    withDeployments: branches.filter((b) => (b.deployments?.length || 0) > 0).length,
   }
 
   return (
@@ -67,9 +67,13 @@ export default async function BranchesPage() {
               branches.map((branch) => (
                 <tr key={branch.id} className="hover:bg-[var(--surface-muted)]">
                   <td className="px-6 py-4 text-sm">
-                    <Link href={`/clients/${branch.clientId}`} className="font-medium text-[var(--brand)] hover:underline">
-                      {branch.client.name}
-                    </Link>
+                    {branch.client?.id ? (
+                      <Link href={`/clients/${branch.clientId}`} className="font-medium text-[var(--brand)] hover:underline">
+                        {branch.client.name || "Unknown Client"}
+                      </Link>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">Unknown Client</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="flex items-center gap-2">
@@ -80,9 +84,9 @@ export default async function BranchesPage() {
                   <td className="px-6 py-4 text-sm">{branch.code || "—"}</td>
                   <td className="px-6 py-4 text-sm">{branch.city || "—"}</td>
                   <td className="px-6 py-4 text-sm">{branch.province || "—"}</td>
-                  <td className="px-6 py-4 text-sm">{branch.client.type}</td>
+                  <td className="px-6 py-4 text-sm">{branch.client?.type || "—"}</td>
                   <td className="px-6 py-4 text-sm">
-                    <StatusChip label={String(branch.deployments.length)} variant="neutral" />
+                    <StatusChip label={String(branch.deployments?.length || 0)} variant="neutral" />
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <Link href={`/clients/branches/${branch.id}`} className="text-[var(--brand)] hover:underline">

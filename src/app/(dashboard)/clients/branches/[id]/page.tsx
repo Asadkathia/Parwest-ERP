@@ -37,7 +37,8 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
     })
   }
 
-  const activeDeployments = branch.deployments.filter((d) => d.status === "ACTIVE")
+  const deployments = branch.deployments || []
+  const activeDeployments = deployments.filter((d) => d.status === "ACTIVE")
 
   return (
     <div className="space-y-6">
@@ -143,7 +144,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
 
           <Card>
             <CardHeader className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-[var(--text)]">Deployments ({branch.deployments.length})</h3>
+              <h3 className="text-base font-semibold text-[var(--text)]">Deployments ({deployments.length})</h3>
               <Link href={`/deployments/new?clientId=${branch.clientId}&branchId=${branch.id}`} className="text-sm text-[var(--brand)] hover:underline">
                 + Add Deployment
               </Link>
@@ -162,21 +163,27 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
-                    {branch.deployments.length === 0 ? (
+                    {deployments.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-8 text-center text-[var(--text-muted)]">
                           No deployments at this branch yet.
                         </td>
                       </tr>
                     ) : (
-                      branch.deployments.map((deployment) => (
+                      deployments.map((deployment) => {
+                        const guard = deployment.guard
+                        return (
                         <tr key={deployment.id} className="hover:bg-[var(--surface-muted)]">
                           <td className="px-6 py-4 text-sm">
-                            <Link href={`/guards/${deployment.guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
-                              {deployment.guard.name}
-                            </Link>
+                            {guard?.id ? (
+                              <Link href={`/guards/${guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
+                                {guard.name || "Unknown Guard"}
+                              </Link>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">Unknown Guard</span>
+                            )}
                           </td>
-                          <td className="px-6 py-4 text-sm">{deployment.guard.parwestId}</td>
+                          <td className="px-6 py-4 text-sm">{guard?.parwestId || "—"}</td>
                           <td className="px-6 py-4 text-sm">{deployment.designation || "—"}</td>
                           <td className="px-6 py-4 text-sm">
                             <StatusChip label={deployment.status} variant={deployment.status === "ACTIVE" ? "success" : "warning"} />
@@ -188,7 +195,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                             </Link>
                           </td>
                         </tr>
-                      ))
+                      )})
                     )}
                   </tbody>
                 </table>
@@ -208,17 +215,21 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
             <CardBody className="space-y-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Name</p>
-                <Link href={`/clients/${branch.client.id}`} className="text-sm font-medium text-[var(--brand)] hover:underline">
-                  {branch.client.name}
-                </Link>
+                {branch.client?.id ? (
+                  <Link href={`/clients/${branch.client.id}`} className="text-sm font-medium text-[var(--brand)] hover:underline">
+                    {branch.client.name || "Unknown Client"}
+                  </Link>
+                ) : (
+                  <p className="text-sm font-medium text-[var(--text)]">Unknown Client</p>
+                )}
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Type</p>
-                <p className="text-sm font-medium text-[var(--text)]">{branch.client.type}</p>
+                <p className="text-sm font-medium text-[var(--text)]">{branch.client?.type || "—"}</p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Status</p>
-                <StatusChip label={branch.client.status} variant={branch.client.status === "ACTIVE" ? "success" : "warning"} />
+                <StatusChip label={branch.client?.status || "UNKNOWN"} variant={branch.client?.status === "ACTIVE" ? "success" : "warning"} />
               </div>
               {branch.isHeadOffice ? <StatusChip label="Head Office" variant="success" /> : null}
             </CardBody>
@@ -231,7 +242,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
             <CardBody className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Total Deployments</span>
-                <span className="font-semibold text-[var(--text)]">{branch.deployments.length}</span>
+                <span className="font-semibold text-[var(--text)]">{deployments.length}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Active</span>
@@ -239,7 +250,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Inactive</span>
-                <span className="font-semibold text-[var(--text)]">{branch.deployments.length - activeDeployments.length}</span>
+                <span className="font-semibold text-[var(--text)]">{deployments.length - activeDeployments.length}</span>
               </div>
             </CardBody>
           </Card>

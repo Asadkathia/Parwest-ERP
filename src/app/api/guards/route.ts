@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { isMockEnabled } from "@/lib/mockData"
+import { mockGuardsList } from "@/lib/mockData/guards"
 
 export async function GET(request: NextRequest) {
     try {
@@ -18,6 +20,25 @@ export async function GET(request: NextRequest) {
         if (regionId) where.regionId = regionId
         if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
         if (status) where.status = status
+
+        if (isMockEnabled()) {
+            const guards = mockGuardsList
+                .filter((guard) => (where.status ? guard.status === where.status : true))
+                .map((guard) => ({
+                    id: guard.id,
+                    parwestId: guard.parwestId,
+                    name: guard.name,
+                    cnic: guard.cnic,
+                    phone: guard.phone || null,
+                    email: guard.email || null,
+                    status: guard.status,
+                    regionId: null,
+                    regionalOfficeId: null,
+                    region: null,
+                    regionalOffice: null,
+                }))
+            return NextResponse.json(guards)
+        }
 
         const guards = await prisma.guard.findMany({
             where,
@@ -47,6 +68,21 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
+
+        if (isMockEnabled()) {
+            const mock = {
+                id: `mock-guard-${Date.now()}`,
+                parwestId: `PW-${String(Date.now()).slice(-5)}`,
+                name: String(body.name || "Mock Guard"),
+                cnic: String(body.cnic || "00000-0000000-0"),
+                phone: body.phone || null,
+                email: body.email || null,
+                status: body.status || "PENDING",
+                regionId: body.regionId || null,
+                regionalOfficeId: body.regionalOfficeId || null,
+            }
+            return NextResponse.json(mock, { status: 201 })
+        }
 
         // Generate Parwest ID
         const lastGuard = await prisma.guard.findFirst({

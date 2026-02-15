@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { isMockEnabled } from "@/lib/mockData"
+import { mockClientsList } from "@/lib/mockData/clients"
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,6 +18,21 @@ export async function GET(request: NextRequest) {
         const where: any = {}
         if (regionId) where.regionId = regionId
         if (status) where.status = status
+
+        if (isMockEnabled()) {
+            const clients = mockClientsList
+                .filter((client) => (where.status ? client.status === where.status : true))
+                .map((client) => ({
+                    id: client.id,
+                    name: client.name,
+                    type: client.type,
+                    city: client.city,
+                    status: client.status,
+                    regionId: client.regionId,
+                    region: client.regionId ? { id: client.regionId, name: client.regionId } : null,
+                }))
+            return NextResponse.json(clients)
+        }
 
         const clients = await prisma.client.findMany({
             where,
@@ -43,6 +60,25 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
+
+        if (isMockEnabled()) {
+            const mock = {
+                id: `mock-client-${Date.now()}`,
+                name: String(body.name || "Mock Client"),
+                email: body.email || null,
+                type: body.type || "OTHER",
+                isBranchless: body.isBranchless === "true",
+                headOfficeAddress: body.headOfficeAddress || null,
+                city: body.city || null,
+                status: body.status || "ACTIVE",
+                logoUrl: body.logoUrl || null,
+                ntn: body.ntn || null,
+                strn: body.strn || null,
+                contractUrl: body.contractUrl || null,
+                regionId: body.regionId || null,
+            }
+            return NextResponse.json(mock, { status: 201 })
+        }
 
         const client = await prisma.client.create({
             data: {

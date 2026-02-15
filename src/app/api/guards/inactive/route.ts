@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { isMockEnabled } from "@/lib/mockData"
+import { mockInactiveGuards } from "@/lib/mockData/guards"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+        }
+
+        if (isMockEnabled()) {
+            return NextResponse.json(mockInactiveGuards)
         }
 
         const guards = await prisma.guard.findMany({

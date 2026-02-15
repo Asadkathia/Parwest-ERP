@@ -42,7 +42,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     })
   }
 
-  const totalDeployments = client.branches.reduce((sum, branch) => sum + branch.deployments.length, 0)
+  const totalDeployments = client.branches.reduce((sum, branch) => sum + (branch.deployments?.length || 0), 0)
 
   return (
     <div className="space-y-6">
@@ -145,7 +145,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                           ) : null}
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <StatusChip
-                              label={`${branch.deployments.length} deployment${branch.deployments.length !== 1 ? "s" : ""}`}
+                              label={`${branch.deployments?.length || 0} deployment${(branch.deployments?.length || 0) !== 1 ? "s" : ""}`}
                               variant="neutral"
                             />
                             {branch.isHeadOffice ? <StatusChip label="Head Office" variant="success" /> : null}

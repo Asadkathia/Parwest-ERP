@@ -9,38 +9,72 @@ import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
+import { isMockEnabled } from "@/lib/mockData"
+import { mockClientsList } from "@/lib/mockData/clients"
 
 export default async function ClientsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  let clients: Awaited<ReturnType<typeof prisma.client.findMany>> = []
+  let clients: Array<{
+    id: string
+    name: string
+    type: string
+    city: string | null
+    status: string
+    regionId: string | null
+    branchCount: number
+  }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
+  const mockMode = isMockEnabled()
 
-  try {
-    const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
-      prisma.client.findMany({
-        take: 20,
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.client.count(),
-      prisma.client.count({ where: { status: "ACTIVE" } }),
-      prisma.client.count({ where: { status: "INACTIVE" } }),
-      prisma.branch.count(),
-    ])
-    clients = clientRows
-    stats.total = total
-    stats.active = active
-    stats.inactive = inactive
-    stats.totalBranches = totalBranches
-  } catch (error) {
-    if (isPrismaMissingSchemaError(error)) {
-      dbWarning = "Database schema is not fully migrated yet. Client data is temporarily unavailable."
-    } else {
-      dbWarning = `Unable to load client data: ${toErrorMessage(error, "Unknown database error")}`
+  if (mockMode) {
+    clients = mockClientsList.slice(0, 20)
+    stats.total = clients.length
+    stats.active = clients.filter((c) => c.status === "ACTIVE").length
+    stats.inactive = clients.filter((c) => c.status === "INACTIVE").length
+    stats.totalBranches = clients.reduce((sum, c) => sum + c.branchCount, 0)
+    dbWarning = "Mock mode enabled: showing client fallback data."
+  } else {
+    try {
+      const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
+        prisma.client.findMany({
+          take: 20,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.client.count(),
+        prisma.client.count({ where: { status: "ACTIVE" } }),
+        prisma.client.count({ where: { status: "INACTIVE" } }),
+        prisma.branch.count(),
+      ])
+      clients = clientRows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        city: c.city,
+        status: c.status,
+        regionId: c.regionId,
+        branchCount: 0,
+      }))
+      stats.total = total
+      stats.active = active
+      stats.inactive = inactive
+      stats.totalBranches = totalBranches
+    } catch (error) {
+      clients = mockClientsList.slice(0, 20)
+      stats.total = clients.length
+      stats.active = clients.filter((c) => c.status === "ACTIVE").length
+      stats.inactive = clients.filter((c) => c.status === "INACTIVE").length
+      stats.totalBranches = clients.reduce((sum, c) => sum + c.branchCount, 0)
+
+      if (isPrismaMissingSchemaError(error)) {
+        dbWarning = "Database schema is not fully migrated yet. Showing fallback client mock data."
+      } else {
+        dbWarning = `Unable to load client data (${toErrorMessage(error, "Unknown database error")}). Showing fallback mock data.`
+      }
+      console.error("ClientsPage query failed:", error)
     }
-    console.error("ClientsPage query failed:", error)
   }
 
   return (
@@ -104,7 +138,7 @@ export default async function ClientsPage() {
                   <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{client.name}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.type}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.city || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">—</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.branchCount}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionId || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />

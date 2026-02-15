@@ -9,38 +9,80 @@ import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
+import { mockGuardsList } from "@/lib/mockData/guards"
+import { isMockEnabled } from "@/lib/mockData"
 
 export default async function GuardsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  let guards: Awaited<ReturnType<typeof prisma.guard.findMany>> = []
+  let guards: Array<{
+    id: string
+    parwestId: string
+    name: string
+    cnic: string
+    phone: string | null
+    status: string
+    regionId: string | null
+  }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
+  const mockMode = isMockEnabled()
 
-  try {
-    const [guardRows, total, active, pending, inactive] = await Promise.all([
-      prisma.guard.findMany({
-        take: 20,
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.guard.count(),
-      prisma.guard.count({ where: { status: "ACTIVE" } }),
-      prisma.guard.count({ where: { status: "PENDING" } }),
-      prisma.guard.count({ where: { status: "INACTIVE" } }),
-    ])
-    guards = guardRows
-    stats.total = total
-    stats.active = active
-    stats.pending = pending
-    stats.inactive = inactive
-  } catch (error) {
-    if (isPrismaMissingSchemaError(error)) {
-      dbWarning = "Database schema is not fully migrated yet. Guard data is temporarily unavailable."
-    } else {
-      dbWarning = `Unable to load guard data: ${toErrorMessage(error, "Unknown database error")}`
+  if (mockMode) {
+    guards = mockGuardsList.slice(0, 20).map((guard) => ({
+      id: guard.id,
+      parwestId: guard.parwestId,
+      name: guard.name,
+      cnic: guard.cnic,
+      phone: guard.phone || null,
+      status: guard.status,
+      regionId: null,
+    }))
+    stats.total = guards.length
+    stats.active = guards.filter((g) => g.status === "ACTIVE").length
+    stats.pending = guards.filter((g) => g.status === "PENDING").length
+    stats.inactive = guards.filter((g) => g.status === "INACTIVE").length
+    dbWarning = "Mock mode enabled: showing guard fallback data."
+  } else {
+    try {
+      const [guardRows, total, active, pending, inactive] = await Promise.all([
+        prisma.guard.findMany({
+          take: 20,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.guard.count(),
+        prisma.guard.count({ where: { status: "ACTIVE" } }),
+        prisma.guard.count({ where: { status: "PENDING" } }),
+        prisma.guard.count({ where: { status: "INACTIVE" } }),
+      ])
+      guards = guardRows
+      stats.total = total
+      stats.active = active
+      stats.pending = pending
+      stats.inactive = inactive
+    } catch (error) {
+      guards = mockGuardsList.slice(0, 20).map((guard) => ({
+        id: guard.id,
+        parwestId: guard.parwestId,
+        name: guard.name,
+        cnic: guard.cnic,
+        phone: guard.phone || null,
+        status: guard.status,
+        regionId: null,
+      }))
+      stats.total = guards.length
+      stats.active = guards.filter((g) => g.status === "ACTIVE").length
+      stats.pending = guards.filter((g) => g.status === "PENDING").length
+      stats.inactive = guards.filter((g) => g.status === "INACTIVE").length
+
+      if (isPrismaMissingSchemaError(error)) {
+        dbWarning = "Database schema is not fully migrated yet. Showing fallback guard mock data."
+      } else {
+        dbWarning = `Unable to load guard data (${toErrorMessage(error, "Unknown database error")}). Showing fallback mock data.`
+      }
+      console.error("GuardsPage query failed:", error)
     }
-    console.error("GuardsPage query failed:", error)
   }
 
   return (

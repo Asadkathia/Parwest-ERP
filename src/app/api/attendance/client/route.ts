@@ -92,7 +92,10 @@ export async function GET(request: NextRequest) {
         }
 
         const rows: ClientAttendanceRow[] = deployments.flatMap((deployment): ClientAttendanceRow[] => {
-            if (deployment.guard.attendances.length === 0) {
+            const guard = deployment.guard
+            const guardAttendances = Array.isArray(guard?.attendances) ? guard.attendances : []
+
+            if (guardAttendances.length === 0) {
                 return [
                     {
                         deploymentId: deployment.id,
@@ -100,9 +103,9 @@ export async function GET(request: NextRequest) {
                         status: "NO_RECORD",
                         shiftType: null,
                         guard: {
-                            id: deployment.guard.id,
-                            parwestId: deployment.guard.parwestId,
-                            name: deployment.guard.name,
+                            id: guard?.id || "unknown-guard",
+                            parwestId: guard?.parwestId || "—",
+                            name: guard?.name || "Unknown Guard",
                         },
                         client: deployment.client,
                         branch: deployment.branch,
@@ -111,15 +114,15 @@ export async function GET(request: NextRequest) {
                 ]
             }
 
-            return deployment.guard.attendances.map((attendance) => ({
+            return guardAttendances.map((attendance) => ({
                 deploymentId: deployment.id,
                 date: attendance.date,
                 status: attendance.status,
                 shiftType: attendance.shiftType,
                 guard: {
-                    id: deployment.guard.id,
-                    parwestId: deployment.guard.parwestId,
-                    name: deployment.guard.name,
+                    id: guard?.id || "unknown-guard",
+                    parwestId: guard?.parwestId || "—",
+                    name: guard?.name || "Unknown Guard",
                 },
                 client: deployment.client,
                 branch: deployment.branch,
