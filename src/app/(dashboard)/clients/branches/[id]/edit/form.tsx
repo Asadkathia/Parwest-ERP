@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import { getMockBranchType } from "@/lib/mockData"
 
 type Branch = {
     id: string
@@ -29,6 +30,7 @@ type Props = {
 
 export default function BranchEditForm({ branch }: Props) {
     const router = useRouter()
+    const branchType = getMockBranchType(branch.id)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
@@ -101,6 +103,16 @@ export default function BranchEditForm({ branch }: Props) {
                                 placeholder="e.g., LHR-001, ISB-002"
                                 className="ui-input"
                             />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Branch Model
+                            </label>
+                            <select name="branchType" defaultValue={branchType} className="ui-select">
+                                <option value="CONVENTIONAL">Conventional</option>
+                                <option value="ISLAMIC">Islamic</option>
+                            </select>
                         </div>
 
                         <div className="md:col-span-2">

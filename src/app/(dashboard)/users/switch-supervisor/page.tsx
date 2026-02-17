@@ -1,6 +1,10 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { userLinks, userScreens } from "@/lib/parity/screenConfigs"
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import SwitchSupervisorManager from "./manager"
 
-export default function UsersSwitchSupervisorPage() {
-  return <ConfiguredInteractiveScreen config={userScreens["switch-supervisor"]} links={userLinks} />
+export default async function UsersSwitchSupervisorPage() {
+  const session = await auth()
+  if (!session) redirect("/login")
+
+  return <SwitchSupervisorManager />
 }

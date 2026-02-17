@@ -11,6 +11,7 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockDeploymentsList } from "@/lib/mockData/deployments"
+import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
 
 export default async function DeploymentsPage() {
   const session = await auth()
@@ -23,10 +24,13 @@ export default async function DeploymentsPage() {
     branchId: string | null
     deploymentDate: Date
     status: "ACTIVE" | "PENDING" | "INACTIVE" | string
+    regionId?: string | null
+    regionalOfficeId?: string | null
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0 }
   const mockMode = isMockEnabled()
+  const scope = deriveManagerScope(session)
 
   if (mockMode) {
     deployments = mockDeploymentsList.slice(0, 20).map((row) => ({
@@ -68,6 +72,16 @@ export default async function DeploymentsPage() {
       }
       console.error("DeploymentsPage query failed:", error)
     }
+  }
+
+  deployments = applyManagerScope(deployments, scope, {
+    regionId: (row) => row.regionId,
+    regionalOfficeId: (row) => row.regionalOfficeId,
+  })
+  if (scope) {
+    dbWarning = dbWarning
+      ? `${dbWarning} Manager scope active: showing deployments for your region/regional office only.`
+      : "Manager scope active: showing deployments for your region/regional office only."
   }
 
   return (

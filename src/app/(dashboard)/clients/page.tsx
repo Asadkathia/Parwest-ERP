@@ -11,6 +11,7 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockClientsList } from "@/lib/mockData/clients"
+import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
 
 export default async function ClientsPage() {
   const session = await auth()
@@ -28,6 +29,7 @@ export default async function ClientsPage() {
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
   const mockMode = isMockEnabled()
+  const scope = deriveManagerScope(session)
 
   if (mockMode) {
     clients = mockClientsList.slice(0, 20)
@@ -75,6 +77,15 @@ export default async function ClientsPage() {
       }
       console.error("ClientsPage query failed:", error)
     }
+  }
+
+  clients = applyManagerScope(clients, scope, {
+    regionId: (row) => row.regionId,
+  })
+  if (scope) {
+    dbWarning = dbWarning
+      ? `${dbWarning} Manager scope active: showing clients for your region only.`
+      : "Manager scope active: showing clients for your region only."
   }
 
   return (

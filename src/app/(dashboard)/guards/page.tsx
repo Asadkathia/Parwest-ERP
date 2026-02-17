@@ -11,6 +11,7 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { mockGuardsList } from "@/lib/mockData/guards"
 import { isMockEnabled } from "@/lib/mockData"
+import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
 
 export default async function GuardsPage() {
   const session = await auth()
@@ -24,13 +25,16 @@ export default async function GuardsPage() {
     phone: string | null
     status: string
     regionId: string | null
+    regionalOfficeId: string | null
+    supervisorName: string | null
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
   const mockMode = isMockEnabled()
+  const scope = deriveManagerScope(session)
 
   if (mockMode) {
-    guards = mockGuardsList.slice(0, 20).map((guard) => ({
+    guards = mockGuardsList.slice(0, 20).map((guard, index) => ({
       id: guard.id,
       parwestId: guard.parwestId,
       name: guard.name,
@@ -38,6 +42,8 @@ export default async function GuardsPage() {
       phone: guard.phone || null,
       status: guard.status,
       regionId: null,
+      regionalOfficeId: null,
+      supervisorName: index % 2 === 0 ? "Fazal Mehdi" : "Muhammad Aslam",
     }))
     stats.total = guards.length
     stats.active = guards.filter((g) => g.status === "ACTIVE").length
@@ -57,12 +63,14 @@ export default async function GuardsPage() {
         prisma.guard.count({ where: { status: "INACTIVE" } }),
       ])
       guards = guardRows
+        .map((guard) => ({ ...guard, supervisorName: null }))
+        .map((guard) => ({ ...guard, regionalOfficeId: guard.regionalOfficeId || null }))
       stats.total = total
       stats.active = active
       stats.pending = pending
       stats.inactive = inactive
     } catch (error) {
-      guards = mockGuardsList.slice(0, 20).map((guard) => ({
+      guards = mockGuardsList.slice(0, 20).map((guard, index) => ({
         id: guard.id,
         parwestId: guard.parwestId,
         name: guard.name,
@@ -70,6 +78,8 @@ export default async function GuardsPage() {
         phone: guard.phone || null,
         status: guard.status,
         regionId: null,
+        regionalOfficeId: null,
+        supervisorName: index % 2 === 0 ? "Fazal Mehdi" : "Muhammad Aslam",
       }))
       stats.total = guards.length
       stats.active = guards.filter((g) => g.status === "ACTIVE").length
@@ -83,6 +93,17 @@ export default async function GuardsPage() {
       }
       console.error("GuardsPage query failed:", error)
     }
+  }
+
+  guards = applyManagerScope(guards, scope, {
+    regionId: (row) => row.regionId,
+    regionalOfficeId: (row) => row.regionalOfficeId,
+  })
+
+  if (scope) {
+    dbWarning = dbWarning
+      ? `${dbWarning} Manager scope active: showing data for your region/regional office only.`
+      : "Manager scope active: showing data for your region/regional office only."
   }
 
   return (
@@ -131,6 +152,7 @@ export default async function GuardsPage() {
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">CNIC</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Phone</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Supervisor</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Region</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
@@ -139,7 +161,7 @@ export default async function GuardsPage() {
           <tbody className="divide-y divide-[var(--border)]">
             {guards.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={8} className="px-6 py-12 text-center text-[var(--text-muted)]">
                   <p className="text-base font-medium text-[var(--text)]">No guards found.</p>
                 </td>
               </tr>
@@ -150,6 +172,7 @@ export default async function GuardsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.name}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.cnic}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.phone || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.supervisorName || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.regionId || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip

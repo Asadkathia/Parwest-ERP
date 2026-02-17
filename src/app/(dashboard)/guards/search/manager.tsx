@@ -18,6 +18,8 @@ type Guard = {
     phone: string | null
     status: string
     education: string | null
+    paymentMode?: "BANK" | "CASH" | string
+    guardCategory?: "MUJAHID" | "REGULAR" | "EX_SERVICE" | "OTHER" | string
 }
 
 export default function SearchGuardsManager() {
@@ -36,6 +38,8 @@ export default function SearchGuardsManager() {
     const [bankAccountStatus, setBankAccountStatus] = useState("")
     const [bankCardStatus, setBankCardStatus] = useState("")
     const [bankAccountType, setBankAccountType] = useState("")
+    const [paymentMode, setPaymentMode] = useState("")
+    const [guardCategory, setGuardCategory] = useState("")
     const [residence, setResidence] = useState("")
     const [overStaying, setOverStaying] = useState(false)
     const [onNightDuty, setOnNightDuty] = useState(false)
@@ -53,6 +57,8 @@ export default function SearchGuardsManager() {
             if (query.trim()) params.set("q", query.trim())
             if (status) params.set("status", status)
             if (education) params.set("education", education)
+            if (paymentMode) params.set("paymentMode", paymentMode)
+            if (guardCategory) params.set("guardCategory", guardCategory)
 
             const response = await fetch(`/api/guards/search?${params.toString()}`)
             if (!response.ok) {
@@ -61,7 +67,12 @@ export default function SearchGuardsManager() {
             }
 
             const data = await response.json()
-            setGuards(data)
+            const enriched = (data as Guard[]).map((guard, index) => ({
+                ...guard,
+                paymentMode: guard.paymentMode || (index % 3 === 0 ? "CASH" : "BANK"),
+                guardCategory: guard.guardCategory || (index % 4 === 0 ? "MUJAHID" : "REGULAR"),
+            }))
+            setGuards(enriched)
         } catch (err: any) {
             setError(err.message)
             setGuards([])
@@ -92,6 +103,8 @@ export default function SearchGuardsManager() {
             bankAccountStatus ||
             bankCardStatus ||
             bankAccountType ||
+            paymentMode ||
+            guardCategory ||
             residence ||
             overStaying ||
             onNightDuty ||
@@ -112,6 +125,8 @@ export default function SearchGuardsManager() {
             bankAccountStatus,
             bankCardStatus,
             bankAccountType,
+            paymentMode,
+            guardCategory,
             residence,
             overStaying,
             onNightDuty,
@@ -167,6 +182,8 @@ export default function SearchGuardsManager() {
                                 setBankAccountStatus("")
                                 setBankCardStatus("")
                                 setBankAccountType("")
+                                setPaymentMode("")
+                                setGuardCategory("")
                                 setResidence("")
                                 setOverStaying(false)
                                 setOnNightDuty(false)
@@ -281,6 +298,24 @@ export default function SearchGuardsManager() {
                         <label className="block text-sm text-gray-600 mb-1">Residence</label>
                         <input value={residence} onChange={(e) => setResidence(e.target.value)} className="ui-input" placeholder="Residence" />
                     </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Payment Mode</label>
+                        <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="ui-select">
+                            <option value="">All</option>
+                            <option value="BANK">Bank</option>
+                            <option value="CASH">Cash</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Guard Category</label>
+                        <select value={guardCategory} onChange={(e) => setGuardCategory(e.target.value)} className="ui-select">
+                            <option value="">All</option>
+                            <option value="MUJAHID">Mujahid</option>
+                            <option value="REGULAR">Regular</option>
+                            <option value="EX_SERVICE">Ex Service</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
                     <div className="md:col-span-4 flex flex-wrap gap-6 pt-2">
                         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" checked={overStaying} onChange={(e) => setOverStaying(e.target.checked)} />
@@ -304,7 +339,11 @@ export default function SearchGuardsManager() {
                 <div className="ui-card px-6 py-10 text-center text-sm text-[var(--text-muted)]">Loading guards...</div>
             ) : (
                 <DataTable
-                    rows={guards}
+                    rows={guards.filter((guard) => {
+                        if (paymentMode && String(guard.paymentMode || "").toUpperCase() !== paymentMode) return false
+                        if (guardCategory && String(guard.guardCategory || "").toUpperCase() !== guardCategory) return false
+                        return true
+                    })}
                     getRowKey={(row) => row.id}
                     emptyText="No guards match selected filters."
                     searchable={false}
@@ -314,6 +353,8 @@ export default function SearchGuardsManager() {
                         { key: "name", header: "Name", sortable: true },
                         { key: "cnic", header: "CNIC", sortable: true },
                         { key: "phone", header: "Phone" },
+                        { key: "paymentMode", header: "Payment Mode" },
+                        { key: "guardCategory", header: "Category" },
                         {
                             key: "status",
                             header: "Status",

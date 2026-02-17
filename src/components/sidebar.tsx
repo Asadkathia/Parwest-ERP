@@ -30,6 +30,9 @@ const navItems: NavNode[] = [
             { title: "Home", href: "/dashboard", icon: LayoutDashboard },
             { title: "Online Users", href: "/dashboard/online-users", icon: Users },
             { title: "AI Chat", href: "/dashboard/ai-chat", icon: Sparkles },
+            { title: "Reports List", href: "/dashboard/reports-list", icon: FileText },
+            { title: "Admin Center", href: "/dashboard/admin-center", icon: ClipboardList },
+            { title: "SHSHK Insights", href: "/dashboard/shshk", icon: Sparkles },
         ],
     },
     {
@@ -49,6 +52,8 @@ const navItems: NavNode[] = [
             { title: "Residences", href: "/guards/residences", icon: Building2 },
             { title: "Assign Residence", href: "/guards/assign-residence", icon: MapPin },
             { title: "OnJob Trainings", href: "/guards/trainings", icon: FileText },
+            { title: "Emergency Guard", href: "/guards/emergency", icon: Users },
+            { title: "Docs Checklist Print", href: "/guards/docs-checklist", icon: FileText },
             { title: "Prerequisites", href: "/guards/prerequisites", icon: Users },
         ],
     },
@@ -65,6 +70,7 @@ const navItems: NavNode[] = [
             { title: "Reports", href: "/payroll/reports", icon: FileText },
             { title: "Settings", href: "/payroll/settings", icon: Settings },
             { title: "Loans", href: "/payroll/loans", icon: DollarSign },
+            { title: "Bulk Loans", href: "/payroll/loans/bulk", icon: Upload },
         ],
     },
     {
@@ -82,6 +88,7 @@ const navItems: NavNode[] = [
             { title: "Invoiced Billings", href: "/clients/invoiced-billings", icon: DollarSign },
             { title: "Branches", href: "/clients/branches", icon: MapPin },
             { title: "Pricing", href: "/clients/pricing", icon: DollarSign },
+            { title: "Invoicing", href: "/clients/invoicing", icon: DollarSign },
         ],
     },
     {
@@ -136,6 +143,7 @@ const navItems: NavNode[] = [
             { title: "Guard Documents", href: "/settings/guard-pledgeable-documents", icon: FileText },
             { title: "User Types", href: "/settings/user-types", icon: Users },
             { title: "Guard Bank Names", href: "/settings/guard-bank-names", icon: DollarSign },
+            { title: "Fingerprint Device", href: "/settings/fingerprint-device", icon: Settings },
             { title: "System Settings", href: "/settings/system", icon: Settings },
         ],
     },

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Edit } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import { mockGuardProfile } from "@/lib/mockData/guards"
+import ProfileImageCard from "@/components/guards/ProfileImageCard"
 
 export default async function GuardDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
@@ -34,6 +35,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         email: guard.email,
         status: guard.status,
         regionalOffice: guard.regionalOffice?.name || mockGuardProfile.regionalOffice,
+        supervisorName: (mockGuardProfile as { supervisorName?: string }).supervisorName || "Fazal Mehdi",
     }
 
     const getStatusColor = (status: string) => {
@@ -71,17 +73,21 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                 </Link>
             </div>
 
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             {/* Guard Header Card */}
             <div className="bg-white rounded-lg border p-6">
                 <div className="flex items-start justify-between">
                     <div>
                         <h1 className="text-3xl font-bold">{guard.name}</h1>
                         <p className="text-gray-600 mt-1">Parwest ID: {guard.parwestId}</p>
+                        <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.supervisorName}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
                         {guard.status}
                     </span>
                 </div>
+            </div>
+            <ProfileImageCard guardId={guard.id} guardName={guard.name} />
             </div>
 
             {/* Tabs */}

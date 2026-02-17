@@ -86,6 +86,16 @@ export default function BranchForm({ clientId, clientName }: Props) {
                         </div>
 
                         <div className="md:col-span-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Branch Model
+                            </label>
+                            <select name="branchType" defaultValue="CONVENTIONAL" className="ui-select">
+                                <option value="CONVENTIONAL">Conventional</option>
+                                <option value="ISLAMIC">Islamic</option>
+                            </select>
+                        </div>
+
+                        <div className="md:col-span-2">
                             <label className="flex items-center gap-2">
                                 <input
                                     type="checkbox"

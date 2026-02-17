@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { Bot, Plus, Send, Sparkles, User } from "lucide-react"
 import { cn } from "@/lib/utils"
+import PromptReportPanel from "@/components/ai/PromptReportPanel"
 
 type ChatMessage = {
   id: string
@@ -222,6 +223,7 @@ export default function AiReportingScreen() {
 
           <div className="flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-6 md:px-8">
             <div className="mx-auto w-full max-w-3xl space-y-6">
+              <PromptReportPanel />
               {messages.map((msg) => (
                 <div key={msg.id} className={cn("flex w-full", msg.role === "assistant" ? "justify-start" : "justify-end")}>
                   <div

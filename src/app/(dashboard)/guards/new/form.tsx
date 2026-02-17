@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
+import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 
 type Region = {
     id: string
@@ -23,8 +25,19 @@ type Props = {
 
 export default function GuardEnrollmentForm({ regions, regionalOffices }: Props) {
     const router = useRouter()
+    const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+
+    const applyOcrFields = (fields: Record<string, string>) => {
+        const form = formRef.current
+        if (!form) return
+
+        Object.entries(fields).forEach(([name, value]) => {
+            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+            if (input) input.value = value
+        })
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -55,12 +68,16 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
     }
 
     return (
-        <form onSubmit={handleSubmit} className="ui-card p-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
                 <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                     {error}
                 </div>
             )}
+
+            <div>
+                <OcrUploadPanel target="guard" onApply={applyOcrFields} />
+            </div>
 
             <div className="space-y-8">
                 {/* Basic Information */}
@@ -454,6 +471,28 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                 <option value="INACTIVE">Inactive</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Payment Mode
+                            </label>
+                            <select name="paymentMode" defaultValue="BANK" className="ui-input">
+                                <option value="BANK">Bank</option>
+                                <option value="CASH">Cash</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Guard Category
+                            </label>
+                            <select name="guardCategory" defaultValue="REGULAR" className="ui-input">
+                                <option value="MUJAHID">Mujahid</option>
+                                <option value="REGULAR">Regular</option>
+                                <option value="EX_SERVICE">Ex Service</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -540,6 +579,44 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
                                 <option value="Current">Current</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Account Title
+                            </label>
+                            <input
+                                type="text"
+                                name="bankAccountTitle"
+                                className="ui-input"
+                                placeholder="Account title"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                IBAN
+                            </label>
+                            <input
+                                type="text"
+                                name="bankIban"
+                                className="ui-input"
+                                placeholder="PK00XXXX0000000000000000"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Account Status
+                            </label>
+                            <select name="bankAccountStatus" defaultValue="PENDING" className="ui-input">
+                                <option value="PENDING">Pending</option>
+                                <option value="ACTIVE">Active</option>
+                                <option value="INACTIVE">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <GuardAccountsEditor />
                     </div>
                 </div>
 

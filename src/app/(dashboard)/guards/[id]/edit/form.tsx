@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
+import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
+import ProfileImageCard from "@/components/guards/ProfileImageCard"
 
 type Guard = {
     id: string
@@ -31,6 +34,8 @@ type Guard = {
     bankName: string | null
     bankAccountNumber: string | null
     bankAccountType: string | null
+    paymentMode?: string | null
+    guardCategory?: string | null
 }
 
 type Region = {
@@ -52,6 +57,7 @@ type Props = {
 
 export default function GuardEditForm({ guard, regions, regionalOffices }: Props) {
     const router = useRouter()
+    const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
@@ -88,13 +94,29 @@ export default function GuardEditForm({ guard, regions, regionalOffices }: Props
         }
     }
 
+    const applyOcrFields = (fields: Record<string, string>) => {
+        const form = formRef.current
+        if (!form) return
+        Object.entries(fields).forEach(([name, value]) => {
+            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+            if (input) input.value = value
+        })
+    }
+
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="bg-white rounded-lg border p-6">
             {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
                     {error}
                 </div>
             )}
+
+            <div className="mb-6">
+                <OcrUploadPanel target="guard" onApply={applyOcrFields} />
+            </div>
+            <div className="mb-6">
+                <ProfileImageCard guardId={guard.id} guardName={guard.name} />
+            </div>
 
             <div className="space-y-8">
                 {/* Basic Information */}
@@ -374,6 +396,28 @@ export default function GuardEditForm({ guard, regions, regionalOffices }: Props
                                 <option value="INACTIVE">Inactive</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Payment Mode
+                            </label>
+                            <select name="paymentMode" defaultValue={guard.paymentMode || "BANK"} className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="BANK">Bank</option>
+                                <option value="CASH">Cash</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Guard Category
+                            </label>
+                            <select name="guardCategory" defaultValue={guard.guardCategory || "REGULAR"} className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="MUJAHID">Mujahid</option>
+                                <option value="REGULAR">Regular</option>
+                                <option value="EX_SERVICE">Ex Service</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -466,6 +510,44 @@ export default function GuardEditForm({ guard, regions, regionalOffices }: Props
                                 <option value="Current">Current</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Account Title
+                            </label>
+                            <input
+                                type="text"
+                                name="bankAccountTitle"
+                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Account title"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                IBAN
+                            </label>
+                            <input
+                                type="text"
+                                name="bankIban"
+                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="PK00XXXX0000000000000000"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Account Status
+                            </label>
+                            <select name="bankAccountStatus" defaultValue="PENDING" className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="PENDING">Pending</option>
+                                <option value="ACTIVE">Active</option>
+                                <option value="INACTIVE">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <GuardAccountsEditor />
                     </div>
                 </div>
             </div>

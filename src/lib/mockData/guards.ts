@@ -21,7 +21,10 @@ export const mockGuardProfile = {
     nextOfKin: "Brother Name",
     status: "ACTIVE",
     regionalOffice: "Lahore Office",
+    supervisorName: "Fazal Mehdi",
     isExService: false,
+    paymentMode: "BANK",
+    guardCategory: "MUJAHID",
     joiningDate: new Date("2020-01-15"),
 
     // Tab: Attachments
@@ -225,6 +228,9 @@ export const mockGuardsList = [
         name: "Test Guard Two",
         cnic: "42101-7654321-1",
         status: "INACTIVE",
+        supervisorName: "Muhammad Aslam",
+        paymentMode: "CASH",
+        guardCategory: "REGULAR",
     },
 ]
 

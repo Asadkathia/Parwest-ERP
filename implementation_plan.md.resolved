@@ -220,3 +220,50 @@ Columns:
 2. Do not mark a row fully complete unless all five columns are `✅`.
 3. During frontend-first phases, only `Route`, `UI Fields`, and `UX Flow` are expected to advance.
 4. KPI updates are mandatory after each major merge.
+
+---
+
+## AI-Enhanced ERP Additions (Frontend-Only)
+
+### KPI Baseline (Updated: February 17, 2026)
+- AI/UI Additions Route Coverage: **100%**
+- AI/UI Additions Flow Coverage: **88%**
+
+| Addition | Route | UI Fields | UX Flow | API/DB | Tests | Notes |
+|---|---|---|---|---|---|---|
+| Reports List (System Generated) | ✅ | ✅ | ✅ | ⬜ | 🟡 | Template cards + run-now simulation + generated outputs table |
+| Emergency Guard Pool | ✅ | ✅ | ✅ | ⬜ | 🟡 | Eligibility rules + urgency filters + local action mutations |
+| Prompt Based Reporting | ✅ | ✅ | ✅ | ⬜ | 🟡 | AI chat enhanced with prompt-based KPI/table reporting panel |
+| OCR Form Autofill | ✅ | ✅ | 🟡 | ⬜ | 🟡 | OCR upload panel integrated into guard/client add/edit forms |
+| Broadcast + Admin Logs | ✅ | ✅ | ✅ | ⬜ | 🟡 | Admin center with broadcast composer/history and recent logs |
+| Islamic/Conventional Branches | ✅ | ✅ | ✅ | ⬜ | 🟡 | Branch model chips, KPIs, list filter, and form selectors |
+| Client Invoicing (Branch/Client wise) | ✅ | ✅ | ✅ | ⬜ | 🟡 | Mode switch, period/client filters, draft/posted mock actions |
+| SHSHK Admin Suggestions | ✅ | ✅ | ✅ | ⬜ | 🟡 | Dashboard insights page with category/priority suggestions |
+
+---
+
+## Meeting Notes 14 Feb Closure
+
+### KPI Baseline (Updated: February 17, 2026)
+- Meeting-Notes Route Coverage: **86%**
+- Meeting-Notes UI Coverage: **78%**
+- Meeting-Notes Flow Coverage: **74%**
+
+| Meeting Note Item | Route | UI Fields | UX Flow | API/DB | Tests | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| Guards docs checklist print | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `/guards/docs-checklist` added with print preview and document matrix |
+| Guard profile picture edit | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `ProfileImageCard` added in guard detail and edit |
+| Guard enroll to supervisor and show supervisor | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | Partial | Supervisor fields already in enroll form; supervisor column/details exposed |
+| Guard cash option in enrollment/search | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Payment mode added to add/search guard |
+| Guard account details + status/type/title/IBAN | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Added account title/IBAN/status + multi-account editor UI |
+| Multiple guard accounts + active account | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `GuardAccountsEditor` added (mock/local payload only) |
+| Guard categories (Mujahid etc.) | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Category selector added in guard add/edit/search |
+| Fingerprint device | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `/settings/fingerprint-device` mock management page added |
+| Dashboard maps | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `GuardClientMapCard` added to dashboard |
+| Client add by branch and branchless | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Enrollment mode added with branchless/group paths |
+| Client add as group then add branches | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Group branch setup editor added in new client form |
+| Branch type changes + branchless to branchfull | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Branch model already present; conversion UX added in client edit |
+| Switch supervisor (region->office->from->to) | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Dedicated interactive manager replaces generic parity view |
+| Bulk guard loans via formatted sheet | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | `/payroll/loans/bulk` mock upload/review/commit flow added |
+| Manager users see only own region data | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | Partial | Frontend scope helper added and applied to key modules; API hard-enforcement deferred |
+| Additional client search filters | ✅ | ✅ | ✅ | ⬜ | ⬜ | Partial | Extended filters: branch model/branchless/region/status/contact/date |

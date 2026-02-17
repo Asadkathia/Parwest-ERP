@@ -9,6 +9,7 @@ import Panel from "@/components/ui/panel"
 import ActionButton from "@/components/ui/action-button"
 import { Select } from "@/components/ui/form-controls"
 import StatusChip from "@/components/ui/status-chip"
+import GuardClientMapCard from "@/components/dashboard/GuardClientMapCard"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -37,7 +38,35 @@ export default async function DashboardPage() {
         <StatCard label="Pending Tickets" value={0} tone="danger" icon={<MessageSquareMore className="h-5 w-5" />} />
       </div>
 
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Link href="/dashboard/reports-list" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">Reports List</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Run system-generated templates.</p>
+        </Link>
+        <Link href="/dashboard/admin-center" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">Admin Center</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Broadcast + recent system logs.</p>
+        </Link>
+        <Link href="/dashboard/shshk" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">SHSHK Insights</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">AI suggestions for system health.</p>
+        </Link>
+        <Link href="/clients/invoicing" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">Client Invoicing</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Branch-wise and client-wise drafts.</p>
+        </Link>
+        <Link href="/guards/docs-checklist" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">Docs Checklist Print</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Select guards and print required docs checklist.</p>
+        </Link>
+        <Link href="/payroll/loans/bulk" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+          <p className="text-sm font-semibold text-[var(--text)]">Bulk Loans</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Upload and process multiple guard loans.</p>
+        </Link>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-4">
         <Card>
           <CardHeader>
             <SectionTitle
@@ -83,6 +112,8 @@ export default async function DashboardPage() {
             </div>
           </CardBody>
         </Card>
+        <GuardClientMapCard />
+        </div>
 
         <div className="space-y-4">
           <Panel>

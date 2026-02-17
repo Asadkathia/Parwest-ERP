@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 
 type Client = {
     id: string
@@ -33,8 +34,21 @@ type Props = {
 
 export default function ClientEditForm({ client, regions }: Props) {
     const router = useRouter()
+    const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [convertToBranchfull, setConvertToBranchfull] = useState(false)
+    const [firstBranchName, setFirstBranchName] = useState("")
+    const [firstBranchCity, setFirstBranchCity] = useState("")
+
+    const applyOcrFields = (fields: Record<string, string>) => {
+        const form = formRef.current
+        if (!form) return
+        Object.entries(fields).forEach(([name, value]) => {
+            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+            if (input) input.value = value
+        })
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -45,6 +59,9 @@ export default function ClientEditForm({ client, regions }: Props) {
         const data = {
             ...Object.fromEntries(formData.entries()),
             isBranchless: formData.get("isBranchless") === "on",
+            convertToBranchfull,
+            firstBranchName,
+            firstBranchCity,
         }
 
         try {
@@ -68,12 +85,16 @@ export default function ClientEditForm({ client, regions }: Props) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="ui-card p-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
                 <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
+
+            <div className="mb-6">
+                <OcrUploadPanel target="client" onApply={applyOcrFields} />
+            </div>
 
             <div className="space-y-8">
                 {/* Basic Information */}
@@ -186,6 +207,30 @@ export default function ClientEditForm({ client, regions }: Props) {
                                 </span>
                             </label>
                         </div>
+
+                        {client.isBranchless ? (
+                            <div className="md:col-span-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 space-y-3">
+                                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                                    <input
+                                        type="checkbox"
+                                        checked={convertToBranchfull}
+                                        onChange={(e) => setConvertToBranchfull(e.target.checked)}
+                                        className="h-4 w-4 accent-[var(--brand)]"
+                                    />
+                                    Convert branchless client to branchfull
+                                </label>
+                                {convertToBranchfull ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <input className="ui-input" placeholder="First branch name" value={firstBranchName} onChange={(e) => setFirstBranchName(e.target.value)} />
+                                        <input className="ui-input" placeholder="First branch city" value={firstBranchCity} onChange={(e) => setFirstBranchCity(e.target.value)} />
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <div className="md:col-span-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--text-muted)]">
+                                Branchfull client already configured. Toggle branchless only if you want to switch model.
+                            </div>
+                        )}
                     </div>
                 </div>
 

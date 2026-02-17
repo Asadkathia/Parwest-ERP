@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { isMockEnabled } from "@/lib/mockData"
+import { mockGuardsList } from "@/lib/mockData/guards"
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,6 +16,37 @@ export async function GET(request: NextRequest) {
         const status = searchParams.get("status")
         const education = searchParams.get("education")
         const regionId = searchParams.get("regionId")
+        const paymentMode = searchParams.get("paymentMode")
+        const guardCategory = searchParams.get("guardCategory")
+
+        if (isMockEnabled()) {
+            const rows = mockGuardsList.filter((guard) => {
+                if (status && guard.status !== status) return false
+                if (education && (guard.education || "").toLowerCase() !== education.toLowerCase()) return false
+                if (paymentMode && (String((guard as any).paymentMode || "").toUpperCase() !== paymentMode.toUpperCase())) return false
+                if (guardCategory && (String((guard as any).guardCategory || "").toUpperCase() !== guardCategory.toUpperCase())) return false
+                if (q) {
+                    const text = `${guard.name} ${guard.parwestId} ${guard.cnic} ${guard.phone || ""}`.toLowerCase()
+                    if (!text.includes(q.toLowerCase())) return false
+                }
+                return true
+            })
+            return NextResponse.json(
+                rows.map((guard) => ({
+                    id: guard.id,
+                    parwestId: guard.parwestId,
+                    name: guard.name,
+                    cnic: guard.cnic,
+                    phone: guard.phone || null,
+                    status: guard.status,
+                    education: guard.education || null,
+                    paymentMode: (guard as any).paymentMode || "BANK",
+                    guardCategory: (guard as any).guardCategory || "REGULAR",
+                    region: null,
+                    regionalOffice: null,
+                }))
+            )
+        }
 
         const guards = await prisma.guard.findMany({
             where: {

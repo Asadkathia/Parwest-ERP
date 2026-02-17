@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "
 import SectionTitle from "@/components/ui/section-title"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import StatusChip from "@/components/ui/status-chip"
+import { getMockBranchType } from "@/lib/mockData"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -39,6 +40,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
 
   const deployments = branch.deployments || []
   const activeDeployments = deployments.filter((d) => d.status === "ACTIVE")
+  const branchModel = getMockBranchType(branch.id)
 
   return (
     <div className="space-y-6">
@@ -76,6 +78,12 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Active Deployments</p>
             <p className="mt-2 text-base font-semibold text-emerald-700">{activeDeployments.length}</p>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+            <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Model</p>
+            <div className="mt-2">
+              <StatusChip label={branchModel} variant={branchModel === "ISLAMIC" ? "warning" : "neutral"} />
+            </div>
           </div>
         </CardBody>
       </Card>

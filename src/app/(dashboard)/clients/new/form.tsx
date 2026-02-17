@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
+import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 
 type Region = {
     id: string
@@ -16,8 +17,21 @@ type Props = {
 
 export default function ClientEnrollmentForm({ regions }: Props) {
     const router = useRouter()
+    const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [enrollmentMode, setEnrollmentMode] = useState<"BRANCHLESS" | "GROUP_WITH_BRANCHES">("BRANCHLESS")
+    const [groupBranches, setGroupBranches] = useState<Array<{ name: string; city: string; type: "ISLAMIC" | "CONVENTIONAL" }>>([])
+
+    const applyOcrFields = (fields: Record<string, string>) => {
+        const form = formRef.current
+        if (!form) return
+
+        Object.entries(fields).forEach(([name, value]) => {
+            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+            if (input) input.value = value
+        })
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -25,7 +39,11 @@ export default function ClientEnrollmentForm({ regions }: Props) {
         setError("")
 
         const formData = new FormData(e.currentTarget)
-        const data = Object.fromEntries(formData.entries())
+        const data = {
+            ...Object.fromEntries(formData.entries()),
+            enrollmentMode,
+            branches: groupBranches,
+        }
 
         try {
             const response = await fetch("/api/clients", {
@@ -48,12 +66,16 @@ export default function ClientEnrollmentForm({ regions }: Props) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="ui-card p-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="ui-card p-6">
             {error && (
                 <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
+
+            <div className="mb-6">
+                <OcrUploadPanel target="client" onApply={applyOcrFields} />
+            </div>
 
             <div className="space-y-8">
                 {/* Basic Information */}
@@ -165,10 +187,25 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                                     type="checkbox"
                                     name="isBranchless"
                                     value="true"
+                                    checked={enrollmentMode === "BRANCHLESS"}
+                                    onChange={(e) => setEnrollmentMode(e.target.checked ? "BRANCHLESS" : "GROUP_WITH_BRANCHES")}
                                     className="h-4 w-4 accent-[var(--brand)]"
                                 />
                                 <span className="text-sm text-[var(--text)]">Branchless Client</span>
                             </label>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Enrollment Mode</label>
+                            <select
+                                className="ui-select"
+                                value={enrollmentMode}
+                                onChange={(e) => setEnrollmentMode(e.target.value as "BRANCHLESS" | "GROUP_WITH_BRANCHES")}
+                            >
+                                <option value="BRANCHLESS">Branchless</option>
+                                <option value="GROUP_WITH_BRANCHES">Group Client + Add Branches</option>
+                            </select>
+                            <input type="hidden" name="enrollmentMode" value={enrollmentMode} />
                         </div>
                     </div>
                 </div>
@@ -440,6 +477,74 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
                     </div>
                 </div>
+
+                {enrollmentMode === "GROUP_WITH_BRANCHES" ? (
+                    <div>
+                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Group Branch Setup</h2>
+                        <div className="space-y-3">
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm"
+                                    onClick={() => setGroupBranches((prev) => [...prev, { name: "", city: "", type: "CONVENTIONAL" }])}
+                                >
+                                    Add Branch
+                                </button>
+                            </div>
+                            {groupBranches.length === 0 ? (
+                                <p className="text-sm text-[var(--text-muted)]">No branches added yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {groupBranches.map((branch, index) => (
+                                        <div key={`branch-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+                                            <input
+                                                className="ui-input"
+                                                placeholder="Branch name"
+                                                value={branch.name}
+                                                onChange={(e) =>
+                                                    setGroupBranches((prev) =>
+                                                        prev.map((item, idx) => (idx === index ? { ...item, name: e.target.value } : item))
+                                                    )
+                                                }
+                                            />
+                                            <input
+                                                className="ui-input"
+                                                placeholder="City"
+                                                value={branch.city}
+                                                onChange={(e) =>
+                                                    setGroupBranches((prev) =>
+                                                        prev.map((item, idx) => (idx === index ? { ...item, city: e.target.value } : item))
+                                                    )
+                                                }
+                                            />
+                                            <select
+                                                className="ui-select"
+                                                value={branch.type}
+                                                onChange={(e) =>
+                                                    setGroupBranches((prev) =>
+                                                        prev.map((item, idx) =>
+                                                            idx === index ? { ...item, type: e.target.value as "ISLAMIC" | "CONVENTIONAL" } : item
+                                                        )
+                                                    )
+                                                }
+                                            >
+                                                <option value="CONVENTIONAL">Conventional</option>
+                                                <option value="ISLAMIC">Islamic</option>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                className="text-left text-sm text-red-600 hover:underline"
+                                                onClick={() => setGroupBranches((prev) => prev.filter((_, idx) => idx !== index))}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {/* Form Actions */}
