@@ -265,9 +265,7 @@ export default function AiReportingScreen() {
                   </div>
                 </div>
               ) : null}
-
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
-              <div ref={scrollAnchorRef} />
             </div>
           </div>
 

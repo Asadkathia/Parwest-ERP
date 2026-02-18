@@ -307,10 +307,13 @@ export const inventoryLinks = [
 ]
 
 export const reportLinks = [
+  { label: "Overview", href: "/reports" },
   { label: "Scheduled", href: "/reports/scheduled" },
   { label: "Guard Deployment", href: "/reports/guard-deployment" },
   { label: "Day & Night", href: "/reports/day-night-duty" },
   { label: "Client Enrolled", href: "/reports/client-enrolled" },
+  { label: "AI/Prompt", href: "/reports/ai" },
+  { label: "Generated List", href: "/reports/generated" },
 ]
 
 export const importLinks = [

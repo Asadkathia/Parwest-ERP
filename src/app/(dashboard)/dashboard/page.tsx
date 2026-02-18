@@ -39,7 +39,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Link href="/dashboard/reports-list" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
+        <Link href="/reports/generated" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
           <p className="text-sm font-semibold text-[var(--text)]">Reports List</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">Run system-generated templates.</p>
         </Link>
