@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
 import { payrollOperationLinks, payrollOperationScreens } from "@/lib/parity/screenConfigs"
 
@@ -8,6 +8,9 @@ export default async function PayrollOperationDetailPage({
   params: Promise<{ screen: string }>
 }) {
   const { screen } = await params
+  if (screen === "salary-v1") {
+    redirect("/payroll/operations/salary-v2")
+  }
   const config = payrollOperationScreens[screen]
 
   if (!config) {

@@ -43,6 +43,8 @@ export default function AiReportingScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const scrollAnchorRef = useRef<HTMLDivElement>(null)
+  const hasMountedRef = useRef(false)
+  const prevMessageCountRef = useRef(0)
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) ?? threads[0],
@@ -54,8 +56,21 @@ export default function AiReportingScreen() {
   const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading])
 
   useEffect(() => {
-    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, loading])
+    const messageCount = messages.length
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      prevMessageCountRef.current = messageCount
+      return
+    }
+
+    const hasNewMessage = messageCount > prevMessageCountRef.current
+    if (hasNewMessage || loading) {
+      scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }
+
+    prevMessageCountRef.current = messageCount
+  }, [messages.length, loading])
 
   const updateThread = (threadId: string, updater: (thread: ChatThread) => ChatThread) => {
     setThreads((prev) => prev.map((thread) => (thread.id === threadId ? updater(thread) : thread)))
@@ -135,9 +150,9 @@ export default function AiReportingScreen() {
   }
 
   return (
-    <div className="h-[calc(100vh-7.5rem)] min-h-[38rem] overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#f7f9fc] shadow-[var(--shadow-sm)]">
-      <div className="grid h-full grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[var(--border)] bg-[#f2f5fb] lg:flex lg:flex-col">
+    <div className="h-[calc(100dvh-8.25rem)] min-h-[38rem] overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#f7f9fc] shadow-[var(--shadow-sm)]">
+      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="hidden min-h-0 border-r border-[var(--border)] bg-[#f2f5fb] lg:flex lg:flex-col">
           <div className="p-3">
             <button
               type="button"
@@ -181,7 +196,7 @@ export default function AiReportingScreen() {
           </div>
         </aside>
 
-        <section className="flex h-full flex-col bg-[var(--surface)]">
+        <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
           <header className="border-b border-[var(--border)] bg-white px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -221,7 +236,7 @@ export default function AiReportingScreen() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-6 md:px-8">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-6 md:px-8">
             <div className="mx-auto w-full max-w-3xl space-y-6">
               <PromptReportPanel />
               {messages.map((msg) => (
