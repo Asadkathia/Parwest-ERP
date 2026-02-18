@@ -119,14 +119,8 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
     actions: ["Calculate Salary"],
     table: { columns: ["Parwest ID", "Guard", "Client/Branch", "Days", "Amount", "Status"] },
   },
-  "salary-v1": {
-    title: "Salary V1",
-    sections: [{ title: "Legacy Salary View", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }] }],
-    actions: ["Search"],
-    table: { columns: ["Parwest ID", "Guard", "Net Salary", "Payment Status"] },
-  },
   "salary-v2": {
-    title: "Salary V2",
+    title: "Salary",
     sections: [{ title: "Salary V2 Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
     actions: ["Search", "Export Summary"],
     table: { columns: ["Parwest ID", "Guard", "Base", "Deductions", "Net Salary", "Status"] },
@@ -294,6 +288,7 @@ export const payrollOperationLinks = [
   { label: "Other Deductions", href: "/payroll/operations/other-deductions" },
   { label: "Special Duty", href: "/payroll/operations/special-duty" },
   { label: "Holidays", href: "/payroll/operations/holidays" },
+  { label: "Salary", href: "/payroll/operations/salary" },
   { label: "Salary", href: "/payroll/operations/salary-v2" },
   { label: "Bulk Slips", href: "/payroll/operations/bulk-salary-slips" },
   { label: "Clearance", href: "/payroll/operations/clearance" },

@@ -1,5 +1,5 @@
-import ClientSearchManager from "@/components/clients/ClientSearchManager"
+import { redirect } from "next/navigation"
 
 export default function ClientSearchV2Page() {
-  return <ClientSearchManager title="Search Clients V2" subtitle="Modern search interface with profile links" />
+  redirect("/clients/search")
 }

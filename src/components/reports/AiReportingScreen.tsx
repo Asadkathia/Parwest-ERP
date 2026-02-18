@@ -42,8 +42,9 @@ export default function AiReportingScreen() {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const messageViewportRef = useRef<HTMLDivElement>(null)
-  const didMountRef = useRef(false)
+  const scrollAnchorRef = useRef<HTMLDivElement>(null)
+  const hasMountedRef = useRef(false)
+  const prevMessageCountRef = useRef(0)
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) ?? threads[0],
@@ -55,20 +56,21 @@ export default function AiReportingScreen() {
   const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading])
 
   useEffect(() => {
-    const viewport = messageViewportRef.current
-    if (!viewport) return
+    const messageCount = messages.length
 
-    // Prevent initial page jump on first render; only auto-scroll after updates.
-    if (!didMountRef.current) {
-      didMountRef.current = true
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      prevMessageCountRef.current = messageCount
       return
     }
 
-    viewport.scrollTo({
-      top: viewport.scrollHeight,
-      behavior: "smooth",
-    })
-  }, [messages, loading])
+    const hasNewMessage = messageCount > prevMessageCountRef.current
+    if (hasNewMessage || loading) {
+      scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }
+
+    prevMessageCountRef.current = messageCount
+  }, [messages.length, loading])
 
   const updateThread = (threadId: string, updater: (thread: ChatThread) => ChatThread) => {
     setThreads((prev) => prev.map((thread) => (thread.id === threadId ? updater(thread) : thread)))
@@ -148,9 +150,9 @@ export default function AiReportingScreen() {
   }
 
   return (
-    <div className="h-[calc(100dvh-7.5rem)] min-h-0 max-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#f7f9fc] shadow-[var(--shadow-sm)]">
+    <div className="h-[calc(100dvh-8.25rem)] min-h-[38rem] overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#f7f9fc] shadow-[var(--shadow-sm)]">
       <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[var(--border)] bg-[#f2f5fb] lg:flex lg:flex-col">
+        <aside className="hidden min-h-0 border-r border-[var(--border)] bg-[#f2f5fb] lg:flex lg:flex-col">
           <div className="p-3">
             <button
               type="button"
@@ -234,7 +236,7 @@ export default function AiReportingScreen() {
             </div>
           </header>
 
-          <div ref={messageViewportRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-6 md:px-8">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-6 md:px-8">
             <div className="mx-auto w-full max-w-3xl space-y-6">
               <PromptReportPanel />
               {messages.map((msg) => (
