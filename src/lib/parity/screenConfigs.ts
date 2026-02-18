@@ -294,9 +294,7 @@ export const payrollOperationLinks = [
   { label: "Other Deductions", href: "/payroll/operations/other-deductions" },
   { label: "Special Duty", href: "/payroll/operations/special-duty" },
   { label: "Holidays", href: "/payroll/operations/holidays" },
-  { label: "Salary", href: "/payroll/operations/salary" },
-  { label: "Salary V1", href: "/payroll/operations/salary-v1" },
-  { label: "Salary V2", href: "/payroll/operations/salary-v2" },
+  { label: "Salary", href: "/payroll/operations/salary-v2" },
   { label: "Bulk Slips", href: "/payroll/operations/bulk-salary-slips" },
   { label: "Clearance", href: "/payroll/operations/clearance" },
   { label: "UnPaid", href: "/payroll/operations/unpaid-salaries" },
@@ -314,10 +312,13 @@ export const inventoryLinks = [
 ]
 
 export const reportLinks = [
+  { label: "Overview", href: "/reports" },
   { label: "Scheduled", href: "/reports/scheduled" },
   { label: "Guard Deployment", href: "/reports/guard-deployment" },
   { label: "Day & Night", href: "/reports/day-night-duty" },
   { label: "Client Enrolled", href: "/reports/client-enrolled" },
+  { label: "AI/Prompt", href: "/reports/ai" },
+  { label: "Generated List", href: "/reports/generated" },
 ]
 
 export const importLinks = [
