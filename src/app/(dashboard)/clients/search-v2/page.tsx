@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import ClientSearchManager from "@/components/clients/ClientSearchManager"
 
 export default function ClientSearchV2Page() {
-  redirect("/clients/search")
+  return <ClientSearchManager title="Search Clients V2" subtitle="Legacy V2 search behavior and controls." variant="v2" />
 }

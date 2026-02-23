@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type AttendanceRecord = {
     id: string
@@ -8,10 +10,10 @@ type AttendanceRecord = {
     status: string
     shiftType: string | null
     notes: string | null
-    guard: {
+    guard?: {
         id: string
-        parwestId: string
-        name: string
+        parwestId?: string
+        name?: string
         cnic: string
     }
 }
@@ -29,6 +31,7 @@ export default function GuardAttendanceManager() {
     const [records, setRecords] = useState<AttendanceRecord[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [notice, setNotice] = useState("")
 
     const [activeGuards, setActiveGuards] = useState<GuardOption[]>([])
     const [markGuardId, setMarkGuardId] = useState("")
@@ -36,6 +39,13 @@ export default function GuardAttendanceManager() {
     const [markStatus, setMarkStatus] = useState("PRESENT")
     const [markShift, setMarkShift] = useState("DAY")
     const [markNotes, setMarkNotes] = useState("")
+    const [bulkGuardIds, setBulkGuardIds] = useState<string[]>([])
+    const [bulkDate, setBulkDate] = useState("")
+    const [bulkStatus, setBulkStatus] = useState("PRESENT")
+    const [bulkShift, setBulkShift] = useState("DAY")
+    const [bulkNotes, setBulkNotes] = useState("")
+    const [bulkFile, setBulkFile] = useState<File | null>(null)
+    const [bulkLoading, setBulkLoading] = useState(false)
 
     const loadAttendance = async () => {
         try {
@@ -82,6 +92,7 @@ export default function GuardAttendanceManager() {
     const markAttendance = async (e: React.FormEvent) => {
         e.preventDefault()
         setError("")
+        setNotice("")
 
         const response = await fetch("/api/attendance", {
             method: "POST",
@@ -103,20 +114,129 @@ export default function GuardAttendanceManager() {
 
         setMarkNotes("")
         await loadAttendance()
+        setNotice("Attendance marked successfully.")
+    }
+
+    const toggleBulkGuard = (guardId: string) => {
+        setBulkGuardIds((prev) =>
+            prev.includes(guardId) ? prev.filter((id) => id !== guardId) : [...prev, guardId]
+        )
+    }
+
+    const bulkMarkAttendance = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!bulkDate || bulkGuardIds.length === 0) {
+            setError("Select at least one guard and a date for bulk mark.")
+            return
+        }
+        setBulkLoading(true)
+        setError("")
+        setNotice("")
+        try {
+            const results = await Promise.all(
+                bulkGuardIds.map((guardId) =>
+                    fetch("/api/attendance", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            guardId,
+                            date: bulkDate,
+                            status: bulkStatus,
+                            shiftType: bulkShift,
+                            notes: bulkNotes || null,
+                        }),
+                    })
+                )
+            )
+            const failed = results.filter((r) => !r.ok).length
+            if (failed > 0) {
+                setError(`Bulk mark completed with ${failed} failed row(s).`)
+            } else {
+                setNotice(`Bulk attendance marked for ${bulkGuardIds.length} guard(s).`)
+            }
+            await loadAttendance()
+        } finally {
+            setBulkLoading(false)
+        }
+    }
+
+    const bulkUploadAttendance = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!bulkFile) {
+            setError("Please select a CSV file for bulk upload.")
+            return
+        }
+        setBulkLoading(true)
+        setError("")
+        setNotice("")
+        try {
+            const text = await bulkFile.text()
+            const lines = text
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter(Boolean)
+            if (lines.length < 2) {
+                setError("CSV must contain header and at least one data row.")
+                return
+            }
+
+            const [header, ...rows] = lines
+            const headers = header.split(",").map((h) => h.trim().toLowerCase())
+            const guardIdIndex = headers.indexOf("guardid")
+            const dateIndex = headers.indexOf("date")
+            const statusIndex = headers.indexOf("status")
+            const shiftIndex = headers.indexOf("shift")
+            const notesIndex = headers.indexOf("notes")
+
+            if (guardIdIndex === -1 || dateIndex === -1 || statusIndex === -1) {
+                setError("CSV header must include: guardId,date,status (optional: shift,notes).")
+                return
+            }
+
+            const uploadResults = await Promise.all(
+                rows.map(async (row) => {
+                    const parts = row.split(",").map((p) => p.trim())
+                    const guardId = parts[guardIdIndex]
+                    const date = parts[dateIndex]
+                    const status = parts[statusIndex] || "PRESENT"
+                    const shift = shiftIndex >= 0 ? parts[shiftIndex] || "DAY" : "DAY"
+                    const notes = notesIndex >= 0 ? parts[notesIndex] || null : null
+                    if (!guardId || !date || !status) return { ok: false }
+                    const response = await fetch("/api/attendance", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ guardId, date, status, shiftType: shift, notes }),
+                    })
+                    return { ok: response.ok }
+                })
+            )
+
+            const successCount = uploadResults.filter((r) => r.ok).length
+            const failedCount = uploadResults.length - successCount
+            if (failedCount > 0) {
+                setError(`Bulk upload processed ${successCount} row(s), ${failedCount} failed.`)
+            } else {
+                setNotice(`Bulk upload completed for ${successCount} row(s).`)
+            }
+            await loadAttendance()
+            setBulkFile(null)
+        } finally {
+            setBulkLoading(false)
+        }
     }
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Guard Attendance</h1>
-                <p className="text-gray-600 mt-1">Filter attendance by Parwest ID and date range, and mark attendance</p>
+                <h1 className="text-3xl font-bold">Attendance</h1>
+                <p className="text-gray-600 mt-1">Filter attendance by Secure Ops ID and date range</p>
             </div>
 
             <div className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div><label className="block text-sm text-gray-600 mb-1">Parwest ID</label><input value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="PW-00001" /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">Start Date</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">End Date</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                <div className="flex items-end"><button onClick={loadAttendance} className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Search</button></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Secure Ops ID*</label><input value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Secure Ops ID" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Start Date*</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                <div className="flex items-end"><ActionButton onClick={loadAttendance} className="w-full">Submit</ActionButton></div>
             </div>
 
             <form onSubmit={markAttendance} className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -148,7 +268,7 @@ export default function GuardAttendanceManager() {
                     </select>
                 </div>
                 <div className="flex items-end">
-                    <button className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Mark</button>
+                    <ActionButton type="submit" className="w-full">Mark</ActionButton>
                 </div>
                 <div className="md:col-span-6">
                     <label className="block text-sm text-gray-600 mb-1">Notes</label>
@@ -156,7 +276,86 @@ export default function GuardAttendanceManager() {
                 </div>
             </form>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            <form onSubmit={bulkMarkAttendance} className="bg-white rounded-lg border p-4 space-y-3">
+                <h2 className="text-lg font-semibold">Bulk Mark Attendance</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Date*</label>
+                        <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Status</label>
+                        <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                            <option value="PRESENT">Present</option>
+                            <option value="ABSENT">Absent</option>
+                            <option value="LEAVE">Leave</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Shift</label>
+                        <select value={bulkShift} onChange={(e) => setBulkShift(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                            <option value="DAY">Day</option>
+                            <option value="NIGHT">Night</option>
+                            <option value="BOTH">Both</option>
+                        </select>
+                    </div>
+                    <div className="flex items-end">
+                        <ActionButton type="submit" className="w-full" disabled={bulkLoading}>
+                            {bulkLoading ? "Processing..." : "Mark Selected"}
+                        </ActionButton>
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Notes</label>
+                    <input value={bulkNotes} onChange={(e) => setBulkNotes(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Optional notes for all selected guards" />
+                </div>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-gray-700">Select Guards</label>
+                        <button
+                            type="button"
+                            onClick={() => setBulkGuardIds(activeGuards.map((guard) => guard.id))}
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                        >
+                            Select All
+                        </button>
+                    </div>
+                    <div className="max-h-44 overflow-y-auto rounded-md border p-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {activeGuards.map((guard) => (
+                            <label key={guard.id} className="inline-flex items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={bulkGuardIds.includes(guard.id)}
+                                    onChange={() => toggleBulkGuard(guard.id)}
+                                    className="h-4 w-4"
+                                />
+                                <span>{guard.parwestId} - {guard.name}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            </form>
+
+            <form onSubmit={bulkUploadAttendance} className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="md:col-span-3">
+                    <label className="block text-sm text-gray-600 mb-1">Bulk Attendance Upload (CSV)</label>
+                    <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                        className="w-full border rounded-md px-3 py-2"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Format: guardId,date,status,shift,notes</p>
+                </div>
+                <div className="flex items-end">
+                    <ActionButton type="submit" className="w-full" disabled={bulkLoading}>
+                        {bulkLoading ? "Uploading..." : "Upload CSV"}
+                    </ActionButton>
+                </div>
+            </form>
+
+            {error ? <InlineAlert type="error" message={error} /> : null}
+            {notice ? <InlineAlert type="success" message={notice} /> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <table className="w-full">
@@ -179,8 +378,8 @@ export default function GuardAttendanceManager() {
                             records.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{new Date(row.date).toLocaleDateString("en-US")}</td>
-                                    <td className="px-6 py-4 text-sm">{row.guard.parwestId}</td>
-                                    <td className="px-6 py-4 text-sm">{row.guard.name}</td>
+                                    <td className="px-6 py-4 text-sm">{row.guard?.parwestId || "—"}</td>
+                                    <td className="px-6 py-4 text-sm">{row.guard?.name || "—"}</td>
                                     <td className="px-6 py-4 text-sm">{row.status}</td>
                                     <td className="px-6 py-4 text-sm">{row.shiftType || "—"}</td>
                                     <td className="px-6 py-4 text-sm">{row.notes || "—"}</td>

@@ -1,6 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { userLinks, userScreens } from "@/lib/parity/screenConfigs"
+import CsRelationshipManager from "@/components/users/CsRelationshipManager"
 
 export default function UsersCsRelationshipPage() {
-  return <ConfiguredInteractiveScreen config={userScreens["cs-relationship"]} links={userLinks} />
+  return <CsRelationshipManager />
 }

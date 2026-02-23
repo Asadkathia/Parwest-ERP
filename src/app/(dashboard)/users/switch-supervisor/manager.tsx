@@ -49,21 +49,29 @@ export default function SwitchSupervisorManager() {
   }, [fromSupervisorId, toSupervisorId])
 
   const canPreview = Boolean(regionId && officeId && fromSupervisorId && toSupervisorId)
+  const resetForm = () => {
+    setRegionId("")
+    setOfficeId("")
+    setFromSupervisorId("")
+    setToSupervisorId("")
+    setReason("")
+    setResult("idle")
+  }
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Switch Supervisor" subtitle="Region -> office -> from supervisor -> to supervisor workflow" />
+      <SectionTitle title="Switch Supervisor" subtitle="region -> reigional office -> From Supervisor -> To supervisor" />
 
       <section className="ui-card p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm mb-1 text-[var(--text-muted)]">Region</label>
+          <label className="block text-sm mb-1 text-[var(--text-muted)]">region</label>
           <select value={regionId} onChange={(e) => { setRegionId(e.target.value); setOfficeId(""); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
             <option value="">Select region</option>
             {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1 text-[var(--text-muted)]">Regional Office</label>
+          <label className="block text-sm mb-1 text-[var(--text-muted)]">reigional office</label>
           <select value={officeId} onChange={(e) => { setOfficeId(e.target.value); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
             <option value="">Select office</option>
             {officeOptions.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
@@ -77,7 +85,7 @@ export default function SwitchSupervisorManager() {
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1 text-[var(--text-muted)]">To Supervisor</label>
+          <label className="block text-sm mb-1 text-[var(--text-muted)]">To supervisor</label>
           <select value={toSupervisorId} onChange={(e) => setToSupervisorId(e.target.value)} className="ui-select">
             <option value="">Select to supervisor</option>
             {supervisorOptions.filter((item) => item.id !== fromSupervisorId).map((sup) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
@@ -90,7 +98,8 @@ export default function SwitchSupervisorManager() {
 
         <div className="md:col-span-2 lg:col-span-3 flex items-center gap-2">
           <ActionButton disabled={!canPreview} onClick={() => setResult("previewed")}>Preview</ActionButton>
-          <ActionButton variant="secondary" disabled={result !== "previewed"} onClick={() => setResult("switched")}>Switch</ActionButton>
+          <ActionButton variant="secondary" disabled={result !== "previewed"} onClick={() => setResult("switched")}>Submit</ActionButton>
+          <ActionButton variant="secondary" onClick={resetForm}>Reset</ActionButton>
         </div>
       </section>
 

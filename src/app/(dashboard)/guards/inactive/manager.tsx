@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type InactiveGuard = {
     id: string
@@ -12,8 +14,13 @@ type InactiveGuard = {
 
 export default function InactiveGuardsManager() {
     const [guards, setGuards] = useState<InactiveGuard[]>([])
+    const [entries, setEntries] = useState("10")
+    const [search, setSearch] = useState("")
+    const [selectDate, setSelectDate] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [notice, setNotice] = useState("")
+    const [confirmReactivateId, setConfirmReactivateId] = useState<string | null>(null)
 
     const loadInactiveGuards = async () => {
         try {
@@ -54,7 +61,20 @@ export default function InactiveGuardsManager() {
         }
 
         await loadInactiveGuards()
+        setNotice("Guard reactivated.")
     }
+
+    const filtered = guards
+        .filter((guard) => {
+            if (!search.trim()) return true
+            const q = search.toLowerCase()
+            return guard.name.toLowerCase().includes(q) || guard.parwestId.toLowerCase().includes(q)
+        })
+        .filter((guard) => {
+            if (!selectDate) return true
+            return new Date(guard.updatedAt).toISOString().slice(0, 10) === selectDate
+        })
+        .slice(0, Number.parseInt(entries, 10) || 10)
 
     return (
         <div className="space-y-6">
@@ -63,9 +83,32 @@ export default function InactiveGuardsManager() {
                 <p className="text-gray-600 mt-1">List of deactivated guards with reactivation controls</p>
             </div>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {error ? <InlineAlert type="error" message={error} /> : null}
+            {notice ? <InlineAlert type="success" message={notice} /> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
+                <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
+                    <div>
+                        <label className="mb-1 block text-xs text-gray-600">Show</label>
+                        <select value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
+                            {["10", "25", "50", "100", "200"].map((value) => (
+                                <option key={value} value={value}>
+                                    {value}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Search:</label>
+                            <input value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Select Date</label>
+                            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                        </div>
+                    </div>
+                </div>
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b">
                         <tr>
@@ -79,23 +122,60 @@ export default function InactiveGuardsManager() {
                     <tbody className="divide-y">
                         {loading ? (
                             <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
-                        ) : guards.length === 0 ? (
+                        ) : filtered.length === 0 ? (
                             <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">No inactive guards found.</td></tr>
                         ) : (
-                            guards.map((guard) => (
+                            filtered.map((guard) => (
                                 <tr key={guard.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{guard.parwestId}</td>
                                     <td className="px-6 py-4 text-sm">{guard.name}</td>
                                     <td className="px-6 py-4 text-sm">{new Date(guard.updatedAt).toLocaleString("en-US")}</td>
                                     <td className="px-6 py-4 text-sm">{guard.status}</td>
                                     <td className="px-6 py-4 text-sm">
-                                        <button onClick={() => reactivateGuard(guard.id)} className="text-blue-600 hover:text-blue-800 font-medium">Reactivate</button>
+                                        <ActionButton variant="secondary" onClick={() => setConfirmReactivateId(guard.id)}>Activate</ActionButton>
                                     </td>
                                 </tr>
                             ))
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {confirmReactivateId ? (
+                <ConfirmDialog
+                    title="Activate Guard"
+                    message="Are you sure you want to activate this inactive guard?"
+                    onNo={() => setConfirmReactivateId(null)}
+                    onYes={async () => {
+                        await reactivateGuard(confirmReactivateId)
+                        setConfirmReactivateId(null)
+                    }}
+                />
+            ) : null}
+        </div>
+    )
+}
+
+function ConfirmDialog({
+    title,
+    message,
+    onYes,
+    onNo,
+}: {
+    title: string
+    message: string
+    onYes: () => void | Promise<void>
+    onNo: () => void
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
+                <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
+                <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
+                <div className="mt-5 flex justify-end gap-2">
+                    <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
+                    <ActionButton onClick={onYes}>Yes</ActionButton>
+                </div>
             </div>
         </div>
     )

@@ -34,6 +34,53 @@ type ParsedNotes = {
     remarks?: string
 }
 
+const LEGACY_REGIONAL_OFFICES = [
+    "head office lahore",
+    "islamabad",
+    "quetta",
+    "peshawar",
+    "karachi",
+    "multan",
+    "sahiwal",
+    "gujranwala",
+    "faisalabad",
+    "sub office kasur",
+    "sub office sheikhupura",
+    "test office",
+    "hyderabad",
+    "sukkur",
+    "qadir pur ghotki",
+    "jand",
+]
+
+const LEGACY_CLIENTS = [
+    "National Bank of Pakistan",
+    "Standard Chartered Bank Limited Pakistan",
+    "United Bank Limited",
+    "MCB Bank Ltd",
+    "Faysal Bank Limited",
+    "Summit Bank Limited",
+    "Meezan Bank Limited",
+    "Bank Al Habib Limited",
+    "Samba Bank Limited",
+    "Habib Bank Limited",
+]
+
+const LEGACY_BRANCHES = [
+    "Crystalline Chemicals Industries Pvt Ltd",
+    "Parsi Grave Yard",
+    "FGA of Pakistan",
+    "Ghalib Assocoates",
+    "Saudi Pak BA Rajpot",
+    "AM Gill Pvt Ltd",
+    "Trans Fab",
+    "Mr Atif Murad",
+    "21 5 Cantt Lahore Qalnadr",
+    "239 FF DHA",
+    "Mr Basit Rehman Malik",
+    "HOUSE#96 U, PHASE III, DHA",
+]
+
 function parseNotes(raw: string | null): ParsedNotes {
     if (!raw) return {}
 
@@ -74,6 +121,10 @@ export default function TrainingsManager() {
     const [branchFilter, setBranchFilter] = useState("")
     const [fromDate, setFromDate] = useState("")
     const [toDate, setToDate] = useState("")
+    const [itemsPerPage, setItemsPerPage] = useState("10")
+    const [tableSearch, setTableSearch] = useState("")
+    const [armorer, setArmorer] = useState("No")
+    const [supervisorUniform, setSupervisorUniform] = useState("Yes")
 
     const loadTrainings = async () => {
         try {
@@ -124,9 +175,20 @@ export default function TrainingsManager() {
                 return false
             }
 
+            if (tableSearch.trim()) {
+                const q = tableSearch.toLowerCase()
+                const guardName = row.guard?.name?.toLowerCase() || ""
+                const guardParwestId = row.guard?.parwestId?.toLowerCase() || ""
+                const trainingType = row.trainingType?.toLowerCase() || ""
+                const notesText = row.notes?.toLowerCase() || ""
+                if (!(guardName.includes(q) || guardParwestId.includes(q) || trainingType.includes(q) || notesText.includes(q))) {
+                    return false
+                }
+            }
+
             return true
         })
-    }, [rows, regionalOfficeFilter, clientFilter, branchFilter, fromDate, toDate])
+    }, [rows, regionalOfficeFilter, clientFilter, branchFilter, fromDate, toDate, tableSearch])
 
     const clearFilters = () => {
         setRegionalOfficeFilter("")
@@ -139,7 +201,7 @@ export default function TrainingsManager() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-4">
-                <SectionTitle title="OnJob Trainings" subtitle="Track OJT sessions and completion status by guard" />
+                <SectionTitle title="On Job Training" subtitle="Track OJT sessions and completion status by guard" />
                 <Link href="/guards/trainings/new" className="ui-btn ui-btn-primary">Add New Training</Link>
             </div>
 
@@ -147,15 +209,30 @@ export default function TrainingsManager() {
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
-                        <input value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-input" placeholder="Regional office" />
+                        <select value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
+                            <option value="">--Select Regional Office--</option>
+                            {LEGACY_REGIONAL_OFFICES.map((office) => (
+                                <option key={office} value={office}>{office}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-                        <input value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-input" placeholder="Client" />
+                        <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-select">
+                            <option value="">--Select Client--</option>
+                            {LEGACY_CLIENTS.map((client) => (
+                                <option key={client} value={client}>{client}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch</label>
-                        <input value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-input" placeholder="Branch" />
+                        <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-select">
+                            <option value="">--Select Branch--</option>
+                            {LEGACY_BRANCHES.map((branch) => (
+                                <option key={branch} value={branch}>{branch}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">From Date</label>
@@ -167,12 +244,44 @@ export default function TrainingsManager() {
                     </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Show</label>
+                        <select value={itemsPerPage} onChange={(e) => setItemsPerPage(e.target.value)} className="ui-select">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Search:</label>
+                        <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="ui-input" placeholder="Guard / ID / type / remarks" />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Armorer</label>
+                        <select value={armorer} onChange={(e) => setArmorer(e.target.value)} className="ui-select">
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Supervisor Has Uniform</label>
+                        <select value={supervisorUniform} onChange={(e) => setSupervisorUniform(e.target.value)} className="ui-select">
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                     <ActionButton>Filter</ActionButton>
                     <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
                     <ActionButton>Export All OJT Report</ActionButton>
                     <ActionButton>Export Filtered OJT Report</ActionButton>
                     <ActionButton>Branch Training Report</ActionButton>
+                    <ActionButton>Export Branch Report</ActionButton>
+                    <ActionButton>Export Summary</ActionButton>
                     <ActionButton variant="danger">Missing Training Report</ActionButton>
                 </div>
             </FilterBar>
@@ -204,7 +313,7 @@ export default function TrainingsManager() {
                         ) : filteredRows.length === 0 ? (
                             <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">No training records found.</td></tr>
                         ) : (
-                            filteredRows.map((training) => {
+                            filteredRows.slice(0, Number.parseInt(itemsPerPage, 10) || 10).map((training) => {
                                 const notes = parseNotes(training.notes)
                                 const created = new Date(training.completedAt)
                                 const due = new Date(created)

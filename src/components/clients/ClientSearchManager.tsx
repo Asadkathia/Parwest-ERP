@@ -24,12 +24,37 @@ type ClientRow = {
   createdAt?: string
 }
 
+const LEGACY_CLIENT_TYPE_OPTIONS = ["bank", "manufacturer", "other"]
+const LEGACY_CITY_OPTIONS = [
+  "All Cities",
+  "Lahore",
+  "Gujranwala",
+  "Sahiwal",
+  "Multan",
+  "Karachi",
+  "Faisalabad",
+  "Khanpur",
+  "Chichawatni",
+  "Bahawalpur",
+  "Mian Channu",
+  "Khanewal",
+  "Ahmedpur East",
+  "Ahmed Nager Chatha",
+  "Ali Pur",
+  "Arifwala",
+  "Attock",
+  "Basti Malook",
+  "Bhagalchur",
+  "Bhalwal",
+]
+
 type Props = {
   title: string
   subtitle: string
+  variant?: "legacy" | "v2"
 }
 
-export default function ClientSearchManager({ title, subtitle }: Props) {
+export default function ClientSearchManager({ title, subtitle, variant = "legacy" }: Props) {
   const [rows, setRows] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -37,15 +62,9 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
   const [name, setName] = useState("")
   const [clientType, setClientType] = useState("")
   const [city, setCity] = useState("")
-  const [branchModel, setBranchModel] = useState("")
-  const [branchless, setBranchless] = useState("")
-  const [regionId, setRegionId] = useState("")
-  const [status, setStatus] = useState("")
-  const [contact, setContact] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
-
-  const getBranchModel = (id: string) => (id.charCodeAt(id.length - 1) % 2 === 0 ? "ISLAMIC" : "CONVENTIONAL")
+  const [rowsPerPage, setRowsPerPage] = useState("10")
+  const [tableSearch, setTableSearch] = useState("")
+  const [selectDate, setSelectDate] = useState("")
 
   const loadRows = async () => {
     try {
@@ -74,24 +93,24 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
     return rows.filter((row) => {
       if (name && !row.name.toLowerCase().includes(name.toLowerCase())) return false
       if (clientType && row.type.toLowerCase() !== clientType.toLowerCase()) return false
-      if (city && !(row.city || "").toLowerCase().includes(city.toLowerCase())) return false
-      if (branchModel && getBranchModel(row.id) !== branchModel) return false
-      if (branchless && String(row.isBranchless) !== String(branchless === "YES")) return false
-      if (regionId && (row.regionId || "") !== regionId) return false
-      if (status && row.status !== status) return false
-      if (contact && !`${row.contactPerson || ""} ${row.contactNumber || ""}`.toLowerCase().includes(contact.toLowerCase())) return false
-      if (dateFrom && row.createdAt && new Date(row.createdAt) < new Date(dateFrom)) return false
-      if (dateTo && row.createdAt && new Date(row.createdAt) > new Date(dateTo)) return false
+      if (city && city !== "All Cities" && !(row.city || "").toLowerCase().includes(city.toLowerCase())) return false
+      if (tableSearch && !`${row.name} ${row.type} ${row.city || ""}`.toLowerCase().includes(tableSearch.toLowerCase())) return false
+      if (selectDate && row.createdAt && new Date(row.createdAt).toISOString().slice(0, 10) !== selectDate) return false
       return true
     })
-  }, [rows, name, clientType, city, branchModel, branchless, regionId, status, contact, dateFrom, dateTo])
+  }, [rows, name, clientType, city, tableSearch, selectDate])
+
+  const pageSize = useMemo(() => {
+    const parsed = Number.parseInt(rowsPerPage, 10)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10
+  }, [rowsPerPage])
 
   return (
     <div className="space-y-6">
       <SectionTitle title={title} subtitle={subtitle} />
 
       <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Enter client name" />
@@ -100,58 +119,43 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Client Type</label>
             <select value={clientType} onChange={(e) => setClientType(e.target.value)} className="ui-select">
               <option value="">--Select Client Type--</option>
-              <option value="BANK">Bank</option>
-              <option value="MANUFACTURER">Manufacturer</option>
-              <option value="RETAIL">Retail</option>
-              <option value="CORPORATE">Corporate</option>
-              <option value="GOVERNMENT">Government</option>
-              <option value="RESIDENTIAL">Residential</option>
-              <option value="OTHER">Other</option>
+              {LEGACY_CLIENT_TYPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-            <input value={city} onChange={(e) => setCity(e.target.value)} className="ui-input" placeholder="--Select City--" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Branch Model</label>
-            <select value={branchModel} onChange={(e) => setBranchModel(e.target.value)} className="ui-select">
-              <option value="">All</option>
-              <option value="ISLAMIC">Islamic</option>
-              <option value="CONVENTIONAL">Conventional</option>
+            <select value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
+              <option value="">--Select City--</option>
+              {LEGACY_CITY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Branchless</label>
-            <select value={branchless} onChange={(e) => setBranchless(e.target.value)} className="ui-select">
-              <option value="">All</option>
-              <option value="YES">Yes</option>
-              <option value="NO">No</option>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">
+              {variant === "v2" ? "Show 102550100 entries per page" : "Show 102550100200 entries"}
+            </label>
+            <select value={rowsPerPage} onChange={(e) => setRowsPerPage(e.target.value)} className="ui-select">
+              {(variant === "v2" ? ["10", "25", "50", "100"] : ["10", "25", "50", "100", "200"]).map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
-            <input value={regionId} onChange={(e) => setRegionId(e.target.value)} className="ui-input" placeholder="Region ID" />
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
+            <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="ui-input" placeholder="Search:" />
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="ui-select">
-              <option value="">All</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact</label>
-            <input value={contact} onChange={(e) => setContact(e.target.value)} className="ui-input" placeholder="Contact person or number" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Date From</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="ui-input" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Date To</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="ui-input" />
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Date</label>
+            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -166,18 +170,15 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
               setName("")
               setClientType("")
               setCity("")
-              setBranchModel("")
-              setBranchless("")
-              setRegionId("")
-              setStatus("")
-              setContact("")
-              setDateFrom("")
-              setDateTo("")
+              setRowsPerPage("10")
+              setTableSearch("")
+              setSelectDate("")
             }}
           >
             <RotateCcw className="h-4 w-4" />
-            Clear
+            {variant === "v2" ? "Clear" : "Reset"}
           </ActionButton>
+          {variant === "legacy" ? <ActionButton variant="secondary">Export In Excel</ActionButton> : null}
         </div>
       </FilterBar>
 
@@ -208,7 +209,6 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
             sortable: true,
           },
           { key: "type", header: "Type", sortable: true },
-          { key: "branchModel", header: "Branch Model", render: (row) => getBranchModel(row.id) },
           { key: "city", header: "City", render: (row) => row.city || "—", sortable: true },
           { key: "isBranchless", header: "Is Branchless", render: (row) => (row.isBranchless ? "Yes" : "No") },
           {
@@ -232,13 +232,19 @@ export default function ClientSearchManager({ title, subtitle }: Props) {
                 <Link href={`/clients/${row.id}/edit`} className="text-emerald-700 hover:underline">
                   Edit
                 </Link>
+                {variant === "v2" ? (
+                  <button type="button" className="text-amber-700 hover:underline">
+                    Update Status
+                  </button>
+                ) : null}
               </div>
             ),
           },
         ]}
         getRowKey={(row) => row.id}
         emptyText={loading ? "Loading clients..." : "No clients found."}
-        searchPlaceholder="Search table rows..."
+        searchable={false}
+        pageSize={pageSize}
         stickyHeader
       />
     </div>

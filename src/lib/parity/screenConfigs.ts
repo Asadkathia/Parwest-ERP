@@ -11,7 +11,7 @@ export type ScreenConfig = {
 
 const payrollLoanSections: UiSection[] = [
   {
-    title: "Add Loan",
+    title: "Add Loans",
     fields: [
       { label: "Month", type: "month", required: true },
       { label: "Parwest ID", required: true },
@@ -27,11 +27,11 @@ const payrollLoanSections: UiSection[] = [
 
 export const payrollOperationScreens: Record<string, ScreenConfig> = {
   loan: {
-    title: "Payroll Loan",
+    title: "Loan",
     description: "Loan operations with add/finalize/export tabs.",
     tabs: ["Add Loans", "Finalize Loans", "Export Finalised History"],
     sections: payrollLoanSections,
-    actions: ["Save Loan", "Finalize Selected", "Export Finalised History"],
+    actions: ["Save Loan", "Finalize Loans", "Export Finalised History"],
     table: {
       title: "Loan Records",
       columns: ["Month", "Parwest ID", "Guard", "Client/Branch", "Amount", "Status", "Action"],
@@ -41,7 +41,7 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
     title: "Extra Hours",
     sections: [
       {
-        title: "Record Extra Hours",
+        title: "Extra Hours",
         fields: [
           { label: "Parwest ID", required: true },
           { label: "Branch", required: true },
@@ -50,14 +50,14 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Save Extra Hours"],
+    actions: ["Submit", "Reset"],
     table: { columns: ["Parwest ID", "Branch", "Hours", "Creation Date", "Action"] },
   },
   "other-deductions": {
     title: "Other Deductions",
     sections: [
       {
-        title: "Record Miscellaneous Deductions",
+        title: "Other Deductions",
         fields: [
           { label: "Parwest ID", required: true },
           { label: "Month", type: "month", required: true },
@@ -66,14 +66,14 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Save Deduction"],
+    actions: ["Submit", "Reset"],
     table: { columns: ["Parwest ID", "Month", "Amount", "Reason", "Action"] },
   },
   "special-duty": {
     title: "Special Duty",
     sections: [
       {
-        title: "Special Duty Record",
+        title: "Special Duty",
         fields: [
           { label: "Secure Ops ID", required: true },
           { label: "From Date", type: "date", required: true },
@@ -84,14 +84,14 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Save Special Duty"],
+    actions: ["Submit", "Reset"],
     table: { columns: ["Secure Ops ID", "Date Range", "Hours", "Cost/Hour", "Comments", "Action"] },
   },
   holidays: {
     title: "Holidays",
     sections: [
       {
-        title: "Holiday Calendar",
+        title: "Holidays",
         fields: [
           { label: "Holiday Name", required: true },
           { label: "Date", type: "date", required: true },
@@ -99,7 +99,7 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Add Holiday"],
+    actions: ["Add", "Update", "Delete"],
     table: { columns: ["Holiday", "Date", "Notes", "Action"] },
   },
   salary: {
@@ -107,7 +107,7 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
     tabs: ["Calculate Salary", "Salary History"],
     sections: [
       {
-        title: "Salary Filters",
+        title: "Calculate Salary Filters",
         fields: [
           { label: "Region", type: "select", required: true },
           { label: "Select Client", type: "select" },
@@ -116,30 +116,30 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Calculate Salary"],
+    actions: ["CALCULATE SALARY"],
     table: { columns: ["Parwest ID", "Guard", "Client/Branch", "Days", "Amount", "Status"] },
   },
   "salary-v2": {
-    title: "Salary",
-    sections: [{ title: "Salary V2 Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
-    actions: ["Search", "Export Summary"],
+    title: "Salary V2",
+    sections: [{ title: "Salary V2 Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Select Client", type: "select" }, { label: "Branch", type: "select" }] }],
+    actions: ["Search", "Export Summary", "Export In Excel"],
     table: { columns: ["Parwest ID", "Guard", "Base", "Deductions", "Net Salary", "Status"] },
   },
   "bulk-salary-slips": {
     title: "Bulk Salary Slips",
-    sections: [{ title: "Mass Slip Generation", fields: [{ label: "Month", type: "month", required: true }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
-    actions: ["Generate Slips", "Download Zip"],
+    sections: [{ title: "Bulk Salary Slips", fields: [{ label: "Month", type: "month", required: true }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
+    actions: ["Generate Slips", "Download Zip", "Export In Excel"],
     table: { columns: ["Cycle", "Employees", "Generated At", "Generated By", "Action"] },
   },
   clearance: {
     title: "Clearance",
-    sections: [{ title: "Final Settlement", fields: [{ label: "Parwest ID" }, { label: "Last Working Date", type: "date" }, { label: "Pending Dues", type: "number" }, { label: "Notes", type: "textarea" }] }],
-    actions: ["Process Clearance"],
+    sections: [{ title: "Clearance", fields: [{ label: "Parwest ID" }, { label: "Last Working Date", type: "date" }, { label: "Pending Dues", type: "number" }, { label: "Notes", type: "textarea" }] }],
+    actions: ["Process Clearance", "Submit", "Reset"],
     table: { columns: ["Parwest ID", "Name", "Final Amount", "Status", "Action"] },
   },
   "unpaid-salaries": {
     title: "UnPaid Salaries",
-    sections: [{ title: "Unpaid Salary Filters", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Client", type: "select" }] }],
+    sections: [{ title: "UnPaid Salaries", fields: [{ label: "Month", type: "month" }, { label: "Region", type: "select" }, { label: "Select Client", type: "select" }, { label: "Branch", type: "select" }] }],
     actions: ["Search", "Export Unpaid Report"],
     table: { columns: ["Parwest ID", "Guard", "Month", "Amount", "Reason", "Action"] },
   },
@@ -147,7 +147,7 @@ export const payrollOperationScreens: Record<string, ScreenConfig> = {
 
 export const inventoryScreens: Record<string, ScreenConfig> = {
   search: {
-    title: "Inventory Search",
+    title: "Search",
     description: "Central management hub for inventory.",
     sections: [
       {
@@ -191,26 +191,26 @@ export const inventoryScreens: Record<string, ScreenConfig> = {
     table: { columns: ["Condition", "Action"] },
   },
   demand: {
-    title: "Inventory Demand",
+    title: "Demand",
     sections: [{ title: "Demand Request", fields: [{ label: "Regional Office", type: "select" }, { label: "Category", type: "select" }, { label: "Item", type: "select" }, { label: "Requested Quantity", type: "number" }, { label: "Notes", type: "textarea" }] }],
-    actions: ["Checkout", "Track Requests"],
+    actions: ["Checkout", "Track Requests", "Export In Excel File"],
     table: { columns: ["Request ID", "Regional Office", "Category", "Item", "Requested", "Fulfilled", "Status"] },
   },
   "stock-in": {
     title: "Stock In",
     sections: [{ title: "Register New Inventory", fields: [{ label: "Order ID" }, { label: "Category", type: "select" }, { label: "Item", type: "select" }, { label: "Vendor", type: "select" }, { label: "Price", type: "number" }, { label: "Purchase Date", type: "date" }, { label: "Date of Expiry", type: "date" }, { label: "Warranty Time" }, { label: "Warranty Type" }, { label: "Size" }, { label: "Weight" }, { label: "Length" }, { label: "Width" }, { label: "Color" }, { label: "Is Insured", type: "checkbox" }, { label: "Is Non Unique", type: "checkbox" }, { label: "Quantity of Non Unique Items", type: "number" }] }],
-    actions: ["Save Stock In"],
+    actions: ["Save Stock In", "Reset"],
   },
   "assign-item": {
     title: "Assign Item",
     sections: [{ title: "Assign Inventory", fields: [{ label: "Assign To", type: "select", options: ["Client", "Guard"] }, { label: "Select Regional Office", type: "select" }, { label: "Select Category", type: "select" }, { label: "Select Client/Guard", type: "select" }, { label: "Secure Ops Unique Number" }, { label: "Serial Number" }] }],
-    actions: ["Checkout"],
+    actions: ["Checkout", "Clear"],
     table: { columns: ["Item", "Assigned To", "Assigned At", "Returned At", "Status"] },
   },
   condemned: {
     title: "Condemned Items",
     sections: [{ title: "Condemn Item", fields: [{ label: "Unique ID" }, { label: "Condemned Date", type: "date" }, { label: "Reason", type: "textarea" }] }],
-    actions: ["Mark as Condemned"],
+    actions: ["Mark as Condemned", "Export In Excel File"],
     table: { columns: ["Unique ID", "Product Type", "Category", "Vendor", "Regional Office", "Purchase Date", "Condemned Date"] },
   },
 }
@@ -289,13 +289,14 @@ export const payrollOperationLinks = [
   { label: "Special Duty", href: "/payroll/operations/special-duty" },
   { label: "Holidays", href: "/payroll/operations/holidays" },
   { label: "Salary", href: "/payroll/operations/salary" },
-  { label: "Salary", href: "/payroll/operations/salary-v2" },
+  { label: "Salary V2", href: "/payroll/operations/salary-v2" },
   { label: "Bulk Slips", href: "/payroll/operations/bulk-salary-slips" },
   { label: "Clearance", href: "/payroll/operations/clearance" },
   { label: "UnPaid", href: "/payroll/operations/unpaid-salaries" },
 ]
 
 export const inventoryLinks = [
+  { label: "Dashboard", href: "/inventory" },
   { label: "Search", href: "/inventory/search" },
   { label: "Categories", href: "/inventory/categories" },
   { label: "Vendors", href: "/inventory/vendors" },
@@ -343,7 +344,7 @@ export const dashboardScreens: Record<string, ScreenConfig> = {
 
 export const userScreens: Record<string, ScreenConfig> = {
   new: {
-    title: "Add New User",
+    title: "User Enrolment Form",
     description: "User enrolment form from UI docs.",
     sections: [
       {
@@ -377,7 +378,7 @@ export const userScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Search", "Clear", "Export in Excel"],
+    actions: ["Search", "Clear", "Export In Excel"],
     table: { columns: ["ID", "Photo", "Name", "Email", "Role", "Regional Office", "Status", "Action"] },
   },
   "ms-relationship": {
@@ -513,7 +514,7 @@ export const auditScreens: Record<string, ScreenConfig> = {
 
 export const payrollScreens: Record<string, ScreenConfig> = {
   operationsHub: {
-    title: "Payroll Operations",
+    title: "Operation",
     description: "Frontend parity screen for payroll operational workflows from UI docs.",
     sections: [
       {
@@ -526,11 +527,11 @@ export const payrollScreens: Record<string, ScreenConfig> = {
         ],
       },
     ],
-    actions: ["Search", "Clear"],
+    actions: ["Search", "Clear", "Export In Excel"],
     table: { columns: ["Operation", "Month", "Region", "Client", "Branch", "Action"] },
   },
   reportsHub: {
-    title: "Payroll Reports",
+    title: "Reports",
     description: "Export and analytics tools listed in payroll report submenu.",
     sections: [
       {
@@ -538,11 +539,11 @@ export const payrollScreens: Record<string, ScreenConfig> = {
         fields: payrollReportExports.map((name) => ({ label: name, type: "checkbox" })),
       },
     ],
-    actions: ["Run Selected Report", "Export"],
+    actions: ["Run Selected Report", "Export", "Export In Excel"],
     table: { columns: ["Report", "Frequency", "Last Run", "Status", "Action"] },
   },
   settingsHub: {
-    title: "Payroll Settings",
+    title: "Settings",
     description: "Payroll defaults, month initialize, and limits from UI docs.",
     tabs: ["Payroll Defaults", "Month Initialise", "Limits"],
     sections: [

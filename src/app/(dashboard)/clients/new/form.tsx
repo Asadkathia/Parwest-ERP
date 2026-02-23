@@ -20,8 +20,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
-    const [enrollmentMode, setEnrollmentMode] = useState<"BRANCHLESS" | "GROUP_WITH_BRANCHES">("BRANCHLESS")
-    const [groupBranches, setGroupBranches] = useState<Array<{ name: string; city: string; type: "ISLAMIC" | "CONVENTIONAL" }>>([])
+    const [isBranchless, setIsBranchless] = useState(true)
 
     const applyOcrFields = (fields: Record<string, string>) => {
         const form = formRef.current
@@ -41,8 +40,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
         const formData = new FormData(e.currentTarget)
         const data = {
             ...Object.fromEntries(formData.entries()),
-            enrollmentMode,
-            branches: groupBranches,
+            isBranchless,
         }
 
         try {
@@ -84,7 +82,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client Name <span className="text-red-500">*</span>
+                                Client's Name * <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
@@ -104,108 +102,63 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                                 required
                                 className="ui-select"
                             >
-                                <option value="">Select type</option>
-                                <option value="BANK">Bank</option>
-                                <option value="MANUFACTURER">Manufacturer</option>
-                                <option value="RETAIL">Retail</option>
-                                <option value="CORPORATE">Corporate</option>
-                                <option value="GOVERNMENT">Government</option>
-                                <option value="RESIDENTIAL">Residential</option>
-                                <option value="OTHER">Other</option>
+                                <option value="">Client Type</option>
+                                <option value="BANK">bank</option>
+                                <option value="MANUFACTURER">manufacturer</option>
+                                <option value="OTHER">other</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Email
+                                Client's Email *
                             </label>
                             <input
                                 type="email"
                                 name="email"
+                                required
                                 className="ui-input"
-                                placeholder="client@example.com"
+                                placeholder="Client's Email"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Enrollment Date
+                                Enrollment Date* (Please Enter Correct Enrollment Date For Accurate Reporting)
                             </label>
                             <input
                                 type="date"
                                 name="enrollmentDate"
+                                required
                                 className="ui-input"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Region
-                            </label>
-                            <select
-                                name="regionId"
-                                className="ui-select"
-                            >
-                                <option value="">Select region</option>
-                                {regions.map((region) => (
-                                    <option key={region.id} value={region.id}>
-                                        {region.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                City
+                                Client Location
                             </label>
                             <input
                                 type="text"
                                 name="city"
                                 className="ui-input"
-                                placeholder="Enter city"
+                                placeholder="Lahore"
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Status
-                            </label>
-                            <select
-                                name="status"
-                                defaultValue="ACTIVE"
-                                className="ui-select"
-                            >
-                                <option value="ACTIVE">Active</option>
-                                <option value="INACTIVE">Inactive</option>
-                            </select>
-                        </div>
-
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 lg:col-span-2">
                             <label className="flex items-center gap-2">
                                 <input
                                     type="checkbox"
                                     name="isBranchless"
                                     value="true"
-                                    checked={enrollmentMode === "BRANCHLESS"}
-                                    onChange={(e) => setEnrollmentMode(e.target.checked ? "BRANCHLESS" : "GROUP_WITH_BRANCHES")}
+                                    checked={isBranchless}
+                                    onChange={(e) => setIsBranchless(e.target.checked)}
                                     className="h-4 w-4 accent-[var(--brand)]"
                                 />
-                                <span className="text-sm text-[var(--text)]">Branchless Client</span>
+                                <span className="text-sm text-[var(--text)]">Branchless</span>
                             </label>
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Enrollment Mode</label>
-                            <select
-                                className="ui-select"
-                                value={enrollmentMode}
-                                onChange={(e) => setEnrollmentMode(e.target.value as "BRANCHLESS" | "GROUP_WITH_BRANCHES")}
-                            >
-                                <option value="BRANCHLESS">Branchless</option>
-                                <option value="GROUP_WITH_BRANCHES">Group Client + Add Branches</option>
-                            </select>
-                            <input type="hidden" name="enrollmentMode" value={enrollmentMode} />
+                            <input type="hidden" name="isBranchless" value={isBranchless ? "true" : "false"} />
                         </div>
                     </div>
                 </div>
@@ -216,10 +169,11 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                     <div className="grid grid-cols-1 gap-6">
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Head Office Address
+                                Head Office Address *
                             </label>
                             <textarea
                                 name="headOfficeAddress"
+                                required
                                 rows={3}
                                 className="ui-textarea"
                                 placeholder="Enter head office address"
@@ -233,19 +187,21 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person *</label>
                             <input
                                 type="text"
                                 name="contactPerson"
+                                required
                                 className="ui-input"
                                 placeholder="Contact person"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number *</label>
                             <input
                                 type="text"
                                 name="contactNumber"
+                                required
                                 className="ui-input"
                                 placeholder="Contact number"
                             />
@@ -260,7 +216,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client Postal Code</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client's Postal Code</label>
                             <input
                                 type="text"
                                 name="clientPostalCode"
@@ -273,77 +229,23 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                 {/* Introducer/Referral */}
                 <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Introducer / Referral</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Introducer/Referral</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Name</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
                             <input type="text" name="introducerName" className="ui-input" placeholder="Name" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Contact Number</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
                             <input type="text" name="introducerContactNumber" className="ui-input" placeholder="Contact number" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer Address</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
                             <input type="text" name="introducerAddress" className="ui-input" placeholder="Address" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Introducer CNIC Number</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Cnic Number</label>
                             <input type="text" name="introducerCnicNumber" className="ui-input" placeholder="CNIC number" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tax & Legal Information */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Tax & Legal Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                NTN (National Tax Number)
-                            </label>
-                            <input
-                                type="text"
-                                name="ntn"
-                                className="ui-input"
-                                placeholder="Enter NTN"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                STRN (Sales Tax Registration)
-                            </label>
-                            <input
-                                type="text"
-                                name="strn"
-                                className="ui-input"
-                                placeholder="Enter STRN"
-                            />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Contract Document URL
-                            </label>
-                            <input
-                                type="url"
-                                name="contractUrl"
-                                className="ui-input"
-                                placeholder="https://..."
-                            />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Logo URL
-                            </label>
-                            <input
-                                type="url"
-                                name="logoUrl"
-                                className="ui-input"
-                                placeholder="https://..."
-                            />
                         </div>
                     </div>
                 </div>
@@ -370,7 +272,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         <div className="md:col-span-2">
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Operational Provinces</label>
                             <select name="operationalProvinces" className="ui-select">
-                                <option value="">Select operational territory</option>
+                                <option value="">Select Operational Territory</option>
                                 <option value="Punjab">Punjab</option>
                                 <option value="Sindh">Sindh</option>
                                 <option value="KPK">KPK</option>
@@ -392,7 +294,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
                             <select name="locationRegionalOffice" className="ui-select">
-                                <option value="">Select regional office</option>
+                                <option value="">-Select Regional Office--</option>
                                 {regions.map((region) => (
                                     <option key={region.id} value={region.id}>{region.name}</option>
                                 ))}
@@ -478,73 +380,6 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                     </div>
                 </div>
 
-                {enrollmentMode === "GROUP_WITH_BRANCHES" ? (
-                    <div>
-                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Group Branch Setup</h2>
-                        <div className="space-y-3">
-                            <div className="flex justify-end">
-                                <button
-                                    type="button"
-                                    className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm"
-                                    onClick={() => setGroupBranches((prev) => [...prev, { name: "", city: "", type: "CONVENTIONAL" }])}
-                                >
-                                    Add Branch
-                                </button>
-                            </div>
-                            {groupBranches.length === 0 ? (
-                                <p className="text-sm text-[var(--text-muted)]">No branches added yet.</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {groupBranches.map((branch, index) => (
-                                        <div key={`branch-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
-                                            <input
-                                                className="ui-input"
-                                                placeholder="Branch name"
-                                                value={branch.name}
-                                                onChange={(e) =>
-                                                    setGroupBranches((prev) =>
-                                                        prev.map((item, idx) => (idx === index ? { ...item, name: e.target.value } : item))
-                                                    )
-                                                }
-                                            />
-                                            <input
-                                                className="ui-input"
-                                                placeholder="City"
-                                                value={branch.city}
-                                                onChange={(e) =>
-                                                    setGroupBranches((prev) =>
-                                                        prev.map((item, idx) => (idx === index ? { ...item, city: e.target.value } : item))
-                                                    )
-                                                }
-                                            />
-                                            <select
-                                                className="ui-select"
-                                                value={branch.type}
-                                                onChange={(e) =>
-                                                    setGroupBranches((prev) =>
-                                                        prev.map((item, idx) =>
-                                                            idx === index ? { ...item, type: e.target.value as "ISLAMIC" | "CONVENTIONAL" } : item
-                                                        )
-                                                    )
-                                                }
-                                            >
-                                                <option value="CONVENTIONAL">Conventional</option>
-                                                <option value="ISLAMIC">Islamic</option>
-                                            </select>
-                                            <button
-                                                type="button"
-                                                className="text-left text-sm text-red-600 hover:underline"
-                                                onClick={() => setGroupBranches((prev) => prev.filter((_, idx) => idx !== index))}
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ) : null}
             </div>
 
             {/* Form Actions */}

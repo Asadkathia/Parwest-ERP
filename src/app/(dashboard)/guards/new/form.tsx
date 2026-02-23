@@ -1,727 +1,603 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { type ReactNode, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react"
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
-import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 
 type Region = {
-    id: string
-    name: string
+  id: string
+  name: string
 }
 
 type RegionalOffice = {
-    id: string
-    name: string
-    region: Region
+  id: string
+  name: string
+  region: Region
 }
 
 type Props = {
-    regions: Region[]
-    regionalOffices: RegionalOffice[]
+  regions: Region[]
+  regionalOffices: RegionalOffice[]
+}
+
+type SectionConfig = {
+  id: string
+  label: string
+}
+
+const SECTION_CONFIG: SectionConfig[] = [
+  { id: "general", label: "GENERAL INFORMATION" },
+  { id: "previousEmployment", label: "PREVIOUS EMPLOYMENT DETAILS" },
+  { id: "address", label: "ADDRESS DETAIL" },
+  { id: "education", label: "EDUCATION" },
+  { id: "introducer", label: "INTRODUCER" },
+  { id: "physical", label: "PHYSICAL DETAILS" },
+  { id: "family", label: "ADD FAMILY MEMBER DETAIL" },
+  { id: "nearestRelative", label: "ADD NEAREST RELATIVE DETAIL" },
+]
+
+const LEGACY_GUARD_TYPES = [
+  "Guard",
+  "location supervisor",
+  "cpo",
+  "SO",
+  "ASO",
+  "LSO",
+  "Receptionist",
+  "CCTV Operator",
+  "Complaint Receiver",
+]
+
+const EDUCATION_LEVELS = ["Primary", "Middle", "Matric", "Intermediate", "Graduate", "B.A", "BSc", "M.A", "Msc"]
+const BLOOD_GROUPS = ["O+ve", "A+ve", "B+ve", "AB+ve", "O-ve", "A-ve", "B-ve", "AB-ve"]
+const MARITAL_STATUSES = ["single", "married", "divorced", "widowed", "separated", "engaged"]
+const PREREQUISITE_ITEMS = [
+  "NADRA Verification",
+  "Health Certificate Verification",
+  "Police Verification",
+  "Eyesight Certificate",
+  "character verification",
+  "mental health check",
+  "3rd gurantor verysis",
+  "Company card & CNIC",
+]
+
+function useSectionChecklist() {
+  const initial = Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
+  initial.general = true
+
+  const [sections, setSections] = useState<Record<string, boolean>>(initial)
+  const allSelected = useMemo(() => Object.values(sections).every(Boolean), [sections])
+
+  const toggle = (id: string) => setSections((prev) => ({ ...prev, [id]: !prev[id] }))
+  const setAll = (value: boolean) => {
+    setSections(Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, value])) as Record<string, boolean>)
+  }
+
+  return { sections, toggle, allSelected, setAll }
 }
 
 export default function GuardEnrollmentForm({ regions, regionalOffices }: Props) {
-    const router = useRouter()
-    const formRef = useRef<HTMLFormElement>(null)
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState("")
+  const router = useRouter()
+  const formRef = useRef<HTMLFormElement>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const { sections, toggle, allSelected, setAll } = useSectionChecklist()
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
+  )
+  const [prerequisites, setPrerequisites] = useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        PREREQUISITE_ITEMS.map((item) => [item.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])
+      ) as Record<string, boolean>
+  )
 
-    const applyOcrFields = (fields: Record<string, string>) => {
-        const form = formRef.current
-        if (!form) return
+  const [familyRows, setFamilyRows] = useState([0])
+  const [nearestRows, setNearestRows] = useState([0])
+  const familyCounterRef = useRef(1)
+  const nearestCounterRef = useRef(1)
 
-        Object.entries(fields).forEach(([name, value]) => {
-            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
-            if (input) input.value = value
-        })
-    }
+  const toggleSectionCollapse = (id: string) => {
+    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setLoading(true)
-        setError("")
+  const toggleChecklistSection = (id: string) => {
+    toggle(id)
+    setCollapsed((prev) => ({ ...prev, [id]: false }))
+  }
 
-        const formData = new FormData(e.currentTarget)
-        const data = Object.fromEntries(formData.entries())
+  const allPrerequisitesSelected = useMemo(
+    () => Object.values(prerequisites).length > 0 && Object.values(prerequisites).every(Boolean),
+    [prerequisites]
+  )
 
-        try {
-            const response = await fetch("/api/guards", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            })
+  const togglePrerequisite = (key: string) => {
+    setPrerequisites((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
-            if (!response.ok) {
-                const error = await response.json()
-                throw new Error(error.message || "Failed to create guard")
-            }
-
-            router.push("/guards")
-            router.refresh()
-        } catch (err: any) {
-            setError(err.message)
-            setLoading(false)
-        }
-    }
-
-    return (
-        <form ref={formRef} onSubmit={handleSubmit} className="ui-card p-6">
-            {error && (
-                <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    {error}
-                </div>
-            )}
-
-            <div>
-                <OcrUploadPanel target="guard" onApply={applyOcrFields} />
-            </div>
-
-            <div className="space-y-8">
-                {/* Basic Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Basic Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Full Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="name"
-                                required
-                                className="ui-input"
-                                placeholder="Enter full name"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                CNIC <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="cnic"
-                                required
-                                pattern="[0-9]{5}-[0-9]{7}-[0-9]{1}"
-                                className="ui-input"
-                                placeholder="12345-1234567-1"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                name="phone"
-                                className="ui-input"
-                                placeholder="03XX-XXXXXXX"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Email
-                            </label>
-                            <input
-                                type="email"
-                                name="email"
-                                className="ui-input"
-                                placeholder="guard@example.com"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Date of Birth
-                            </label>
-                            <input
-                                type="date"
-                                name="dateOfBirth"
-                                className="ui-input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Age
-                            </label>
-                            <input
-                                type="number"
-                                name="age"
-                                min="18"
-                                max="65"
-                                className="ui-input"
-                                placeholder="Age"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Father's Name
-                            </label>
-                            <input
-                                type="text"
-                                name="fatherName"
-                                className="ui-input"
-                                placeholder="Father's name"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Mother's Name
-                            </label>
-                            <input
-                                type="text"
-                                name="motherName"
-                                className="ui-input"
-                                placeholder="Mother's name"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Religion
-                            </label>
-                            <select
-                                name="religion"
-                                className="ui-input"
-                            >
-                                <option value="">Select religion</option>
-                                <option value="Islam">Islam</option>
-                                <option value="Christianity">Christianity</option>
-                                <option value="Hinduism">Hinduism</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Marital Status
-                            </label>
-                            <select
-                                name="maritalStatus"
-                                className="ui-input"
-                            >
-                                <option value="">Select status</option>
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Divorced">Divorced</option>
-                                <option value="Widowed">Widowed</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Education
-                            </label>
-                            <select
-                                name="education"
-                                className="ui-input"
-                            >
-                                <option value="">Select education</option>
-                                <option value="Primary">Primary</option>
-                                <option value="Middle">Middle</option>
-                                <option value="Matric">Matric</option>
-                                <option value="Intermediate">Intermediate</option>
-                                <option value="Graduate">Graduate</option>
-                                <option value="Post-Graduate">Post-Graduate</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Nationality
-                            </label>
-                            <input
-                                type="text"
-                                name="nationality"
-                                className="ui-input"
-                                placeholder="Pakistani"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Next of Kin
-                            </label>
-                            <input
-                                type="text"
-                                name="nextOfKin"
-                                className="ui-input"
-                                placeholder="Next of kin"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                CNIC Issue Date
-                            </label>
-                            <input
-                                type="date"
-                                name="cnicIssueDate"
-                                className="ui-input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                CNIC Expiry Date
-                            </label>
-                            <input
-                                type="date"
-                                name="cnicExpiryDate"
-                                className="ui-input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Guarding Duration
-                            </label>
-                            <input
-                                type="text"
-                                name="guardingDuration"
-                                className="ui-input"
-                                placeholder="e.g., 5 years"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Disability
-                            </label>
-                            <input
-                                type="text"
-                                name="disability"
-                                className="ui-input"
-                                placeholder="None"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Address Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Address Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Permanent Address
-                            </label>
-                            <textarea
-                                name="addressPermanent"
-                                rows={3}
-                                className="ui-input"
-                                placeholder="Enter permanent address"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Current Address
-                            </label>
-                            <textarea
-                                name="addressCurrent"
-                                rows={3}
-                                className="ui-input"
-                                placeholder="Enter current address"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Emergency Contact
-                            </label>
-                            <input
-                                type="text"
-                                name="emergencyContact"
-                                className="ui-input"
-                                placeholder="Emergency contact number"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                District
-                            </label>
-                            <input
-                                type="text"
-                                name="district"
-                                className="ui-input"
-                                placeholder="District"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                City
-                            </label>
-                            <input
-                                type="text"
-                                name="city"
-                                className="ui-input"
-                                placeholder="City"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                State
-                            </label>
-                            <input
-                                type="text"
-                                name="state"
-                                className="ui-input"
-                                placeholder="State"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Postal Code
-                            </label>
-                            <input
-                                type="text"
-                                name="postalCode"
-                                className="ui-input"
-                                placeholder="Postal code"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Country
-                            </label>
-                            <input
-                                type="text"
-                                name="country"
-                                className="ui-input"
-                                placeholder="Country"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Employment Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Employment Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Region
-                            </label>
-                            <select
-                                name="regionId"
-                                className="ui-input"
-                            >
-                                <option value="">Select region</option>
-                                {regions.map((region) => (
-                                    <option key={region.id} value={region.id}>
-                                        {region.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Regional Office
-                            </label>
-                            <select
-                                name="regionalOfficeId"
-                                className="ui-input"
-                            >
-                                <option value="">Select office</option>
-                                {regionalOffices.map((office) => (
-                                    <option key={office.id} value={office.id}>
-                                        {office.name} ({office.region.name})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Joining Date
-                            </label>
-                            <input
-                                type="date"
-                                name="joiningDate"
-                                className="ui-input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Status
-                            </label>
-                            <select
-                                name="status"
-                                defaultValue="PENDING"
-                                className="ui-input"
-                            >
-                                <option value="PENDING">Pending</option>
-                                <option value="ACTIVE">Active</option>
-                                <option value="INACTIVE">Inactive</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Payment Mode
-                            </label>
-                            <select name="paymentMode" defaultValue="BANK" className="ui-input">
-                                <option value="BANK">Bank</option>
-                                <option value="CASH">Cash</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Guard Category
-                            </label>
-                            <select name="guardCategory" defaultValue="REGULAR" className="ui-input">
-                                <option value="MUJAHID">Mujahid</option>
-                                <option value="REGULAR">Regular</option>
-                                <option value="EX_SERVICE">Ex Service</option>
-                                <option value="OTHER">Other</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Ex-Service Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Ex-Service Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="isExService"
-                                    value="true"
-                                    className="h-4 w-4 accent-[var(--brand)]"
-                                />
-                                <span className="text-sm font-medium text-gray-700">Ex-Service Personnel</span>
-                            </label>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Rank
-                            </label>
-                            <input
-                                type="text"
-                                name="exServiceRank"
-                                className="ui-input"
-                                placeholder="e.g., Sepoy, Naik, Havildar"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Regiment
-                            </label>
-                            <input
-                                type="text"
-                                name="exServiceRegiment"
-                                className="ui-input"
-                                placeholder="e.g., Punjab Regiment"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Banking Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Banking Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Bank Name
-                            </label>
-                            <input
-                                type="text"
-                                name="bankName"
-                                className="ui-input"
-                                placeholder="e.g., HBL, MCB, UBL"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Number
-                            </label>
-                            <input
-                                type="text"
-                                name="bankAccountNumber"
-                                className="ui-input"
-                                placeholder="Account number"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Type
-                            </label>
-                            <select
-                                name="bankAccountType"
-                                className="ui-input"
-                            >
-                                <option value="">Select type</option>
-                                <option value="Savings">Savings</option>
-                                <option value="Current">Current</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Title
-                            </label>
-                            <input
-                                type="text"
-                                name="bankAccountTitle"
-                                className="ui-input"
-                                placeholder="Account title"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                IBAN
-                            </label>
-                            <input
-                                type="text"
-                                name="bankIban"
-                                className="ui-input"
-                                placeholder="PK00XXXX0000000000000000"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Status
-                            </label>
-                            <select name="bankAccountStatus" defaultValue="PENDING" className="ui-input">
-                                <option value="PENDING">Pending</option>
-                                <option value="ACTIVE">Active</option>
-                                <option value="INACTIVE">Inactive</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <GuardAccountsEditor />
-                    </div>
-                </div>
-
-                {/* Verification Details */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Verification Details</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[
-                            "NADRA Verification",
-                            "Health Certificate Verification",
-                            "Police Verification",
-                            "Eyesight Certificate",
-                            "Character Verification",
-                            "Mental Health Check",
-                            "Company Card & CNIC",
-                        ].map((item) => (
-                            <label key={item} className="inline-flex items-center gap-2">
-                                <input type="checkbox" name={`verification_${item.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`} value="true" />
-                                <span className="text-sm text-gray-700">{item}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Introducer and Relative Details */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Introducer / Relative Details</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Name</label>
-                            <input type="text" name="introducerName" className="ui-input" placeholder="Introducer name" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Address</label>
-                            <input type="text" name="introducerAddress" className="ui-input" placeholder="Introducer address" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Introducer Relation</label>
-                            <input type="text" name="introducerRelation" className="ui-input" placeholder="Relation" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Relative Name</label>
-                            <input type="text" name="relativeName" className="ui-input" placeholder="Relative name" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Relative CNIC #</label>
-                            <input type="text" name="relativeCnic" className="ui-input" placeholder="12345-1234567-1" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Relative Address</label>
-                            <input type="text" name="relativeAddress" className="ui-input" placeholder="Relative address" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Manager Information */}
-                <div>
-                    <h2 className="text-lg font-semibold mb-4 pb-2 border-b border-[var(--border)]">Office / Regional Manager Info</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Manager Name</label>
-                            <input type="text" name="managerName" className="ui-input" placeholder="Manager name" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Manager Contact #</label>
-                            <input type="text" name="managerContact" className="ui-input" placeholder="03XX-XXXXXXX" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Manager Email</label>
-                            <input type="email" name="managerEmail" className="ui-input" placeholder="manager@example.com" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Name</label>
-                            <input type="text" name="supervisorName" className="ui-input" placeholder="Supervisor name" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Contact #</label>
-                            <input type="text" name="supervisorContact" className="ui-input" placeholder="03XX-XXXXXXX" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor Email</label>
-                            <input type="email" name="supervisorEmail" className="ui-input" placeholder="supervisor@example.com" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Form Actions */}
-            <div className="flex items-center gap-4 mt-8 pt-6 border-t">
-                <Link
-                    href="/guards"
-                    className="ui-btn ui-btn-secondary flex items-center gap-2"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Cancel
-                </Link>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="ui-btn ui-btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Save className="h-4 w-4" />
-                    {loading ? "Saving..." : "Save Guard"}
-                </button>
-            </div>
-        </form>
+  const toggleAllPrerequisites = (value: boolean) => {
+    setPrerequisites((prev) =>
+      Object.fromEntries(Object.keys(prev).map((key) => [key, value])) as Record<string, boolean>
     )
+  }
+
+  const applyOcrFields = (fields: Record<string, string>) => {
+    const form = formRef.current
+    if (!form) return
+
+    Object.entries(fields).forEach(([name, value]) => {
+      const input = form.elements.namedItem(name) as
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLSelectElement
+        | null
+      if (input) input.value = value
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    setSuccess("")
+
+    const formData = new FormData(e.currentTarget)
+    const data = Object.fromEntries(formData.entries())
+    const cnicValue = String(data.cnic || "").trim()
+    const phoneValue = String(data.phone || "").trim()
+    const ageValue = String(data.age || "").trim()
+    const familyAgeValues = Object.entries(data)
+      .filter(([key]) => key.includes("_age"))
+      .map(([, value]) => String(value || "").trim())
+
+    if (cnicValue && !/^\d{5}-\d{7}-\d$/.test(cnicValue)) {
+      setError("CNIC format must be XXXXX-XXXXXXX-X")
+      setLoading(false)
+      return
+    }
+
+    if (phoneValue && !/^\+92-\d{3}-\d{7}$/.test(phoneValue)) {
+      setError("Contact format must be +92-300-1234567")
+      setLoading(false)
+      return
+    }
+
+    if (ageValue && (!Number.isFinite(Number(ageValue)) || Number(ageValue) < 0)) {
+      setError("Please enter a valid age")
+      setLoading(false)
+      return
+    }
+
+    for (const familyAge of familyAgeValues) {
+      if (familyAge && (!Number.isFinite(Number(familyAge)) || Number(familyAge) < 0)) {
+        setError("Please enter a valid age")
+        setLoading(false)
+        return
+      }
+    }
+
+    try {
+      const response = await fetch("/api/guards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const responseError = await response.json().catch(() => ({}))
+        throw new Error(responseError.message || "Failed to create guard")
+      }
+
+      setSuccess("Guard created successfully.")
+      router.push("/guards")
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      {success ? (
+        <div className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          {success}
+        </div>
+      ) : null}
+
+      <div className="ui-card p-6">
+        <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">Pre-Requisites Checklist</h2>
+        <label className="mb-3 inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+          <input
+            type="checkbox"
+            name="select_all_prerequisites"
+            checked={allPrerequisitesSelected}
+            onChange={(e) => toggleAllPrerequisites(e.target.checked)}
+          />
+          <span className="text-sm font-medium">Select All</span>
+        </label>
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {PREREQUISITE_ITEMS.map((item) => {
+            const key = item.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+            return (
+            <label key={item} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+              <input
+                type="checkbox"
+                name={`pre_${key}`}
+                value="true"
+                checked={prerequisites[key] || false}
+                onChange={() => togglePrerequisite(key)}
+              />
+              <span className="text-sm">{item}</span>
+            </label>
+          )})}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => setAll(!allSelected)} className="ui-btn ui-btn-secondary">
+            {allSelected ? "Uncheck All" : "Select All"}
+          </button>
+          <input className="ui-input max-w-xs" name="importCnic" placeholder="Cnic #" />
+          <button type="button" className="ui-btn ui-btn-primary">IMPORT</button>
+        </div>
+      </div>
+
+      <div className="ui-card p-6">
+        <OcrUploadPanel target="guard" onApply={applyOcrFields} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-2">
+        {SECTION_CONFIG.map((section) => (
+          <label key={section.id} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2">
+            <input type="checkbox" checked={sections[section.id]} onChange={() => toggleChecklistSection(section.id)} className="h-4 w-4 accent-[var(--brand)]" />
+            <span className={sections[section.id] ? "text-sm text-[var(--text)] line-through" : "text-sm text-[var(--text)]"}>{section.label}</span>
+          </label>
+        ))}
+      </div>
+
+      {sections.general ? (
+        <CollapsibleSection
+          title="GENERAL INFORMATION"
+          collapsed={collapsed.general}
+          onToggle={() => toggleSectionCollapse("general")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="Parwest ID*" name="parwestId" required />
+            <Field label="PARWEST SHORT NAME" name="parwest_shortname" placeholder="Short Name" />
+            <Field label="FULL NAME *" name="name" required placeholder="Full Name" />
+            <Field label="FATHER'S NAME *" name="fatherName" required placeholder="FATHER'S NAME" />
+            <Field label="MOTHER'S NAME *" name="motherName" required placeholder="MOTHER'S NAME" />
+            <Field label="DATE OF BIRTH *" name="dateOfBirth" type="date" required />
+            <Field label="AGE" name="age" type="number" placeholder="AGE" />
+            <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X) *" name="cnic" required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+            <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
+            <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
+            <Field label="NEXT OF KIN *" name="nextOfKin" required />
+            <Field label="CONTACT # (FORMAT: +92-300-1234567) *" name="phone" required placeholder="Contact # (Format: +92-300-1234567)" />
+            <Field label="PASSPORT #" name="passportNumber" placeholder="PASSPORT #" />
+            <Field label="PASSPORT EXPIRY DATE" name="passportExpiryDate" type="date" />
+            <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
+            <Field label="SECT *" name="sect" placeholder="SECT" />
+            <Field label="CAST *" name="cast" placeholder="CAST" />
+            <SelectField label="DESIGNATION (TYPE)" name="designation" options={LEGACY_GUARD_TYPES} defaultValue="Guard" />
+            <Field label="SALARY *" name="salary" type="number" placeholder="Salary" required />
+            <Field label="POLICE STATION *" name="policeStation" required />
+            <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" />
+            <SelectField label="MARITAL STATUS" name="maritalStatus" options={MARITAL_STATUSES} placeholder="--Select Marital Status--" />
+            <SelectField label="Region" name="regionId" options={regions.map((r) => ({ label: r.name, value: r.id }))} />
+            <SelectField
+              label="Regional Office"
+              name="regionalOfficeId"
+              options={[
+                { label: "head office lahore", value: "legacy-head-office-lahore" },
+                ...regionalOffices.map((office) => ({ label: `${office.name} (${office.region.name})`, value: office.id })),
+              ]}
+            />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.previousEmployment ? (
+        <CollapsibleSection
+          title="PREVIOUS EMPLOYMENT DETAILS"
+          collapsed={collapsed.previousEmployment}
+          onToggle={() => toggleSectionCollapse("previousEmployment")}
+        >
+          <div className="mb-4 flex flex-wrap items-center gap-4">
+            <span className="text-sm font-medium text-[var(--text)]">EX</span>
+            {["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].map((option) => (
+              <label key={option} className="inline-flex items-center gap-2 text-sm">
+                <input type="radio" name="exServiceType" value={option} defaultChecked={option === "ARMY"} className="h-4 w-4 accent-[var(--brand)]" />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="REGISTRATION NO" name="exServiceRegistrationNo" placeholder="Registration No" />
+            <Field label="RANK" name="exServiceRank" placeholder="Rank" />
+            <Field label="UNIT" name="exServiceUnit" placeholder="Unit" />
+            <Field label="SERVICE PERIOD" name="exServicePeriod" placeholder="Select Date of Enrollment & Date of Discharge" />
+            <Field label="YEARS" name="exServiceYears" type="number" placeholder="years" />
+            <Field label="MONTHS" name="exServiceMonths" type="number" placeholder="months" />
+            <Field label="DATE OF ENROLLMENT" name="dateOfEnrollment" type="date" />
+            <Field label="DATE OF DISCHARGE" name="dateOfDischarge" type="date" />
+            <Field label="REMARKS" name="exServiceRemarks" placeholder="Remarks" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.address ? (
+        <CollapsibleSection
+          title="ADDRESS DETAIL"
+          collapsed={collapsed.address}
+          onToggle={() => toggleSectionCollapse("address")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="CURRENT RESIDENTIAL ADDRESS *" name="addressCurrent" required placeholder="Current Residential Address" />
+            <Field label="CURRENT ADDRESS CONTACT NO *" name="currentAddressContact" required placeholder="Current Address Contact No" />
+            <Field label="PERMANENT RESIDENTIAL ADDRESS *" name="addressPermanent" required placeholder="Permanent Residential Address" />
+            <Field label="PERMANENT ADDRESS CONTACT NO *" name="permanentAddressContact" required placeholder="Permanent Address Contact No" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.education ? (
+        <CollapsibleSection
+          title="EDUCATION"
+          collapsed={collapsed.education}
+          onToggle={() => toggleSectionCollapse("education")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <SelectField label="EDUCATION" name="education" options={EDUCATION_LEVELS} placeholder="Choose Education Level" />
+            <Field label="YEAR" name="passingYear" placeholder="Year" />
+            <Field label="NAME OF INSTITUTE" name="educationInstitute" placeholder="Name Of Institute" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.introducer ? (
+        <CollapsibleSection
+          title="INTRODUCER"
+          collapsed={collapsed.introducer}
+          onToggle={() => toggleSectionCollapse("introducer")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="FULL NAME *" name="introducerName" required placeholder="Full Name" />
+            <Field label="INTRODUCER'S CNIC" name="introducerCnic" placeholder="Introducer's CNIC" />
+            <Field label="INTRODUCER'S ADDRESS" name="introducerAddress" placeholder="Introducer's Address" />
+            <Field label="INTRODUCER'S CONTACT" name="introducerContact" placeholder="Introducer's Contact #" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.physical ? (
+        <CollapsibleSection
+          title="PHYSICAL DETAILS"
+          collapsed={collapsed.physical}
+          onToggle={() => toggleSectionCollapse("physical")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="HEIGHT *" name="height" required placeholder="Height" />
+            <Field label="WEIGHT *" name="weight" required placeholder="Weight" />
+            <Field label="EYE COLOR *" name="eyeColor" required placeholder="Eye Color" />
+            <Field label="HAIR COLOR *" name="hairColor" required placeholder="Hair Color" />
+            <Field label="ANY DISABILITY *" name="disability" required placeholder="Any Disability" />
+            <Field label="MARK OF IDENTIFICATION*" name="identificationMark" required placeholder="Mark of Identification" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.family ? (
+        <CollapsibleSection
+          title="ADD FAMILY MEMBER DETAIL"
+          collapsed={collapsed.family}
+          onToggle={() => toggleSectionCollapse("family")}
+          action={(
+            <button
+              type="button"
+              className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                const nextId = familyCounterRef.current++
+                setFamilyRows((prev) => [...prev, nextId])
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          )}
+        >
+          <div className="space-y-6">
+            {familyRows.map((idx, rowIndex) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-[var(--text)]">Family Member #{rowIndex + 1}</p>
+                  {familyRows.length > 1 ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                      onClick={() => setFamilyRows((prev) => prev.filter((id) => id !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Field label="NAME" name={`family_${idx}_name`} placeholder="NAME" />
+                  <Field label="RELATION" name={`family_${idx}_relation`} placeholder="RELATION" />
+                  <Field label="AGE" name={`family_${idx}_age`} placeholder="AGE" />
+                  <Field label="PROFESSION" name={`family_${idx}_profession`} placeholder="PROFESSION" />
+                  <Field label="ADDRESS" name={`family_${idx}_address`} placeholder="ADDRESS" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.nearestRelative ? (
+        <CollapsibleSection
+          title="ADD NEAREST RELATIVE DETAIL"
+          collapsed={collapsed.nearestRelative}
+          onToggle={() => toggleSectionCollapse("nearestRelative")}
+          action={(
+            <button
+              type="button"
+              className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                const nextId = nearestCounterRef.current++
+                setNearestRows((prev) => [...prev, nextId])
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          )}
+        >
+          <div className="space-y-6">
+            {nearestRows.map((idx, rowIndex) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-[var(--text)]">Nearest Relative #{rowIndex + 1}</p>
+                  {nearestRows.length > 1 ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                      onClick={() => setNearestRows((prev) => prev.filter((id) => id !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Field label="NAME" name={`nearest_${idx}_name`} placeholder="NAME" />
+                  <Field label="FATHER NAME" name={`nearest_${idx}_fatherName`} placeholder="FATHER NAME" />
+                  <Field label="RELATION" name={`nearest_${idx}_relation`} placeholder="RELATION" />
+                  <Field label="PROFESSION" name={`nearest_${idx}_profession`} placeholder="PROFESSION" />
+                  <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X)" name={`nearest_${idx}_cnic`} placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+                  <Field label="CNIC ISSUE DATE" name={`nearest_${idx}_cnicIssueDate`} type="date" />
+                  <Field label="CONTACT #" name={`nearest_${idx}_contact`} placeholder="+__-___-_______" />
+                  <Field label="ADDRESS" name={`nearest_${idx}_address`} placeholder="ADDRESS" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      <div className="flex items-center gap-4 pb-4">
+        <Link href="/guards" className="ui-btn ui-btn-secondary flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Cancel
+        </Link>
+        <button type="submit" disabled={loading} className="ui-btn ui-btn-primary flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <Save className="h-4 w-4" />
+          {loading ? "Saving..." : "SUBMIT"}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function CollapsibleSection({
+  title,
+  collapsed,
+  onToggle,
+  children,
+  action,
+}: {
+  title: string
+  collapsed: boolean
+  onToggle: () => void
+  children: ReactNode
+  action?: ReactNode
+}) {
+  return (
+    <div className="ui-card overflow-hidden">
+      <div className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+        <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
+        <div className="inline-flex items-center gap-2">
+          {action}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-muted)] hover:bg-[var(--surface)]"
+            aria-label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+          >
+            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+      {!collapsed ? <div className="p-6">{children}</div> : null}
+    </div>
+  )
+}
+
+function Field({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required,
+}: {
+  label: string
+  name: string
+  type?: string
+  placeholder?: string
+  required?: boolean
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {label} {required ? <span className="text-red-500">*</span> : null}
+      </label>
+      <input type={type} name={name} required={required} className="ui-input" placeholder={placeholder} />
+    </div>
+  )
+}
+
+function SelectField({
+  label,
+  name,
+  options,
+  defaultValue = "",
+  placeholder,
+}: {
+  label: string
+  name: string
+  options: Array<string | { label: string; value: string }>
+  defaultValue?: string
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">{label}</label>
+      <select name={name} defaultValue={defaultValue} className="ui-input">
+        <option value="">{placeholder || `Select ${label.toLowerCase()}`}</option>
+        {options.map((option) => {
+          const value = typeof option === "string" ? option : option.value
+          const labelText = typeof option === "string" ? option : option.label
+          return (
+            <option key={`${name}-${value}`} value={value}>
+              {labelText}
+            </option>
+          )
+        })}
+      </select>
+    </div>
+  )
 }

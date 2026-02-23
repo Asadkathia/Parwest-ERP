@@ -7,6 +7,7 @@ import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
 import EmptyState from "@/components/ui/empty-state"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type ClientTypeRow = { id: string; name: string; addedBy: string }
 type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string }
@@ -35,8 +36,12 @@ const initialLocations: LocationRow[] = [
 export default function ClientTypesLocationsManager() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("All Client Types")
   const [query, setQuery] = useState("")
+  const [entries, setEntries] = useState("10")
   const [inputName, setInputName] = useState("")
   const [inputUniqueKey, setInputUniqueKey] = useState("")
+  const [notice, setNotice] = useState("")
+  const [error, setError] = useState("")
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const [clientTypes, setClientTypes] = useState<ClientTypeRow[]>(initialClientTypes)
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeRow[]>(initialDocumentTypes)
@@ -60,7 +65,11 @@ export default function ClientTypesLocationsManager() {
   }, [locations, query])
 
   const onAdd = () => {
-    if (!inputName.trim()) return
+    if (!inputName.trim()) {
+      setError("Name is required.")
+      return
+    }
+    setError("")
 
     if (activeTab === "All Client Types") {
       setClientTypes((prev) => [{ id: String(prev.length + 1), name: inputName.trim(), addedBy: "ADMIN" }, ...prev])
@@ -83,12 +92,21 @@ export default function ClientTypesLocationsManager() {
 
     setInputName("")
     setInputUniqueKey("")
+    setNotice("Record added.")
   }
 
   const onDelete = (id: string) => {
     if (activeTab === "All Client Types") setClientTypes((prev) => prev.filter((row) => row.id !== id))
     else if (activeTab === "Client's Document Types") setDocumentTypes((prev) => prev.filter((row) => row.id !== id))
     else setLocations((prev) => prev.filter((row) => row.id !== id))
+    setNotice("Record deleted.")
+  }
+
+  const resetInputs = () => {
+    setInputName("")
+    setInputUniqueKey("")
+    setQuery("")
+    setNotice("Filters reset.")
   }
 
   const tabClass = (tab: (typeof TABS)[number]) =>
@@ -125,6 +143,14 @@ export default function ClientTypesLocationsManager() {
             <div />
           )}
           <div>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Show</label>
+            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+              {["10", "25", "50", "100"].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Search</label>
             <input value={query} onChange={(e) => setQuery(e.target.value)} className="ui-input" placeholder="Search rows" />
           </div>
@@ -132,14 +158,17 @@ export default function ClientTypesLocationsManager() {
 
         <div className="flex flex-wrap gap-2">
           <ActionButton onClick={onAdd}>Add</ActionButton>
-          <ActionButton variant="secondary">Update</ActionButton>
-          <ActionButton variant="danger">Delete</ActionButton>
+          <ActionButton variant="secondary" onClick={resetInputs}>Reset</ActionButton>
+          <ActionButton variant="secondary" onClick={() => setNotice("Changes submitted.")}>Submit</ActionButton>
         </div>
       </FilterBar>
 
+      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? <InlineAlert type="success" message={notice} /> : null}
+
       {activeTab === "All Client Types" ? (
         <DataTable
-          rows={filteredClientTypes}
+          rows={filteredClientTypes.slice(0, Number.parseInt(entries, 10) || 10)}
           columns={[
             { key: "id", header: "Serial #", sortable: true },
             { key: "name", header: "Name", sortable: true },
@@ -152,7 +181,7 @@ export default function ClientTypesLocationsManager() {
               key: "action",
               header: "Action",
               render: (row) => (
-                <button className="text-red-600 hover:underline" onClick={() => onDelete(row.id)}>
+                <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
                   Delete
                 </button>
               ),
@@ -164,7 +193,7 @@ export default function ClientTypesLocationsManager() {
         />
       ) : activeTab === "Client's Document Types" ? (
         <DataTable
-          rows={filteredDocumentTypes}
+          rows={filteredDocumentTypes.slice(0, Number.parseInt(entries, 10) || 10)}
           columns={[
             { key: "name", header: "Name", sortable: true },
             { key: "uniqueKey", header: "Unique Key", sortable: true },
@@ -173,7 +202,7 @@ export default function ClientTypesLocationsManager() {
               key: "action",
               header: "Action",
               render: (row) => (
-                <button className="text-red-600 hover:underline" onClick={() => onDelete(row.id)}>
+                <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
                   Delete
                 </button>
               ),
@@ -185,7 +214,7 @@ export default function ClientTypesLocationsManager() {
         />
       ) : filteredLocations.length > 0 ? (
         <DataTable
-          rows={filteredLocations}
+          rows={filteredLocations.slice(0, Number.parseInt(entries, 10) || 10)}
           columns={[
             { key: "locationName", header: "Location Name", sortable: true },
             { key: "createdBy", header: "Created By", sortable: true },
@@ -199,6 +228,43 @@ export default function ClientTypesLocationsManager() {
       ) : (
         <EmptyState title="No locations found" description="Create your first client location from the form above." />
       )}
+
+      {confirmDeleteId ? (
+        <ConfirmDialog
+          title="Delete Record"
+          message="Are you sure you want to delete this record?"
+          onNo={() => setConfirmDeleteId(null)}
+          onYes={() => {
+            onDelete(confirmDeleteId)
+            setConfirmDeleteId(null)
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  onYes,
+  onNo,
+}: {
+  title: string
+  message: string
+  onYes: () => void
+  onNo: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
+        <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
+          <ActionButton onClick={onYes}>Yes</ActionButton>
+        </div>
+      </div>
     </div>
   )
 }

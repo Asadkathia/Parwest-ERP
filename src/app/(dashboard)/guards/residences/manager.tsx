@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import InlineAlert from "@/components/ui/inline-alert"
 
 type Residence = {
     id: string
@@ -11,6 +13,7 @@ type Residence = {
     capacity: number | null
     occupied: number | null
     status: string
+    createdAt?: string
     _count?: { assignments: number }
 }
 
@@ -27,6 +30,8 @@ const defaultForm = {
 
 export default function ResidencesManager() {
     const [query, setQuery] = useState("")
+    const [entries, setEntries] = useState("10")
+    const [selectDate, setSelectDate] = useState("")
     const [rows, setRows] = useState<Residence[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -106,11 +111,24 @@ export default function ResidencesManager() {
         })
     }
 
+    const visibleRows = rows
+        .filter((row) => {
+            if (!query.trim()) return true
+            const q = query.toLowerCase()
+            return row.address.toLowerCase().includes(q) || (row.ownerName || "").toLowerCase().includes(q) || (row.supervisor || "").toLowerCase().includes(q)
+        })
+        .filter((row) => {
+            if (!selectDate) return true
+            if (!row.createdAt) return false
+            return new Date(row.createdAt).toISOString().slice(0, 10) === selectDate
+        })
+        .slice(0, Number.parseInt(entries, 10) || 10)
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Residences</h1>
-                <p className="text-gray-600 mt-1">Manage residence master records and assignments</p>
+                <h1 className="text-3xl font-bold">Add Residence</h1>
+                <p className="text-gray-600 mt-1">Manage residence records and update ownership/supervisor data</p>
             </div>
 
             <form onSubmit={saveResidence} className="bg-white rounded-lg border p-4 space-y-3">
@@ -119,7 +137,7 @@ export default function ResidencesManager() {
                     <input value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Address" required />
                     <input value={form.ownerName} onChange={(e) => setForm((prev) => ({ ...prev, ownerName: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Name" />
                     <input value={form.ownerPhone} onChange={(e) => setForm((prev) => ({ ...prev, ownerPhone: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Phone" />
-                    <input value={form.supervisor} onChange={(e) => setForm((prev) => ({ ...prev, supervisor: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Supervisor" />
+                    <input value={form.supervisor} onChange={(e) => setForm((prev) => ({ ...prev, supervisor: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Select Supervisor" />
                     <input type="number" value={form.capacity} onChange={(e) => setForm((prev) => ({ ...prev, capacity: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Capacity" min={0} />
                     <input type="number" value={form.occupied} onChange={(e) => setForm((prev) => ({ ...prev, occupied: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Occupied" min={0} />
                     <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} className="border rounded-md px-3 py-2">
@@ -127,26 +145,40 @@ export default function ResidencesManager() {
                         <option value="INACTIVE">Inactive</option>
                     </select>
                     <div className="flex gap-2">
-                        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">{form.id ? "Update" : "Create"}</button>
+                        <ActionButton type="submit">{form.id ? "Update" : "Create"}</ActionButton>
                         {form.id && (
-                            <button type="button" onClick={() => setForm(defaultForm)} className="border px-4 py-2 rounded-md hover:bg-gray-50">Cancel</button>
+                            <ActionButton type="button" variant="secondary" onClick={() => setForm(defaultForm)}>Cancel</ActionButton>
                         )}
                     </div>
                 </div>
             </form>
 
-            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-3">
-                    <label className="block text-sm text-gray-600 mb-1">Search</label>
+            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Show</label>
+                    <select value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        {["10", "25", "50", "100"].map((value) => (
+                            <option key={value} value={value}>
+                                {value}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Search:</label>
                     <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Address, owner or supervisor" />
                 </div>
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Select Date</label>
+                    <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                </div>
                 <div className="flex items-end">
-                    <button onClick={loadResidences} className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Search</button>
+                    <ActionButton onClick={loadResidences} className="w-full">Search</ActionButton>
                 </div>
             </div>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
-            {success && <div className="text-sm text-green-600">{success}</div>}
+            {error ? <InlineAlert type="error" message={error} /> : null}
+            {success ? <InlineAlert type="success" message={success} /> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <table className="w-full">
@@ -164,10 +196,10 @@ export default function ResidencesManager() {
                     <tbody className="divide-y">
                         {loading ? (
                             <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
-                        ) : rows.length === 0 ? (
+                        ) : visibleRows.length === 0 ? (
                             <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">No residences found.</td></tr>
                         ) : (
-                            rows.map((row) => (
+                            visibleRows.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{row.address}</td>
                                     <td className="px-6 py-4 text-sm">{row.ownerName || "—"}</td>
@@ -175,7 +207,9 @@ export default function ResidencesManager() {
                                     <td className="px-6 py-4 text-sm">{row.supervisor || "—"}</td>
                                     <td className="px-6 py-4 text-sm">{(row.occupied ?? 0)}/{(row.capacity ?? 0)}</td>
                                     <td className="px-6 py-4 text-sm">{row._count?.assignments ?? 0}</td>
-                                    <td className="px-6 py-4 text-sm"><button onClick={() => editResidence(row)} className="text-blue-600 hover:text-blue-800">Edit</button></td>
+                                    <td className="px-6 py-4 text-sm">
+                                        <ActionButton variant="secondary" onClick={() => editResidence(row)}>Edit</ActionButton>
+                                    </td>
                                 </tr>
                             ))
                         )}
