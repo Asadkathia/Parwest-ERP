@@ -209,7 +209,7 @@ export default function TrainingsManager() {
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
-                        <select value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
+                        <select name="regional_office_id" value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Regional Office--</option>
                             {LEGACY_REGIONAL_OFFICES.map((office) => (
                                 <option key={office} value={office}>{office}</option>
@@ -218,7 +218,7 @@ export default function TrainingsManager() {
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-                        <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-select">
+                        <select name="client_id" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Client--</option>
                             {LEGACY_CLIENTS.map((client) => (
                                 <option key={client} value={client}>{client}</option>
@@ -227,7 +227,7 @@ export default function TrainingsManager() {
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Branch</label>
-                        <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-select">
+                        <select name="branch_id" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Branch--</option>
                             {LEGACY_BRANCHES.map((branch) => (
                                 <option key={branch} value={branch}>{branch}</option>
@@ -246,8 +246,8 @@ export default function TrainingsManager() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Show</label>
-                        <select value={itemsPerPage} onChange={(e) => setItemsPerPage(e.target.value)} className="ui-select">
+                        <label className="block text-sm text-gray-600 mb-1">Items per page:</label>
+                        <select name="Items per page:" value={itemsPerPage} onChange={(e) => setItemsPerPage(e.target.value)} className="ui-select">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -255,8 +255,8 @@ export default function TrainingsManager() {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Search:</label>
-                        <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="ui-input" placeholder="Guard / ID / type / remarks" />
+                        <label className="block text-sm text-gray-600 mb-1">Search by client, branch, guard, supervisor...</label>
+                        <input name="Search by client, branch, guard, supervisor..." value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="ui-input" placeholder="Guard / ID / type / remarks" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Armorer</label>
@@ -264,6 +264,16 @@ export default function TrainingsManager() {
                             <option value="Yes">Yes</option>
                             <option value="No">No</option>
                         </select>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                            <label className="inline-flex items-center gap-1">
+                                <input name="Yes" type="radio" checked={armorer === "Yes"} onChange={() => setArmorer("Yes")} />
+                                Yes
+                            </label>
+                            <label className="inline-flex items-center gap-1">
+                                <input name="No" type="radio" checked={armorer === "No"} onChange={() => setArmorer("No")} />
+                                No
+                            </label>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Supervisor Has Uniform</label>
@@ -271,6 +281,16 @@ export default function TrainingsManager() {
                             <option value="Yes">Yes</option>
                             <option value="No">No</option>
                         </select>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                            <label className="inline-flex items-center gap-1">
+                                <input name="supervisor_uniform_yes" type="radio" checked={supervisorUniform === "Yes"} onChange={() => setSupervisorUniform("Yes")} />
+                                Yes
+                            </label>
+                            <label className="inline-flex items-center gap-1">
+                                <input name="supervisor_uniform_no" type="radio" checked={supervisorUniform === "No"} onChange={() => setSupervisorUniform("No")} />
+                                No
+                            </label>
+                        </div>
                     </div>
                 </div>
 

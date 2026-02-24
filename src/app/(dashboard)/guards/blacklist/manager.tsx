@@ -133,7 +133,7 @@ export default function BlacklistManager() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
                         <label className="block text-sm text-gray-600 mb-1">Search by CNIC number...</label>
-                        <input value={cnicQuery} onChange={(e) => setCnicQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Cnic #" />
+                        <input name="Cnic #" value={cnicQuery} onChange={(e) => setCnicQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Cnic #" />
                     </div>
                     <div className="flex items-end">
                         <ActionButton onClick={loadBlacklisted} className="w-full">Search</ActionButton>
@@ -143,7 +143,7 @@ export default function BlacklistManager() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
                         <label className="block text-sm text-gray-600 mb-1">Add Active Guard to Blacklist</label>
-                        <select value={selectedGuardId} onChange={(e) => setSelectedGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        <select name="selected_guard_id" value={selectedGuardId} onChange={(e) => setSelectedGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2">
                             <option value="">--Select Guard--</option>
                             {activeGuards.map((guard) => (
                                 <option key={guard.id} value={guard.id}>{guard.parwestId} - {guard.name} ({guard.cnic})</option>
@@ -163,7 +163,7 @@ export default function BlacklistManager() {
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
                     <div>
                         <label className="mb-1 block text-xs text-gray-600">Show</label>
-                        <select value={rowCountSelect} onChange={(e) => setRowCountSelect(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
+                        <select name="rowCountSelect" value={rowCountSelect} onChange={(e) => setRowCountSelect(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
                             {["10 rows", "25 rows", "50 rows", "100 rows"].map((opt) => (
                                 <option key={opt} value={opt}>
                                     {opt}
@@ -174,11 +174,11 @@ export default function BlacklistManager() {
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Search:</label>
-                            <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <input name="Search:" value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
                         </div>
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Select Date</label>
-                            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
                         </div>
                     </div>
                 </div>

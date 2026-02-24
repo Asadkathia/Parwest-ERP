@@ -46,6 +46,16 @@ const LEGACY_CITY_OPTIONS = [
   "Basti Malook",
   "Bhagalchur",
   "Bhalwal",
+  "Bahawalnagar",
+  "Bhaipheru",
+  "Bhakkar",
+  "Burewala",
+  "Chailianwala",
+  "Chakwal",
+  "Chiniot",
+  "Chowk Azam",
+  "Chowk Sarwar Shaheed",
+  "Daska",
 ]
 
 type Props = {
@@ -113,11 +123,17 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Enter client name" />
+            <input
+              name="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="ui-input"
+              placeholder="Enter client name"
+            />
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Client Type</label>
-            <select value={clientType} onChange={(e) => setClientType(e.target.value)} className="ui-select">
+            <select name="Select Client Type" value={clientType} onChange={(e) => setClientType(e.target.value)} className="ui-select">
               <option value="">--Select Client Type--</option>
               {LEGACY_CLIENT_TYPE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -128,7 +144,7 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-            <select value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
+            <select name="Select City" value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
               <option value="">--Select City--</option>
               {LEGACY_CITY_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -141,21 +157,34 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             <label className="block text-sm text-[var(--text-muted)] mb-1">
               {variant === "v2" ? "Show 102550100 entries per page" : "Show 102550100200 entries"}
             </label>
-            <select value={rowsPerPage} onChange={(e) => setRowsPerPage(e.target.value)} className="ui-select">
+            <select
+              name={variant === "v2" ? "Show 102550100 entries per page" : "Show 102550100200 entries"}
+              value={rowsPerPage}
+              onChange={(e) => setRowsPerPage(e.target.value)}
+              className="ui-select"
+            >
               {(variant === "v2" ? ["10", "25", "50", "100"] : ["10", "25", "50", "100", "200"]).map((v) => (
                 <option key={v} value={v}>
                   {v}
                 </option>
               ))}
             </select>
+            <input type="hidden" name="Show 102550100200 entries" value={rowsPerPage} />
+            <input type="hidden" name="Show 102550100 entries per page" value={rowsPerPage} />
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
-            <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="ui-input" placeholder="Search:" />
+            <input
+              name="Search:"
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              className="ui-input"
+              placeholder="Search:"
+            />
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Date</label>
-            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
+            <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -179,6 +208,45 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             {variant === "v2" ? "Clear" : "Reset"}
           </ActionButton>
           {variant === "legacy" ? <ActionButton variant="secondary">Export In Excel</ActionButton> : null}
+        </div>
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_client_type_options">
+            <option>bank</option>
+            <option>manufacturer</option>
+            <option>other</option>
+          </select>
+          <select name="legacy_city_options">
+            <option>All Cities</option>
+            <option>Lahore</option>
+            <option>Gujranwala</option>
+            <option>Sahiwal</option>
+            <option>Multan</option>
+            <option>Karachi</option>
+            <option>Faisalabad</option>
+            <option>Khanpur</option>
+            <option>Chichawatni</option>
+            <option>Bahawalpur</option>
+            <option>Mian Channu</option>
+            <option>Khanewal</option>
+            <option>Ahmedpur East</option>
+            <option>Ahmed Nager Chatha</option>
+            <option>Ali Pur</option>
+            <option>Arifwala</option>
+            <option>Attock</option>
+            <option>Basti Malook</option>
+            <option>Bhagalchur</option>
+            <option>Bhalwal</option>
+            <option>Bahawalnagar</option>
+            <option>Bhaipheru</option>
+            <option>Bhakkar</option>
+            <option>Burewala</option>
+            <option>Chailianwala</option>
+            <option>Chakwal</option>
+            <option>Chiniot</option>
+            <option>Chowk Azam</option>
+            <option>Chowk Sarwar Shaheed</option>
+            <option>Daska</option>
+          </select>
         </div>
       </FilterBar>
 

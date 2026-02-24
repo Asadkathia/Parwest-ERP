@@ -135,11 +135,11 @@ export default function AssignResidenceForm() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Supervisor</label>
-                        <input value={supervisor} onChange={(e) => setSupervisor(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Supervisor name" />
+                        <input name="supervisor_id_on_user_profile" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Supervisor name" />
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Residences</label>
-                        <select value={residenceId} onChange={(e) => setResidenceId(e.target.value)} className="w-full border rounded-md px-3 py-2" required>
+                        <select name="residence_id" value={residenceId} onChange={(e) => setResidenceId(e.target.value)} className="w-full border rounded-md px-3 py-2" required>
                             <option value="">Nothing selected</option>
                             {residences.map((residence) => (
                                 <option key={residence.id} value={residence.id}>{residence.address}</option>
@@ -148,7 +148,7 @@ export default function AssignResidenceForm() {
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Guard</label>
-                        <select value={guardId} onChange={(e) => setGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2" required>
+                        <select name="guard_id" value={guardId} onChange={(e) => setGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2" required>
                             <option value="">--Select Guard--</option>
                             {guards.map((guard) => (
                                 <option key={guard.id} value={guard.id}>{guard.parwestId} - {guard.name}</option>

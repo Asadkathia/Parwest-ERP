@@ -61,6 +61,70 @@ async function listFiles(dir) {
   return out
 }
 
+async function fileExists(p) {
+  try {
+    await fs.access(p)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function resolveImport(fromFile, importPath) {
+  if (!importPath || (!importPath.startsWith('@/') && !importPath.startsWith('.'))) return null
+
+  const base = importPath.startsWith('@/')
+    ? path.join('src', importPath.slice(2))
+    : path.resolve(path.dirname(fromFile), importPath)
+
+  const candidates = [
+    `${base}.tsx`,
+    `${base}.ts`,
+    `${base}.jsx`,
+    `${base}.js`,
+    path.join(base, 'index.tsx'),
+    path.join(base, 'index.ts'),
+    path.join(base, 'index.jsx'),
+    path.join(base, 'index.js'),
+  ]
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) return candidate
+  }
+  return null
+}
+
+async function collectImportedSources(entryFiles) {
+  const visited = new Set()
+  const queue = [...entryFiles]
+  const out = new Set()
+
+  while (queue.length) {
+    const file = queue.pop()
+    if (!file || visited.has(file)) continue
+    visited.add(file)
+
+    let src = ''
+    try {
+      src = await fs.readFile(file, 'utf8')
+    } catch {
+      continue
+    }
+    out.add(file)
+
+    const importRegex = /import\s+[\s\S]*?\s+from\s+["'`]([^"'`]+)["'`]/g
+    let match
+    while ((match = importRegex.exec(src)) !== null) {
+      const resolved = await resolveImport(file, match[1])
+      if (!resolved) continue
+      if (!resolved.startsWith(path.join('src', 'components')) && !resolved.startsWith(path.join('src', 'app'))) continue
+      if (!visited.has(resolved)) queue.push(resolved)
+    }
+  }
+
+  return [...out]
+}
+
 function extractCurrentLabelsOptions(source) {
   const labels = []
   const selectOptions = []
@@ -70,6 +134,8 @@ function extractCurrentLabelsOptions(source) {
     /<label[^>]*>([\s\S]*?)<\/label>/g,
     /placeholder\s*=\s*["'`]([^"'`]{1,180})["'`]/g,
     /placeholder\s*:\s*["'`]([^"'`]{1,180})["'`]/g,
+    /name\s*=\s*["'`]([^"'`]{1,180})["'`]/g,
+    /id\s*=\s*["'`]([^"'`]{1,180})["'`]/g,
   ]
 
   for (const re of regexes) {
@@ -105,7 +171,8 @@ function extractCurrentLabelsOptions(source) {
 
 async function getCurrentForRoute(route) {
   const dir = path.join('src', 'app', '(dashboard)', route)
-  const files = await listFiles(dir)
+  const routeFiles = await listFiles(dir)
+  const files = await collectImportedSources(routeFiles)
   const allLabels = []
   const allOptions = []
 

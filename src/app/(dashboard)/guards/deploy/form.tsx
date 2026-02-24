@@ -269,7 +269,7 @@ export default function DeployGuardForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Region <span className="text-red-500">*</span></label>
-              <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)} required className="ui-select">
+              <select name="region_id_on_user_profile" value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)} required className="ui-select">
                 <option value="">--Select Region--</option>
                 {regions.map((region) => (
                   <option key={region.id} value={region.id}>
@@ -281,7 +281,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Regional Office</label>
-              <select value={selectedRegionalOffice} onChange={(e) => setSelectedRegionalOffice(e.target.value)} required className="ui-select">
+              <select name="regional_office_id" value={selectedRegionalOffice} onChange={(e) => setSelectedRegionalOffice(e.target.value)} required className="ui-select">
                 <option value="">Nothing selected</option>
                 {regionalOffices
                   .filter((ro) => !selectedRegion || ro.regionId === selectedRegion)
@@ -295,7 +295,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Select Client <span className="text-red-500">*</span></label>
-              <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} required className="ui-select">
+              <select name="client_id_on_user_profile" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} required className="ui-select">
                 <option value="">--Select Client--</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
@@ -307,7 +307,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Branch</label>
-              <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} disabled={!selectedClient} className="ui-select disabled:bg-slate-100">
+              <select name="branch_id_on_user_profile" value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} disabled={!selectedClient} className="ui-select disabled:bg-slate-100">
                 <option value="">Nothing selected</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -319,7 +319,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deploy as</label>
-              <select value={designation} onChange={(e) => setDesignation(e.target.value)} required className="ui-select">
+              <select name="deploy_as" value={designation} onChange={(e) => setDesignation(e.target.value)} required className="ui-select">
                 <option value="">--Select Deployment Type--</option>
                 <option value="Guard">Guard</option>
                 <option value="location supervisor">location supervisor</option>
@@ -335,7 +335,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard's Type</label>
-              <select value={guardType} onChange={(e) => setGuardType(e.target.value)} required className="ui-select">
+              <select name="guard_type" value={guardType} onChange={(e) => setGuardType(e.target.value)} required className="ui-select">
                 <option value="">Type</option>
                 <option value="Guard">Guard</option>
                 <option value="Ex-Service">Ex-Service</option>
@@ -352,7 +352,7 @@ export default function DeployGuardForm() {
 
           <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Select Guard</label>
-            <select value={selectedGuard} onChange={(e) => setSelectedGuard(e.target.value)} required disabled={!selectedRegion} className="ui-select disabled:bg-slate-100">
+            <select name="guard_id" value={selectedGuard} onChange={(e) => setSelectedGuard(e.target.value)} required disabled={!selectedRegion} className="ui-select disabled:bg-slate-100">
               <option value="">--Select Guard--</option>
               {guards.map((guard) => (
                 <option key={guard.id} value={guard.id}>
@@ -378,6 +378,14 @@ export default function DeployGuardForm() {
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard's Type</label>
                   <input value={guardType || "Type"} readOnly className="ui-input bg-slate-50" />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Supervisor Name</label>
+                  <input name="Supervisor Name" value="—" readOnly className="ui-input bg-slate-50" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Manager Name</label>
+                  <input name="Manager Name" value="—" readOnly className="ui-input bg-slate-50" />
+                </div>
               </div>
             </div>
           ) : null}
@@ -392,19 +400,19 @@ export default function DeployGuardForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Salary</label>
-              <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="Guards salary" className="ui-input" />
+              <input name="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="Guards salary" className="ui-input" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Overtime</label>
-              <input type="number" value={overtime} onChange={(e) => setOvertime(e.target.value)} placeholder="Guards Overtime Pay" className="ui-input" />
+              <input name="overtime" type="number" value={overtime} onChange={(e) => setOvertime(e.target.value)} placeholder="Guards Overtime Pay" className="ui-input" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Extra Hours</label>
-              <input type="number" value={extraHours} onChange={(e) => setExtraHours(e.target.value)} placeholder="Extra hours salary" className="ui-input" />
+              <input name="extra_hours" type="number" value={extraHours} onChange={(e) => setExtraHours(e.target.value)} placeholder="Extra hours salary" className="ui-input" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Post Allowance</label>
-              <input type="number" value={postAllowance} onChange={(e) => setPostAllowance(e.target.value)} placeholder="Guards post allowance" className="ui-input" />
+              <input name="post_allowance" type="number" value={postAllowance} onChange={(e) => setPostAllowance(e.target.value)} placeholder="Guards post allowance" className="ui-input" />
             </div>
           </div>
         </section>
@@ -420,33 +428,33 @@ export default function DeployGuardForm() {
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Shift</label>
               <div className="flex gap-4 text-sm mt-2">
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" checked={shiftType === "DAY"} onChange={() => setShiftType("DAY")} className="h-4 w-4 accent-[var(--brand)]" />
+                  <input name="shift" type="radio" checked={shiftType === "DAY"} onChange={() => setShiftType("DAY")} className="h-4 w-4 accent-[var(--brand)]" />
                   <span>Day</span>
                 </label>
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" checked={shiftType === "NIGHT"} onChange={() => setShiftType("NIGHT")} className="h-4 w-4 accent-[var(--brand)]" />
+                  <input name="shift" type="radio" checked={shiftType === "NIGHT"} onChange={() => setShiftType("NIGHT")} className="h-4 w-4 accent-[var(--brand)]" />
                   <span>Night</span>
                 </label>
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" checked={shiftType === "BOTH"} onChange={() => setShiftType("BOTH")} className="h-4 w-4 accent-[var(--brand)]" />
+                  <input name="shift" type="radio" checked={shiftType === "BOTH"} onChange={() => setShiftType("BOTH")} className="h-4 w-4 accent-[var(--brand)]" />
                   <span>Both</span>
                 </label>
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Date</label>
-              <input type="date" value={deploymentDate} onChange={(e) => setDeploymentDate(e.target.value)} required className="ui-input" />
+              <input name="deployment_date" type="date" value={deploymentDate} onChange={(e) => setDeploymentDate(e.target.value)} required className="ui-input" />
             </div>
 
             {(shiftType === "DAY" || shiftType === "BOTH") ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Day Shift Start</label>
-                  <input type="time" value={dayShiftStart} onChange={(e) => setDayShiftStart(e.target.value)} className="ui-input" />
+                  <input name="day_shift_start" type="time" value={dayShiftStart} onChange={(e) => setDayShiftStart(e.target.value)} className="ui-input" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Day Shift End</label>
-                  <input type="time" value={dayShiftEnd} onChange={(e) => setDayShiftEnd(e.target.value)} className="ui-input" />
+                  <input name="day_shift_end" type="time" value={dayShiftEnd} onChange={(e) => setDayShiftEnd(e.target.value)} className="ui-input" />
                 </div>
               </>
             ) : null}
@@ -455,18 +463,18 @@ export default function DeployGuardForm() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Night Shift Start</label>
-                  <input type="time" value={nightShiftStart} onChange={(e) => setNightShiftStart(e.target.value)} className="ui-input" />
+                  <input name="night_shift_start" type="time" value={nightShiftStart} onChange={(e) => setNightShiftStart(e.target.value)} className="ui-input" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Night Shift End</label>
-                  <input type="time" value={nightShiftEnd} onChange={(e) => setNightShiftEnd(e.target.value)} className="ui-input" />
+                  <input name="night_shift_end" type="time" value={nightShiftEnd} onChange={(e) => setNightShiftEnd(e.target.value)} className="ui-input" />
                 </div>
               </>
             ) : null}
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment</label>
-              <select value={deploymentType} onChange={(e) => setDeploymentType(e.target.value)} className="ui-select">
+              <select name="deployment_type" value={deploymentType} onChange={(e) => setDeploymentType(e.target.value)} className="ui-select">
                 <option value="REGULAR">Regular</option>
                 <option value="OVERTIME">Overtime</option>
               </select>
@@ -474,6 +482,7 @@ export default function DeployGuardForm() {
             <div className="flex items-end">
               <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
                 <input
+                  name="isExtra"
                   type="checkbox"
                   checked={isExtraGuard}
                   onChange={(e) => setIsExtraGuard(e.target.checked)}
@@ -487,6 +496,7 @@ export default function DeployGuardForm() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Comment <span className="text-red-500">*</span></label>
                 <textarea
+                  name="Add Comment"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   required={isExtraGuard}
@@ -499,7 +509,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard Deployment Status*</label>
-              <select value={guardDeploymentStatus} onChange={(e) => setGuardDeploymentStatus(e.target.value)} className="ui-select">
+              <select name="Select Action:" value={guardDeploymentStatus} onChange={(e) => setGuardDeploymentStatus(e.target.value)} className="ui-select">
                 <option value="">Select Status</option>
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="PENDING">PENDING</option>
@@ -514,6 +524,7 @@ export default function DeployGuardForm() {
           <ActionButton type="button" variant="secondary" onClick={() => router.back()}>Cancel</ActionButton>
           <ActionButton type="button" variant="secondary">Revoke Deployment</ActionButton>
           <ActionButton type="button" variant="secondary">Change Deployment</ActionButton>
+          <input type="checkbox" name="check" className="h-4 w-4 self-center accent-[var(--brand)]" />
         </div>
       </form>
     </div>

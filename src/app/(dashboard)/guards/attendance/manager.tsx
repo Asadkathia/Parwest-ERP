@@ -233,9 +233,9 @@ export default function GuardAttendanceManager() {
             </div>
 
             <div className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div><label className="block text-sm text-gray-600 mb-1">Secure Ops ID*</label><input value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Secure Ops ID" /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">Start Date*</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Secure Ops ID*</label><input name="Secure Ops ID*" value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Secure Ops ID" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Strat Date*</label><input name="Strat Date*" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input name="End Date*" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                 <div className="flex items-end"><ActionButton onClick={loadAttendance} className="w-full">Submit</ActionButton></div>
             </div>
 

@@ -61,8 +61,19 @@ function normalizeDesignation(value: string | null | undefined) {
   return value
 }
 
+function toIsoDate(value: Date | null | undefined) {
+  if (!value) return ""
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 function startsWithLabel(value: string, prefix: string) {
   return value.toLowerCase().includes(prefix.toLowerCase())
+}
+
+function toSafeNumber(value: string | undefined, fallback: number) {
+  const n = Number.parseInt(value || "", 10)
+  if (Number.isNaN(n) || n <= 0) return fallback
+  return n
 }
 
 export default async function ClientDetailPage({
@@ -70,14 +81,35 @@ export default async function ClientDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{
+    tab?: string
+    search?: string
+    show?: string
+    selectDate?: string
+    branch?: string
+    startDate?: string
+    endDate?: string
+    supervisor?: string
+    manager?: string
+  }>
 }) {
   const session = await auth()
   if (!session) redirect("/login")
 
   const { id } = await params
-  const { tab: tabParam } = await searchParams
+  const {
+    tab: tabParam,
+    search: listSearch = "",
+    show = "10",
+    selectDate = "",
+    branch = "",
+    startDate = "",
+    endDate = "",
+    supervisor = "",
+    manager = "",
+  } = await searchParams
   const activeTab: TabKey = isTab(tabParam) ? tabParam : "general-information"
+  const showCount = toSafeNumber(show, 10)
 
   const client = await prisma.client.findUnique({
     where: { id },
@@ -114,6 +146,64 @@ export default async function ClientDetailPage({
 
   const activeDeploymentRows = allDeployments.filter((row) => row.deployment.status === "ACTIVE")
   const extraDeploymentRows = activeDeploymentRows.filter((row) => row.deployment.isExtraGuard)
+
+  const normalizedSearch = listSearch.trim().toLowerCase()
+  const normalizedBranch = branch.trim().toLowerCase()
+  const normalizedSupervisor = supervisor.trim().toLowerCase()
+  const normalizedManager = manager.trim().toLowerCase()
+
+  const filteredAssignedRows = activeDeploymentRows
+    .filter(({ deployment, branch: deploymentBranch }) => {
+      const guardName = deployment.guard?.name?.toLowerCase() || ""
+      const guardParwest = deployment.guard?.parwestId?.toLowerCase() || ""
+      const branchName = deploymentBranch.name?.toLowerCase() || ""
+      const branchContact = deploymentBranch.contactPerson?.toLowerCase() || ""
+      const branchManagerValue = deploymentBranch.contactPerson?.toLowerCase() || ""
+
+      if (normalizedSearch && !guardName.includes(normalizedSearch) && !guardParwest.includes(normalizedSearch) && !branchName.includes(normalizedSearch)) return false
+      if (normalizedBranch && !branchName.includes(normalizedBranch)) return false
+      if (normalizedSupervisor && !branchContact.includes(normalizedSupervisor) && !guardName.includes(normalizedSupervisor)) return false
+      if (normalizedManager && !branchManagerValue.includes(normalizedManager)) return false
+      if (selectDate && toIsoDate(deployment.deploymentDate) !== selectDate) return false
+      return true
+    })
+    .slice(0, showCount)
+
+  const filteredExtraRows = extraDeploymentRows
+    .filter(({ deployment, branch: deploymentBranch }) => {
+      const guardName = deployment.guard?.name?.toLowerCase() || ""
+      const branchName = deploymentBranch.name?.toLowerCase() || ""
+      if (normalizedSearch && !guardName.includes(normalizedSearch) && !branchName.includes(normalizedSearch)) return false
+      if (normalizedBranch && !branchName.includes(normalizedBranch)) return false
+      if (startDate && !deployment.deploymentDate) return false
+      if (endDate && !deployment.deploymentDate) return false
+      if (selectDate && toIsoDate(deployment.deploymentDate) !== selectDate) return false
+      return true
+    })
+    .slice(0, showCount)
+
+  const filteredBranches = client.branches
+    .filter((branchRow) => {
+      const name = branchRow.name?.toLowerCase() || ""
+      const city = branchRow.city?.toLowerCase() || ""
+      const address = branchRow.address?.toLowerCase() || ""
+      const contact = branchRow.contactPerson?.toLowerCase() || ""
+
+      if (normalizedSearch && !name.includes(normalizedSearch) && !city.includes(normalizedSearch) && !address.includes(normalizedSearch) && !contact.includes(normalizedSearch)) return false
+      if (selectDate && toIsoDate(branchRow.updatedAt) !== selectDate) return false
+      return true
+    })
+    .slice(0, showCount)
+
+  const filteredPricingConfigs = client.pricingConfigs
+    .filter((pricingRow) => {
+      const type = pricingRow.guardType?.toLowerCase() || ""
+      const rate = String(pricingRow.rate)
+      if (normalizedSearch && !type.includes(normalizedSearch) && !rate.includes(normalizedSearch)) return false
+      if (selectDate && toIsoDate(pricingRow.updatedAt) !== selectDate) return false
+      return true
+    })
+    .slice(0, showCount)
 
   const uniqueDayGuardIds = new Set(
     activeDeploymentRows
@@ -255,8 +345,16 @@ export default async function ClientDetailPage({
           <CardHeader>
             <h2 className="text-base font-semibold text-[var(--text)]">ASSIGNED GUARDS</h2>
           </CardHeader>
-          <CardBody>
-            {activeDeploymentRows.length === 0 ? (
+          <CardBody className="space-y-4">
+            <LegacyFilterForm clientId={client.id} tab="assigned-guards">
+              <FilterField label="Select Supervisor" name="supervisor" defaultValue={supervisor} />
+              <FilterField label="Select Manager" name="manager" defaultValue={manager} />
+              <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
+              <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
+              <FilterField label="Search:" name="search" defaultValue={listSearch} />
+            </LegacyFilterForm>
+
+            {filteredAssignedRows.length === 0 ? (
               <EmptyTableMessage message="No assigned guards found." />
             ) : (
               <TableWrapper>
@@ -271,7 +369,7 @@ export default async function ClientDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {activeDeploymentRows.map(({ deployment, branch }) => (
+                  {filteredAssignedRows.map(({ deployment, branch }) => (
                     <tr key={deployment.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
                       <Td>{deployment.guard?.parwestId || "—"}</Td>
                       <Td>{deployment.guard?.name || "—"}</Td>
@@ -293,8 +391,16 @@ export default async function ClientDetailPage({
           <CardHeader>
             <h2 className="text-base font-semibold text-[var(--text)]">EXTRA GUARDS</h2>
           </CardHeader>
-          <CardBody>
-            {extraDeploymentRows.length === 0 ? (
+          <CardBody className="space-y-4">
+            <LegacyFilterForm clientId={client.id} tab="extra-guards">
+              <FilterField label="Branch*" name="branch" defaultValue={branch} />
+              <FilterField label="Start Date" name="startDate" type="date" defaultValue={startDate} />
+              <FilterField label="End Date" name="endDate" type="date" defaultValue={endDate} />
+              <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100", "200"]} />
+              <FilterField label="Search:" name="search" defaultValue={listSearch} />
+            </LegacyFilterForm>
+
+            {filteredExtraRows.length === 0 ? (
               <EmptyTableMessage message="No extra guard deployment records found." />
             ) : (
               <TableWrapper>
@@ -308,7 +414,7 @@ export default async function ClientDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {extraDeploymentRows.map(({ deployment, branch }) => (
+                  {filteredExtraRows.map(({ deployment, branch }) => (
                     <tr key={deployment.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
                       <Td>{deployment.guard?.parwestId || "—"}</Td>
                       <Td>{deployment.guard?.name || "—"}</Td>
@@ -333,8 +439,14 @@ export default async function ClientDetailPage({
               Add Branch
             </Link>
           </CardHeader>
-          <CardBody>
-            {client.branches.length === 0 ? (
+          <CardBody className="space-y-4">
+            <LegacyFilterForm clientId={client.id} tab="branches">
+              <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
+              <FilterField label="Search:" name="search" defaultValue={listSearch} />
+              <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
+            </LegacyFilterForm>
+
+            {filteredBranches.length === 0 ? (
               <EmptyTableMessage message="No branches found for this client." />
             ) : (
               <TableWrapper>
@@ -348,7 +460,7 @@ export default async function ClientDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {client.branches.map((branch) => (
+                  {filteredBranches.map((branch) => (
                     <tr key={branch.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
                       <Td>
                         <Link href={`/clients/branches/${branch.id}`} className="text-[var(--brand)] hover:underline">
@@ -374,8 +486,14 @@ export default async function ClientDetailPage({
             <h2 className="text-base font-semibold text-[var(--text)]">PRICING</h2>
             <Link href="/clients/pricing" className="ui-btn ui-btn-secondary">Open Pricing Module</Link>
           </CardHeader>
-          <CardBody>
-            {client.pricingConfigs.length === 0 ? (
+          <CardBody className="space-y-4">
+            <LegacyFilterForm clientId={client.id} tab="pricing">
+              <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
+              <FilterField label="Search:" name="search" defaultValue={listSearch} />
+              <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
+            </LegacyFilterForm>
+
+            {filteredPricingConfigs.length === 0 ? (
               <EmptyTableMessage message="No pricing profiles configured." />
             ) : (
               <TableWrapper>
@@ -387,7 +505,7 @@ export default async function ClientDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {client.pricingConfigs.map((config) => (
+                  {filteredPricingConfigs.map((config) => (
                     <tr key={config.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
                       <Td>{config.guardType}</Td>
                       <Td>{config.rate.toLocaleString()}</Td>
@@ -492,6 +610,23 @@ export default async function ClientDetailPage({
               <FieldDisplay label="Client Cities" value={client.city || "Lahore"} />
               <FieldDisplay label="Guard Types" value="Guard" />
               <FieldDisplay label="Invoice Month *" value={new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" })} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FieldDisplay label="Effective Rate" value="35,000" />
+              <FieldDisplay label="Guard Ex-Services" value="Other" />
+              <FieldDisplay label="Extra Hours Rate / Hour" value="500" />
+              <FieldDisplay label="Criteria" value="Branch-wise" />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="ui-btn ui-btn-secondary">Reset</button>
+              <button type="button" className="ui-btn ui-btn-secondary">Submit</button>
+              <button type="button" className="ui-btn ui-btn-secondary">Export In Excel File</button>
+              <button type="button" className="ui-btn ui-btn-secondary">Dismiss</button>
+              <button type="button" className="ui-btn ui-btn-primary">Save</button>
+              <button type="button" className="ui-btn ui-btn-secondary">Close</button>
+              <button type="button" className="ui-btn ui-btn-primary">Generate Invoice</button>
             </div>
 
             {client.invoices.length === 0 ? (
@@ -640,4 +775,59 @@ function Th({ children }: { children: ReactNode }) {
 
 function Td({ children }: { children: ReactNode }) {
   return <td className="px-4 py-3 text-sm text-[var(--text)]">{children}</td>
+}
+
+function LegacyFilterForm({
+  clientId,
+  tab,
+  children,
+}: {
+  clientId: string
+  tab: TabKey
+  children: ReactNode
+}) {
+  return (
+    <form className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+      <input type="hidden" name="tab" value={tab} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">{children}</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="submit" formAction={`/clients/${clientId}`} className="ui-btn ui-btn-primary">Search</button>
+        <Link href={`/clients/${clientId}?tab=${tab}`} className="ui-btn ui-btn-secondary">Reset</Link>
+        <button type="button" className="ui-btn ui-btn-secondary">Export In Excel File</button>
+      </div>
+    </form>
+  )
+}
+
+function FilterField({
+  label,
+  name,
+  defaultValue,
+  type = "text",
+  as,
+  options = [],
+}: {
+  label: string
+  name: string
+  defaultValue?: string
+  type?: "text" | "date"
+  as?: "select"
+  options?: string[]
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+      {as === "select" ? (
+        <select name={name} defaultValue={defaultValue || ""} className="ui-select">
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input name={name} type={type} defaultValue={defaultValue || ""} className="ui-input" />
+      )}
+    </label>
+  )
 }

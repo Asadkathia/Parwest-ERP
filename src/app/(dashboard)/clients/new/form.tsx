@@ -21,6 +21,8 @@ export default function ClientEnrollmentForm({ regions }: Props) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [isBranchless, setIsBranchless] = useState(true)
+    const [introducerAddress, setIntroducerAddress] = useState("")
+    const [defaultBranchName, setDefaultBranchName] = useState("")
 
     const applyOcrFields = (fields: Record<string, string>) => {
         const form = formRef.current
@@ -134,23 +136,11 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client Location
-                            </label>
-                            <input
-                                type="text"
-                                name="city"
-                                className="ui-input"
-                                placeholder="Lahore"
-                            />
-                        </div>
-
                         <div className="md:col-span-2 lg:col-span-2">
                             <label className="flex items-center gap-2">
                                 <input
                                     type="checkbox"
-                                    name="isBranchless"
+                                    name="is_client_branch_less_checkbox"
                                     value="true"
                                     checked={isBranchless}
                                     onChange={(e) => setIsBranchless(e.target.checked)}
@@ -159,25 +149,6 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                                 <span className="text-sm text-[var(--text)]">Branchless</span>
                             </label>
                             <input type="hidden" name="isBranchless" value={isBranchless ? "true" : "false"} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Address Information */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Address Information</h2>
-                    <div className="grid grid-cols-1 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Head Office Address *
-                            </label>
-                            <textarea
-                                name="headOfficeAddress"
-                                required
-                                rows={3}
-                                className="ui-textarea"
-                                placeholder="Enter head office address"
-                            />
                         </div>
                     </div>
                 </div>
@@ -208,12 +179,43 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Client Location</label>
-                            <input
-                                type="text"
+                            <select
                                 name="clientLocation"
-                                className="ui-input"
-                                placeholder="Client location"
-                            />
+                                className="ui-select"
+                                defaultValue="Lahore"
+                            >
+                                <option value="All Cities">All Cities</option>
+                                <option value="Lahore">Lahore</option>
+                                <option value="Gujranwala">Gujranwala</option>
+                                <option value="Sahiwal">Sahiwal</option>
+                                <option value="Islamabad">Islamabad</option>
+                                <option value="Karachi">Karachi</option>
+                                <option value="Multan">Multan</option>
+                                <option value="Faisalabad">Faisalabad</option>
+                                <option value="Khanpur">Khanpur</option>
+                                <option value="Chichawatni">Chichawatni</option>
+                                <option value="Bahawalpur">Bahawalpur</option>
+                                <option value="Mian Channu">Mian Channu</option>
+                                <option value="Khanewal">Khanewal</option>
+                                <option value="Ahmedpur East">Ahmedpur East</option>
+                                <option value="Ahmed Nager Chatha">Ahmed Nager Chatha</option>
+                                <option value="Ali Pur">Ali Pur</option>
+                                <option value="Arifwala">Arifwala</option>
+                                <option value="Attock">Attock</option>
+                                <option value="Basti Malook">Basti Malook</option>
+                                <option value="Bhagalchur">Bhagalchur</option>
+                                <option value="Bhalwal">Bhalwal</option>
+                                <option value="Bahawalnagar">Bahawalnagar</option>
+                                <option value="Bhaipheru">Bhaipheru</option>
+                                <option value="Bhakkar">Bhakkar</option>
+                                <option value="Burewala">Burewala</option>
+                                <option value="Chailianwala">Chailianwala</option>
+                                <option value="Chakwal">Chakwal</option>
+                                <option value="Chiniot">Chiniot</option>
+                                <option value="Chowk Azam">Chowk Azam</option>
+                                <option value="Chowk Sarwar Shaheed">Chowk Sarwar Shaheed</option>
+                                <option value="Daska">Daska</option>
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Client's Postal Code</label>
@@ -222,6 +224,18 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                                 name="clientPostalCode"
                                 className="ui-input"
                                 placeholder="Postal code"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Head Office Address *
+                            </label>
+                            <textarea
+                                name="headOfficeAddress"
+                                required
+                                rows={2}
+                                className="ui-textarea"
+                                placeholder="Head Office Address"
                             />
                         </div>
                     </div>
@@ -241,7 +255,15 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
-                            <input type="text" name="introducerAddress" className="ui-input" placeholder="Address" />
+                            <input
+                                type="text"
+                                name="introducer_address"
+                                className="ui-input"
+                                placeholder="Address"
+                                value={introducerAddress}
+                                onChange={(event) => setIntroducerAddress(event.target.value)}
+                            />
+                            <input type="hidden" name="introducerAddress" value={introducerAddress} />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Cnic Number</label>
@@ -284,6 +306,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                 </div>
 
                 {/* Branchless Location Information */}
+                {isBranchless ? (
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Location Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -330,8 +353,32 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
                     </div>
                 </div>
+                ) : null}
+
+                {!isBranchless ? (
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Default Branch</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Default Branch Name</label>
+                            <input
+                                type="text"
+                                name="default_branch_name"
+                                className="ui-input"
+                                placeholder="Default Branch Name"
+                                value={defaultBranchName}
+                                onChange={(event) => setDefaultBranchName(event.target.value)}
+                            />
+                            <input type="hidden" name="defaultBranchName" value={defaultBranchName} />
+                        </div>
+                    </div>
+                </div>
+                ) : (
+                  <input type="hidden" name="default_branch_name" value="" />
+                )}
 
                 {/* Branchless Client Contract */}
+                {isBranchless ? (
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Client Contract</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -379,6 +426,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
                     </div>
                 </div>
+                ) : null}
 
             </div>
 

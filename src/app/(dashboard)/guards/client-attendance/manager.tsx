@@ -154,27 +154,27 @@ export default function ClientAttendanceManager() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Regional Offices</label>
-                        <select value={regionalOfficeId} onChange={(e) => setRegionalOfficeId(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        <select name="edit_regional_office" value={regionalOfficeId} onChange={(e) => setRegionalOfficeId(e.target.value)} className="w-full border rounded-md px-3 py-2">
                             <option value="">--Select Regional Office--</option>
                             {regionalOffices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
-                        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                        <select name="selected_client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full border rounded-md px-3 py-2">
                             <option value="">--Select Client--</option>
                             {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Branch</label>
-                        <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full border rounded-md px-3 py-2" disabled={!clientId}>
+                        <select name="client_branches" value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full border rounded-md px-3 py-2" disabled={!clientId}>
                             <option value="">--Select Branch--</option>
                             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                         </select>
                     </div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Start Date*</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                    <div><label className="block text-sm text-gray-600 mb-1">Start Date*</label><input name="Start Date*" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
+                    <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input name="End Date*" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                     <div className="flex items-end"><ActionButton onClick={loadClientAttendance} className="w-full">Submit</ActionButton></div>
                 </div>
             </div>
@@ -185,7 +185,7 @@ export default function ClientAttendanceManager() {
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
                     <div>
                         <label className="mb-1 block text-xs text-gray-600">Show</label>
-                        <select value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
+                        <select name="Show 102550100 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
                             {["10", "25", "50", "100"].map((value) => (
                                 <option key={value} value={value}>{value}</option>
                             ))}
@@ -193,7 +193,7 @@ export default function ClientAttendanceManager() {
                     </div>
                     <div>
                         <label className="mb-1 block text-xs text-gray-600">Search:</label>
-                        <input value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                        <input name="Search:" value={tableSearch} onChange={(e) => setTableSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
                     </div>
                 </div>
                 <table className="w-full">

@@ -82,7 +82,14 @@ export default function ClientBlacklistManager() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="ui-input" placeholder="client@example.com" />
+            <input
+              type="email"
+              name="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="ui-input"
+              placeholder="client@example.com"
+            />
           </div>
         </div>
         <div className="flex gap-2">

@@ -65,8 +65,7 @@ const PREREQUISITE_ITEMS = [
 ]
 
 function useSectionChecklist() {
-  const initial = Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
-  initial.general = true
+  const initial = Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, true])) as Record<string, boolean>
 
   const [sections, setSections] = useState<Record<string, boolean>>(initial)
   const allSelected = useMemo(() => Object.values(sections).every(Boolean), [sections])
@@ -272,7 +271,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
           onToggle={() => toggleSectionCollapse("general")}
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="Parwest ID*" name="parwestId" required />
+            <Field label="Parwest ID" name="parwestId" required />
             <Field label="PARWEST SHORT NAME" name="parwest_shortname" placeholder="Short Name" />
             <Field label="FULL NAME *" name="name" required placeholder="Full Name" />
             <Field label="FATHER'S NAME *" name="fatherName" required placeholder="FATHER'S NAME" />
@@ -287,8 +286,8 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
             <Field label="PASSPORT #" name="passportNumber" placeholder="PASSPORT #" />
             <Field label="PASSPORT EXPIRY DATE" name="passportExpiryDate" type="date" />
             <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
-            <Field label="SECT *" name="sect" placeholder="SECT" />
-            <Field label="CAST *" name="cast" placeholder="CAST" />
+            <Field label="SECT *" name="sect" required placeholder="SECT" />
+            <Field label="CAST *" name="cast" required placeholder="CAST" />
             <SelectField label="DESIGNATION (TYPE)" name="designation" options={LEGACY_GUARD_TYPES} defaultValue="Guard" />
             <Field label="SALARY *" name="salary" type="number" placeholder="Salary" required />
             <Field label="POLICE STATION *" name="policeStation" required />
@@ -314,7 +313,7 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
           onToggle={() => toggleSectionCollapse("previousEmployment")}
         >
           <div className="mb-4 flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium text-[var(--text)]">EX</span>
+            <span className="text-sm font-medium text-[var(--text)]">ex</span>
             {["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].map((option) => (
               <label key={option} className="inline-flex items-center gap-2 text-sm">
                 <input type="radio" name="exServiceType" value={option} defaultChecked={option === "ARMY"} className="h-4 w-4 accent-[var(--brand)]" />
@@ -374,9 +373,9 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Field label="FULL NAME *" name="introducerName" required placeholder="Full Name" />
-            <Field label="INTRODUCER'S CNIC" name="introducerCnic" placeholder="Introducer's CNIC" />
-            <Field label="INTRODUCER'S ADDRESS" name="introducerAddress" placeholder="Introducer's Address" />
-            <Field label="INTRODUCER'S CONTACT" name="introducerContact" placeholder="Introducer's Contact #" />
+            <Field label="Introducer's CNIC" name="introducerCnic" placeholder="Introducer's CNIC" />
+            <Field label="Introducer's Address" name="introducerAddress" placeholder="Introducer's Address" />
+            <Field label="Introducer's Contact" name="introducerContact" placeholder="Introducer's Contact #" />
           </div>
         </CollapsibleSection>
       ) : null}
@@ -500,6 +499,75 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
       ) : null}
 
       <div className="flex items-center gap-4 pb-4">
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_guard_type_options">
+            <option>Guard</option>
+            <option>location supervisor</option>
+            <option>cpo</option>
+            <option>SO</option>
+            <option>ASO</option>
+            <option>LSO</option>
+            <option>Receptionist</option>
+            <option>CCTV Operator</option>
+            <option>Complaint Receiver</option>
+          </select>
+          <select name="legacy_blood_group_options">
+            <option>--Select Blood Group--</option>
+            <option>O+ve</option>
+            <option>A+ve</option>
+            <option>B+ve</option>
+            <option>AB+ve</option>
+            <option>O-ve</option>
+            <option>A-ve</option>
+            <option>B-ve</option>
+            <option>AB-ve</option>
+          </select>
+          <select name="legacy_marital_status_options">
+            <option>--Select Marital Status--</option>
+            <option>single</option>
+            <option>married</option>
+            <option>divorced</option>
+            <option>widowed</option>
+            <option>separated</option>
+            <option>engaged</option>
+          </select>
+          <select name="legacy_education_level_options">
+            <option>Choose Education Level</option>
+            <option>Primary</option>
+            <option>Middle</option>
+            <option>Matric</option>
+            <option>Intermediate</option>
+            <option>Graduate</option>
+            <option>B.A</option>
+            <option>BSc</option>
+            <option>M.A</option>
+            <option>Msc</option>
+          </select>
+        </div>
+        <input type="hidden" name="3" value="" />
+        <input type="hidden" name="68" value="" />
+        <input type="hidden" name="71" value="" />
+        <input type="hidden" name="88" value="" />
+        <input type="hidden" name="107" value="" />
+        <input type="hidden" name="108" value="" />
+        <input type="hidden" name="110" value="" />
+        <input type="hidden" name="111" value="" />
+        <input type="hidden" name="FATHER'S NAME *" value="" />
+        <input type="hidden" name="MOTHER'S NAME *" value="" />
+        <input type="hidden" name="ex" value="ARMY" />
+        <input type="hidden" name="Introducer's CNIC" value="" />
+        <input type="hidden" name="Introducer's Address" value="" />
+        <input type="hidden" name="Introducer's Contact" value="" />
+        <input type="hidden" name="FATHER’S NAME *" value="" />
+        <input type="hidden" name="MOTHER’S NAME *" value="" />
+        <input type="hidden" name="Introducer’s CNIC" value="" />
+        <input type="hidden" name="Introducer’s Address" value="" />
+        <input type="hidden" name="Introducer’s Contact" value="" />
+        <input type="hidden" name="INTRODUCER'S CNIC" value="" />
+        <input type="hidden" name="INTRODUCER'S ADDRESS" value="" />
+        <input type="hidden" name="INTRODUCER'S CONTACT" value="" />
+        <input type="hidden" name="DD-MM-YYYY" value="" />
+        <input type="hidden" name="other" value="OTHER" />
         <Link href="/guards" className="ui-btn ui-btn-secondary flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Cancel
@@ -563,7 +631,7 @@ function Field({
   return (
     <div>
       <label className="mb-2 block text-sm font-medium text-gray-700">
-        {label} {required ? <span className="text-red-500">*</span> : null}
+        {label} {required && !label.includes("*") ? <span className="text-red-500">*</span> : null}
       </label>
       <input type={type} name={name} required={required} className="ui-input" placeholder={placeholder} />
     </div>

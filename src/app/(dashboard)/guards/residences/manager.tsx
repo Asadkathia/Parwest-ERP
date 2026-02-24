@@ -134,10 +134,10 @@ export default function ResidencesManager() {
             <form onSubmit={saveResidence} className="bg-white rounded-lg border p-4 space-y-3">
                 <h2 className="font-semibold">{form.id ? "Edit Residence" : "Create Residence"}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Address" required />
-                    <input value={form.ownerName} onChange={(e) => setForm((prev) => ({ ...prev, ownerName: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Name" />
-                    <input value={form.ownerPhone} onChange={(e) => setForm((prev) => ({ ...prev, ownerPhone: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Phone" />
-                    <input value={form.supervisor} onChange={(e) => setForm((prev) => ({ ...prev, supervisor: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Select Supervisor" />
+                    <input name="Address" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Address" required />
+                    <input name="Owner Name" value={form.ownerName} onChange={(e) => setForm((prev) => ({ ...prev, ownerName: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Name" />
+                    <input name="Owner Phone" value={form.ownerPhone} onChange={(e) => setForm((prev) => ({ ...prev, ownerPhone: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Phone" />
+                    <input name="Select Supervisor" value={form.supervisor} onChange={(e) => setForm((prev) => ({ ...prev, supervisor: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Select Supervisor" />
                     <input type="number" value={form.capacity} onChange={(e) => setForm((prev) => ({ ...prev, capacity: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Capacity" min={0} />
                     <input type="number" value={form.occupied} onChange={(e) => setForm((prev) => ({ ...prev, occupied: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Occupied" min={0} />
                     <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} className="border rounded-md px-3 py-2">
@@ -155,8 +155,8 @@ export default function ResidencesManager() {
 
             <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-4">
                 <div>
-                    <label className="block text-sm text-gray-600 mb-1">Show</label>
-                    <select value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                    <label className="block text-sm text-gray-600 mb-1">Show 102550100 entries</label>
+                    <select name="Show 102550100 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2">
                         {["10", "25", "50", "100"].map((value) => (
                             <option key={value} value={value}>
                                 {value}
@@ -166,11 +166,11 @@ export default function ResidencesManager() {
                 </div>
                 <div>
                     <label className="block text-sm text-gray-600 mb-1">Search:</label>
-                    <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Address, owner or supervisor" />
+                    <input name="Search:" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Address, owner or supervisor" />
                 </div>
                 <div>
                     <label className="block text-sm text-gray-600 mb-1">Select Date</label>
-                    <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+                    <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
                 </div>
                 <div className="flex items-end">
                     <ActionButton onClick={loadResidences} className="w-full">Search</ActionButton>

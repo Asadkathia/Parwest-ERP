@@ -33,6 +33,8 @@ export default function RegionalOfficesManager() {
   const [fax, setFax] = useState("")
   const [region, setRegion] = useState("")
   const [search, setSearch] = useState("")
+  const [entries, setEntries] = useState("10")
+  const [selectDate, setSelectDate] = useState("")
 
   const filtered = useMemo(() => {
     if (!search) return rows
@@ -40,6 +42,8 @@ export default function RegionalOfficesManager() {
       [row.office, row.seriesCode, row.region, row.officeHead].join(" ").toLowerCase().includes(search.toLowerCase())
     )
   }, [rows, search])
+
+  const visibleRows = filtered.slice(0, Number.parseInt(entries, 10) || 10)
 
   const onCreate = () => {
     if (!office.trim() || !seriesCode.trim() || !region.trim()) return
@@ -68,6 +72,19 @@ export default function RegionalOfficesManager() {
   }
 
   const onDelete = (id: string) => setRows((prev) => prev.filter((row) => row.id !== id))
+
+  const onReset = () => {
+    setOffice("")
+    setOfficeHead("")
+    setSeriesCode("")
+    setPhone("")
+    setMobile("")
+    setFax("")
+    setRegion("")
+    setSearch("")
+    setEntries("10")
+    setSelectDate("")
+  }
 
   return (
     <div className="space-y-6">
@@ -104,19 +121,34 @@ export default function RegionalOfficesManager() {
             <input value={region} onChange={(e) => setRegion(e.target.value)} className="ui-input" placeholder="Region" />
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Search</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
             <input value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search" />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Show</label>
+            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+              {["10", "25", "50", "100", "200"].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Date</label>
+            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
           </div>
         </div>
         <div className="flex gap-2">
           <ActionButton onClick={onCreate}>Create</ActionButton>
+          <ActionButton variant="secondary" onClick={onReset}>Reset</ActionButton>
+          <ActionButton variant="secondary">Submit</ActionButton>
           <ActionButton variant="secondary">Update</ActionButton>
-          <ActionButton variant="danger">Delete</ActionButton>
+          <ActionButton variant="secondary">Delete</ActionButton>
+          <ActionButton variant="secondary">Export In Excel File</ActionButton>
         </div>
       </FilterBar>
 
       <DataTable
-        rows={filtered}
+        rows={visibleRows}
         columns={[
           { key: "office", header: "Office", sortable: true },
           { key: "seriesCode", header: "Series Code", sortable: true },

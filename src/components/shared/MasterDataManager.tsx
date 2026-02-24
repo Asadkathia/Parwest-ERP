@@ -34,6 +34,8 @@ export default function MasterDataManager({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [query, setQuery] = useState("")
+  const [entries, setEntries] = useState("10")
+  const [selectDate, setSelectDate] = useState("")
 
   const filtered = useMemo(() => {
     if (!query) return data
@@ -43,6 +45,8 @@ export default function MasterDataManager({
       return false
     })
   }, [data, query])
+
+  const visibleRows = filtered.slice(0, Number.parseInt(entries, 10) || 10)
 
   const onCreate = () => {
     if (!name.trim()) return
@@ -66,6 +70,14 @@ export default function MasterDataManager({
     setData((prev) => prev.filter((row) => row.id !== id))
   }
 
+  const onReset = () => {
+    setName("")
+    setDescription("")
+    setQuery("")
+    setEntries("10")
+    setSelectDate("")
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -85,14 +97,29 @@ export default function MasterDataManager({
             </div>
           ) : null}
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Search</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
             <input value={query} onChange={(e) => setQuery(e.target.value)} className="ui-input" placeholder="Search" />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Show</label>
+            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+              {["10", "25", "50", "100", "200"].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Date</label>
+            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton onClick={onCreate}>Create</ActionButton>
+          <ActionButton variant="secondary" onClick={onReset}>Reset</ActionButton>
+          <ActionButton variant="secondary">Submit</ActionButton>
           <ActionButton variant="secondary">Update</ActionButton>
           <ActionButton variant="secondary">Delete</ActionButton>
+          <ActionButton variant="secondary">Export In Excel File</ActionButton>
         </div>
       </FilterBar>
 
@@ -106,10 +133,10 @@ export default function MasterDataManager({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {filtered.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No records found.</td></tr>
             ) : (
-              filtered.map((row) => (
+              visibleRows.map((row) => (
                 <tr key={row.id} className="hover:bg-[var(--surface-muted)]">
                   <td className="px-4 py-3 text-sm">{row.name}</td>
                   {columns.some((c) => c.toLowerCase().includes("description")) ? <td className="px-4 py-3 text-sm">{row.description || "—"}</td> : null}

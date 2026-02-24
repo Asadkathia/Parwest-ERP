@@ -30,7 +30,6 @@ const navItems: NavNode[] = [
             { title: "Home", href: "/dashboard", icon: LayoutDashboard },
             { title: "Online Users", href: "/dashboard/online-users", icon: Users },
             { title: "AI Chat", href: "/dashboard/ai-chat", icon: Sparkles },
-            { title: "Reports List", href: "/dashboard/reports-list", icon: FileText },
             { title: "Admin Center", href: "/dashboard/admin-center", icon: ClipboardList },
             { title: "SHSHK Insights", href: "/dashboard/shshk", icon: Sparkles },
         ],
@@ -62,14 +61,13 @@ const navItems: NavNode[] = [
         icon: DollarSign,
         children: [
             { title: "Operations", href: "/payroll/operations", icon: DollarSign },
-            { title: "Loan", href: "/payroll/operations/loan", icon: DollarSign },
+            { title: "Loans", href: "/payroll/operations/loan", icon: DollarSign },
             { title: "Extra Hours", href: "/payroll/operations/extra-hours", icon: DollarSign },
             { title: "Special Duty", href: "/payroll/operations/special-duty", icon: DollarSign },
             { title: "Salary", href: "/payroll/operations/salary-v2", icon: DollarSign },
             { title: "UnPaid Salaries", href: "/payroll/operations/unpaid-salaries", icon: DollarSign },
             { title: "Reports", href: "/payroll/reports", icon: FileText },
             { title: "Settings", href: "/payroll/settings", icon: Settings },
-            { title: "Loans", href: "/payroll/loans", icon: DollarSign },
             { title: "Bulk Loans", href: "/payroll/loans/bulk", icon: Upload },
         ],
     },
@@ -79,7 +77,7 @@ const navItems: NavNode[] = [
         children: [
             { title: "All Clients", href: "/clients", icon: Building2 },
             { title: "Add Client", href: "/clients/new", icon: Building2 },
-            { title: "Search Client", href: "/clients/search", icon: Search },
+            { title: "Search Client", href: "/clients/search-v2", icon: Search },
             { title: "Types & Locations", href: "/clients/types-locations", icon: Settings },
             { title: "Black Listed", href: "/clients/blacklist", icon: Building2 },
             { title: "Export Branches", href: "/clients/export-branches", icon: FileText },
@@ -89,11 +87,6 @@ const navItems: NavNode[] = [
             { title: "Pricing", href: "/clients/pricing", icon: DollarSign },
             { title: "Invoicing", href: "/clients/invoicing", icon: DollarSign },
         ],
-    },
-    {
-        title: "Deployments",
-        href: "/deployments",
-        icon: MapPin,
     },
     {
         title: "Inventory",
@@ -155,6 +148,8 @@ const navItems: NavNode[] = [
             { title: "Guard Deployment", href: "/reports/guard-deployment", icon: FileText },
             { title: "Day & Night", href: "/reports/day-night-duty", icon: FileText },
             { title: "Client Enrolled", href: "/reports/client-enrolled", icon: FileText },
+            { title: "AI/Prompt Reports", href: "/reports/ai", icon: Sparkles },
+            { title: "Generated Reports", href: "/reports/generated", icon: FileText },
         ],
     },
     {

@@ -89,8 +89,8 @@ export default function InactiveGuardsManager() {
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
                     <div>
-                        <label className="mb-1 block text-xs text-gray-600">Show</label>
-                        <select value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
+                        <label className="mb-1 block text-xs text-gray-600">Show 102550100200 entries</label>
+                        <select name="Show 102550100200 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
                             {["10", "25", "50", "100", "200"].map((value) => (
                                 <option key={value} value={value}>
                                     {value}
@@ -101,11 +101,11 @@ export default function InactiveGuardsManager() {
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Search:</label>
-                            <input value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <input name="Search:" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
                         </div>
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Select Date</label>
-                            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
                         </div>
                     </div>
                 </div>

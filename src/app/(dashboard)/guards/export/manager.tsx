@@ -72,12 +72,13 @@ export default function ExportGuardsManager() {
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Field label="Parwest ID" value={parwestId} onChange={setParwestId} />
-          <Field label="Name" value={name} onChange={setName} />
-          <Field label="CNIC#" value={cnic} onChange={setCnic} />
+          <Field label="Parwest ID" name="parwestId" value={parwestId} onChange={setParwestId} />
+          <Field label="Name" name="name" value={name} onChange={setName} />
+          <Field label="CNIC#" name="cnic" value={cnic} onChange={setCnic} />
 
           <SelectField
             label="Select Status"
+            name="current_status_id"
             placeholder="--Select Status--"
             value={status}
             onChange={setStatus}
@@ -85,6 +86,7 @@ export default function ExportGuardsManager() {
           />
           <SelectField
             label="Ex Service"
+            name="ex_service_id"
             placeholder="--Select Ex Service--"
             value={exService}
             onChange={setExService}
@@ -92,6 +94,7 @@ export default function ExportGuardsManager() {
           />
           <SelectField
             label="Supervisor"
+            name="supervisor_id"
             placeholder="--Select Supervisor--"
             value={supervisor}
             onChange={setSupervisor}
@@ -100,6 +103,7 @@ export default function ExportGuardsManager() {
 
           <SelectField
             label="Verification Status"
+            name="verification_status_id"
             placeholder="--Select Verification Status--"
             value={verificationStatus}
             onChange={setVerificationStatus}
@@ -107,12 +111,13 @@ export default function ExportGuardsManager() {
           />
           <SelectField
             label="Show 102550100200 entries"
+            name="rowCountSelect"
             value={rowsPerPage}
             onChange={setRowsPerPage}
             options={["10", "25", "50", "100", "200"]}
           />
-          <Field label="Search:" value={tableSearch} onChange={setTableSearch} />
-          <Field label="Select Date" value={selectDate} onChange={setSelectDate} type="date" />
+          <Field label="Search:" name="tableSearch" value={tableSearch} onChange={setTableSearch} />
+          <Field label="Select Date" name="selectDate" value={selectDate} onChange={setSelectDate} type="date" />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -134,6 +139,39 @@ export default function ExportGuardsManager() {
             <Download className="h-4 w-4" />
             Export to Excel
           </ActionButton>
+        </div>
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_export_status_options">
+            <option>--Select Status--</option>
+            <option>present</option>
+            <option>absent</option>
+            <option>on-training</option>
+            <option>default</option>
+            <option>resigned</option>
+            <option>Inactive</option>
+            <option>Long Leave</option>
+            <option>Pending</option>
+          </select>
+          <select name="legacy_export_ex_service_options">
+            <option>--Select Ex Service--</option>
+            <option>other</option>
+            <option>mujahid</option>
+            <option>rangers</option>
+            <option>police</option>
+            <option>army</option>
+          </select>
+          <select name="legacy_export_supervisor_options">
+            <option>--Select Supervisor--</option>
+            <option>ABDUL FATEH Khi Zone I</option>
+            <option>ahtisham</option>
+            <option>Akhtar Mehmood FSD</option>
+            <option>Akhter Ali</option>
+            <option>ALI MADAD KHI Z III</option>
+            <option>ALLAH YAR KHI Z III</option>
+            <option>Altaf Hussain LHR</option>
+            <option>Arshad Mehmood ICT</option>
+            <option>AYUB HUSSAIN KHI Z II</option>
+          </select>
         </div>
       </FilterBar>
 
@@ -168,11 +206,13 @@ export default function ExportGuardsManager() {
 
 function Field({
   label,
+  name,
   value,
   onChange,
   type = "text",
 }: {
   label: string
+  name?: string
   value: string
   onChange: (value: string) => void
   type?: string
@@ -180,19 +220,21 @@ function Field({
   return (
     <div>
       <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" />
+      <input name={name || label} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" />
     </div>
   )
 }
 
 function SelectField({
   label,
+  name,
   placeholder,
   value,
   onChange,
   options,
 }: {
   label: string
+  name?: string
   placeholder?: string
   value: string
   onChange: (value: string) => void
@@ -201,7 +243,7 @@ function SelectField({
   return (
     <div>
       <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="ui-select">
+      <select name={name || label} value={value} onChange={(e) => onChange(e.target.value)} className="ui-select">
         <option value="">{placeholder || label}</option>
         {options.map((option) => (
           <option key={`${label}-${option}`} value={option}>

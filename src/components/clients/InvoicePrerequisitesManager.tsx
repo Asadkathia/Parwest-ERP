@@ -165,7 +165,7 @@ export default function InvoicePrerequisitesManager() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Province</label>
-                <select value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">
+                <select name="Select Province" value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">
                   <option value="">--Select Province--</option>
                   {PROVINCE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -176,7 +176,7 @@ export default function InvoicePrerequisitesManager() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-                <select value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
+                <select name="Select City" value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
                   <option value="">--Select City--</option>
                   {CITY_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -187,7 +187,7 @@ export default function InvoicePrerequisitesManager() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Guard Type</label>
-                <select value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
+                <select name="Select Guard Type" value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
                   <option value="">--Guard Type--</option>
                   {GUARD_TYPE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -199,6 +199,7 @@ export default function InvoicePrerequisitesManager() {
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Effective Rate</label>
                 <input
+                  name="Effective Rate"
                   type="number"
                   value={effectiveRate}
                   onChange={(e) => setEffectiveRate(e.target.value)}
@@ -208,7 +209,7 @@ export default function InvoicePrerequisitesManager() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Enqueue</label>
-                <select value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")} className="ui-select">
+                <select name="Enqueue" value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")} className="ui-select">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
@@ -217,7 +218,7 @@ export default function InvoicePrerequisitesManager() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Show 102550100200 entries</label>
-                <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+                <select name="Show 102550100200 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
                   {["10", "25", "50", "100", "200"].map((v) => (
                     <option key={v} value={v}>
                       {v}
@@ -227,7 +228,7 @@ export default function InvoicePrerequisitesManager() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
-                <input value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search:" />
+                <input name="Search:" value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search:" />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -238,6 +239,15 @@ export default function InvoicePrerequisitesManager() {
               <ActionButton variant="secondary" onClick={() => setConfirmAction("submit-default")}>
                 Submit
               </ActionButton>
+              <input type="hidden" name="Client Province" value={province} />
+              <input type="hidden" name="Client Cities" value={city} />
+              <input type="hidden" name="Guard Types" value={guardType} />
+              <input type="hidden" name="Edit Rate" value="true" />
+              <input type="hidden" name="ID" value="1" />
+              <input type="hidden" name="Province Name" value={provinceName || province} />
+              <input type="hidden" name="City Name" value={cityName || city} />
+              <input type="hidden" name="Guard Type" value={guardType} />
+              <input type="hidden" name="Guard Type Name" value={guardTypeName || guardType} />
             </div>
           </FilterBar>
           {notice ? <InlineAlert type="success" message={notice} /> : null}
@@ -274,11 +284,11 @@ export default function InvoicePrerequisitesManager() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
+              <input name="Name" value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
-                <input value={provinceName} onChange={(e) => setProvinceName(e.target.value)} className="ui-input" placeholder="Province" />
+                <input name="Province Name" value={provinceName} onChange={(e) => setProvinceName(e.target.value)} className="ui-input" placeholder="Province" />
               </div>
               <div className="flex items-end">
                 <ActionButton onClick={() => setNotice("Client province saved.")}>Submit</ActionButton>
@@ -301,11 +311,11 @@ export default function InvoicePrerequisitesManager() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
+              <input name="Name" value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
-              <input value={cityName} onChange={(e) => setCityName(e.target.value)} className="ui-input" placeholder="Province" />
+              <input name="City Name" value={cityName} onChange={(e) => setCityName(e.target.value)} className="ui-input" placeholder="Province" />
             </div>
               <div className="flex items-end">
                 <ActionButton onClick={() => setNotice("Client city saved.")}>Submit</ActionButton>
@@ -329,11 +339,11 @@ export default function InvoicePrerequisitesManager() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input value={guardTypeName} onChange={(e) => setGuardTypeName(e.target.value)} className="ui-input" placeholder="Name" />
+              <input name="Guard Type Name" value={guardTypeName} onChange={(e) => setGuardTypeName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Enqueue</label>
-              <select className="ui-select" value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")}>
+              <select name="Enqueue" className="ui-select" value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")}>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
               </select>
@@ -360,7 +370,7 @@ export default function InvoicePrerequisitesManager() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
+              <input name="Name" value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div className="flex items-end">
               <ActionButton onClick={() => setNotice("Invoice header saved.")}>Submit</ActionButton>

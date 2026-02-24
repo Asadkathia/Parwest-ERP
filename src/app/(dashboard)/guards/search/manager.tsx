@@ -277,12 +277,13 @@ export default function SearchGuardsManager() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Input label="Parwest ID" value={filters.parwestId} onChange={(v) => setFilter("parwestId", v)} placeholder="Parwest ID" />
-          <Input label="Name" value={filters.name} onChange={(v) => setFilter("name", v)} placeholder="Name" />
-          <Input label="CNIC#" value={filters.cnic} onChange={(v) => setFilter("cnic", v)} placeholder="CNIC#" />
-          <Input label="Phone Number" value={filters.phone} onChange={(v) => setFilter("phone", v)} placeholder="Phone Number" />
+          <Input label="Name" name="name" value={filters.name} onChange={(v) => setFilter("name", v)} placeholder="Name" />
+          <Input label="CNIC#" name="cnic" value={filters.cnic} onChange={(v) => setFilter("cnic", v)} placeholder="CNIC#" />
+          <Input label="Phone Number" name="phoneNumber" value={filters.phone} onChange={(v) => setFilter("phone", v)} placeholder="Phone Number" />
 
           <Select
             label="Select Education"
+            name="education"
             value={filters.education}
             onChange={(v) => setFilter("education", v)}
             options={LEGACY_EDUCATION_OPTIONS}
@@ -290,6 +291,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Select Relegion"
+            name="religion"
             value={filters.religion}
             onChange={(v) => setFilter("religion", v)}
             options={LEGACY_RELIGION_OPTIONS}
@@ -297,6 +299,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Select Status"
+            name="current_status_id"
             value={filters.status}
             onChange={(v) => setFilter("status", v)}
             options={LEGACY_STATUS_OPTIONS}
@@ -304,6 +307,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Select Client"
+            name="client_id"
             value={filters.client}
             onChange={(v) => setFilter("client", v)}
             options={LEGACY_CLIENT_OPTIONS}
@@ -311,6 +315,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Supervisor"
+            name="supervisor_id"
             value={filters.supervisor}
             onChange={(v) => setFilter("supervisor", v)}
             options={LEGACY_SUPERVISOR_OPTIONS}
@@ -318,6 +323,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Ex Service"
+            name="ex_service_id"
             value={filters.exService}
             onChange={(v) => setFilter("exService", v)}
             options={LEGACY_EX_SERVICE_OPTIONS}
@@ -325,24 +331,27 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Verification Type"
+            name="verification_type_id"
             value={filters.verificationType}
             onChange={(v) => setFilter("verificationType", v)}
             options={LEGACY_VERIFICATION_TYPE_OPTIONS}
-            placeholder="Verification Type"
+            placeholder="--Select Verification Type--"
           />
           <Select
             label="Verification Status"
+            name="verification_status_id"
             value={filters.verificationStatus}
             onChange={(v) => setFilter("verificationStatus", v)}
             options={LEGACY_VERIFICATION_STATUS_OPTIONS}
-            placeholder="Verification Status"
+            placeholder="--Select Verification Status--"
           />
 
-          <Input label="Created From" type="date" value={filters.createdFrom} onChange={(v) => setFilter("createdFrom", v)} />
-          <Input label="Created To" type="date" value={filters.createdTo} onChange={(v) => setFilter("createdTo", v)} />
-          <Input label="Bank Name" value={filters.bankName} onChange={(v) => setFilter("bankName", v)} placeholder="Bank Name" />
+          <Input label="Created From" name="createdFrom" type="date" value={filters.createdFrom} onChange={(v) => setFilter("createdFrom", v)} />
+          <Input label="Created To" name="createdTo" type="date" value={filters.createdTo} onChange={(v) => setFilter("createdTo", v)} />
+          <Input label="Bank Name" name="bank_name" value={filters.bankName} onChange={(v) => setFilter("bankName", v)} placeholder="Bank Name" />
           <Select
             label="Bank Account Status"
+            name="bank_account_status"
             value={filters.bankAccountStatus}
             onChange={(v) => setFilter("bankAccountStatus", v)}
             options={LEGACY_BANK_ACCOUNT_STATUS_OPTIONS}
@@ -351,6 +360,7 @@ export default function SearchGuardsManager() {
 
           <Select
             label="Bank Card Status"
+            name="bank_card_status"
             value={filters.bankCardStatus}
             onChange={(v) => setFilter("bankCardStatus", v)}
             options={LEGACY_BANK_CARD_STATUS_OPTIONS}
@@ -358,6 +368,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Bank Account Type"
+            name="bank_account_type"
             value={filters.bankAccountType}
             onChange={(v) => setFilter("bankAccountType", v)}
             options={LEGACY_BANK_ACCOUNT_TYPE_OPTIONS}
@@ -365,6 +376,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Payment Mode"
+            name="payment_mode"
             value={filters.paymentMode}
             onChange={(v) => setFilter("paymentMode", v)}
             options={["BANK", "CASH"]}
@@ -372,6 +384,7 @@ export default function SearchGuardsManager() {
           />
           <Select
             label="Guard Category"
+            name="guard_category"
             value={filters.guardCategory}
             onChange={(v) => setFilter("guardCategory", v)}
             options={["MUJAHID", "REGULAR", "EX_SERVICE", "OTHER"]}
@@ -380,37 +393,39 @@ export default function SearchGuardsManager() {
 
           <Select
             label="Residence"
+            name="residence"
             value={filters.residence}
             onChange={(v) => setFilter("residence", v)}
             options={LEGACY_RESIDENCE_OPTIONS}
             placeholder="Residence"
           />
           <Select
-            label="Show"
+            label="Show 102550100200500All records"
+            name="rowCountSelect"
             value={filters.rowsPerPage}
             onChange={(v) => setFilter("rowsPerPage", v)}
             options={["10", "25", "50", "100", "200", "500", "All records"]}
-            placeholder="Show"
+            placeholder="Show 102550100200500All records"
           />
-          <Input label="Search:" value={filters.tableSearch} onChange={(v) => setFilter("tableSearch", v)} placeholder="Search:" />
-          <Input label="Select Date" type="date" value={filters.selectDate} onChange={(v) => setFilter("selectDate", v)} />
+          <Input label="Search:" name="tableSearch" value={filters.tableSearch} onChange={(v) => setFilter("tableSearch", v)} placeholder="Search:" />
+          <Input label="Select Date" name="selectDate" type="date" value={filters.selectDate} onChange={(v) => setFilter("selectDate", v)} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-6">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={filters.onNightDuty} onChange={(e) => setFilter("onNightDuty", e.target.checked)} />
+            <input name="isOnNightDuty" type="checkbox" checked={filters.onNightDuty} onChange={(e) => setFilter("onNightDuty", e.target.checked)} />
             isOnNightDuty
           </label>
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={filters.isArchived} onChange={(e) => setFilter("isArchived", e.target.checked)} />
+            <input name="isArchived" type="checkbox" checked={filters.isArchived} onChange={(e) => setFilter("isArchived", e.target.checked)} />
             isArchived
           </label>
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={filters.terminatedRecords} onChange={(e) => setFilter("terminatedRecords", e.target.checked)} />
+            <input name="terminatedRecords" type="checkbox" checked={filters.terminatedRecords} onChange={(e) => setFilter("terminatedRecords", e.target.checked)} />
             Terminated Records
           </label>
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={filters.overStaying} onChange={(e) => setFilter("overStaying", e.target.checked)} />
+            <input name="isOverstaying" type="checkbox" checked={filters.overStaying} onChange={(e) => setFilter("overStaying", e.target.checked)} />
             isOverstaying
           </label>
         </div>
@@ -436,6 +451,41 @@ export default function SearchGuardsManager() {
             <Download className="h-4 w-4" />
             Export In Excel
           </ActionButton>
+        </div>
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_education_options">
+            <option>--Select Education--</option>
+            <option>Intermediate</option>
+            <option>Matric</option>
+            <option>Middle</option>
+            <option>Graduate</option>
+            <option>B.A</option>
+            <option>BSc</option>
+            <option>M.A</option>
+            <option>Msc</option>
+          </select>
+          <select name="legacy_religion_options">
+            <option>--Select Relegion--</option>
+            <option>Islam</option>
+            <option>Christianity</option>
+            <option>Hinduism</option>
+          </select>
+          <select name="legacy_status_options">
+            <option>--Select Status--</option>
+            <option>present</option>
+            <option>absent</option>
+            <option>on-training</option>
+            <option>default</option>
+            <option>resigned</option>
+            <option>Inactive</option>
+            <option>Long Leave</option>
+            <option>Pending</option>
+          </select>
+          <select name="legacy_client_options">
+            <option>--Select Client--</option>
+            <option>National Bank of Pakistan</option>
+            <option>Standard Chartered Bank Limited Pakistan</option>
+          </select>
         </div>
       </div>
 
@@ -514,12 +564,14 @@ export default function SearchGuardsManager() {
 
 function Input({
   label,
+  name,
   value,
   onChange,
   placeholder,
   type = "text",
 }: {
   label: string
+  name?: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -528,19 +580,21 @@ function Input({
   return (
     <div>
       <label className="mb-1 block text-sm text-gray-600">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" placeholder={placeholder} />
+      <input name={name || label} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" placeholder={placeholder} />
     </div>
   )
 }
 
 function Select({
   label,
+  name,
   value,
   onChange,
   options,
   placeholder,
 }: {
   label: string
+  name?: string
   value: string
   onChange: (value: string) => void
   options: string[]
@@ -549,7 +603,7 @@ function Select({
   return (
     <div>
       <label className="mb-1 block text-sm text-gray-600">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="ui-select">
+      <select name={name || label} value={value} onChange={(e) => onChange(e.target.value)} className="ui-select">
         <option value="">{placeholder || `Select ${label}`}</option>
         {options.map((option) => (
           <option key={`${label}-${option}`} value={option}>

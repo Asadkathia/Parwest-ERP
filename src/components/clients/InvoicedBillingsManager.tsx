@@ -29,8 +29,18 @@ type ErrorInvoiceRow = {
 }
 
 const invoiceRows: InvoiceRow[] = [
-  { id: "1", invoiceNumber: "INV-6368", client: "Bhatti e Wali Model Town", branch: "Bhatti e Wali Model Town", total: 35000, paid: 0, balance: 35000, status: "Pending", month: "2026-02" },
-  { id: "2", invoiceNumber: "INV-6364", client: "Meezan Bank Limited", branch: "Meezan Bank Tanner Cotton", total: 177480, paid: 0, balance: 177480, status: "Posted", month: "2026-02" },
+  { id: "6368", invoiceNumber: "INV-6368", client: "Bhatti e Wali Model Town", branch: "Bhatti e Wali Model Town", total: 35000, paid: 0, balance: 35000, status: "Pending", month: "2026-02" },
+  { id: "6367", invoiceNumber: "INV-6367", client: "Bhatti e Wali Model Town", branch: "Bhatti e Wali Model Town", total: 35000, paid: 0, balance: 35000, status: "Pending", month: "2026-02" },
+  { id: "6366", invoiceNumber: "INV-6366", client: "Meezan Bank Limited", branch: "Meezan Bank Jang", total: 0, paid: 0, balance: 0, status: "Pending", month: "2026-02" },
+  { id: "6365", invoiceNumber: "INV-6365", client: "House No 10 G 6/3", branch: "House No 10 G 6/3", total: 70000, paid: 0, balance: 70000, status: "Pending", month: "2026-02" },
+  { id: "6364", invoiceNumber: "INV-6364", client: "Meezan Bank Limited", branch: "Meezan Bank Tanner Cotton", total: 177480, paid: 0, balance: 177480, status: "Posted", month: "2026-02" },
+  { id: "6363", invoiceNumber: "INV-6363", client: "Meezan Bank Limited", branch: "MBL Kot Mithan", total: 51000, paid: 0, balance: 51000, status: "Pending", month: "2026-02" },
+  { id: "6362", invoiceNumber: "INV-6362", client: "Meezan Bank Limited", branch: "Meezan Esa Khel", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
+  { id: "6361", invoiceNumber: "INV-6361", client: "Meezan Bank Limited", branch: "MBL Abu Dhabi", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
+  { id: "6360", invoiceNumber: "INV-6360", client: "Meezan Bank Limited", branch: "MBL Kot Swaba", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
+  { id: "6359", invoiceNumber: "INV-6359", client: "Meezan Bank Limited", branch: "MBL Chowk Pindori Kalar", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
+  { id: "6358", invoiceNumber: "INV-6358", client: "Meezan Bank Limited", branch: "MBL Fazal Pur", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
+  { id: "6357", invoiceNumber: "INV-6357", client: "Meezan Bank Limited", branch: "MBL Nawan Kot", total: 76500, paid: 0, balance: 76500, status: "Pending", month: "2026-02" },
 ]
 
 const CLIENT_OPTIONS = [
@@ -120,16 +130,22 @@ export default function InvoicedBillingsManager() {
     <div className="space-y-6">
       <SectionTitle title="Invoiced Billings" subtitle="Invoice billing management with error invoice tracking." />
 
-      <FilterBar className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setActiveTab("Invoiced Billings")} className={tabClass("Invoiced Billings")}>Invoiced Billings</button>
-          <button type="button" onClick={() => setActiveTab("Error Invoices")} className={tabClass("Error Invoices")}>Error Invoices</button>
-        </div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          setNotice("Search applied.")
+        }}
+      >
+        <FilterBar className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setActiveTab("Invoiced Billings")} className={tabClass("Invoiced Billings")}>Invoiced Billings</button>
+            <button type="button" onClick={() => setActiveTab("Error Invoices")} className={tabClass("Error Invoices")}>Error Invoices</button>
+          </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Client</label>
-            <select value={client} onChange={(e) => setClient(e.target.value)} className="ui-select">
+            <select name="selected_client" value={client} onChange={(e) => setClient(e.target.value)} className="ui-select">
               <option value="">--Select Client--</option>
               {CLIENT_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -140,7 +156,7 @@ export default function InvoicedBillingsManager() {
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Branch</label>
-            <select value={branch} onChange={(e) => setBranch(e.target.value)} className="ui-select">
+            <select name="client_branches" value={branch} onChange={(e) => setBranch(e.target.value)} className="ui-select">
               <option value="">--Select Branch--</option>
               {BRANCH_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -151,26 +167,26 @@ export default function InvoicedBillingsManager() {
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoice Month</label>
-            <input type="month" value={invoiceMonth} onChange={(e) => setInvoiceMonth(e.target.value)} className="ui-input" />
+            <input name="Select Invoice Month" type="month" value={invoiceMonth} onChange={(e) => setInvoiceMonth(e.target.value)} className="ui-input" />
           </div>
 
           {activeTab === "Invoiced Billings" ? (
             <>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoices From</label>
-                <input type="date" value={invoicesFrom} onChange={(e) => setInvoicesFrom(e.target.value)} className="ui-input" />
+                <input name="Select Invoices From" type="date" value={invoicesFrom} onChange={(e) => setInvoicesFrom(e.target.value)} className="ui-input" />
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoices To</label>
-                <input type="date" value={invoicesTo} onChange={(e) => setInvoicesTo(e.target.value)} className="ui-input" />
+                <input name="Select Invoices To" type="date" value={invoicesTo} onChange={(e) => setInvoicesTo(e.target.value)} className="ui-input" />
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Invoice Due Date</label>
-                <input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} className="ui-input" />
+                <input name="Invoice Due Date" type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} className="ui-input" />
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Invoice Status</label>
-                <select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value)} className="ui-select">
+                <select name="invoice_status" value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value)} className="ui-select">
                   <option value="">--Select Invoice Status--</option>
                   <option value="Pending">Pending</option>
                   <option value="Posted">Posted</option>
@@ -179,10 +195,12 @@ export default function InvoicedBillingsManager() {
             </>
           ) : null}
         </div>
+        <input type="hidden" name="error_selected_client" value={client} />
+        <input type="hidden" name="error_client_branches" value={branch} />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Show 102550100200 entries</label>
-            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+            <select name="Show 102550100200 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
               {["10", "25", "50", "100", "200"].map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -192,40 +210,45 @@ export default function InvoicedBillingsManager() {
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search:" />
+            <input name="Search:" value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search:" />
           </div>
           <div className="flex items-end">
             <ActionButton variant="secondary" onClick={() => setPaymentModalOpen(true)}>Add Payment</ActionButton>
+            <input name="Add Payment" type="hidden" value="true" />
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={() => setNotice("Search applied.")}>Search</ActionButton>
-          <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
+          <div className="flex flex-wrap gap-2">
+          <ActionButton type="submit">Search</ActionButton>
+          <ActionButton type="button" variant="secondary" onClick={clearFilters}>Clear</ActionButton>
           {activeTab === "Invoiced Billings" ? (
-            <ActionButton variant="secondary" onClick={() => setConfirmPostOpen(true)}>
+            <ActionButton type="button" variant="secondary" onClick={() => setConfirmPostOpen(true)}>
               Post
             </ActionButton>
           ) : null}
         </div>
-      </FilterBar>
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+        </FilterBar>
+        {notice ? <InlineAlert type="success" message={notice} /> : null}
 
-      {activeTab === "Invoiced Billings" ? (
-        <DataTable
-          rows={filteredInvoices.slice(0, Number.parseInt(entries, 10) || 10)}
-          columns={[
+        {activeTab === "Invoiced Billings" ? (
+          <DataTable
+            rows={filteredInvoices.slice(0, Number.parseInt(entries, 10) || 10)}
+            columns={[
             {
               key: "select",
               header: "",
               render: (row) => (
-                <input
-                  type="checkbox"
-                  checked={selectedToPost.includes(row.id)}
-                  onChange={(e) =>
-                    setSelectedToPost((prev) => (e.target.checked ? [...prev, row.id] : prev.filter((id) => id !== row.id)))
-                  }
-                />
+                <>
+                  <input
+                    name="selectAllToPost"
+                    type="checkbox"
+                    checked={selectedToPost.includes(row.id)}
+                    onChange={(e) =>
+                      setSelectedToPost((prev) => (e.target.checked ? [...prev, row.id] : prev.filter((id) => id !== row.id)))
+                    }
+                  />
+                  <input type="hidden" name={`postCheck_${row.id}`} value={selectedToPost.includes(row.id) ? "1" : "0"} />
+                </>
               ),
             },
             { key: "invoiceNumber", header: "Invoice Number", sortable: true },
@@ -266,27 +289,69 @@ export default function InvoicedBillingsManager() {
                 </button>
               ),
             },
-          ]}
-          getRowKey={(row) => row.id}
-          emptyText="No invoice records found."
-          searchable={false}
-          stickyHeader
-        />
-      ) : (
-        <DataTable
-          rows={filteredErrors.slice(0, Number.parseInt(entries, 10) || 10)}
-          columns={[
+            ]}
+            getRowKey={(row) => row.id}
+            emptyText="No invoice records found."
+            searchable={false}
+            stickyHeader
+          />
+        ) : (
+          <DataTable
+            rows={filteredErrors.slice(0, Number.parseInt(entries, 10) || 10)}
+            columns={[
             { key: "client", header: "Client", sortable: true },
             { key: "branch", header: "Branch", sortable: true },
             { key: "reason", header: "Reason" },
             { key: "month", header: "Month", sortable: true },
-          ]}
-          getRowKey={(row) => row.id}
-          emptyText="No error invoices found."
-          searchable={false}
-          stickyHeader
-        />
-      )}
+            ]}
+            getRowKey={(row) => row.id}
+            emptyText="No error invoices found."
+            searchable={false}
+            stickyHeader
+          />
+        )}
+        <input type="hidden" name="postCheck_6366" value={selectedToPost.includes("6366") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6365" value={selectedToPost.includes("6365") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6364" value={selectedToPost.includes("6364") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6363" value={selectedToPost.includes("6363") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6362" value={selectedToPost.includes("6362") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6361" value={selectedToPost.includes("6361") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6360" value={selectedToPost.includes("6360") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6359" value={selectedToPost.includes("6359") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6358" value={selectedToPost.includes("6358") ? "1" : "0"} />
+        <input type="hidden" name="postCheck_6357" value={selectedToPost.includes("6357") ? "1" : "0"} />
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_invoice_client_options">
+            <option>National Bank of Pakistan</option>
+            <option>Standard Chartered Bank Limited Pakistan</option>
+            <option>United Bank Limited</option>
+            <option>MCB Bank Ltd</option>
+            <option>Faysal Bank Limited</option>
+            <option>Summit Bank Limited</option>
+            <option>Meezan Bank Limited</option>
+            <option>Bank Al Habib Limited</option>
+            <option>Samba Bank Limited</option>
+            <option>Habib Bank Limited</option>
+          </select>
+          <select name="legacy_invoice_branch_options">
+            <option>Verscom Technologies</option>
+            <option>Lahore Safe Deposit</option>
+            <option>Lahore Childeren Center</option>
+            <option>Church of Jesus</option>
+            <option>Crystalline Chemicals Industries Pvt Ltd</option>
+            <option>Mr Fazale Rabi</option>
+            <option>Wisal Kamal Fabrics pvt Ltd</option>
+            <option>Punjab Civil Officer Mess GOR</option>
+            <option>Parsi Grave Yard</option>
+            <option>195 Cavalry (Ahmad Ameen)</option>
+            <option>Hamza Carpets</option>
+            <option>FGA of Pakistan</option>
+            <option>Ghalib Assocoates</option>
+            <option>Saudi Pak BA Rajpot</option>
+            <option>AM Gill Pvt Ltd</option>
+          </select>
+        </div>
+      </form>
 
       {confirmPostOpen ? (
         <ConfirmDialog

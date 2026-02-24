@@ -1,199 +1,192 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
-import StatusChip from "@/components/ui/status-chip"
-import EmptyState from "@/components/ui/empty-state"
 import InlineAlert from "@/components/ui/inline-alert"
 
-type ClientTypeRow = { id: string; name: string; addedBy: string }
-type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string }
+type ClientTypeRow = { id: string; serial: number; name: string; addedBy: string }
+type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string; status: "ACTIVE" | "INACTIVE" }
 type LocationRow = { id: string; locationName: string; createdBy: string; createdOn: string }
 
-const TABS = ["All Client Types", "Client's Document Types", "Client Locations"] as const
+type AddMode = "clientType" | "documentType" | "location"
 
 const initialClientTypes: ClientTypeRow[] = [
-  { id: "1", name: "Bank", addedBy: "SUPERUSER" },
-  { id: "2", name: "Manufacturer", addedBy: "SUPERUSER" },
-  { id: "3", name: "Other", addedBy: "SUPERUSER" },
+  { id: "1", serial: 1, name: "Bank", addedBy: "SUPERUSER" },
+  { id: "2", serial: 2, name: "Manufacturer", addedBy: "SUPERUSER" },
+  { id: "3", serial: 3, name: "Other", addedBy: "SUPERUSER" },
 ]
 
 const initialDocumentTypes: DocumentTypeRow[] = [
-  { id: "1", name: "Verification Form", uniqueKey: "FE879B37B8", createdAt: "2018-01-29" },
-  { id: "2", name: "Authentication Form", uniqueKey: "0AFC4214F", createdAt: "2018-01-29" },
-  { id: "3", name: "File", uniqueKey: "8C700922AD", createdAt: "2018-02-08" },
+  { id: "1", name: "Verification Form", uniqueKey: "FE879B37B8", createdAt: "2018-01-29 10:00:36", status: "INACTIVE" },
+  { id: "2", name: "Authentication Form", uniqueKey: "0AFC4214F", createdAt: "2018-01-29 10:01:31", status: "INACTIVE" },
+  { id: "3", name: "File", uniqueKey: "8C700922AD", createdAt: "2018-02-08 14:52:58", status: "INACTIVE" },
 ]
 
 const initialLocations: LocationRow[] = [
-  { id: "1", locationName: "Lahore", createdBy: "SUPERUSER", createdOn: "2018-04-26" },
-  { id: "2", locationName: "Gujranwala", createdBy: "SUPERUSER", createdOn: "2018-04-26" },
-  { id: "3", locationName: "Multan", createdBy: "N/A", createdOn: "2018-05-17" },
+  { id: "1", locationName: "ALL CITIES", createdBy: "SUPERUSER", createdOn: "NOV 30TH, -0001" },
+  { id: "2", locationName: "LAHORE", createdBy: "SUPERUSER", createdOn: "APR 26TH, 2018" },
+  { id: "3", locationName: "GUJRANWALA", createdBy: "SUPERUSER", createdOn: "APR 26TH, 2018" },
+  { id: "4", locationName: "MULTAN", createdBy: "N/A", createdOn: "MAY 17TH, 2018" },
 ]
 
 export default function ClientTypesLocationsManager() {
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("All Client Types")
-  const [query, setQuery] = useState("")
-  const [entries, setEntries] = useState("10")
-  const [inputName, setInputName] = useState("")
-  const [inputUniqueKey, setInputUniqueKey] = useState("")
-  const [notice, setNotice] = useState("")
-  const [error, setError] = useState("")
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-
   const [clientTypes, setClientTypes] = useState<ClientTypeRow[]>(initialClientTypes)
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeRow[]>(initialDocumentTypes)
   const [locations, setLocations] = useState<LocationRow[]>(initialLocations)
 
+  const [query, setQuery] = useState("")
+  const [entries, setEntries] = useState("10")
+  const [notice, setNotice] = useState("")
+  const [error, setError] = useState("")
+
+  const [addMode, setAddMode] = useState<AddMode | null>(null)
+  const [nameInput, setNameInput] = useState("")
+  const [uniqueKeyInput, setUniqueKeyInput] = useState("")
+
+  const limited = Number.parseInt(entries, 10) || 10
+  const q = query.trim().toLowerCase()
+
   const filteredClientTypes = useMemo(() => {
-    if (!query) return clientTypes
-    return clientTypes.filter((row) => row.name.toLowerCase().includes(query.toLowerCase()))
-  }, [clientTypes, query])
+    const rows = q
+      ? clientTypes.filter((row) => row.name.toLowerCase().includes(q) || row.addedBy.toLowerCase().includes(q))
+      : clientTypes
+    return rows.slice(0, limited)
+  }, [clientTypes, q, limited])
 
   const filteredDocumentTypes = useMemo(() => {
-    if (!query) return documentTypes
-    return documentTypes.filter(
-      (row) => row.name.toLowerCase().includes(query.toLowerCase()) || row.uniqueKey.toLowerCase().includes(query.toLowerCase())
-    )
-  }, [documentTypes, query])
+    const rows = q
+      ? documentTypes.filter(
+          (row) =>
+            row.name.toLowerCase().includes(q) ||
+            row.uniqueKey.toLowerCase().includes(q) ||
+            row.createdAt.toLowerCase().includes(q)
+        )
+      : documentTypes
+    return rows.slice(0, limited)
+  }, [documentTypes, q, limited])
 
   const filteredLocations = useMemo(() => {
-    if (!query) return locations
-    return locations.filter((row) => row.locationName.toLowerCase().includes(query.toLowerCase()))
-  }, [locations, query])
+    const rows = q
+      ? locations.filter(
+          (row) =>
+            row.locationName.toLowerCase().includes(q) ||
+            row.createdBy.toLowerCase().includes(q) ||
+            row.createdOn.toLowerCase().includes(q)
+        )
+      : locations
+    return rows.slice(0, limited)
+  }, [locations, q, limited])
 
-  const onAdd = () => {
-    if (!inputName.trim()) {
+  const closeModal = () => {
+    setAddMode(null)
+    setNameInput("")
+    setUniqueKeyInput("")
+  }
+
+  const submitAdd = () => {
+    if (!nameInput.trim()) {
       setError("Name is required.")
       return
     }
+
     setError("")
 
-    if (activeTab === "All Client Types") {
-      setClientTypes((prev) => [{ id: String(prev.length + 1), name: inputName.trim(), addedBy: "ADMIN" }, ...prev])
-    } else if (activeTab === "Client's Document Types") {
-      setDocumentTypes((prev) => [
+    if (addMode === "clientType") {
+      setClientTypes((prev) => [
         {
-          id: String(prev.length + 1),
-          name: inputName.trim(),
-          uniqueKey: (inputUniqueKey.trim() || Math.random().toString(16).slice(2, 10)).toUpperCase(),
-          createdAt: new Date().toISOString().slice(0, 10),
+          id: crypto.randomUUID(),
+          serial: prev.length + 1,
+          name: nameInput.trim(),
+          addedBy: "SUPERUSER",
         },
         ...prev,
       ])
-    } else {
-      setLocations((prev) => [
-        { id: String(prev.length + 1), locationName: inputName.trim(), createdBy: "ADMIN", createdOn: new Date().toISOString().slice(0, 10) },
-        ...prev,
-      ])
+      setNotice("Client type added.")
     }
 
-    setInputName("")
-    setInputUniqueKey("")
-    setNotice("Record added.")
-  }
+    if (addMode === "documentType") {
+      setDocumentTypes((prev) => [
+        {
+          id: crypto.randomUUID(),
+          name: nameInput.trim(),
+          uniqueKey: (uniqueKeyInput.trim() || Math.random().toString(16).slice(2, 10)).toUpperCase(),
+          createdAt: new Date().toLocaleString("en-US"),
+          status: "INACTIVE",
+        },
+        ...prev,
+      ])
+      setNotice("Client document type added.")
+    }
 
-  const onDelete = (id: string) => {
-    if (activeTab === "All Client Types") setClientTypes((prev) => prev.filter((row) => row.id !== id))
-    else if (activeTab === "Client's Document Types") setDocumentTypes((prev) => prev.filter((row) => row.id !== id))
-    else setLocations((prev) => prev.filter((row) => row.id !== id))
-    setNotice("Record deleted.")
-  }
+    if (addMode === "location") {
+      setLocations((prev) => [
+        {
+          id: crypto.randomUUID(),
+          locationName: nameInput.trim().toUpperCase(),
+          createdBy: "SUPERUSER",
+          createdOn: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase(),
+        },
+        ...prev,
+      ])
+      setNotice("Client location added.")
+    }
 
-  const resetInputs = () => {
-    setInputName("")
-    setInputUniqueKey("")
-    setQuery("")
-    setNotice("Filters reset.")
+    closeModal()
   }
-
-  const tabClass = (tab: (typeof TABS)[number]) =>
-    `px-3 py-1.5 text-sm rounded-full border transition ${
-      activeTab === tab
-        ? "bg-[var(--brand)] text-white border-[var(--brand)]"
-        : "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]"
-    }`
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Client Types & Locations" subtitle="Master data tables for client types, document types, and client locations." />
+      <SectionTitle title="Types & Locations" subtitle="All client types, client's document types, and client locations." />
 
-      <FilterBar className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((tab) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={tabClass(tab)}>
-              {tab}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+        <div>
+          <label className="mb-1 block text-xs text-[var(--text-muted)]">Show</label>
+          <select value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
+            {[
+              "10",
+              "25",
+              "50",
+              "100",
+            ].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-            <input value={inputName} onChange={(e) => setInputName(e.target.value)} className="ui-input" placeholder="Name" />
-          </div>
-          {activeTab === "Client's Document Types" ? (
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Unique Key</label>
-              <input value={inputUniqueKey} onChange={(e) => setInputUniqueKey(e.target.value)} className="ui-input" placeholder="Unique key" />
-            </div>
-          ) : (
-            <div />
-          )}
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Show</label>
-            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
-              {["10", "25", "50", "100"].map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Search</label>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} className="ui-input" placeholder="Search rows" />
-          </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--text-muted)]">Search:</label>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="rounded-md border px-2 py-1 text-sm"
+            placeholder="Search all tables"
+          />
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={onAdd}>Add</ActionButton>
-          <ActionButton variant="secondary" onClick={resetInputs}>Reset</ActionButton>
-          <ActionButton variant="secondary" onClick={() => setNotice("Changes submitted.")}>Submit</ActionButton>
-        </div>
-      </FilterBar>
+      </div>
 
       {error ? <InlineAlert type="error" message={error} /> : null}
       {notice ? <InlineAlert type="success" message={notice} /> : null}
 
-      {activeTab === "All Client Types" ? (
+      <MasterSection title="All Client Types" onAdd={() => setAddMode("clientType")}>
         <DataTable
-          rows={filteredClientTypes.slice(0, Number.parseInt(entries, 10) || 10)}
+          rows={filteredClientTypes}
           columns={[
-            { key: "id", header: "Serial #", sortable: true },
+            { key: "serial", header: "Serial #", sortable: true },
             { key: "name", header: "Name", sortable: true },
-            {
-              key: "addedBy",
-              header: "Added By",
-              render: (row) => <StatusChip label={row.addedBy} variant="neutral" />,
-            },
-            {
-              key: "action",
-              header: "Action",
-              render: (row) => (
-                <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
-                  Delete
-                </button>
-              ),
-            },
+            { key: "addedBy", header: "Added By", sortable: true },
           ]}
           getRowKey={(row) => row.id}
           searchable={false}
           emptyText="No client types found."
         />
-      ) : activeTab === "Client's Document Types" ? (
+      </MasterSection>
+
+      <MasterSection title="Client's Document Types" onAdd={() => setAddMode("documentType")}>
         <DataTable
-          rows={filteredDocumentTypes.slice(0, Number.parseInt(entries, 10) || 10)}
+          rows={filteredDocumentTypes}
           columns={[
             { key: "name", header: "Name", sortable: true },
             { key: "uniqueKey", header: "Unique Key", sortable: true },
@@ -202,8 +195,15 @@ export default function ClientTypesLocationsManager() {
               key: "action",
               header: "Action",
               render: (row) => (
-                <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
-                  Delete
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-emerald-700 hover:underline"
+                  onClick={() => {
+                    setDocumentTypes((prev) => prev.map((item) => (item.id === row.id ? { ...item, status: item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : item)))
+                    setNotice("Document status updated.")
+                  }}
+                >
+                  {row.status === "ACTIVE" ? "DEACTIVATE" : "ACTIVATE"}
                 </button>
               ),
             },
@@ -212,59 +212,79 @@ export default function ClientTypesLocationsManager() {
           searchable={false}
           emptyText="No document types found."
         />
-      ) : filteredLocations.length > 0 ? (
+      </MasterSection>
+
+      <MasterSection title="Client Locations" onAdd={() => setAddMode("location")}>
         <DataTable
-          rows={filteredLocations.slice(0, Number.parseInt(entries, 10) || 10)}
+          rows={filteredLocations}
           columns={[
             { key: "locationName", header: "Location Name", sortable: true },
             { key: "createdBy", header: "Created By", sortable: true },
             { key: "createdOn", header: "Created On", sortable: true },
-            { key: "action", header: "Action", render: () => <span className="text-[var(--brand)]">Edit</span> },
+            { key: "action", header: "Action", render: () => <span className="text-[var(--brand)]">EDIT</span> },
           ]}
           getRowKey={(row) => row.id}
           searchable={false}
           emptyText="No locations found."
         />
-      ) : (
-        <EmptyState title="No locations found" description="Create your first client location from the form above." />
-      )}
+      </MasterSection>
 
-      {confirmDeleteId ? (
-        <ConfirmDialog
-          title="Delete Record"
-          message="Are you sure you want to delete this record?"
-          onNo={() => setConfirmDeleteId(null)}
-          onYes={() => {
-            onDelete(confirmDeleteId)
-            setConfirmDeleteId(null)
-          }}
-        />
+      {addMode ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
+            <h3 className="text-base font-semibold text-[var(--text)]">
+              {addMode === "clientType"
+                ? "Add Client Type"
+                : addMode === "documentType"
+                  ? "Add Client Document Type"
+                  : "Add Client Location"}
+            </h3>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Name*</label>
+                <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} className="ui-input" placeholder="Name" />
+              </div>
+              {addMode === "documentType" ? (
+                <div>
+                  <label className="mb-1 block text-sm text-[var(--text-muted)]">Unique Key</label>
+                  <input value={uniqueKeyInput} onChange={(e) => setUniqueKeyInput(e.target.value)} className="ui-input" placeholder="Unique key" />
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <ActionButton variant="secondary" onClick={closeModal}>Close</ActionButton>
+              <ActionButton onClick={submitAdd}>Submit</ActionButton>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )
 }
 
-function ConfirmDialog({
+function MasterSection({
   title,
-  message,
-  onYes,
-  onNo,
+  children,
+  onAdd,
 }: {
   title: string
-  message: string
-  onYes: () => void
-  onNo: () => void
+  children: ReactNode
+  onAdd: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
-        <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
-          <ActionButton onClick={onYes}>Yes</ActionButton>
-        </div>
-      </div>
-    </div>
+    <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white">
+      <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+        <h2 className="text-sm font-semibold tracking-wide text-[var(--text)] uppercase">{title}</h2>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex h-7 w-7 items-center justify-center rounded bg-emerald-500 text-white hover:bg-emerald-600"
+          aria-label={`Add ${title}`}
+        >
+          +
+        </button>
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
   )
 }
