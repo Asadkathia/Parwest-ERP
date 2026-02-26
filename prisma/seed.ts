@@ -4,7 +4,18 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const databaseUrl =
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.DATABASE_URL_UNPOOLED ??
+    process.env.POSTGRES_URL_NON_POOLING
+
+if (!databaseUrl) {
+    throw new Error("Database URL is required to run seed.")
+}
+
+const pool = new Pool({ connectionString: databaseUrl })
 const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
