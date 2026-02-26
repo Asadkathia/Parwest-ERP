@@ -22,10 +22,25 @@ export const mockGuardProfile = {
     status: "ACTIVE",
     regionalOffice: "Lahore Office",
     supervisorName: "Fazal Mehdi",
+    managerName: "Muhammad Arshad",
+    enrolledBy: "Usman Hameed",
     isExService: false,
     paymentMode: "BANK",
     guardCategory: "MUJAHID",
     joiningDate: new Date("2020-01-15"),
+    joiningAge: 30,
+    profileIntroducer: "Muhammad Usman",
+    nearestRelatives: [
+        {
+            name: "Waqar Ahmed",
+            fatherName: "Yaqoob Ahmed",
+            relation: "Brother",
+            profession: "Businessman",
+            cnic: "35202-1234567-1",
+            contact: "+92-300-4455667",
+            address: "Lahore",
+        },
+    ],
 
     // Tab: Attachments
     attachments: [

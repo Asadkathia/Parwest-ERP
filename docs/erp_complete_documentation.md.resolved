@@ -211,9 +211,10 @@ Identified roles in the system:
 
 **Features**:
 - Search by CNIC
-- Add to blacklist
+- Add CNIC to blacklist (identity-level, not guard-record selection)
 - Record who blacklisted and when
 - Reason for blacklisting
+- Blacklisted CNIC blocks future guard enrollment attempts
 
 #### 2.6 Inactive Guards
 **URL**: `/guard/inactive-guards`

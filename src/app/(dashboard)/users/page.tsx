@@ -105,8 +105,8 @@ export default async function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--text-muted)]">—</td>
                   <td className="px-6 py-4 text-sm">
-                    <Link href={`/users/${user.id}`} className="text-[var(--brand)] hover:underline font-medium">
-                      View
+                    <Link href="/users/search" className="text-[var(--brand)] hover:underline font-medium">
+                      Manage
                     </Link>
                   </td>
                 </tr>

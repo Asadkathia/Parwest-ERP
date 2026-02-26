@@ -1,6 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { requisitionScreens } from "@/lib/parity/screenConfigs"
+import RequisitionsManager from "@/components/requisitions/RequisitionsManager"
 
 export default function RequisitionsPage() {
-  return <ConfiguredInteractiveScreen config={requisitionScreens.approvals} />
+  return <RequisitionsManager />
 }

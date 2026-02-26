@@ -7,6 +7,16 @@ import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import { mockGuardProfile } from "@/lib/mockData/guards"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 
+function calculateAge(dateOfBirth?: Date | null, referenceDate?: Date | null) {
+    if (!dateOfBirth || !referenceDate) return null
+    let years = referenceDate.getFullYear() - dateOfBirth.getFullYear()
+    const monthDiff = referenceDate.getMonth() - dateOfBirth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < dateOfBirth.getDate())) {
+        years--
+    }
+    return years >= 0 ? years : null
+}
+
 export default async function GuardDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
@@ -36,6 +46,21 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         status: guard.status,
         regionalOffice: guard.regionalOffice?.name || mockGuardProfile.regionalOffice,
         supervisorName: (mockGuardProfile as { supervisorName?: string }).supervisorName || "Fazal Mehdi",
+        managerName: (guard as any).managerName || (mockGuardProfile as { managerName?: string }).managerName || "—",
+        joiningAge:
+            (guard as any).joiningAge ??
+            calculateAge(guard.dateOfBirth, guard.joiningDate) ??
+            (mockGuardProfile as { joiningAge?: number }).joiningAge ??
+            null,
+        enrolledBy: (guard as any).enrolledBy || (mockGuardProfile as { enrolledBy?: string }).enrolledBy || "—",
+        profileIntroducer:
+            (guard as any).profileIntroducer ||
+            (mockGuardProfile as { profileIntroducer?: string }).profileIntroducer ||
+            "—",
+        nearestRelatives:
+            (guard as any).nearestRelatives ||
+            (mockGuardProfile as { nearestRelatives?: Array<Record<string, string>> }).nearestRelatives ||
+            [],
     }
 
     const getStatusColor = (status: string) => {

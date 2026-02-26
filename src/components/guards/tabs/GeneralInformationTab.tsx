@@ -29,6 +29,8 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
         }
     }
 
+    const nearestRelativeList = Array.isArray(guard.nearestRelatives) ? guard.nearestRelatives : []
+
     return (
         <div className="space-y-6">
             {/* Status Badge */}
@@ -94,6 +96,10 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         <p className="text-sm text-gray-600">Next of Kin</p>
                         <p className="font-medium">{guard.nextOfKin || "—"}</p>
                     </div>
+                    <div>
+                        <p className="text-sm text-gray-600">Profile Introducer</p>
+                        <p className="font-medium">{guard.profileIntroducer || "—"}</p>
+                    </div>
                 </div>
             </div>
 
@@ -115,6 +121,12 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     <div>
                         <p className="text-sm text-gray-600">Emergency Contact</p>
                         <p className="font-medium">{guard.emergencyContact || "—"}</p>
+                    </div>
+                    <div className="md:col-span-2 lg:col-span-3">
+                        <p className="text-sm text-gray-600">Additional Contact Numbers</p>
+                        <p className="font-medium">
+                            {guard.additionalContactNumbers || guard.phoneSecondary || "—"}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -149,14 +161,70 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         <p className="font-medium">{guard.regionalOffice || "—"}</p>
                     </div>
                     <div>
+                        <p className="text-sm text-gray-600">Manager</p>
+                        <p className="font-medium">{guard.managerName || "—"}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-600">Enrolled By User</p>
+                        <p className="font-medium">{guard.enrolledBy || "—"}</p>
+                    </div>
+                    <div>
                         <p className="text-sm text-gray-600">Joining Date</p>
                         <p className="font-medium">{formatDate(guard.joiningDate)}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-600">Joining Age</p>
+                        <p className="font-medium">{guard.joiningAge != null ? `${guard.joiningAge} years` : "—"}</p>
                     </div>
                     <div>
                         <p className="text-sm text-gray-600">Ex-Service</p>
                         <p className="font-medium">{guard.isExService ? "Yes" : "No"}</p>
                     </div>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-semibold mb-4">Nearest Relative Details</h3>
+                {nearestRelativeList.length === 0 ? (
+                    <p className="text-sm text-gray-600">No nearest relative details available.</p>
+                ) : (
+                    <div className="space-y-4">
+                        {nearestRelativeList.map((relative: any, index: number) => (
+                            <div key={`${relative.name || "relative"}-${index}`} className="rounded-md border p-4">
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                                    <div>
+                                        <p className="text-xs text-gray-500">Name</p>
+                                        <p className="font-medium">{relative.name || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Father Name</p>
+                                        <p className="font-medium">{relative.fatherName || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Relation</p>
+                                        <p className="font-medium">{relative.relation || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Profession</p>
+                                        <p className="font-medium">{relative.profession || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">CNIC</p>
+                                        <p className="font-medium">{relative.cnic || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Contact</p>
+                                        <p className="font-medium">{relative.contact || "—"}</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <p className="text-xs text-gray-500">Address</p>
+                                        <p className="font-medium">{relative.address || "—"}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     )

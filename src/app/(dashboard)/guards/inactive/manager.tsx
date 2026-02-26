@@ -21,6 +21,7 @@ export default function InactiveGuardsManager() {
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
     const [confirmReactivateId, setConfirmReactivateId] = useState<string | null>(null)
+    const [reactivateReason, setReactivateReason] = useState("")
 
     const loadInactiveGuards = async () => {
         try {
@@ -46,12 +47,16 @@ export default function InactiveGuardsManager() {
         loadInactiveGuards()
     }, [])
 
-    const reactivateGuard = async (guardId: string) => {
+    const reactivateGuard = async (guardId: string, reason: string) => {
         setError("")
+        if (!reason.trim()) {
+            setError("Reactivation reason is required.")
+            return
+        }
         const response = await fetch(`/api/guards/${guardId}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "ACTIVE" }),
+            body: JSON.stringify({ status: "ACTIVE", reason }),
         })
 
         if (!response.ok) {
@@ -62,6 +67,7 @@ export default function InactiveGuardsManager() {
 
         await loadInactiveGuards()
         setNotice("Guard reactivated.")
+        setReactivateReason("")
     }
 
     const filtered = guards
@@ -145,9 +151,14 @@ export default function InactiveGuardsManager() {
                 <ConfirmDialog
                     title="Activate Guard"
                     message="Are you sure you want to activate this inactive guard?"
-                    onNo={() => setConfirmReactivateId(null)}
+                    reason={reactivateReason}
+                    onReasonChange={setReactivateReason}
+                    onNo={() => {
+                        setConfirmReactivateId(null)
+                        setReactivateReason("")
+                    }}
                     onYes={async () => {
-                        await reactivateGuard(confirmReactivateId)
+                        await reactivateGuard(confirmReactivateId, reactivateReason)
                         setConfirmReactivateId(null)
                     }}
                 />
@@ -159,11 +170,15 @@ export default function InactiveGuardsManager() {
 function ConfirmDialog({
     title,
     message,
+    reason,
+    onReasonChange,
     onYes,
     onNo,
 }: {
     title: string
     message: string
+    reason: string
+    onReasonChange: (value: string) => void
     onYes: () => void | Promise<void>
     onNo: () => void
 }) {
@@ -172,6 +187,18 @@ function ConfirmDialog({
             <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
                 <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
+                <div className="mt-3">
+                    <label className="mb-1 block text-sm font-medium text-[var(--text)]">
+                        Reactivation Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        value={reason}
+                        onChange={(e) => onReasonChange(e.target.value)}
+                        rows={3}
+                        className="ui-textarea"
+                        placeholder="Enter reason for reactivation"
+                    />
+                </div>
                 <div className="mt-5 flex justify-end gap-2">
                     <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
                     <ActionButton onClick={onYes}>Yes</ActionButton>

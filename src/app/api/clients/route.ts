@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockClientsList } from "@/lib/mockData/clients"
+import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
     try {
@@ -10,6 +11,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
         const regionId = searchParams.get("regionId")
@@ -18,10 +20,16 @@ export async function GET(request: NextRequest) {
         const where: any = {}
         if (regionId) where.regionId = regionId
         if (status) where.status = status
+        Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
 
         if (isMockEnabled()) {
             const clients = mockClientsList
                 .filter((client) => (where.status ? client.status === where.status : true))
+                .filter((client) =>
+                    applyManagerScope([client], managerScope, {
+                        regionId: (row) => (row as any).regionId,
+                    }).length > 0
+                )
                 .map((client) => ({
                     id: client.id,
                     name: client.name,
@@ -58,8 +66,13 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
+        const bodyRegionId = body?.regionId ? String(body.regionId) : null
+        if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
+            return NextResponse.json({ message: "Forbidden: cannot create client outside your scope." }, { status: 403 })
+        }
 
         if (isMockEnabled()) {
             const mock = {

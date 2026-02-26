@@ -1,14 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { ticketScreens } from "@/lib/parity/screenConfigs"
+import TicketListManager from "@/components/tickets/TicketListManager"
 
 export default function TicketsPage() {
-  return (
-    <ConfiguredInteractiveScreen
-      config={ticketScreens.listing}
-      links={[
-        { label: "Create Ticket", href: "/tickets/new" },
-        { label: "Prerequisites", href: "/tickets/prerequisites" },
-      ]}
-    />
-  )
+  return <TicketListManager />
 }

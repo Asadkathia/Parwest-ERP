@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function POST(
     request: NextRequest,
@@ -11,6 +12,7 @@ export async function POST(
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { id } = await params
         const body = await request.json()
@@ -25,6 +27,9 @@ export async function POST(
                 { message: "Deployment not found" },
                 { status: 404 }
             )
+        }
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existingDeployment.regionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
         }
 
         if (existingDeployment.status === "INACTIVE") {

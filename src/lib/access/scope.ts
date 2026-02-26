@@ -44,3 +44,40 @@ export function applyManagerScope<T>(
     return regionPass && officePass
   })
 }
+
+export function buildManagerScopeWhere(
+  scope: ManagerScope | null,
+  keys: {
+    regionId?: string
+    regionalOfficeId?: string
+  }
+) {
+  if (!scope) return {}
+
+  const where: Record<string, string> = {}
+  if (keys.regionId && scope.regionId) where[keys.regionId] = scope.regionId
+  if (keys.regionalOfficeId && scope.regionalOfficeIds.length > 0) {
+    where[keys.regionalOfficeId] = scope.regionalOfficeIds[0]
+  }
+  return where
+}
+
+export function managerScopeDenied(
+  scope: ManagerScope | null,
+  values: {
+    regionId?: string | null
+    regionalOfficeId?: string | null
+  }
+) {
+  if (!scope) return false
+
+  if (scope.regionId && values.regionId && values.regionId !== scope.regionId) return true
+  if (
+    scope.regionalOfficeIds.length > 0 &&
+    values.regionalOfficeId &&
+    !scope.regionalOfficeIds.includes(values.regionalOfficeId)
+  ) {
+    return true
+  }
+  return false
+}

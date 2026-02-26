@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockDeploymentsList } from "@/lib/mockData/deployments"
+import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET() {
     try {
@@ -10,10 +11,13 @@ export async function GET() {
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         if (isMockEnabled()) {
             return NextResponse.json(
-                mockDeploymentsList.map((row) => ({
+                applyManagerScope(mockDeploymentsList, managerScope, {
+                    regionalOfficeId: (row) => (row as any).regionalOfficeId,
+                }).map((row) => ({
                     ...row,
                     deploymentDate: new Date(row.deploymentDate),
                 }))
@@ -21,6 +25,7 @@ export async function GET() {
         }
 
         const deployments = await prisma.deployment.findMany({
+            where: buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
             orderBy: { createdAt: "desc" },
             include: {
                 guard: true,
@@ -43,8 +48,13 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
+        const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: bodyRegionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: cannot create deployment outside your scope." }, { status: 403 })
+        }
 
         if (isMockEnabled()) {
             const mockDeployment = {

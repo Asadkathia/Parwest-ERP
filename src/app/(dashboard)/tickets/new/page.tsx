@@ -1,6 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { moduleHubScreens } from "@/lib/parity/screenConfigs"
+import TicketNewManager from "@/components/tickets/TicketNewManager"
 
 export default function NewTicketPage() {
-  return <ConfiguredInteractiveScreen config={moduleHubScreens.ticketNew} />
+  return <TicketNewManager />
 }

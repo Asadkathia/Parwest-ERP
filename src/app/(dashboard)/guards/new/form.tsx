@@ -6,20 +6,18 @@ import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-re
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 
-type Region = {
-  id: string
-  name: string
-}
-
 type RegionalOffice = {
   id: string
   name: string
-  region: Region
+  region: {
+    id: string
+    name: string
+  }
 }
 
 type Props = {
-  regions: Region[]
   regionalOffices: RegionalOffice[]
+  currentUserName: string
 }
 
 type SectionConfig = {
@@ -78,7 +76,24 @@ function useSectionChecklist() {
   return { sections, toggle, allSelected, setAll }
 }
 
-export default function GuardEnrollmentForm({ regions, regionalOffices }: Props) {
+function calculateAge(dateOfBirth: string, referenceDate?: string) {
+  if (!dateOfBirth) return ""
+
+  const birth = new Date(dateOfBirth)
+  if (Number.isNaN(birth.getTime())) return ""
+
+  const reference = referenceDate ? new Date(referenceDate) : new Date()
+  if (Number.isNaN(reference.getTime())) return ""
+
+  let age = reference.getFullYear() - birth.getFullYear()
+  const monthDiff = reference.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birth.getDate())) {
+    age--
+  }
+  return age >= 0 ? String(age) : ""
+}
+
+export default function GuardEnrollmentForm({ regionalOffices, currentUserName }: Props) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
   const [loading, setLoading] = useState(false)
@@ -99,6 +114,12 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
   const [nearestRows, setNearestRows] = useState([0])
   const familyCounterRef = useRef(1)
   const nearestCounterRef = useRef(1)
+  const [contactRows, setContactRows] = useState([1])
+  const contactCounterRef = useRef(2)
+  const [dateOfBirth, setDateOfBirth] = useState("")
+  const [joiningDate, setJoiningDate] = useState("")
+  const ageValue = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth])
+  const joiningAgeValue = useMemo(() => calculateAge(dateOfBirth, joiningDate), [dateOfBirth, joiningDate])
 
   const toggleSectionCollapse = (id: string) => {
     setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -145,10 +166,13 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
     setSuccess("")
 
     const formData = new FormData(e.currentTarget)
-    const data = Object.fromEntries(formData.entries())
+    const data = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>
     const cnicValue = String(data.cnic || "").trim()
-    const phoneValue = String(data.phone || "").trim()
     const ageValue = String(data.age || "").trim()
+    const contactNumbers = Object.entries(data)
+      .filter(([key]) => key === "phone" || key.startsWith("phone_secondary_"))
+      .map(([, value]) => String(value || "").trim())
+      .filter(Boolean)
     const familyAgeValues = Object.entries(data)
       .filter(([key]) => key.includes("_age"))
       .map(([, value]) => String(value || "").trim())
@@ -159,10 +183,18 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
       return
     }
 
-    if (phoneValue && !/^\+92-\d{3}-\d{7}$/.test(phoneValue)) {
-      setError("Contact format must be +92-300-1234567")
+    if (contactNumbers.length === 0) {
+      setError("At least one contact number is required.")
       setLoading(false)
       return
+    }
+
+    for (const number of contactNumbers) {
+      if (!/^\+92-\d{3}-\d{7}$/.test(number)) {
+        setError("Contact format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
     }
 
     if (ageValue && (!Number.isFinite(Number(ageValue)) || Number(ageValue) < 0)) {
@@ -180,6 +212,9 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
     }
 
     try {
+      data.phone = contactNumbers[0]
+      data.additionalContactNumbers = contactNumbers.slice(1).join(", ")
+
       const response = await fetch("/api/guards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -271,18 +306,96 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
           onToggle={() => toggleSectionCollapse("general")}
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="Parwest ID" name="parwestId" required />
-            <Field label="PARWEST SHORT NAME" name="parwest_shortname" placeholder="Short Name" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Regional Office <span className="text-red-500">*</span>
+              </label>
+              <select name="regionalOfficeId" required className="ui-input">
+                <option value="">Select regional office</option>
+                <option value="legacy-head-office-lahore">head office lahore</option>
+                {regionalOffices.map((office) => (
+                  <option key={`regionalOffice-${office.id}`} value={office.id}>
+                    {office.name} ({office.region.name})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Parwest ID</label>
+              <input
+                type="text"
+                value="Auto-generated on submit"
+                readOnly
+                className="ui-input bg-slate-50 text-slate-500"
+              />
+            </div>
             <Field label="FULL NAME *" name="name" required placeholder="Full Name" />
             <Field label="FATHER'S NAME *" name="fatherName" required placeholder="FATHER'S NAME" />
             <Field label="MOTHER'S NAME *" name="motherName" required placeholder="MOTHER'S NAME" />
-            <Field label="DATE OF BIRTH *" name="dateOfBirth" type="date" required />
-            <Field label="AGE" name="age" type="number" placeholder="AGE" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                DATE OF BIRTH <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="dateOfBirth"
+                required
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="ui-input"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">AGE</label>
+              <input type="number" name="age" readOnly value={ageValue} className="ui-input bg-slate-50" placeholder="AGE" />
+            </div>
             <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X) *" name="cnic" required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
             <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
             <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
             <Field label="NEXT OF KIN *" name="nextOfKin" required />
-            <Field label="CONTACT # (FORMAT: +92-300-1234567) *" name="phone" required placeholder="Contact # (Format: +92-300-1234567)" />
+            <div className="space-y-3 lg:col-span-3">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CONTACT # (FORMAT: +92-300-1234567) <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <input
+                  type="text"
+                  name="phone"
+                  required
+                  className="ui-input"
+                  placeholder="Primary Contact # (+92-300-1234567)"
+                />
+                {contactRows.map((idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      name={`phone_secondary_${idx}`}
+                      className="ui-input"
+                      placeholder="Additional Contact #"
+                    />
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] text-red-600 hover:bg-red-50"
+                      onClick={() => setContactRows((prev) => prev.filter((id) => id !== idx))}
+                      aria-label="Remove contact number"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+                onClick={() => {
+                  const nextId = contactCounterRef.current++
+                  setContactRows((prev) => [...prev, nextId])
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Add Contact Number
+              </button>
+            </div>
             <Field label="PASSPORT #" name="passportNumber" placeholder="PASSPORT #" />
             <Field label="PASSPORT EXPIRY DATE" name="passportExpiryDate" type="date" />
             <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
@@ -290,18 +403,29 @@ export default function GuardEnrollmentForm({ regions, regionalOffices }: Props)
             <Field label="CAST *" name="cast" required placeholder="CAST" />
             <SelectField label="DESIGNATION (TYPE)" name="designation" options={LEGACY_GUARD_TYPES} defaultValue="Guard" />
             <Field label="SALARY *" name="salary" type="number" placeholder="Salary" required />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Joining Date</label>
+              <input
+                type="date"
+                name="joiningDate"
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
+                className="ui-input"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Joining Age</label>
+              <input type="number" name="joiningAge" readOnly value={joiningAgeValue} className="ui-input bg-slate-50" placeholder="Joining Age" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Enrolled By User</label>
+              <input type="text" name="enrolledBy" readOnly value={currentUserName} className="ui-input bg-slate-50" />
+            </div>
             <Field label="POLICE STATION *" name="policeStation" required />
             <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" />
             <SelectField label="MARITAL STATUS" name="maritalStatus" options={MARITAL_STATUSES} placeholder="--Select Marital Status--" />
-            <SelectField label="Region" name="regionId" options={regions.map((r) => ({ label: r.name, value: r.id }))} />
-            <SelectField
-              label="Regional Office"
-              name="regionalOfficeId"
-              options={[
-                { label: "head office lahore", value: "legacy-head-office-lahore" },
-                ...regionalOffices.map((office) => ({ label: `${office.name} (${office.region.name})`, value: office.id })),
-              ]}
-            />
+            <Field label="Manager" name="managerName" placeholder="Manager Name" />
+            <Field label="Profile Introducer" name="profileIntroducer" placeholder="Profile Introducer" />
           </div>
         </CollapsibleSection>
       ) : null}

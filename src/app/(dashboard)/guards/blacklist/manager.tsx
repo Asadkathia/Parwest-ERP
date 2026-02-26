@@ -9,23 +9,17 @@ type BlacklistedGuard = {
     name: string
     cnic: string
     updatedAt: string
-}
-
-type ActiveGuard = {
-    id: string
-    parwestId: string
-    name: string
-    cnic: string
+    reason?: string | null
+    blacklistedBy?: string | null
 }
 
 export default function BlacklistManager() {
     const [cnicQuery, setCnicQuery] = useState("")
+    const [reason, setReason] = useState("")
     const [rowCountSelect, setRowCountSelect] = useState("10 rows")
     const [tableSearch, setTableSearch] = useState("")
     const [selectDate, setSelectDate] = useState("")
     const [rows, setRows] = useState<BlacklistedGuard[]>([])
-    const [activeGuards, setActiveGuards] = useState<ActiveGuard[]>([])
-    const [selectedGuardId, setSelectedGuardId] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
@@ -41,7 +35,7 @@ export default function BlacklistManager() {
             const response = await fetch(`/api/guards/blacklist?${params.toString()}`)
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}))
-                throw new Error(data.message || "Failed to fetch blacklisted guards")
+                throw new Error(data.message || "Failed to fetch blacklisted CNIC records")
             }
             const data = await response.json()
             setRows(data)
@@ -53,20 +47,8 @@ export default function BlacklistManager() {
         }
     }
 
-    const loadActiveGuards = async () => {
-        try {
-            const response = await fetch("/api/guards?status=ACTIVE")
-            if (!response.ok) return
-            const data = await response.json()
-            setActiveGuards(data)
-        } catch {
-            setActiveGuards([])
-        }
-    }
-
     useEffect(() => {
         loadBlacklisted()
-        loadActiveGuards()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -84,32 +66,36 @@ export default function BlacklistManager() {
         .slice(0, Number.parseInt(rowCountSelect, 10) || 10)
 
     const blacklistGuard = async () => {
-        if (!selectedGuardId) return
+        const cnic = cnicQuery.trim()
+        if (!cnic) {
+            setError("CNIC is required to blacklist.")
+            return
+        }
         setError("")
 
         const response = await fetch("/api/guards/blacklist", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ guardId: selectedGuardId }),
+            body: JSON.stringify({ cnic, reason: reason.trim() || null }),
         })
 
         if (!response.ok) {
             const data = await response.json().catch(() => ({}))
-            setError(data.message || "Failed to blacklist guard")
+            setError(data.message || "Failed to blacklist CNIC")
             return
         }
 
-        setSelectedGuardId("")
-        await Promise.all([loadBlacklisted(), loadActiveGuards()])
-        setNotice("Guard blacklisted.")
+        await loadBlacklisted()
+        setNotice(`CNIC ${cnic} blocked successfully.`)
+        setReason("")
     }
 
-    const removeFromBlacklist = async (guardId: string) => {
+    const removeFromBlacklist = async (id: string) => {
         setError("")
-        const response = await fetch(`/api/guards/${guardId}/status`, {
-            method: "PATCH",
+        const response = await fetch("/api/guards/blacklist", {
+            method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "ACTIVE" }),
+            body: JSON.stringify({ id }),
         })
 
         if (!response.ok) {
@@ -118,15 +104,15 @@ export default function BlacklistManager() {
             return
         }
 
-        await Promise.all([loadBlacklisted(), loadActiveGuards()])
-        setNotice("Guard removed from blacklist.")
+        await loadBlacklisted()
+        setNotice("CNIC removed from blacklist.")
     }
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Black Listed Guards</h1>
-                <p className="text-gray-600 mt-1">Track and manage blacklisted guard records</p>
+                <h1 className="text-3xl font-bold">Black Listed CNICs</h1>
+                <p className="text-gray-600 mt-1">Blacklist CNIC identities to block future guard enrollment</p>
             </div>
 
             <div className="bg-white rounded-lg border p-4 space-y-3">
@@ -142,16 +128,17 @@ export default function BlacklistManager() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
-                        <label className="block text-sm text-gray-600 mb-1">Add Active Guard to Blacklist</label>
-                        <select name="selected_guard_id" value={selectedGuardId} onChange={(e) => setSelectedGuardId(e.target.value)} className="w-full border rounded-md px-3 py-2">
-                            <option value="">--Select Guard--</option>
-                            {activeGuards.map((guard) => (
-                                <option key={guard.id} value={guard.id}>{guard.parwestId} - {guard.name} ({guard.cnic})</option>
-                            ))}
-                        </select>
+                        <label className="block text-sm text-gray-600 mb-1">Reason (Optional)</label>
+                        <input
+                            name="reason"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="w-full border rounded-md px-3 py-2"
+                            placeholder="Reason for blocking this CNIC"
+                        />
                     </div>
                     <div className="flex items-end">
-                        <ActionButton onClick={blacklistGuard} className="w-full">Submit</ActionButton>
+                        <ActionButton onClick={blacklistGuard} className="w-full">Block CNIC</ActionButton>
                     </div>
                 </div>
             </div>
@@ -187,23 +174,27 @@ export default function BlacklistManager() {
                         <tr>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Cnic #</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Name</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Blacklisted By</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Reason</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Blacklisted On</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {loading ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
+                            <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
                         ) : visibleRows.length === 0 ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">No blacklisted guards found.</td></tr>
+                            <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">No blacklisted CNIC records found.</td></tr>
                         ) : (
                             visibleRows.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{row.cnic}</td>
                                     <td className="px-6 py-4 text-sm">{row.name}</td>
+                                    <td className="px-6 py-4 text-sm">{row.blacklistedBy || "System"}</td>
+                                    <td className="px-6 py-4 text-sm">{row.reason || "—"}</td>
                                     <td className="px-6 py-4 text-sm">{new Date(row.updatedAt).toLocaleString("en-US")}</td>
                                     <td className="px-6 py-4 text-sm">
-                                        <button onClick={() => setConfirmRemoveId(row.id)} className="text-red-600 hover:text-red-800 font-medium">Remove</button>
+                                        <button onClick={() => setConfirmRemoveId(row.id)} className="text-red-600 hover:text-red-800 font-medium">Unblock</button>
                                     </td>
                                 </tr>
                             ))
@@ -214,8 +205,8 @@ export default function BlacklistManager() {
 
             {confirmRemoveId ? (
                 <ConfirmDialog
-                    title="Remove Blacklisted Guard"
-                    message="Are you sure you want to remove this guard from blacklist?"
+                    title="Remove CNIC from Blacklist"
+                    message="Are you sure you want to unblock this CNIC for future enrollment?"
                     onNo={() => setConfirmRemoveId(null)}
                     onYes={async () => {
                         await removeFromBlacklist(confirmRemoveId)

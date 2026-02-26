@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function PUT(
     request: NextRequest,
@@ -11,6 +12,7 @@ export async function PUT(
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { id } = await params
         const body = await request.json()
@@ -22,6 +24,13 @@ export async function PUT(
 
         if (!existingClient) {
             return NextResponse.json({ message: "Client not found" }, { status: 404 })
+        }
+        if (managerScope && managerScopeDenied(managerScope, { regionId: existingClient.regionId })) {
+            return NextResponse.json({ message: "Forbidden: client is outside your scope." }, { status: 403 })
+        }
+        const bodyRegionId = body?.regionId ? String(body.regionId) : null
+        if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
+            return NextResponse.json({ message: "Forbidden: cannot move client outside your scope." }, { status: 403 })
         }
 
         // Update client

@@ -14,29 +14,35 @@ datasource db {
 // ============================================
 
 model User {
-  id               String    @id @default(cuid())
-  name             String
-  email            String    @unique
-  password         String
-  contactNumber    String?
-  photoUrl         String?
-  status           String    @default("ACTIVE") // ACTIVE, INACTIVE
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  contactNumber String?
+  photoUrl      String?
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   roleId           String
-  role             Role      @relation(fields: [roleId], references: [id])
+  role             Role            @relation(fields: [roleId], references: [id])
   regionId         String?
-  region           Region?   @relation(fields: [regionId], references: [id])
+  region           Region?         @relation(fields: [regionId], references: [id])
   regionalOfficeId String?
   regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
-  
-  permissions      UserPermission[]
-  statusHistory    UserStatusHistory[]
-  auditLogs        AuditLog[]
-  ticketsCreated   Ticket[]  @relation("TicketSender")
-  ticketsAssigned  Ticket[]  @relation("TicketAssignee")
+
+  permissions           UserPermission[]
+  statusHistory         UserStatusHistory[]
+  auditLogs             AuditLog[]
+  ticketsCreated        Ticket[]                      @relation("TicketSender")
+  ticketsAssigned       Ticket[]                      @relation("TicketAssignee")
+  managerAssignments    ManagerSupervisorAssignment[] @relation("ManagerAssignments")
+  supervisorAssignments ManagerSupervisorAssignment[] @relation("SupervisorAssignments")
+  clientAssignments     ClientSupervisorAssignment[]
+  guardAssignments      GuardSupervisorAssignment[]
+  requisitionsRequested Requisition[]                 @relation("RequisitionRequester")
+  requisitionsApproved  Requisition[]                 @relation("RequisitionApprover")
 
   @@index([email])
   @@index([roleId])
@@ -49,21 +55,21 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users       User[]
+  users User[]
 }
 
 model UserPermission {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  module     String   // GUARDS, PAYROLL, CLIENTS, etc.
-  canCreate  Boolean  @default(false)
-  canView    Boolean  @default(false)
-  canUpdate  Boolean  @default(false)
-  canDelete  Boolean  @default(false)
-  canRequisition Boolean @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module         String // GUARDS, PAYROLL, CLIENTS, etc.
+  canCreate      Boolean  @default(false)
+  canView        Boolean  @default(false)
+  canUpdate      Boolean  @default(false)
+  canDelete      Boolean  @default(false)
+  canRequisition Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([userId, module])
   @@index([userId])
@@ -108,13 +114,15 @@ model RegionalOffice {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  regionId   String
-  region     Region   @relation(fields: [regionId], references: [id])
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id])
 
-  users      User[]
-  guards     Guard[]
-  deployments Deployment[]
-  inventory  InventoryItem[]
+  users                        User[]
+  guards                       Guard[]
+  deployments                  Deployment[]
+  inventory                    InventoryItem[]
+  inventoryDemands             InventoryDemand[]
+  managerSupervisorAssignments ManagerSupervisorAssignment[]
 
   @@index([regionId])
 }
@@ -124,69 +132,82 @@ model RegionalOffice {
 // ============================================
 
 model Guard {
-  id                 String    @id @default(cuid())
-  parwestId          String    @unique
-  name               String
-  cnic               String    @unique
-  phone              String?
-  email              String?
-  dateOfBirth        DateTime?
-  age                Int?
-  fatherName         String?
-  religion           String?
-  maritalStatus      String?
-  education          String?
-  addressPermanent   String?
-  addressCurrent     String?
-  emergencyContact   String?
-  status             String    @default("PENDING") // PENDING, ACTIVE, INACTIVE, TERMINATED, BLACKLISTED
-  isExService        Boolean   @default(false)
-  exServiceRank      String?
-  exServiceRegiment  String?
-  bankName           String?
-  bankAccountNumber  String?
-  bankAccountType    String?
-  joiningDate        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  parwestId         String    @unique
+  name              String
+  cnic              String    @unique
+  phone             String?
+  email             String?
+  dateOfBirth       DateTime?
+  age               Int?
+  fatherName        String?
+  religion          String?
+  maritalStatus     String?
+  education         String?
+  addressPermanent  String?
+  addressCurrent    String?
+  emergencyContact  String?
+  status            String    @default("PENDING") // PENDING, ACTIVE, INACTIVE, TERMINATED, BLACKLISTED
+  isExService       Boolean   @default(false)
+  exServiceRank     String?
+  exServiceRegiment String?
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountType   String?
+  joiningDate       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relations
-  regionalOfficeId   String?
-  regionalOffice     RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
-  regionId           String?
-  region             Region?   @relation(fields: [regionId], references: [id])
+  regionalOfficeId String?
+  regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
+  regionId         String?
+  region           Region?         @relation(fields: [regionId], references: [id])
 
-  prerequisites      GuardPrerequisite[]
-  deployments        Deployment[]
-  payrolls           Payroll[]
-  loans              Loan[]
-  attendances        Attendance[]
-  inventoryAssignments InventoryAssignment[]
-  residenceAssignment ResidenceAssignment?
-  trainings          Training[]
+  prerequisites         GuardPrerequisite[]
+  deployments           Deployment[]
+  payrolls              Payroll[]
+  loans                 Loan[]
+  attendances           Attendance[]
+  inventoryAssignments  InventoryAssignment[]
+  residenceAssignment   ResidenceAssignment?
+  trainings             Training[]
+  supervisorAssignments GuardSupervisorAssignment[]
 
   @@index([parwestId])
   @@index([cnic])
   @@index([status])
 }
 
+model BlacklistedCnic {
+  id              String   @id @default(cuid())
+  cnic            String   @unique
+  reason          String?
+  createdByUserId String?
+  createdByName   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([cnic])
+}
+
 model DeploymentRate {
-  id               String    @id @default(cuid())
-  regionId         String?
-  region           Region?   @relation(fields: [regionId], references: [id])
-  clientId         String?
-  client           Client?   @relation(fields: [clientId], references: [id])
-  branchId         String?
-  branch           Branch?   @relation(fields: [branchId], references: [id])
-  deployAs         String?
-  guardType        String?
-  shiftType        String?   // DAY, NIGHT, BOTH
-  salary           Float?
-  overtime         Float?
-  extraHours       Float?
-  postAllowance    Float?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id            String   @id @default(cuid())
+  regionId      String?
+  region        Region?  @relation(fields: [regionId], references: [id])
+  clientId      String?
+  client        Client?  @relation(fields: [clientId], references: [id])
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  deployAs      String?
+  guardType     String?
+  shiftType     String? // DAY, NIGHT, BOTH
+  salary        Float?
+  overtime      Float?
+  extraHours    Float?
+  postAllowance Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([regionId])
   @@index([clientId])
@@ -194,60 +215,60 @@ model DeploymentRate {
 }
 
 model GuardPrerequisite {
-  id              String   @id @default(cuid())
-  guardId         String
-  guard           Guard    @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  type            String   // NADRA, HEALTH, POLICE, EYESIGHT, CHARACTER, MENTAL_HEALTH, GUARANTOR, COMPANY_CARD
-  status          String   @default("PENDING") // PENDING, VERIFIED, REJECTED
-  documentUrl     String?
-  verifiedAt      DateTime?
-  verifiedBy      String?
-  expiryDate      DateTime?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String    @id @default(cuid())
+  guardId     String
+  guard       Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  type        String // NADRA, HEALTH, POLICE, EYESIGHT, CHARACTER, MENTAL_HEALTH, GUARANTOR, COMPANY_CARD
+  status      String    @default("PENDING") // PENDING, VERIFIED, REJECTED
+  documentUrl String?
+  verifiedAt  DateTime?
+  verifiedBy  String?
+  expiryDate  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([guardId])
   @@index([type])
 }
 
 model Deployment {
-  id               String    @id @default(cuid())
+  id               String         @id @default(cuid())
   guardId          String
-  guard            Guard     @relation(fields: [guardId], references: [id])
+  guard            Guard          @relation(fields: [guardId], references: [id])
   clientId         String
-  client           Client    @relation(fields: [clientId], references: [id])
+  client           Client         @relation(fields: [clientId], references: [id])
   branchId         String?
-  branch           Branch?   @relation(fields: [branchId], references: [id])
+  branch           Branch?        @relation(fields: [branchId], references: [id])
   regionalOfficeId String
   regionalOffice   RegionalOffice @relation(fields: [regionalOfficeId], references: [id])
   designation      String
   deploymentDate   DateTime
-  shiftType        String    // DAY, NIGHT, BOTH
+  shiftType        String // DAY, NIGHT, BOTH
   rate             Float?
-  status           String    @default("ACTIVE") // ACTIVE, INACTIVE
+  status           String         @default("ACTIVE") // ACTIVE, INACTIVE
   notes            String?
-  
+
   // Extended fields from documentation
-  guardType        String?   // Security Guard, Supervisor, etc.
-  salary           Float?
-  overtime         Float?
-  extraHours       Float?
-  postAllowance    Float?
-  dayShiftStart    String?   // Time format: HH:MM
-  dayShiftEnd      String?
-  nightShiftStart  String?
-  nightShiftEnd    String?
-  deploymentType   String?   @default("REGULAR") // REGULAR, OVERTIME
-  isExtraGuard     Boolean   @default(false)
-  comment          String?
-  
+  guardType       String? // Security Guard, Supervisor, etc.
+  salary          Float?
+  overtime        Float?
+  extraHours      Float?
+  postAllowance   Float?
+  dayShiftStart   String? // Time format: HH:MM
+  dayShiftEnd     String?
+  nightShiftStart String?
+  nightShiftEnd   String?
+  deploymentType  String? @default("REGULAR") // REGULAR, OVERTIME
+  isExtraGuard    Boolean @default(false)
+  comment         String?
+
   // End deployment tracking
-  endDate          DateTime?
-  endReason        String?
-  
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  endDate   DateTime?
+  endReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([guardId])
   @@index([clientId])
@@ -259,8 +280,8 @@ model Attendance {
   guardId   String
   guard     Guard    @relation(fields: [guardId], references: [id])
   date      DateTime
-  status    String   // PRESENT, ABSENT, LEAVE
-  shiftType String?  // DAY, NIGHT
+  status    String // PRESENT, ABSENT, LEAVE
+  shiftType String? // DAY, NIGHT
   notes     String?
   createdAt DateTime @default(now())
 
@@ -270,29 +291,29 @@ model Attendance {
 }
 
 model ResidenceAssignment {
-  id          String   @id @default(cuid())
-  guardId     String   @unique
-  guard       Guard    @relation(fields: [guardId], references: [id])
+  id          String     @id @default(cuid())
+  guardId     String     @unique
+  guard       Guard      @relation(fields: [guardId], references: [id])
   residenceId String?
   residence   Residence? @relation(fields: [residenceId], references: [id])
   location    String
-  assignedAt  DateTime @default(now())
+  assignedAt  DateTime   @default(now())
   notes       String?
 
   @@index([residenceId])
 }
 
 model Residence {
-  id          String   @id @default(cuid())
-  address     String
-  ownerName   String?
-  ownerPhone  String?
-  supervisor  String?
-  capacity    Int?
-  occupied    Int?
-  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  address    String
+  ownerName  String?
+  ownerPhone String?
+  supervisor String?
+  capacity   Int?
+  occupied   Int?
+  status     String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   assignments ResidenceAssignment[]
 
@@ -300,14 +321,14 @@ model Residence {
 }
 
 model Training {
-  id          String   @id @default(cuid())
-  guardId     String
-  guard       Guard    @relation(fields: [guardId], references: [id])
+  id           String   @id @default(cuid())
+  guardId      String
+  guard        Guard    @relation(fields: [guardId], references: [id])
   trainingType String
-  completedAt DateTime
-  instructor  String?
-  notes       String?
-  createdAt   DateTime @default(now())
+  completedAt  DateTime
+  instructor   String?
+  notes        String?
+  createdAt    DateTime @default(now())
 
   @@index([guardId])
 }
@@ -317,31 +338,32 @@ model Training {
 // ============================================
 
 model Client {
-  id               String    @id @default(cuid())
-  name             String
-  email            String?
-  type             String    // BANK, MANUFACTURER, etc.
-  enrollmentDate   DateTime  @default(now())
-  isBranchless     Boolean   @default(false)
+  id                String   @id @default(cuid())
+  name              String
+  email             String?
+  type              String // BANK, MANUFACTURER, etc.
+  enrollmentDate    DateTime @default(now())
+  isBranchless      Boolean  @default(false)
   headOfficeAddress String?
-  city             String?
-  status           String    @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
-  logoUrl          String?
-  ntn              String?   // National Tax Number
-  strn             String?   // Sales Tax Registration
-  contractUrl      String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  city              String?
+  status            String   @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
+  logoUrl           String?
+  ntn               String? // National Tax Number
+  strn              String? // Sales Tax Registration
+  contractUrl       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  regionId         String?
-  region           Region?   @relation(fields: [regionId], references: [id])
+  regionId String?
+  region   Region? @relation(fields: [regionId], references: [id])
 
-  branches         Branch[]
-  deployments      Deployment[]
-  pricingConfigs   PricingConfig[]
-  inventoryAssignments InventoryAssignment[]
-  invoices         Invoice[]
-  deploymentRates  DeploymentRate[]
+  branches              Branch[]
+  deployments           Deployment[]
+  pricingConfigs        PricingConfig[]
+  inventoryAssignments  InventoryAssignment[]
+  invoices              Invoice[]
+  deploymentRates       DeploymentRate[]
+  supervisorAssignments ClientSupervisorAssignment[]
 
   @@index([name])
   @@index([status])
@@ -363,8 +385,9 @@ model Branch {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  deployments   Deployment[]
-  deploymentRates DeploymentRate[]
+  deployments           Deployment[]
+  deploymentRates       DeploymentRate[]
+  supervisorAssignments ClientSupervisorAssignment[]
 
   @@index([clientId])
 }
@@ -382,17 +405,17 @@ model PricingConfig {
 }
 
 model Invoice {
-  id          String   @id @default(cuid())
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
-  invoiceNumber String @unique
-  month       DateTime
-  amount      Float
-  status      String   @default("PENDING") // PENDING, PAID, OVERDUE
-  dueDate     DateTime?
-  paidAt      DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  invoiceNumber String    @unique
+  month         DateTime
+  amount        Float
+  status        String    @default("PENDING") // PENDING, PAID, OVERDUE
+  dueDate       DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([clientId])
   @@index([status])
@@ -403,28 +426,28 @@ model Invoice {
 // ============================================
 
 model Payroll {
-  id                  String   @id @default(cuid())
-  guardId             String
-  guard               Guard    @relation(fields: [guardId], references: [id])
-  month               DateTime
-  year                Int
-  deploymentDays      Int      @default(0)
-  baseSalary          Float    @default(0)
-  extraHours          Float    @default(0)
-  extraHoursAmount    Float    @default(0)
-  specialDutyHours    Float    @default(0)
-  specialDutyAmount   Float    @default(0)
-  loans               Float    @default(0)
-  otherDeductions     Float    @default(0)
-  trainingSchoolFees  Float    @default(0)
-  cwf                 Float    @default(0) // Contribution Welfare Fund
-  eobi                Float    @default(0)
-  essi                Float    @default(0)
-  netSalary           Float    @default(0)
-  paymentStatus       String   @default("PENDING") // PENDING, PAID, UNPAID
-  paymentMethod       String?  // BANK, CASH, MOBILE
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  guardId            String
+  guard              Guard    @relation(fields: [guardId], references: [id])
+  month              DateTime
+  year               Int
+  deploymentDays     Int      @default(0)
+  baseSalary         Float    @default(0)
+  extraHours         Float    @default(0)
+  extraHoursAmount   Float    @default(0)
+  specialDutyHours   Float    @default(0)
+  specialDutyAmount  Float    @default(0)
+  loans              Float    @default(0)
+  otherDeductions    Float    @default(0)
+  trainingSchoolFees Float    @default(0)
+  cwf                Float    @default(0) // Contribution Welfare Fund
+  eobi               Float    @default(0)
+  essi               Float    @default(0)
+  netSalary          Float    @default(0)
+  paymentStatus      String   @default("PENDING") // PENDING, PAID, UNPAID
+  paymentMethod      String? // BANK, CASH, MOBILE
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@unique([guardId, month, year])
   @@index([guardId])
@@ -432,18 +455,29 @@ model Payroll {
   @@index([paymentStatus])
 }
 
+model PayrollHoliday {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
 model Loan {
-  id              String   @id @default(cuid())
-  guardId         String
-  guard           Guard    @relation(fields: [guardId], references: [id])
-  month           DateTime
-  amount          Float
-  status          String   @default("PENDING") // PENDING, FINALIZED
-  deploymentDays  Int?
-  supervisor      String?
-  manager         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  guardId        String
+  guard          Guard    @relation(fields: [guardId], references: [id])
+  month          DateTime
+  amount         Float
+  status         String   @default("PENDING") // PENDING, FINALIZED
+  deploymentDays Int?
+  supervisor     String?
+  manager        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([guardId])
   @@index([status])
@@ -459,7 +493,8 @@ model InventoryCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     InventoryItem[]
+  items   InventoryItem[]
+  demands InventoryDemand[]
 }
 
 model InventoryVendor {
@@ -469,61 +504,92 @@ model InventoryVendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     InventoryItem[]
+  items InventoryItem[]
 }
 
 model InventoryItem {
-  id              String    @id @default(cuid())
-  uniqueNumber    String    @unique
-  serialNumber    String?
-  orderId         String?
-  price           Float?
-  purchaseDate    DateTime?
-  expiryDate      DateTime?
-  warrantyTime    String?
-  warrantyType    String?
-  size            String?
-  weight          String?
-  length          String?
-  width           String?
-  color           String?
-  isInsured       Boolean   @default(false)
-  isNonUnique     Boolean   @default(false)
-  quantity        Int       @default(1)
-  status          String    @default("AVAILABLE") // AVAILABLE, ISSUED, CONDEMNED
-  licenseNumber   String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  uniqueNumber  String    @unique
+  serialNumber  String?
+  orderId       String?
+  price         Float?
+  purchaseDate  DateTime?
+  expiryDate    DateTime?
+  warrantyTime  String?
+  warrantyType  String?
+  size          String?
+  weight        String?
+  length        String?
+  width         String?
+  color         String?
+  isInsured     Boolean   @default(false)
+  isNonUnique   Boolean   @default(false)
+  quantity      Int       @default(1)
+  status        String    @default("AVAILABLE") // AVAILABLE, ISSUED, CONDEMNED
+  licenseNumber String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  categoryId      String
-  category        InventoryCategory @relation(fields: [categoryId], references: [id])
-  vendorId        String?
-  vendor          InventoryVendor? @relation(fields: [vendorId], references: [id])
+  categoryId       String
+  category         InventoryCategory   @relation(fields: [categoryId], references: [id])
+  conditionId      String?
+  condition        InventoryCondition? @relation(fields: [conditionId], references: [id])
+  vendorId         String?
+  vendor           InventoryVendor?    @relation(fields: [vendorId], references: [id])
   regionalOfficeId String?
-  regionalOffice  RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
+  regionalOffice   RegionalOffice?     @relation(fields: [regionalOfficeId], references: [id])
 
-  assignments     InventoryAssignment[]
+  assignments InventoryAssignment[]
 
   @@index([uniqueNumber])
   @@index([status])
   @@index([categoryId])
+  @@index([conditionId])
+}
+
+model InventoryCondition {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items InventoryItem[]
 }
 
 model InventoryAssignment {
-  id          String   @id @default(cuid())
-  itemId      String
-  item        InventoryItem @relation(fields: [itemId], references: [id])
-  guardId     String?
-  guard       Guard?   @relation(fields: [guardId], references: [id])
-  clientId    String?
-  client      Client?  @relation(fields: [clientId], references: [id])
-  assignedAt  DateTime @default(now())
-  returnedAt  DateTime?
-  notes       String?
+  id         String        @id @default(cuid())
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+  guardId    String?
+  guard      Guard?        @relation(fields: [guardId], references: [id])
+  clientId   String?
+  client     Client?       @relation(fields: [clientId], references: [id])
+  assignedAt DateTime      @default(now())
+  returnedAt DateTime?
+  notes      String?
 
   @@index([itemId])
   @@index([guardId])
   @@index([clientId])
+}
+
+model InventoryDemand {
+  id               String             @id @default(cuid())
+  categoryId       String?
+  category         InventoryCategory? @relation(fields: [categoryId], references: [id])
+  regionalOfficeId String?
+  regionalOffice   RegionalOffice?    @relation(fields: [regionalOfficeId], references: [id])
+  quantity         Int
+  requiredBy       DateTime?
+  reason           String?
+  status           String             @default("PENDING") // PENDING, APPROVED, REJECTED, FULFILLED
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([categoryId])
+  @@index([regionalOfficeId])
+  @@index([status])
 }
 
 // ============================================
@@ -531,21 +597,21 @@ model InventoryAssignment {
 // ============================================
 
 model Ticket {
-  id          String   @id @default(cuid())
-  subject     String
-  description String?
-  senderId    String
-  sender      User     @relation("TicketSender", fields: [senderId], references: [id])
+  id           String         @id @default(cuid())
+  subject      String
+  description  String?
+  senderId     String
+  sender       User           @relation("TicketSender", fields: [senderId], references: [id])
   assignedToId String?
-  assignedTo  User?    @relation("TicketAssignee", fields: [assignedToId], references: [id])
-  categoryId  String
-  category    TicketCategory @relation(fields: [categoryId], references: [id])
-  priorityId  String
-  priority    TicketPriority @relation(fields: [priorityId], references: [id])
-  statusId    String
-  status      TicketStatus @relation(fields: [statusId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  assignedTo   User?          @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  categoryId   String
+  category     TicketCategory @relation(fields: [categoryId], references: [id])
+  priorityId   String
+  priority     TicketPriority @relation(fields: [priorityId], references: [id])
+  statusId     String
+  status       TicketStatus   @relation(fields: [statusId], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([senderId])
   @@index([assignedToId])
@@ -560,7 +626,7 @@ model TicketCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tickets     Ticket[]
+  tickets Ticket[]
 }
 
 model TicketPriority {
@@ -570,7 +636,7 @@ model TicketPriority {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tickets   Ticket[]
+  tickets Ticket[]
 }
 
 model TicketStatus {
@@ -580,7 +646,7 @@ model TicketStatus {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tickets   Ticket[]
+  tickets Ticket[]
 }
 
 // ============================================
@@ -591,8 +657,8 @@ model AuditLog {
   id          String   @id @default(cuid())
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
-  event       String   // CREATED, UPDATED, DELETED, etc.
-  module      String   // GUARDS, PAYROLL, etc.
+  event       String // CREATED, UPDATED, DELETED, etc.
+  module      String // GUARDS, PAYROLL, etc.
   ipAddress   String?
   description String?
   createdAt   DateTime @default(now())
@@ -600,4 +666,104 @@ model AuditLog {
   @@index([userId])
   @@index([module])
   @@index([createdAt])
+}
+
+// ============================================
+// USERS RELATIONSHIPS MODULE
+// ============================================
+
+model ManagerSupervisorAssignment {
+  id               String          @id @default(cuid())
+  managerId        String
+  manager          User            @relation("ManagerAssignments", fields: [managerId], references: [id])
+  supervisorId     String
+  supervisor       User            @relation("SupervisorAssignments", fields: [supervisorId], references: [id])
+  regionalOfficeId String?
+  regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
+  effectiveDate    DateTime        @default(now())
+  status           String          @default("ACTIVE")
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([managerId])
+  @@index([supervisorId])
+  @@index([regionalOfficeId])
+}
+
+model ClientSupervisorAssignment {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  supervisorId  String
+  supervisor    User     @relation(fields: [supervisorId], references: [id])
+  effectiveDate DateTime @default(now())
+  status        String   @default("ACTIVE")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([branchId])
+  @@index([supervisorId])
+}
+
+model GuardSupervisorAssignment {
+  id           String    @id @default(cuid())
+  guardId      String
+  guard        Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  supervisorId String
+  supervisor   User      @relation(fields: [supervisorId], references: [id])
+  assignedAt   DateTime  @default(now())
+  endedAt      DateTime?
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([guardId])
+  @@index([supervisorId])
+  @@index([status])
+}
+
+model Requisition {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  module        String
+  priority      String    @default("NORMAL")
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  requesterId   String
+  requester     User      @relation("RequisitionRequester", fields: [requesterId], references: [id])
+  approverId    String?
+  approver      User?     @relation("RequisitionApprover", fields: [approverId], references: [id])
+  approvedAt    DateTime?
+  decisionNotes String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([module])
+  @@index([requesterId])
+  @@index([approverId])
+}
+
+// ============================================
+// SETTINGS MASTER DATA
+// ============================================
+
+model GuardBankName {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GuardPledgeableDocument {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

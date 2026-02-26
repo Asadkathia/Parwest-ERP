@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function PATCH(
     request: NextRequest,
@@ -11,9 +12,27 @@ export async function PATCH(
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { id } = await params
         const body = await request.json()
+
+        const existing = await prisma.deployment.findUnique({
+            where: { id },
+            select: { id: true, regionalOfficeId: true },
+        })
+        if (!existing) {
+            return NextResponse.json({ message: "Deployment not found" }, { status: 404 })
+        }
+
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
+        }
+
+        const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: bodyRegionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: cannot move deployment outside your scope." }, { status: 403 })
+        }
 
         // Check if guard is being changed and if new guard has active deployments
         if (body.guardId) {
@@ -92,8 +111,20 @@ export async function DELETE(
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { id } = await params
+
+        const existing = await prisma.deployment.findUnique({
+            where: { id },
+            select: { id: true, regionalOfficeId: true },
+        })
+        if (!existing) {
+            return NextResponse.json({ message: "Deployment not found" }, { status: 404 })
+        }
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
+        }
 
         // Soft delete - set status to INACTIVE and add end date
         const deployment = await prisma.deployment.update({

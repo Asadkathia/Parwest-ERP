@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 
 export async function PUT(
     request: NextRequest,
@@ -11,9 +13,14 @@ export async function PUT(
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+        const managerScope = deriveManagerScope(session)
 
         const { id } = await params
         const body = await request.json()
+        const nextCnic = body?.cnic ? String(body.cnic).trim() : ""
+        if (nextCnic && !/^\d{5}-\d{7}-\d$/.test(nextCnic)) {
+            return NextResponse.json({ message: "CNIC format must be XXXXX-XXXXXXX-X." }, { status: 400 })
+        }
 
         // Check if guard exists
         const existingGuard = await prisma.guard.findUnique({
@@ -23,12 +30,28 @@ export async function PUT(
         if (!existingGuard) {
             return NextResponse.json({ message: "Guard not found" }, { status: 404 })
         }
+        if (managerScope && managerScopeDenied(managerScope, { regionId: existingGuard.regionId, regionalOfficeId: existingGuard.regionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: guard is outside your scope." }, { status: 403 })
+        }
+
+        const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        let bodyRegionId = body?.regionId ? String(body.regionId) : null
+        if (!bodyRegionId && bodyRegionalOfficeId) {
+            const office = await prisma.regionalOffice.findUnique({
+                where: { id: bodyRegionalOfficeId },
+                select: { regionId: true },
+            })
+            bodyRegionId = office?.regionId || null
+        }
+        if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId, regionalOfficeId: bodyRegionalOfficeId })) {
+            return NextResponse.json({ message: "Forbidden: cannot move guard outside your scope." }, { status: 403 })
+        }
 
         // Check CNIC uniqueness (excluding current guard)
-        if (body.cnic && body.cnic !== existingGuard.cnic) {
+        if (nextCnic && nextCnic !== existingGuard.cnic) {
             const cnicExists = await prisma.guard.findFirst({
                 where: {
-                    cnic: body.cnic,
+                    cnic: nextCnic,
                     id: { not: id },
                 },
             })
@@ -39,6 +62,21 @@ export async function PUT(
                     { status: 400 }
                 )
             }
+
+            try {
+                const blocked = await prisma.blacklistedCnic.findUnique({
+                    where: { cnic: nextCnic },
+                    select: { id: true },
+                })
+                if (blocked) {
+                    return NextResponse.json(
+                        { message: "This CNIC is blacklisted and cannot be assigned to a guard profile." },
+                        { status: 403 }
+                    )
+                }
+            } catch (error) {
+                if (!isPrismaMissingSchemaError(error)) throw error
+            }
         }
 
         // Update guard
@@ -46,7 +84,7 @@ export async function PUT(
             where: { id },
             data: {
                 name: body.name,
-                cnic: body.cnic,
+                cnic: nextCnic || existingGuard.cnic,
                 phone: body.phone || null,
                 email: body.email || null,
                 dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
@@ -58,7 +96,7 @@ export async function PUT(
                 addressPermanent: body.addressPermanent || null,
                 addressCurrent: body.addressCurrent || null,
                 emergencyContact: body.emergencyContact || null,
-                regionId: body.regionId || null,
+                regionId: bodyRegionId,
                 regionalOfficeId: body.regionalOfficeId || null,
                 joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
                 status: body.status || "PENDING",

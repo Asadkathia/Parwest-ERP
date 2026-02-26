@@ -1,174 +1,217 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
 
-type Office = {
+type Region = { id: string; name: string }
+type OfficeRow = {
   id: string
-  office: string
+  name: string
   seriesCode: string
-  region: string
-  officeHead: string
-  phone?: string
-  mobile?: string
-  fax?: string
+  officeHead?: string | null
+  phone?: string | null
+  mobile?: string | null
+  fax?: string | null
+  regionId: string
+  region?: Region | null
+  createdAt: string
 }
 
-const initialRows: Office[] = [
-  { id: "1", office: "Lahore Head Office", seriesCode: "L", region: "Lahore", officeHead: "Admin", phone: "042-111", mobile: "0300-0000000", fax: "042-000" },
-  { id: "2", office: "Karachi Office", seriesCode: "K", region: "Sindh", officeHead: "Manager KHI", phone: "021-111", mobile: "0301-0000000", fax: "021-000" },
-]
-
 export default function RegionalOfficesManager() {
-  const [rows, setRows] = useState<Office[]>(initialRows)
+  const [rows, setRows] = useState<OfficeRow[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
   const [office, setOffice] = useState("")
   const [officeHead, setOfficeHead] = useState("")
   const [seriesCode, setSeriesCode] = useState("")
   const [phone, setPhone] = useState("")
   const [mobile, setMobile] = useState("")
   const [fax, setFax] = useState("")
-  const [region, setRegion] = useState("")
+  const [regionId, setRegionId] = useState("")
   const [search, setSearch] = useState("")
-  const [entries, setEntries] = useState("10")
-  const [selectDate, setSelectDate] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState("")
+  const [error, setError] = useState("")
+
+  const load = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const [officesRes, regionsRes] = await Promise.all([
+        fetch("/api/regional-offices", { cache: "no-store" }),
+        fetch("/api/regions", { cache: "no-store" }),
+      ])
+      const [officesJson, regionsJson] = await Promise.all([
+        officesRes.json().catch(() => []),
+        regionsRes.json().catch(() => []),
+      ])
+      if (!officesRes.ok) throw new Error(officesJson?.message || "Failed to fetch offices.")
+      if (!regionsRes.ok) throw new Error(regionsJson?.message || "Failed to fetch regions.")
+
+      setRows(Array.isArray(officesJson) ? officesJson : [])
+      setRegions(Array.isArray(regionsJson) ? regionsJson : [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load settings data.")
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
 
   const filtered = useMemo(() => {
-    if (!search) return rows
+    if (!search.trim()) return rows
+    const q = search.toLowerCase()
     return rows.filter((row) =>
-      [row.office, row.seriesCode, row.region, row.officeHead].join(" ").toLowerCase().includes(search.toLowerCase())
+      `${row.name} ${row.seriesCode} ${row.region?.name || ""} ${row.officeHead || ""}`
+        .toLowerCase()
+        .includes(q)
     )
   }, [rows, search])
 
-  const visibleRows = filtered.slice(0, Number.parseInt(entries, 10) || 10)
+  const onCreate = async () => {
+    setNotice("")
+    setError("")
 
-  const onCreate = () => {
-    if (!office.trim() || !seriesCode.trim() || !region.trim()) return
+    if (!office.trim() || !seriesCode.trim() || !regionId) {
+      setError("Office name, series code, and region are required.")
+      return
+    }
 
-    setRows((prev) => [
-      {
-        id: String(prev.length + 1),
-        office: office.trim(),
-        officeHead: officeHead.trim() || "—",
-        seriesCode: seriesCode.trim().toUpperCase(),
-        phone: phone.trim() || undefined,
-        mobile: mobile.trim() || undefined,
-        fax: fax.trim() || undefined,
-        region: region.trim(),
-      },
-      ...prev,
-    ])
+    setSaving(true)
+    try {
+      const response = await fetch("/api/regional-offices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: office.trim(),
+          officeHead: officeHead.trim() || null,
+          seriesCode: seriesCode.trim().toUpperCase(),
+          phone: phone.trim() || null,
+          mobile: mobile.trim() || null,
+          fax: fax.trim() || null,
+          regionId,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.message || "Failed to create office.")
 
-    setOffice("")
-    setOfficeHead("")
-    setSeriesCode("")
-    setPhone("")
-    setMobile("")
-    setFax("")
-    setRegion("")
+      setNotice("Regional office created.")
+      setOffice("")
+      setOfficeHead("")
+      setSeriesCode("")
+      setPhone("")
+      setMobile("")
+      setFax("")
+      setRegionId("")
+      await load()
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Failed to create office.")
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const onDelete = (id: string) => setRows((prev) => prev.filter((row) => row.id !== id))
-
-  const onReset = () => {
-    setOffice("")
-    setOfficeHead("")
-    setSeriesCode("")
-    setPhone("")
-    setMobile("")
-    setFax("")
-    setRegion("")
-    setSearch("")
-    setEntries("10")
-    setSelectDate("")
+  const onDelete = async (id: string) => {
+    setNotice("")
+    setError("")
+    try {
+      const response = await fetch(`/api/regional-offices/${id}`, { method: "DELETE" })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.message || "Failed to delete office.")
+      setNotice("Regional office deleted.")
+      await load()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete office.")
+    }
   }
 
   return (
     <div className="space-y-6">
       <SectionTitle title="Settings: Regional Offices" subtitle="Manage specific offices within regions." />
+      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <InlineAlert type="error" message={error} /> : null}
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Office Name *</label>
-            <input value={office} onChange={(e) => setOffice(e.target.value)} className="ui-input" placeholder="Office name" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Office Head</label>
-            <input value={officeHead} onChange={(e) => setOfficeHead(e.target.value)} className="ui-input" placeholder="Office head" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Series Code *</label>
-            <input value={seriesCode} onChange={(e) => setSeriesCode(e.target.value)} className="ui-input" placeholder="LHR" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Phone</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="ui-input" placeholder="Phone" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Mobile</label>
-            <input value={mobile} onChange={(e) => setMobile(e.target.value)} className="ui-input" placeholder="Mobile" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Fax</label>
-            <input value={fax} onChange={(e) => setFax(e.target.value)} className="ui-input" placeholder="Fax" />
-          </div>
+          <Input label="Office Name *" value={office} onChange={setOffice} placeholder="Office name" />
+          <Input label="Office Head" value={officeHead} onChange={setOfficeHead} placeholder="Office head" />
+          <Input label="Series Code *" value={seriesCode} onChange={setSeriesCode} placeholder="LHR" />
+          <Input label="Phone" value={phone} onChange={setPhone} placeholder="Phone" />
+          <Input label="Mobile" value={mobile} onChange={setMobile} placeholder="Mobile" />
+          <Input label="Fax" value={fax} onChange={setFax} placeholder="Fax" />
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Region *</label>
-            <input value={region} onChange={(e) => setRegion(e.target.value)} className="ui-input" placeholder="Region" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search" />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Show</label>
-            <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
-              {["10", "25", "50", "100", "200"].map((value) => (
-                <option key={value} value={value}>{value}</option>
+            <select className="ui-select" value={regionId} onChange={(e) => setRegionId(e.target.value)}>
+              <option value="">Select Region</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name}
+                </option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Date</label>
-            <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="ui-input" />
-          </div>
+          <Input label="Search" value={search} onChange={setSearch} placeholder="Search" />
         </div>
         <div className="flex gap-2">
-          <ActionButton onClick={onCreate}>Create</ActionButton>
-          <ActionButton variant="secondary" onClick={onReset}>Reset</ActionButton>
-          <ActionButton variant="secondary">Submit</ActionButton>
-          <ActionButton variant="secondary">Update</ActionButton>
-          <ActionButton variant="secondary">Delete</ActionButton>
-          <ActionButton variant="secondary">Export In Excel File</ActionButton>
+          <ActionButton onClick={onCreate} disabled={saving}>
+            {saving ? "Saving..." : "Create"}
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>
+            Refresh
+          </ActionButton>
         </div>
       </FilterBar>
 
       <DataTable
-        rows={visibleRows}
+        rows={filtered}
         columns={[
-          { key: "office", header: "Office", sortable: true },
+          { key: "name", header: "Office", sortable: true },
           { key: "seriesCode", header: "Series Code", sortable: true },
-          { key: "region", header: "Region", render: (row) => <StatusChip label={row.region} variant="neutral" />, sortable: true },
-          { key: "officeHead", header: "Office Head", sortable: true },
+          { key: "region", header: "Region", render: (row) => <StatusChip label={row.region?.name || "—"} variant="neutral" />, sortable: true },
+          { key: "officeHead", header: "Office Head", render: (row) => row.officeHead || "—", sortable: true },
           {
             key: "action",
             header: "Action",
             render: (row) => (
-              <button className="text-red-600 hover:underline" onClick={() => onDelete(row.id)}>
+              <button className="text-red-600 hover:underline" onClick={() => void onDelete(row.id)}>
                 Delete
               </button>
             ),
           },
         ]}
-        getRowKey={(row) => row.id}
+        rowKey="id"
         searchable={false}
         stickyHeader
-        emptyText="No offices found."
+        emptyText={loading ? "Loading offices..." : "No offices found."}
       />
+    </div>
+  )
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div>
+      <label className="block text-sm text-[var(--text-muted)] mb-1">{label}</label>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" placeholder={placeholder} />
     </div>
   )
 }

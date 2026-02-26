@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockGuardsList } from "@/lib/mockData/guards"
+import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
     try {
@@ -10,6 +11,8 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
         }
+
+        const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
         const q = searchParams.get("q")?.trim()
@@ -31,8 +34,12 @@ export async function GET(request: NextRequest) {
                 }
                 return true
             })
+            const scopedRows = applyManagerScope(rows, managerScope, {
+                regionId: (row) => (row as any).regionId,
+                regionalOfficeId: (row) => (row as any).regionalOfficeId,
+            })
             return NextResponse.json(
-                rows.map((guard) => ({
+                scopedRows.map((guard) => ({
                     id: guard.id,
                     parwestId: guard.parwestId,
                     name: guard.name,
@@ -53,6 +60,7 @@ export async function GET(request: NextRequest) {
                 ...(status ? { status } : {}),
                 ...(education ? { education } : {}),
                 ...(regionId ? { regionId } : {}),
+                ...buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
                 ...(q
                     ? {
                         OR: [

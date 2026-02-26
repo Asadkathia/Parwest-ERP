@@ -1,71 +1,122 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
+import InlineAlert from "@/components/ui/inline-alert"
 
 const TABS = ["Categories", "Priorities", "Statuses"] as const
 
-type Item = { id: string; name: string; description?: string; color: string }
+type TabName = (typeof TABS)[number]
+type Item = { id: string; name: string; description?: string | null; color?: string | null }
 
-const initial: Record<(typeof TABS)[number], Item[]> = {
-  Categories: [
-    { id: "1", name: "General", description: "General requests", color: "#3B82F6" },
-    { id: "2", name: "Server", description: "Server issues", color: "#EF4444" },
-  ],
-  Priorities: [
-    { id: "1", name: "Low", color: "#10B981" },
-    { id: "2", name: "High", color: "#EF4444" },
-  ],
-  Statuses: [
-    { id: "1", name: "New", color: "#3B82F6" },
-    { id: "2", name: "In-Progress", color: "#F59E0B" },
-  ],
+function endpointFor(tab: TabName) {
+  if (tab === "Categories") return "/api/tickets/categories"
+  if (tab === "Priorities") return "/api/tickets/priorities"
+  return "/api/tickets/statuses"
 }
 
 export default function TicketPrerequisitesManager() {
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Categories")
-  const [data, setData] = useState(initial)
+  const [activeTab, setActiveTab] = useState<TabName>("Categories")
+  const [data, setData] = useState<Record<TabName, Item[]>>({
+    Categories: [],
+    Priorities: [],
+    Statuses: [],
+  })
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [color, setColor] = useState("#3B82F6")
   const [search, setSearch] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState("")
+  const [error, setError] = useState("")
+
+  const loadTab = async (tab: TabName) => {
+    setLoading(true)
+    setError("")
+    try {
+      const response = await fetch(endpointFor(tab), { cache: "no-store" })
+      const payload = await response.json().catch(() => [])
+      if (!response.ok) {
+        throw new Error(payload?.message || `Failed to fetch ${tab.toLowerCase()}.`)
+      }
+      setData((prev) => ({ ...prev, [tab]: Array.isArray(payload) ? payload : [] }))
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to fetch records.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadTab(activeTab)
+  }, [activeTab])
 
   const rows = useMemo(() => {
     const list = data[activeTab]
     if (!search) return list
-    return list.filter((item) => [item.name, item.description || "", item.color].join(" ").toLowerCase().includes(search.toLowerCase()))
+    const q = search.toLowerCase()
+    return list.filter((item) =>
+      [item.name, item.description || "", item.color || ""].join(" ").toLowerCase().includes(q)
+    )
   }, [data, activeTab, search])
 
-  const onSave = () => {
-    if (!name.trim()) return
-
-    setData((prev) => ({
-      ...prev,
-      [activeTab]: [
-        {
-          id: String(prev[activeTab].length + 1),
-          name: name.trim(),
-          description: activeTab === "Categories" ? description.trim() || undefined : undefined,
-          color,
-        },
-        ...prev[activeTab],
-      ],
-    }))
-
+  const clearForm = () => {
     setName("")
     setDescription("")
     setColor("#3B82F6")
   }
 
-  const onDelete = (id: string) => {
-    setData((prev) => ({ ...prev, [activeTab]: prev[activeTab].filter((item) => item.id !== id) }))
+  const onSave = async () => {
+    setNotice("")
+    setError("")
+    if (!name.trim()) {
+      setError("Name is required.")
+      return
+    }
+
+    try {
+      const payload: Record<string, string> = { name: name.trim(), color }
+      if (activeTab === "Categories") payload.description = description.trim()
+
+      const response = await fetch(endpointFor(activeTab), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(json?.message || "Failed to create record.")
+      }
+
+      setNotice(`${activeTab.slice(0, -1)} created successfully.`)
+      clearForm()
+      await loadTab(activeTab)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to create record.")
+    }
   }
 
-  const tabClass = (tab: (typeof TABS)[number]) =>
+  const onDelete = async (id: string) => {
+    setNotice("")
+    setError("")
+    try {
+      const response = await fetch(`${endpointFor(activeTab)}/${id}`, { method: "DELETE" })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(json?.message || "Failed to delete record.")
+      }
+      setNotice(`${activeTab.slice(0, -1)} deleted successfully.`)
+      await loadTab(activeTab)
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete record.")
+    }
+  }
+
+  const tabClass = (tab: TabName) =>
     `px-3 py-1.5 text-sm rounded-full border transition ${
       activeTab === tab
         ? "bg-[var(--brand)] text-white border-[var(--brand)]"
@@ -75,6 +126,8 @@ export default function TicketPrerequisitesManager() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Ticketing Prerequisites" subtitle="Configure categories, priorities, and statuses." />
+      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <InlineAlert type="error" message={error} /> : null}
 
       <FilterBar>
         <div className="flex flex-wrap gap-2">
@@ -111,8 +164,9 @@ export default function TicketPrerequisitesManager() {
         </div>
         <div className="flex gap-2">
           <ActionButton onClick={onSave}>Save</ActionButton>
-          <ActionButton variant="secondary">Update</ActionButton>
-          <ActionButton variant="danger">Delete</ActionButton>
+          <ActionButton variant="secondary" onClick={clearForm}>
+            Reset
+          </ActionButton>
         </div>
       </FilterBar>
 
@@ -126,8 +180,8 @@ export default function TicketPrerequisitesManager() {
             header: "Color",
             render: (row) => (
               <div className="inline-flex items-center gap-2 text-sm">
-                <span className="h-3 w-3 rounded-full border border-[var(--border)]" style={{ backgroundColor: row.color }} />
-                <span>{row.color}</span>
+                <span className="h-3 w-3 rounded-full border border-[var(--border)]" style={{ backgroundColor: row.color || "#94A3B8" }} />
+                <span>{row.color || "—"}</span>
               </div>
             ),
           },
@@ -143,7 +197,7 @@ export default function TicketPrerequisitesManager() {
         ]}
         getRowKey={(row) => row.id}
         searchable={false}
-        emptyText="No records found."
+        emptyText={loading ? "Loading records..." : "No records found."}
         stickyHeader
       />
     </div>

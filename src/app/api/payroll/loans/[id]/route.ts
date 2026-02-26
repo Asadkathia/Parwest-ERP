@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/db"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+    const managerScope = deriveManagerScope(session)
+
+    const { id } = await params
+    const body = await request.json()
+
+    const existing = await prisma.loan.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        guard: {
+          select: {
+            regionId: true,
+            regionalOfficeId: true,
+          },
+        },
+      },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ message: "Loan not found." }, { status: 404 })
+    }
+    if (
+      managerScope &&
+      managerScopeDenied(managerScope, {
+        regionId: existing.guard?.regionId || null,
+        regionalOfficeId: existing.guard?.regionalOfficeId || null,
+      })
+    ) {
+      return NextResponse.json({ message: "Forbidden: loan is outside your scope." }, { status: 403 })
+    }
+
+    const updated = await prisma.loan.update({
+      where: { id },
+      data: {
+        status: body.status ? String(body.status) : undefined,
+        amount: body.amount != null ? Number(body.amount) : undefined,
+        deploymentDays: body.deploymentDays != null ? Number(body.deploymentDays) : undefined,
+        supervisor: body.supervisor !== undefined ? String(body.supervisor || "") : undefined,
+        manager: body.manager !== undefined ? String(body.manager || "") : undefined,
+      },
+      include: {
+        guard: {
+          select: {
+            id: true,
+            name: true,
+            parwestId: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error("Error updating payroll loan:", error)
+    return NextResponse.json({ message: "Failed to update payroll loan" }, { status: 500 })
+  }
+}

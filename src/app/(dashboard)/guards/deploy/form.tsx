@@ -7,11 +7,6 @@ import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
-type Region = {
-  id: string
-  name: string
-}
-
 type Client = {
   id: string
   name: string
@@ -39,13 +34,6 @@ type RegionalOffice = {
   seriesCode: string
   regionId: string
 }
-
-const LEGACY_REGIONS: Region[] = [
-  { id: "legacy-region-punjab", name: "Punjab" },
-  { id: "legacy-region-sindh", name: "Sindh" },
-  { id: "legacy-region-kpk", name: "KPK" },
-  { id: "legacy-region-balochistan", name: "Balochistan" },
-]
 
 const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
   { id: "legacy-head-office-lahore", name: "head office lahore", seriesCode: "LHR", regionId: "legacy-region-punjab" },
@@ -97,13 +85,11 @@ export default function DeployGuardForm() {
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
 
-  const [regions, setRegions] = useState<Region[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [guards, setGuards] = useState<Guard[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
 
-  const [selectedRegion, setSelectedRegion] = useState("")
   const [selectedClient, setSelectedClient] = useState("")
   const [selectedBranch, setSelectedBranch] = useState("")
   const [selectedGuard, setSelectedGuard] = useState("")
@@ -127,28 +113,22 @@ export default function DeployGuardForm() {
   const [guardDeploymentStatus, setGuardDeploymentStatus] = useState("ACTIVE")
 
   useEffect(() => {
-    loadRegions()
     loadClients()
     loadRegionalOffices()
   }, [])
 
   useEffect(() => {
-    if (selectedRegion) loadGuards(selectedRegion)
-  }, [selectedRegion])
+    if (!selectedRegionalOffice) {
+      setGuards([])
+      setSelectedGuard("")
+      return
+    }
+    loadGuards(selectedRegionalOffice)
+  }, [selectedRegionalOffice])
 
   useEffect(() => {
     if (selectedClient) loadBranches(selectedClient)
   }, [selectedClient])
-
-  const loadRegions = async () => {
-    try {
-      const res = await fetch("/api/regions")
-      const data = await res.json()
-      setRegions(Array.isArray(data) && data.length > 0 ? data : LEGACY_REGIONS)
-    } catch {
-      setRegions(LEGACY_REGIONS)
-    }
-  }
 
   const loadClients = async () => {
     try {
@@ -174,9 +154,9 @@ export default function DeployGuardForm() {
     }
   }
 
-  const loadGuards = async (regionId: string) => {
+  const loadGuards = async (regionalOfficeId: string) => {
     try {
-      const res = await fetch(`/api/guards?regionId=${regionId}&status=ACTIVE`)
+      const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}&status=ACTIVE`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
         setGuards(data)
@@ -268,23 +248,10 @@ export default function DeployGuardForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Region <span className="text-red-500">*</span></label>
-              <select name="region_id_on_user_profile" value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)} required className="ui-select">
-                <option value="">--Select Region--</option>
-                {regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Regional Office</label>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Regional Office <span className="text-red-500">*</span></label>
               <select name="regional_office_id" value={selectedRegionalOffice} onChange={(e) => setSelectedRegionalOffice(e.target.value)} required className="ui-select">
                 <option value="">Nothing selected</option>
                 {regionalOffices
-                  .filter((ro) => !selectedRegion || ro.regionId === selectedRegion)
                   .map((office) => (
                     <option key={office.id} value={office.id}>
                       {office.name} ({office.seriesCode})
@@ -352,7 +319,7 @@ export default function DeployGuardForm() {
 
           <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Select Guard</label>
-            <select name="guard_id" value={selectedGuard} onChange={(e) => setSelectedGuard(e.target.value)} required disabled={!selectedRegion} className="ui-select disabled:bg-slate-100">
+            <select name="guard_id" value={selectedGuard} onChange={(e) => setSelectedGuard(e.target.value)} required disabled={!selectedRegionalOffice} className="ui-select disabled:bg-slate-100">
               <option value="">--Select Guard--</option>
               {guards.map((guard) => (
                 <option key={guard.id} value={guard.id}>
