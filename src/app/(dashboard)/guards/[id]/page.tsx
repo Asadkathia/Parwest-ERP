@@ -4,8 +4,10 @@ import { prisma } from "@/lib/db"
 import Link from "next/link"
 import { ArrowLeft, Edit } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
-import { mockGuardProfile } from "@/lib/mockData/guards"
+import { mockGuardProfile, mockGuardsList } from "@/lib/mockData/guards"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
+import InlineAlert from "@/components/ui/inline-alert"
+import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
 function calculateAge(dateOfBirth?: Date | null, referenceDate?: Date | null) {
     if (!dateOfBirth || !referenceDate) return null
@@ -23,13 +25,46 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
 
     const { id } = await params
 
-    const guard = await prisma.guard.findUnique({
-        where: { id },
-        include: {
-            region: true,
-            regionalOffice: true,
-        },
-    })
+    let dbWarning = ""
+    let guard: any = null
+
+    try {
+        guard = await prisma.guard.findUnique({
+            where: { id },
+            include: {
+                region: true,
+                regionalOffice: true,
+            },
+        })
+    } catch (error) {
+        if (!isPrismaMissingSchemaError(error)) {
+            throw error
+        }
+
+        const fallbackGuard =
+            mockGuardsList.find((item) => item.id === id) ??
+            mockGuardsList[0] ??
+            mockGuardProfile
+
+        guard = {
+            id,
+            parwestId: fallbackGuard.parwestId ?? "—",
+            name: fallbackGuard.name ?? "Unknown Guard",
+            cnic: fallbackGuard.cnic ?? "—",
+            phone: fallbackGuard.phone ?? null,
+            email: fallbackGuard.email ?? null,
+            status: fallbackGuard.status ?? "PENDING",
+            dateOfBirth: null,
+            joiningDate: null,
+            region: null,
+            regionalOffice: null,
+        }
+        dbWarning = `Database schema is not fully migrated (${toErrorMessage(
+            error,
+            "missing required tables"
+        )}). Showing fallback profile data.`
+        console.error("GuardDetailPage query failed:", error)
+    }
 
     if (!guard) notFound()
 
@@ -78,6 +113,8 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
 
     return (
         <div className="space-y-6">
+            {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">

@@ -182,6 +182,18 @@ The system uses Prisma ORM with the following main models:
 3. Add environment variables
 4. Deploy!
 
+Required for production database deployments:
+
+- `DATABASE_URL` (pooled/runtime URL)
+- `DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING` (recommended for migrations)
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+
+Important:
+
+- Do not set `SKIP_DB_MIGRATIONS=true` unless you are intentionally running without database migrations.
+- Build pipeline runs `prisma migrate deploy` and DB schema verification before `next build`.
+
 ### Manual Deployment
 
 ```bash

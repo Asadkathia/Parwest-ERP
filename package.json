@@ -14,6 +14,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:verify:schema": "node scripts/verify-db-schema.mjs",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate"

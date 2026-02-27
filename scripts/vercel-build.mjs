@@ -4,6 +4,9 @@ const TRUE_VALUES = new Set(["1", "true", "yes", "on"])
 const skipMigrations = TRUE_VALUES.has(
   String(process.env.SKIP_DB_MIGRATIONS ?? "").trim().toLowerCase()
 )
+const skipSchemaVerification = TRUE_VALUES.has(
+  String(process.env.SKIP_DB_SCHEMA_VERIFY ?? "").trim().toLowerCase()
+)
 
 const pooledUrl =
   process.env.DATABASE_URL ??
@@ -41,6 +44,16 @@ if (!skipMigrations) {
   })
 } else {
   console.log("Skipping Prisma migrations because SKIP_DB_MIGRATIONS=true")
+}
+
+if (!skipSchemaVerification) {
+  console.log("Verifying required DB tables...")
+  run("node", ["scripts/verify-db-schema.mjs"], {
+    ...process.env,
+    ...(pooledUrl ? { DATABASE_URL: pooledUrl } : {}),
+  })
+} else {
+  console.log("Skipping DB schema verification because SKIP_DB_SCHEMA_VERIFY=true")
 }
 
 console.log("Building Next.js...")
