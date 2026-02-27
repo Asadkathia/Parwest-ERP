@@ -6,15 +6,11 @@ import { createMockPrismaClient } from '@/lib/mockData/prismaMock'
 
 const mockMode = isMockEnabled()
 const databaseUrl =
-    process.env.DATABASE_URL ??
-    process.env.POSTGRES_PRISMA_URL ??
-    process.env.POSTGRES_URL ??
-    process.env.DATABASE_URL_UNPOOLED ??
-    process.env.POSTGRES_URL_NON_POOLING
+    process.env.DATABASE_URL ?? process.env.DATABASE_URL_UNPOOLED
 
 if (!mockMode && !databaseUrl) {
     throw new Error(
-        "Database URL is required when mock mode is disabled. Set DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL)."
+        "Database URL is required when mock mode is disabled. Set DATABASE_URL."
     )
 }
 

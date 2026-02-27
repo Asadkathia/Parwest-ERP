@@ -84,15 +84,17 @@ A comprehensive Enterprise Resource Planning (ERP) system built for Parwest Secu
    
    Create a `.env` file in the root directory:
    ```env
-   DATABASE_URL="postgresql://user:password@localhost:5432/parwest_erp"
+   DATABASE_URL="postgresql://<user>:<password>@<neon-pooler-host>/neondb?sslmode=require&channel_binding=require"
+   DATABASE_URL_UNPOOLED="postgresql://<user>:<password>@<neon-direct-host>/neondb?sslmode=require&channel_binding=require"
    NEXTAUTH_SECRET="your-secret-key-here"
-   NEXTAUTH_URL="http://localhost:3000"
+   NEXTAUTH_URL="https://your-domain.vercel.app"
    ```
 
 4. **Run database migrations**
    ```bash
    npx prisma generate
-   npx prisma db push
+   npm run db:migrate:deploy
+   npm run db:verify:schema
    ```
 
 5. **Seed the database (optional)**
@@ -185,7 +187,7 @@ The system uses Prisma ORM with the following main models:
 Required for production database deployments:
 
 - `DATABASE_URL` (pooled/runtime URL)
-- `DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING` (recommended for migrations)
+- `DATABASE_URL_UNPOOLED` (recommended for migrations)
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 

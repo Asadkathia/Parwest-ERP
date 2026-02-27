@@ -9,14 +9,10 @@ const skipSchemaVerification = TRUE_VALUES.has(
 )
 
 const pooledUrl =
-  process.env.DATABASE_URL ??
-  process.env.POSTGRES_PRISMA_URL ??
-  process.env.POSTGRES_URL
+  process.env.DATABASE_URL
 
 const unpooledUrl =
-  process.env.DATABASE_URL_UNPOOLED ??
-  process.env.POSTGRES_URL_NON_POOLING ??
-  pooledUrl
+  process.env.DATABASE_URL_UNPOOLED ?? pooledUrl
 
 function run(command, args, env = process.env) {
   const result = spawnSync(command, args, {
@@ -31,7 +27,7 @@ function run(command, args, env = process.env) {
 
 if (!pooledUrl && !skipMigrations) {
   console.error(
-    "Missing database URL. Set DATABASE_URL (or POSTGRES_PRISMA_URL/POSTGRES_URL)."
+    "Missing database URL. Set DATABASE_URL."
   )
   process.exit(1)
 }
