@@ -57,18 +57,15 @@ export default async function DeploymentsPage() {
       stats.active = active
       stats.inactive = inactive
     } catch (error) {
-      deployments = mockDeploymentsList.slice(0, 20).map((row) => ({
-        ...row,
-        deploymentDate: new Date(row.deploymentDate),
-      }))
-      stats.total = deployments.length
-      stats.active = deployments.filter((d) => d.status === "ACTIVE").length
-      stats.inactive = deployments.filter((d) => d.status === "INACTIVE").length
+      deployments = []
+      stats.total = 0
+      stats.active = 0
+      stats.inactive = 0
 
       if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Showing fallback deployment mock data."
+        dbWarning = "Database schema is not fully migrated yet. Deployment data is unavailable."
       } else {
-        dbWarning = `Unable to load deployment data (${toErrorMessage(error, "Unknown database error")}). Showing fallback mock data.`
+        dbWarning = `Unable to load deployment data (${toErrorMessage(error, "Unknown database error")}).`
       }
       console.error("DeploymentsPage query failed:", error)
     }

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const trainings = await prisma.training.findMany({
@@ -25,9 +26,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(trainings)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching trainings:", error)
-        return NextResponse.json({ message: "Failed to fetch trainings" }, { status: 500 })
+        return internalServerError("Failed to fetch trainings")
     }
 }
 
@@ -35,16 +36,13 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
 
         if (!body.guardId || !body.trainingType || !body.completedAt) {
-            return NextResponse.json(
-                { message: "guardId, trainingType and completedAt are required" },
-                { status: 400 }
-            )
+            return badRequest("guardId, trainingType and completedAt are required")
         }
 
         const training = await prisma.training.create({
@@ -67,8 +65,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(training, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating training:", error)
-        return NextResponse.json({ message: "Failed to create training" }, { status: 500 })
+        return internalServerError("Failed to create training")
     }
 }

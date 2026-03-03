@@ -1,22 +1,33 @@
 "use client"
 
 import { GraduationCap } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type TrainingRecord = {
+    id: string
+    date?: string
+    location?: string
+    conductedBy?: string
+    supervisor?: string
+    topics?: string
+}
 
 interface OnJobTrainingsTabProps {
-    trainings: any[]
+    trainings: GuardLooseRow[]
 }
 
 export default function OnJobTrainingsTab({ trainings }: OnJobTrainingsTabProps) {
+    const sessions = trainings as TrainingRecord[]
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">OnJob Trainings</h2>
                 <div className="text-sm text-gray-600">
-                    Sessions: <span className="font-semibold">{trainings.length}</span>
+                    Sessions: <span className="font-semibold">{sessions.length}</span>
                 </div>
             </div>
 
-            {trainings.length === 0 ? (
+            {sessions.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No training sessions found</p>
@@ -34,7 +45,7 @@ export default function OnJobTrainingsTab({ trainings }: OnJobTrainingsTabProps)
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {trainings.map((training) => (
+                            {sessions.map((training) => (
                                 <tr key={training.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm whitespace-nowrap">
                                         {training.date
@@ -54,4 +65,3 @@ export default function OnJobTrainingsTab({ trainings }: OnJobTrainingsTabProps)
         </div>
     )
 }
-

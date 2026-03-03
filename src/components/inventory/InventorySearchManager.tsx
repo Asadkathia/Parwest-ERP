@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 
 type Option = { id: string; name: string }
@@ -27,24 +27,35 @@ export default function InventorySearchManager() {
     vendorId: "",
   })
 
-  useEffect(() => {
-    fetch("/api/inventory/categories").then((r) => r.json()).then((d) => setCategories(d || [])).catch(() => null)
-    fetch("/api/inventory/vendors").then((r) => r.json()).then((d) => setVendors(d || [])).catch(() => null)
-  }, [])
-
-  useEffect(() => {
+  const loadRows = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (filters.search) params.set("search", filters.search)
     if (filters.status) params.set("status", filters.status)
     if (filters.categoryId) params.set("categoryId", filters.categoryId)
     if (filters.vendorId) params.set("vendorId", filters.vendorId)
-    fetch(`/api/inventory/items?${params.toString()}`)
-      .then((r) => r.json())
-      .then((d) => setRows(d || []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false))
+    try {
+      const response = await fetch(`/api/inventory/items?${params.toString()}`)
+      const data = await response.json().catch(() => [])
+      setRows(Array.isArray(data) ? data : [])
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
   }, [filters.categoryId, filters.search, filters.status, filters.vendorId])
+
+  useEffect(() => {
+    fetch("/api/inventory/categories").then((r) => r.json()).then((d) => setCategories(d || [])).catch(() => null)
+    fetch("/api/inventory/vendors").then((r) => r.json()).then((d) => setVendors(d || [])).catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadRows()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [loadRows])
 
   return (
     <div className="space-y-6">

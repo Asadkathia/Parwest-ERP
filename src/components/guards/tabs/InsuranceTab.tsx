@@ -1,12 +1,25 @@
 "use client"
 
 import { Shield } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type InsurancePolicy = {
+    id: string
+    provider?: string
+    status?: string
+    policyNumber?: string
+    coverageAmount?: number
+    beneficiary?: string
+    startDate?: string
+    expiryDate?: string
+}
 
 interface InsuranceTabProps {
-    insurance: any[]
+    insurance: GuardLooseRow[]
 }
 
 export default function InsuranceTab({ insurance }: InsuranceTabProps) {
+    const policies = insurance as InsurancePolicy[]
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("en-PK", {
             style: "currency",
@@ -18,14 +31,14 @@ export default function InsuranceTab({ insurance }: InsuranceTabProps) {
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">Insurance</h2>
 
-            {insurance.length === 0 ? (
+            {policies.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No insurance policies found</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {insurance.map((policy) => (
+                    {policies.map((policy) => (
                         <div key={policy.id} className="bg-white rounded-lg border p-6">
                             <div className="flex items-center justify-between">
                                 <h3 className="font-semibold">{policy.provider || "Insurance Provider"}</h3>
@@ -47,4 +60,3 @@ export default function InsuranceTab({ insurance }: InsuranceTabProps) {
         </div>
     )
 }
-

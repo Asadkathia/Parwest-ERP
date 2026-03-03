@@ -1,0 +1,24 @@
+{
+  "approvals": [
+    {
+      "function": "Engineering",
+      "status": "approved",
+      "approvedBy": "@backend",
+      "approvedAt": "2026-03-02T18:00:00Z",
+      "notes": "engineering signoff" 
+    },
+    {
+      "function": "QA",
+      "status": "approved",
+      "approvedBy": "@qa",
+      "approvedAt": "2026-03-02T18:05:00Z",
+      "notes": "qa signoff"
+    }
+  ],
+  "checklistComplete": true,
+  "decision": {
+    "finalDecision": "approved",
+    "effectiveVersion": "v1.0.0-rc-2026-03-02-01",
+    "deploymentWindow": "2026-03-03 02:00-03:00 UTC"
+  }
+}

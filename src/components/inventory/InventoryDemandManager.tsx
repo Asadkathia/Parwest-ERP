@@ -24,6 +24,8 @@ type DemandRow = {
 const STATUS_OPTIONS = ["PENDING", "APPROVED", "FULFILLED", "REJECTED"]
 
 export default function InventoryDemandManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<DemandRow[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [offices, setOffices] = useState<Office[]>([])
@@ -77,9 +79,9 @@ export default function InventoryDemandManager() {
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to load demands.")
       setRows(Array.isArray(payload) ? payload : [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setRows([])
-      setNotice({ type: "error", message: error?.message || "Failed to load demands." })
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to load demands.") })
     } finally {
       setLoading(false)
     }
@@ -119,8 +121,8 @@ export default function InventoryDemandManager() {
       setForm({ categoryId: "", regionalOfficeId: "", quantity: "", requiredBy: "", reason: "" })
       setNotice({ type: "success", message: "Demand created." })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to create demand." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to create demand.") })
     } finally {
       setSaving(false)
     }
@@ -137,8 +139,8 @@ export default function InventoryDemandManager() {
       if (!response.ok) throw new Error(payload?.message || "Failed to update demand.")
       setNotice({ type: "success", message: `Demand marked ${status}.` })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to update demand." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to update demand.") })
     }
   }
 
@@ -149,8 +151,8 @@ export default function InventoryDemandManager() {
       if (!response.ok) throw new Error(payload?.message || "Failed to delete demand.")
       setNotice({ type: "success", message: "Demand deleted." })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to delete demand." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to delete demand.") })
     }
   }
 

@@ -1,22 +1,31 @@
 "use client"
 
 import { BookOpen, Award } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type CourseRecord = {
+    id: string
+    name?: string
+    provider?: string
+    completedDate?: string
+}
 
 interface CoursesTabProps {
-    courses: any[]
+    courses: GuardLooseRow[]
 }
 
 export default function CoursesTab({ courses }: CoursesTabProps) {
+    const rows = courses as CourseRecord[]
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Courses</h2>
                 <div className="text-sm text-gray-600">
-                    Completed: <span className="font-semibold">{courses.length}</span>
+                    Completed: <span className="font-semibold">{rows.length}</span>
                 </div>
             </div>
 
-            {courses.length === 0 ? (
+            {rows.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No courses found</p>
@@ -33,7 +42,7 @@ export default function CoursesTab({ courses }: CoursesTabProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {courses.map((course) => (
+                            {rows.map((course) => (
                                 <tr key={course.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm font-medium">{course.name}</td>
                                     <td className="px-6 py-4 text-sm">{course.provider}</td>

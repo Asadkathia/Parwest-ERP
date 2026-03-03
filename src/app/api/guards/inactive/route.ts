@@ -1,15 +1,16 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockInactiveGuards } from "@/lib/mockData/guards"
+import { internalServerError, unauthorized } from "@/lib/api/response"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         if (isMockEnabled()) {
@@ -30,11 +31,11 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(guards)
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (isPrismaMissingSchemaError(error)) {
             return NextResponse.json([])
         }
         console.error("Error fetching inactive guards:", error)
-        return NextResponse.json({ message: "Failed to fetch inactive guards" }, { status: 500 })
+        return internalServerError("Failed to fetch inactive guards")
     }
 }

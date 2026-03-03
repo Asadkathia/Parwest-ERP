@@ -1,10 +1,11 @@
 "use client"
 
 import { Calendar, CheckCircle, XCircle, Clock } from "lucide-react"
+import type { AttendanceRecord, AttendanceSummary } from "@/components/guards/tabs/types"
 
 interface AttendanceTabProps {
-    attendance: any[]
-    attendanceSummary: any
+    attendance: AttendanceRecord[]
+    attendanceSummary: AttendanceSummary
 }
 
 export default function AttendanceTab({ attendance, attendanceSummary }: AttendanceTabProps) {

@@ -1,17 +1,28 @@
 "use client"
 
 import { Activity } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type StatusHistoryRecord = {
+    id: string
+    previousStatus?: string
+    newStatus?: string
+    changedBy?: string
+    changedDate?: string
+    reason?: string
+}
 
 interface StatusHistoryTabProps {
-    statusHistory: any[]
+    statusHistory: GuardLooseRow[]
 }
 
 export default function StatusHistoryTab({ statusHistory }: StatusHistoryTabProps) {
+    const records = statusHistory as StatusHistoryRecord[]
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">Status History</h2>
 
-            {statusHistory.length === 0 ? (
+            {records.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No status history found</p>
@@ -29,7 +40,7 @@ export default function StatusHistoryTab({ statusHistory }: StatusHistoryTabProp
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {statusHistory.map((record) => (
+                            {records.map((record) => (
                                 <tr key={record.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{record.previousStatus || "—"}</td>
                                     <td className="px-6 py-4 text-sm font-medium">{record.newStatus || "—"}</td>
@@ -49,4 +60,3 @@ export default function StatusHistoryTab({ statusHistory }: StatusHistoryTabProp
         </div>
     )
 }
-

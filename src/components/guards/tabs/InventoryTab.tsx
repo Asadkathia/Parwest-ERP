@@ -1,27 +1,38 @@
 "use client"
 
 import { Package } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type InventoryItem = {
+    id: string
+    item?: string
+    category?: string
+    serialNumber?: string
+    issuedDate?: string
+    condition?: string
+}
 
 interface InventoryTabProps {
-    inventory: any[]
+    inventory: GuardLooseRow[]
 }
 
 export default function InventoryTab({ inventory }: InventoryTabProps) {
-    const uniqueCategories = new Set(inventory.map((item) => item.category)).size
+    const items = inventory as InventoryItem[]
+    const uniqueCategories = new Set(items.map((item) => item.category)).size
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <div className="text-sm text-gray-600">
-                    Items: <span className="font-semibold">{inventory.length}</span>
+                    Items: <span className="font-semibold">{items.length}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white rounded-lg border p-4">
                     <p className="text-sm text-gray-600">Assigned Items</p>
-                    <p className="text-2xl font-bold mt-1">{inventory.length}</p>
+                    <p className="text-2xl font-bold mt-1">{items.length}</p>
                 </div>
                 <div className="bg-white rounded-lg border p-4">
                     <p className="text-sm text-gray-600">Item Categories</p>
@@ -29,7 +40,7 @@ export default function InventoryTab({ inventory }: InventoryTabProps) {
                 </div>
             </div>
 
-            {inventory.length === 0 ? (
+            {items.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No inventory assigned</p>
@@ -47,7 +58,7 @@ export default function InventoryTab({ inventory }: InventoryTabProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {inventory.map((item) => (
+                            {items.map((item) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm font-medium">{item.item}</td>
                                     <td className="px-6 py-4 text-sm">{item.category}</td>

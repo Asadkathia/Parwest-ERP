@@ -5,13 +5,13 @@ export type OcrFieldMatch = {
 }
 
 export type OcrExtraction = {
-  documentType: "CNIC" | "PASSPORT" | "CLIENT_FORM"
+  documentType: "CNIC" | "CLIENT_FORM"
   fields: OcrFieldMatch[]
 }
 
 export function simulateOcrExtraction(fileName: string, target: "guard" | "client"): OcrExtraction {
   const lower = fileName.toLowerCase()
-  const documentType = lower.includes("passport") ? "PASSPORT" : lower.includes("client") ? "CLIENT_FORM" : "CNIC"
+  const documentType = lower.includes("client") ? "CLIENT_FORM" : "CNIC"
 
   if (target === "guard") {
     return {

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,31 +11,31 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await context.params
     const body = await request.json()
     const name = body?.name != null ? String(body.name).trim() : undefined
     const dateRaw = body?.date != null ? String(body.date).trim() : undefined
     const notes = body?.notes !== undefined ? (body.notes ? String(body.notes) : null) : undefined
-    const data: any = {}
+    const data: Record<string, unknown> = {}
     if (name !== undefined) data.name = name
     if (notes !== undefined) data.notes = notes
     if (dateRaw !== undefined) {
       const date = new Date(dateRaw)
-      if (Number.isNaN(date.getTime())) return NextResponse.json({ message: "Invalid date value." }, { status: 400 })
+      if (Number.isNaN(date.getTime())) return badRequest("Invalid date value.")
       data.date = date
     }
-    if (Object.keys(data).length === 0) return NextResponse.json({ message: "No fields provided." }, { status: 400 })
+    if (Object.keys(data).length === 0) return badRequest("No fields provided.")
 
     if (isMockEnabled()) return NextResponse.json({ id, ...data })
 
     const updated = await prisma.payrollHoliday.update({ where: { id }, data })
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for payroll holidays yet." }, { status: 503 })
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Holiday not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for payroll holidays yet.")
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Holiday not found.")
     console.error("Error updating payroll holiday:", error)
-    return NextResponse.json({ message: "Failed to update holiday." }, { status: 500 })
+    return internalServerError("Failed to update holiday.")
   }
 }
 
@@ -44,17 +45,17 @@ export async function DELETE(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await context.params
 
     if (isMockEnabled()) return NextResponse.json({ success: true })
 
     await prisma.payrollHoliday.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for payroll holidays yet." }, { status: 503 })
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Holiday not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for payroll holidays yet.")
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Holiday not found.")
     console.error("Error deleting payroll holiday:", error)
-    return NextResponse.json({ message: "Failed to delete holiday." }, { status: 500 })
+    return internalServerError("Failed to delete holiday.")
   }
 }

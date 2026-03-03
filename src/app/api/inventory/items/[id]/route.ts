@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { getPrismaCode } from "@/lib/prisma-errors"
+import { internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -8,7 +10,7 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await params
     const body = await request.json()
 
@@ -33,11 +35,11 @@ export async function PATCH(
     })
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Inventory item not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (getPrismaCode(error) === "P2025") {
+      return notFound("Inventory item not found.")
     }
     console.error("Error updating inventory item:", error)
-    return NextResponse.json({ message: "Failed to update inventory item." }, { status: 500 })
+    return internalServerError("Failed to update inventory item.")
   }
 }

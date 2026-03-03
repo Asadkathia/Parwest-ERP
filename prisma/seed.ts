@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
@@ -23,7 +22,7 @@ async function main() {
     console.log('Starting database seed...')
 
     // Create Super User role
-    const superUserRole = await prisma.role.upsert({
+    await prisma.role.upsert({
         where: { name: 'Super User' },
         update: {},
         create: {
@@ -99,7 +98,7 @@ async function main() {
     const hashedPassword = await bcrypt.hash('admin123@', 10)
 
     // Create admin user
-    const adminUser = await prisma.user.upsert({
+    await prisma.user.upsert({
         where: { email: 'admin@parwestgroup.com' },
         update: {},
         create: {

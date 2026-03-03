@@ -1,12 +1,23 @@
 "use client"
 
 import { ShoppingCart } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type StoreInventoryItem = {
+    id: string
+    item?: string
+    quantity?: number
+    issueDate?: string
+    returnDate?: string
+    status?: string
+}
 
 interface StoreInventoryTabProps {
-    items: any[]
+    items: GuardLooseRow[]
 }
 
 export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
+    const rows = items as StoreInventoryItem[]
     const getStatusColor = (status: string) => {
         if (status === "ISSUED") return "bg-blue-100 text-blue-800"
         if (status === "RETURNED") return "bg-green-100 text-green-800"
@@ -17,7 +28,7 @@ export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">Store Inventory</h2>
 
-            {items.length === 0 ? (
+            {rows.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No store inventory records found</p>
@@ -35,7 +46,7 @@ export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {items.map((item) => (
+                            {rows.map((item) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm font-medium">{item.item || "—"}</td>
                                     <td className="px-6 py-4 text-sm">{item.quantity || 0}</td>
@@ -50,7 +61,7 @@ export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
                                             : "Not Returned"}
                                     </td>
                                     <td className="px-6 py-4 text-sm">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status || "ISSUED")}`}>
                                             {item.status || "—"}
                                         </span>
                                     </td>
@@ -63,4 +74,3 @@ export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
         </div>
     )
 }
-

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const managerScope = deriveManagerScope(session)
 
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get("month") || undefined
     const search = searchParams.get("search") || undefined
 
-    const where: any = {}
+    const where: Prisma.LoanWhereInput = {}
     if (status) where.status = status
     if (guardId) where.guardId = guardId
     if (month) {
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(loans)
   } catch (error) {
     console.error("Error fetching payroll loans:", error)
-    return NextResponse.json({ message: "Failed to fetch payroll loans" }, { status: 500 })
+    return internalServerError("Failed to fetch payroll loans")
   }
 }
 
@@ -67,17 +69,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()
 
     if (!body.guardId || !body.month || body.amount == null) {
-      return NextResponse.json(
-        { message: "guardId, month and amount are required." },
-        { status: 400 }
-      )
+      return badRequest("guardId, month and amount are required.")
     }
 
     const guard = await prisma.guard.findUnique({
@@ -86,15 +85,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (!guard) {
-      return NextResponse.json({ message: "Guard not found." }, { status: 404 })
+      return notFound("Guard not found.")
     }
     if (managerScope && managerScopeDenied(managerScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
-      return NextResponse.json({ message: "Forbidden: guard is outside your scope." }, { status: 403 })
+      return forbidden("Forbidden: guard is outside your scope.")
     }
 
     const month = new Date(String(body.month))
     if (Number.isNaN(month.getTime())) {
-      return NextResponse.json({ message: "Invalid month value." }, { status: 400 })
+      return badRequest("Invalid month value.")
     }
 
     const created = await prisma.loan.create({
@@ -119,11 +118,11 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid relation provided." }, { status: 400 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid relation provided.")
     }
     console.error("Error creating payroll loan:", error)
-    return NextResponse.json({ message: "Failed to create payroll loan" }, { status: 500 })
+    return internalServerError("Failed to create payroll loan")
   }
 }

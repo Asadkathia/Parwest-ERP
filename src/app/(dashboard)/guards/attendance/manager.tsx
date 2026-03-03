@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -47,7 +47,7 @@ export default function GuardAttendanceManager() {
     const [bulkFile, setBulkFile] = useState<File | null>(null)
     const [bulkLoading, setBulkLoading] = useState(false)
 
-    const loadAttendance = async () => {
+    const loadAttendance = useCallback(async () => {
         try {
             setLoading(true)
             setError("")
@@ -65,15 +65,15 @@ export default function GuardAttendanceManager() {
 
             const data = await response.json()
             setRecords(data)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setRecords([])
         } finally {
             setLoading(false)
         }
-    }
+    }, [endDate, parwestId, startDate])
 
-    const loadActiveGuards = async () => {
+    const loadActiveGuards = useCallback(async () => {
         try {
             const response = await fetch("/api/guards?status=ACTIVE")
             if (!response.ok) return
@@ -82,12 +82,12 @@ export default function GuardAttendanceManager() {
         } catch {
             setActiveGuards([])
         }
-    }
+    }, [])
 
     useEffect(() => {
-        loadAttendance()
-        loadActiveGuards()
-    }, [])
+        void loadAttendance()
+        void loadActiveGuards()
+    }, [loadActiveGuards, loadAttendance])
 
     const markAttendance = async (e: React.FormEvent) => {
         e.preventDefault()

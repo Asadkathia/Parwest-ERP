@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
-import { getMockBranchType } from "@/lib/mockData"
+import { deriveBranchModel } from "@/lib/branches/model"
 
 type Branch = {
     id: string
@@ -21,6 +21,7 @@ type Branch = {
     client: {
         id: string
         name: string
+        type?: string | null
     }
 }
 
@@ -30,7 +31,7 @@ type Props = {
 
 export default function BranchEditForm({ branch }: Props) {
     const router = useRouter()
-    const branchType = getMockBranchType(branch.id)
+    const branchType = deriveBranchModel(branch.client?.type)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
@@ -59,8 +60,8 @@ export default function BranchEditForm({ branch }: Props) {
 
             router.push(`/clients/branches/${branch.id}`)
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setLoading(false)
         }
     }

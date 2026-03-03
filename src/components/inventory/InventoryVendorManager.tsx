@@ -13,6 +13,8 @@ type Row = {
 }
 
 export default function InventoryVendorManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<Row[]>([])
   const [form, setForm] = useState({ name: "", contact: "" })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -35,7 +37,10 @@ export default function InventoryVendorManager() {
   }
 
   useEffect(() => {
-    loadRows().catch(() => null)
+    const timer = setTimeout(() => {
+      void loadRows()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const reset = () => {
@@ -64,8 +69,8 @@ export default function InventoryVendorManager() {
       setNotice({ type: "success", message: editingId ? "Vendor updated." : "Vendor created." })
       reset()
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Unable to save vendor." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Unable to save vendor.") })
     }
   }
 
@@ -78,8 +83,8 @@ export default function InventoryVendorManager() {
       }
       setNotice({ type: "success", message: "Vendor deleted." })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Unable to delete vendor." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Unable to delete vendor.") })
     }
   }
 

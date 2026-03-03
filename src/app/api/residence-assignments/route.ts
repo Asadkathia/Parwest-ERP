@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const { searchParams } = new URL(request.url)
@@ -59,12 +60,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(assignments)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching residence assignments:", error)
-        return NextResponse.json(
-            { message: "Failed to fetch residence assignments" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to fetch residence assignments")
     }
 }
 
@@ -72,16 +70,13 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
 
         if (!body.guardId || (!body.location && !body.residenceId)) {
-            return NextResponse.json(
-                { message: "guardId and either location or residenceId are required" },
-                { status: 400 }
-            )
+            return badRequest("guardId and either location or residenceId are required")
         }
 
         const assignedAt = body.assignedAt ? new Date(body.assignedAt) : new Date()
@@ -93,12 +88,12 @@ export async function POST(request: NextRequest) {
             : null
 
         if (body.residenceId && !selectedResidence) {
-            return NextResponse.json({ message: "Residence not found" }, { status: 404 })
+            return notFound("Residence not found")
         }
 
         const finalLocation = body.location || selectedResidence?.address
         if (!finalLocation) {
-            return NextResponse.json({ message: "Valid location is required" }, { status: 400 })
+            return badRequest("Valid location is required")
         }
 
         const assignment = await prisma.residenceAssignment.upsert({
@@ -136,11 +131,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(assignment, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error saving residence assignment:", error)
-        return NextResponse.json(
-            { message: "Failed to save residence assignment" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to save residence assignment")
     }
 }

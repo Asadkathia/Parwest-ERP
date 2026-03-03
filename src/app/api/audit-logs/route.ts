@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import type { Prisma } from "@prisma/client"
 
 const MOCK_AUDIT_LOGS = [
   {
@@ -27,7 +29,7 @@ const MOCK_AUDIT_LOGS = [
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const { searchParams } = new URL(request.url)
     const moduleFilter = searchParams.get("module")?.trim()
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: any = {}
+    const where: Prisma.AuditLogWhereInput = {}
     if (moduleFilter) where.module = moduleFilter
     if (eventFilter) where.event = eventFilter
     if (userId) where.userId = userId
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (dateFromRaw || dateToRaw) {
-      const createdAt: any = {}
+      const createdAt: Prisma.DateTimeFilter = {}
       if (dateFromRaw) {
         const dateFrom = new Date(dateFromRaw)
         if (!Number.isNaN(dateFrom.getTime())) createdAt.gte = dateFrom
@@ -91,23 +93,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(logs)
   } catch (error) {
     console.error("Error fetching audit logs:", error)
-    return NextResponse.json({ message: "Failed to fetch audit logs" }, { status: 500 })
+    return internalServerError("Failed to fetch audit logs")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const body = await request.json()
     const event = String(body?.event || "").trim()
-    const module = String(body?.module || "").trim()
+    const moduleName = String(body?.module || "").trim()
     const description = body?.description ? String(body.description) : null
     const ipAddress = body?.ipAddress ? String(body.ipAddress) : null
 
-    if (!event || !module) {
-      return NextResponse.json({ message: "event and module are required." }, { status: 400 })
+    if (!event || !moduleName) {
+      return badRequest("event and module are required.")
     }
 
     if (isMockEnabled()) {
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
         {
           id: `mock-audit-${Date.now()}`,
           event,
-          module,
+          module: moduleName,
           description,
           ipAddress,
           createdAt: new Date().toISOString(),
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user?.id || null,
         event,
-        module,
+        module: moduleName,
         description,
         ipAddress,
       },
@@ -141,6 +143,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     console.error("Error creating audit log:", error)
-    return NextResponse.json({ message: "Failed to create audit log" }, { status: 500 })
+    return internalServerError("Failed to create audit log")
   }
 }

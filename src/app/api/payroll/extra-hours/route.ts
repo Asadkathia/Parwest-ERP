@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 function parseMonth(input: string) {
   const date = new Date(input)
@@ -13,7 +15,7 @@ function parseMonth(input: string) {
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const managerScope = deriveManagerScope(session)
 
     const { searchParams } = new URL(request.url)
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     const monthRaw = searchParams.get("month")
     const search = searchParams.get("search") || undefined
 
-    const where: any = {}
+    const where: Prisma.PayrollWhereInput = {}
     if (guardId) where.guardId = guardId
     if (monthRaw) {
       const month = parseMonth(monthRaw)
@@ -58,14 +60,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching extra hours:", error)
-    return NextResponse.json({ message: "Failed to fetch extra hours records." }, { status: 500 })
+    return internalServerError("Failed to fetch extra hours records.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()
@@ -75,12 +77,12 @@ export async function POST(request: NextRequest) {
     const rate = Number(body.rate || 0)
 
     if (!guardId || !monthInput) {
-      return NextResponse.json({ message: "guardId and month are required." }, { status: 400 })
+      return badRequest("guardId and month are required.")
     }
 
     const month = parseMonth(monthInput)
     if (!month) {
-      return NextResponse.json({ message: "Invalid month value." }, { status: 400 })
+      return badRequest("Invalid month value.")
     }
 
     const guard = await prisma.guard.findUnique({
@@ -88,10 +90,10 @@ export async function POST(request: NextRequest) {
       select: { id: true, regionId: true, regionalOfficeId: true },
     })
     if (!guard) {
-      return NextResponse.json({ message: "Guard not found." }, { status: 404 })
+      return notFound("Guard not found.")
     }
     if (managerScope && managerScopeDenied(managerScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
-      return NextResponse.json({ message: "Forbidden: guard is outside your scope." }, { status: 403 })
+      return forbidden("Forbidden: guard is outside your scope.")
     }
 
     const year = month.getUTCFullYear()
@@ -150,6 +152,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(saved, { status: existing ? 200 : 201 })
   } catch (error) {
     console.error("Error saving extra hours:", error)
-    return NextResponse.json({ message: "Failed to save extra hours." }, { status: 500 })
+    return internalServerError("Failed to save extra hours.")
   }
 }

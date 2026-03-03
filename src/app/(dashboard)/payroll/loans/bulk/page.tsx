@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
-import { mockBulkLoanDraftRows, type BulkLoanDraftRow } from "@/lib/mockData/loansBulk"
+import { createDraftRowsFromUpload, type BulkLoanDraftRow } from "@/lib/payroll/loans-bulk"
 
 export default function BulkLoansPage() {
-  const [rows, setRows] = useState<BulkLoanDraftRow[]>(mockBulkLoanDraftRows)
+  const [rows, setRows] = useState<BulkLoanDraftRow[]>([])
   const [uploaded, setUploaded] = useState(false)
 
   const readyCount = useMemo(() => rows.filter((row) => row.status !== "DRAFT").length, [rows])
@@ -19,6 +19,12 @@ export default function BulkLoansPage() {
     setRows((prev) => prev.map((row) => ({ ...row, status: "COMMITTED" })))
   }
 
+  const handleUpload = (file: File | null) => {
+    if (!file) return
+    setRows(createDraftRowsFromUpload(file.name))
+    setUploaded(true)
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Bulk Loans Upload" subtitle="Upload formatted sheet, review rows, edit loan date and commit batch." />
@@ -28,12 +34,12 @@ export default function BulkLoansPage() {
           <ActionButton variant="secondary">Download Template</ActionButton>
           <label className="ui-btn ui-btn-secondary px-3 py-2 text-sm cursor-pointer">
             Upload Sheet
-            <input type="file" className="hidden" accept=".xlsx,.csv" onChange={() => setUploaded(true)} />
+            <input type="file" className="hidden" accept=".xlsx,.csv" onChange={(e) => handleUpload(e.target.files?.[0] || null)} />
           </label>
           <ActionButton onClick={commit} disabled={rows.length === 0}>Commit Batch</ActionButton>
         </div>
         <p className="text-sm text-[var(--text-muted)]">
-          {uploaded ? "Sheet parsed successfully (mock)." : "No sheet uploaded yet."} Ready rows: {readyCount}/{rows.length}
+          {uploaded ? "Sheet parsed successfully." : "No sheet uploaded yet."} Ready rows: {readyCount}/{rows.length}
         </p>
       </section>
 

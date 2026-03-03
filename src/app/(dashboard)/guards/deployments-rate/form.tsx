@@ -162,8 +162,8 @@ export default function DeploymentRatesForm() {
       setExtraHours(latest.extraHours?.toString() || "")
       setPostAllowance(latest.postAllowance?.toString() || "")
       setSuccess("Previous rates loaded")
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch previous rates")
     }
   }
 
@@ -198,8 +198,8 @@ export default function DeploymentRatesForm() {
 
       setSuccess("Deployment rate saved")
       await loadRecentRates()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save rate")
     } finally {
       setLoading(false)
     }
@@ -254,7 +254,7 @@ export default function DeploymentRatesForm() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard's Type</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard&apos;s Type</label>
             <select name="guard_type" value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
               <option value="">Nothing selected</option>
               <option value="Guard">Guard</option>

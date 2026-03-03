@@ -13,14 +13,15 @@ type Region = {
 
 type Props = {
     regions: Region[]
+    initialBranchless?: boolean
 }
 
-export default function ClientEnrollmentForm({ regions }: Props) {
+export default function ClientEnrollmentForm({ regions, initialBranchless = true }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
-    const [isBranchless, setIsBranchless] = useState(true)
+    const [isBranchless, setIsBranchless] = useState(initialBranchless)
     const [introducerAddress, setIntroducerAddress] = useState("")
     const [defaultBranchName, setDefaultBranchName] = useState("")
 
@@ -59,8 +60,8 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
             router.push("/clients")
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to create client")
             setLoading(false)
         }
     }
@@ -84,7 +85,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client's Name * <span className="text-red-500">*</span>
+                                Client&apos;s Name * <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
@@ -113,14 +114,14 @@ export default function ClientEnrollmentForm({ regions }: Props) {
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client's Email *
+                                Client&apos;s Email *
                             </label>
                             <input
                                 type="email"
                                 name="email"
                                 required
                                 className="ui-input"
-                                placeholder="Client's Email"
+                                placeholder="Client&apos;s Email"
                             />
                         </div>
 
@@ -137,17 +138,23 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                         </div>
 
                         <div className="md:col-span-2 lg:col-span-2">
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="is_client_branch_less_checkbox"
-                                    value="true"
-                                    checked={isBranchless}
-                                    onChange={(e) => setIsBranchless(e.target.checked)}
-                                    className="h-4 w-4 accent-[var(--brand)]"
-                                />
-                                <span className="text-sm text-[var(--text)]">Branchless</span>
-                            </label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-2">Client Add Mode</label>
+                            <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBranchless(false)}
+                                    className={`px-4 py-2 text-sm font-medium transition-colors ${!isBranchless ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"}`}
+                                >
+                                    Branch Client
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBranchless(true)}
+                                    className={`px-4 py-2 text-sm font-medium transition-colors border-l border-[var(--border)] ${isBranchless ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"}`}
+                                >
+                                    Branchless Client
+                                </button>
+                            </div>
                             <input type="hidden" name="isBranchless" value={isBranchless ? "true" : "false"} />
                         </div>
                     </div>
@@ -218,7 +225,7 @@ export default function ClientEnrollmentForm({ regions }: Props) {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client's Postal Code</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client&apos;s Postal Code</label>
                             <input
                                 type="text"
                                 name="clientPostalCode"

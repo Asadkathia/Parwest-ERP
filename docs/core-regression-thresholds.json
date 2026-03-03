@@ -1,0 +1,11 @@
+{
+  "minCoreTotal": 70,
+  "minByPrefix": {
+    "/api/users": 36,
+    "/api/guards": 4,
+    "/api/deployments": 11,
+    "/api/attendance": 6,
+    "/api/clients": 7,
+    "/api/branches": 6
+  }
+}

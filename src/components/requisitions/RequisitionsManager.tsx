@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -36,7 +36,7 @@ export default function RequisitionsManager() {
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -53,11 +53,11 @@ export default function RequisitionsManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [search, statusFilter])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   const create = async () => {
     setNotice("")

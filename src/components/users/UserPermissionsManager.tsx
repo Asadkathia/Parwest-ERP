@@ -38,6 +38,7 @@ type UserRow = {
 type PermissionRow = {
   moduleName: string
 }
+type ApiUserRow = { id: string; name?: string | null; email?: string | null }
 
 function emptyMap(): PermissionMap {
   return { CREATE: false, VIEW: false, UPDATE: false, DELETE: false, REQUISITIONS: false }
@@ -63,7 +64,7 @@ export default function UserPermissionsManager() {
         if (!response.ok) {
           throw new Error(payload?.message || "Failed to fetch users.")
         }
-        const mapped = (Array.isArray(payload) ? payload : []).map((user: any) => ({
+        const mapped = (Array.isArray(payload) ? (payload as ApiUserRow[]) : []).map((user) => ({
           id: String(user.id),
           name: String(user.name || "Unnamed"),
           email: String(user.email || ""),
@@ -105,9 +106,9 @@ export default function UserPermissionsManager() {
         )
 
         for (const row of Array.isArray(payload) ? payload : []) {
-          const module = String(row.module || "").toUpperCase()
-          if (!nextValues[module]) continue
-          nextValues[module] = {
+          const moduleName = String(row.module || "").toUpperCase()
+          if (!nextValues[moduleName]) continue
+          nextValues[moduleName] = {
             CREATE: Boolean(row.canCreate),
             VIEW: Boolean(row.canView),
             UPDATE: Boolean(row.canUpdate),

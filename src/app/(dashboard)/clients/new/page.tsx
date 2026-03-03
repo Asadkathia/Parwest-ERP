@@ -6,9 +6,16 @@ import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 
-export default async function NewClientPage() {
+export default async function NewClientPage({
+    searchParams,
+}: {
+    searchParams?: Promise<{ mode?: string }>
+}) {
     const session = await auth()
     if (!session) redirect("/login")
+    const params = searchParams ? await searchParams : undefined
+    const mode = params?.mode === "branch" ? "branch" : "branchless"
+    const initialBranchless = mode !== "branch"
 
     let regions: Array<{ id: string; name: string }> = []
     let dbWarning = ""
@@ -30,7 +37,7 @@ export default async function NewClientPage() {
             <SectionTitle title="Add New Client" subtitle="Enroll a new client into the system" />
             {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-            <ClientEnrollmentForm regions={regions} />
+            <ClientEnrollmentForm regions={regions} initialBranchless={initialBranchless} />
         </div>
     )
 }

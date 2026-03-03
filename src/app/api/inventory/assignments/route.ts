@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { getPrismaCode } from "@/lib/prisma-errors"
+import { badRequest, conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function GET() {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const rows = await prisma.inventoryAssignment.findMany({
       include: {
@@ -29,14 +31,14 @@ export async function GET() {
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching inventory assignments:", error)
-    return NextResponse.json({ message: "Failed to fetch assignments." }, { status: 500 })
+    return internalServerError("Failed to fetch assignments.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const body = await request.json()
     const itemId = String(body.itemId || "")
@@ -44,17 +46,45 @@ export async function POST(request: NextRequest) {
     const entityId = String(body.entityId || "")
 
     if (!itemId || !assignTo || !entityId) {
-      return NextResponse.json({ message: "itemId, assignTo and entityId are required." }, { status: 400 })
+      return badRequest("itemId, assignTo and entityId are required.")
     }
     if (assignTo !== "GUARD" && assignTo !== "CLIENT") {
-      return NextResponse.json({ message: "assignTo must be GUARD or CLIENT." }, { status: 400 })
+      return badRequest("assignTo must be GUARD or CLIENT.")
     }
 
     const item = await prisma.inventoryItem.findUnique({
       where: { id: itemId },
       select: { id: true, status: true },
     })
-    if (!item) return NextResponse.json({ message: "Item not found." }, { status: 404 })
+    if (!item) return notFound("Item not found.")
+    if (item.status !== "AVAILABLE") {
+      return conflict("Item is not available for assignment.")
+    }
+
+    const openAssignment = await prisma.inventoryAssignment.findFirst({
+      where: {
+        itemId,
+        returnedAt: null,
+      },
+      select: { id: true },
+    })
+    if (openAssignment) {
+      return conflict("Item already has an active assignment.")
+    }
+
+    if (assignTo === "GUARD") {
+      const guard = await prisma.guard.findUnique({
+        where: { id: entityId },
+        select: { id: true },
+      })
+      if (!guard) return notFound("Guard not found.")
+    } else {
+      const client = await prisma.client.findUnique({
+        where: { id: entityId },
+        select: { id: true },
+      })
+      if (!client) return notFound("Client not found.")
+    }
 
     const assignment = await prisma.inventoryAssignment.create({
       data: {
@@ -85,11 +115,11 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(assignment, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid relation provided." }, { status: 400 })
+  } catch (error: unknown) {
+    if (getPrismaCode(error) === "P2003") {
+      return badRequest("Invalid relation provided.")
     }
     console.error("Error creating inventory assignment:", error)
-    return NextResponse.json({ message: "Failed to create assignment." }, { status: 500 })
+    return internalServerError("Failed to create assignment.")
   }
 }

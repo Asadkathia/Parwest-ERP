@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_TICKETS = [
   {
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: any = {}
+    const where: Prisma.TicketWhereInput = {}
     if (statusId) where.statusId = statusId
     if (priorityId) where.priorityId = priorityId
     if (categoryId) where.categoryId = categoryId
@@ -71,7 +73,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(tickets)
   } catch (error) {
     console.error("Error fetching tickets:", error)
-    return NextResponse.json({ message: "Failed to fetch tickets" }, { status: 500 })
+    return internalServerError("Failed to fetch tickets")
   }
 }
 
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const body = await request.json()
@@ -91,10 +93,7 @@ export async function POST(request: NextRequest) {
     const assignedToId = body?.assignedToId ? String(body.assignedToId) : null
 
     if (!subject || !categoryId || !priorityId || !statusId) {
-      return NextResponse.json(
-        { message: "subject, categoryId, priorityId, and statusId are required." },
-        { status: 400 }
-      )
+      return badRequest("subject, categoryId, priorityId, and statusId are required.")
     }
 
     if (isMockEnabled()) {
@@ -134,11 +133,11 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid category, priority, status, or assignee." }, { status: 400 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid category, priority, status, or assignee.")
     }
     console.error("Error creating ticket:", error)
-    return NextResponse.json({ message: "Failed to create ticket" }, { status: 500 })
+    return internalServerError("Failed to create ticket")
   }
 }

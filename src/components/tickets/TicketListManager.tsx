@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
@@ -33,7 +33,7 @@ export default function TicketListManager() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -52,7 +52,7 @@ export default function TicketListManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [categoryId, priorityId, search, statusId])
 
   useEffect(() => {
     let cancelled = false
@@ -82,7 +82,7 @@ export default function TicketListManager() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [load])
 
   const statusVariant = useMemo(
     () => ({

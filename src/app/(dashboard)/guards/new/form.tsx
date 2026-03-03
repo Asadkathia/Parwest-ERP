@@ -229,8 +229,8 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       setSuccess("Guard created successfully.")
       router.push("/guards")
       router.refresh()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
       setLoading(false)
     }
   }
@@ -396,8 +396,6 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 Add Contact Number
               </button>
             </div>
-            <Field label="PASSPORT #" name="passportNumber" placeholder="PASSPORT #" />
-            <Field label="PASSPORT EXPIRY DATE" name="passportExpiryDate" type="date" />
             <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
             <Field label="SECT *" name="sect" required placeholder="SECT" />
             <Field label="CAST *" name="cast" required placeholder="CAST" />

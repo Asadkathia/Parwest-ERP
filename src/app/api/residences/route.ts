@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const { searchParams } = new URL(request.url)
@@ -39,9 +40,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(residences)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching residences:", error)
-        return NextResponse.json({ message: "Failed to fetch residences" }, { status: 500 })
+        return internalServerError("Failed to fetch residences")
     }
 }
 
@@ -49,13 +50,13 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
 
         if (!body.address) {
-            return NextResponse.json({ message: "address is required" }, { status: 400 })
+            return badRequest("address is required")
         }
 
         const residence = await prisma.residence.create({
@@ -71,8 +72,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(residence, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating residence:", error)
-        return NextResponse.json({ message: "Failed to create residence" }, { status: 500 })
+        return internalServerError("Failed to create residence")
     }
 }

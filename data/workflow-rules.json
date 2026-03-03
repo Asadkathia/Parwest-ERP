@@ -1,0 +1,13 @@
+{
+  "deployments.singleActivePerGuard": true,
+  "deployments.blockInactiveUpdate": true,
+  "deployments.requireActiveGuardStatus": true,
+  "deployments.requireGuardOfficeConsistency": false,
+  "deployments.requireEndDate": true,
+  "deployments.disallowEndDateBeforeDeploymentDate": true,
+  "deployments.disallowFutureEndDate": true,
+  "inventoryDemand.requirePendingInitialStatus": true,
+  "inventoryDemand.enforceTransitionMap": true,
+  "inventoryDemand.blockCoreEditsAfterTerminal": true,
+  "inventoryDemand.requireSufficientStockForFulfillment": true
+}

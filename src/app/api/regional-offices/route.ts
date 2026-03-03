@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_OFFICES = [
     {
@@ -45,12 +46,9 @@ export async function GET() {
             orderBy: { name: "asc" },
         })
         return NextResponse.json(regionalOffices, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching regional offices:", error)
-        return NextResponse.json(
-            { message: "Failed to fetch regional offices" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to fetch regional offices")
     }
 }
 
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
@@ -71,7 +69,7 @@ export async function POST(request: NextRequest) {
         const fax = body?.fax ? String(body.fax) : null
 
         if (!name || !seriesCode || !regionId) {
-            return NextResponse.json({ message: "name, seriesCode and regionId are required." }, { status: 400 })
+            return badRequest("name, seriesCode and regionId are required.")
         }
 
         if (isMockEnabled()) {
@@ -109,17 +107,14 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(regionalOffice, { status: 201 })
-    } catch (error: any) {
-        if (String(error?.code) === "P2002") {
-            return NextResponse.json({ message: "Office name/series code already exists." }, { status: 409 })
+    } catch (error: unknown) {
+        if (String((error as { code?: string }).code) === "P2002") {
+            return conflict("Office name/series code already exists.")
         }
-        if (String(error?.code) === "P2003") {
-            return NextResponse.json({ message: "Invalid region selected." }, { status: 400 })
+        if (String((error as { code?: string }).code) === "P2003") {
+            return badRequest("Invalid region selected.")
         }
         console.error("Error creating regional office:", error)
-        return NextResponse.json(
-            { message: "Failed to create regional office" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to create regional office")
     }
 }

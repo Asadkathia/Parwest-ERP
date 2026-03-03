@@ -102,8 +102,8 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
       router.refresh()
       setShowRegionForm(false)
       ;(e.target as HTMLFormElement).reset()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
     } finally {
       setLoading(false)
     }
@@ -133,8 +133,8 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
       router.refresh()
       setShowOfficeForm(false)
       ;(e.target as HTMLFormElement).reset()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 import { type ReactNode } from "react"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
+import Image from "next/image"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
 import { ArrowLeft, Edit, FileText, Plus } from "lucide-react"
@@ -301,9 +302,12 @@ export default async function ClientDetailPage({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
               <div className="space-y-3">
                 {client.logoUrl ? (
-                  <img
+                  <Image
                     src={client.logoUrl}
                     alt={client.name}
+                    width={220}
+                    height={192}
+                    unoptimized
                     className="h-48 w-full rounded-[var(--radius-md)] border border-[var(--border)] object-cover"
                   />
                 ) : (
@@ -686,7 +690,7 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BRANCH MANAGER'S INFORMATION</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BRANCH MANAGER&apos;S INFORMATION</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="Manager *" value={primaryBranch?.contactPerson || "—"} />
                 <FieldDisplay label="Manager Contact Number *" value={primaryBranch?.contactPhone || "—"} />
@@ -696,7 +700,7 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">OPERATIONS MANAGER'S INFORMATION</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">OPERATIONS MANAGER&apos;S INFORMATION</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="Manager *" value={primaryBranch?.contactPerson || "—"} />
                 <FieldDisplay label="Manager Contact Number" value={primaryBranch?.contactPhone || "—"} />
@@ -706,7 +710,7 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">SUPERVISOR'S INFORMATION</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">SUPERVISOR&apos;S INFORMATION</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="Supervisor *" value={activeDeploymentRows[0]?.deployment?.guard?.name || "—"} />
                 <FieldDisplay label="Supervisor Contact Number *" value={activeDeploymentRows[0]?.deployment?.guard?.phone || "—"} />

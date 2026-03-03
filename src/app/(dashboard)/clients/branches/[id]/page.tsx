@@ -6,7 +6,7 @@ import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "
 import SectionTitle from "@/components/ui/section-title"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import StatusChip from "@/components/ui/status-chip"
-import { getMockBranchType } from "@/lib/mockData"
+import { deriveBranchModel } from "@/lib/branches/model"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -40,7 +40,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
 
   const deployments = branch.deployments || []
   const activeDeployments = deployments.filter((d) => d.status === "ACTIVE")
-  const branchModel = getMockBranchType(branch.id)
+  const branchModel = deriveBranchModel(branch.client?.type)
 
   return (
     <div className="space-y-6">

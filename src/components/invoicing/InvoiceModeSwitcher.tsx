@@ -1,7 +1,8 @@
 "use client"
 
-import { InvoiceMode } from "@/lib/mockData"
 import { cn } from "@/lib/utils"
+
+export type InvoiceMode = "CLIENT_WISE" | "BRANCH_WISE"
 
 type Props = {
   mode: InvoiceMode

@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation"
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { importLinks, importScreens } from "@/lib/parity/screenConfigs"
+import ImportsLifecycleManager from "@/components/imports/ImportsLifecycleManager"
 
 export default async function ImportScreenPage({ params }: { params: Promise<{ screen: string }> }) {
   const { screen } = await params
-  const config = importScreens[screen]
+  const supported = ["users", "guards", "clients", "inventory"]
 
-  if (!config) {
+  if (!supported.includes(screen)) {
     notFound()
   }
 
-  return <ConfiguredInteractiveScreen config={config} links={importLinks} />
+  return <ImportsLifecycleManager initialModule={screen as "users" | "guards" | "clients" | "inventory"} />
 }

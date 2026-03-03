@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 type PreviewRow = {
   id: string
@@ -17,13 +19,14 @@ type PreviewRow = {
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { searchParams } = new URL(request.url)
     const fromSupervisorId = String(searchParams.get("fromSupervisorId") || "").trim()
     const toSupervisorId = String(searchParams.get("toSupervisorId") || "").trim()
+    const managerScope = deriveManagerScope(session)
 
     if (!fromSupervisorId || !toSupervisorId) {
-      return NextResponse.json({ message: "fromSupervisorId and toSupervisorId are required." }, { status: 400 })
+      return badRequest("fromSupervisorId and toSupervisorId are required.")
     }
 
     if (isMockEnabled()) {
@@ -50,17 +53,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
+    if (managerScope) {
+      const [fromSupervisor, toSupervisor] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: fromSupervisorId },
+          select: { id: true, regionId: true, regionalOfficeId: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: toSupervisorId },
+          select: { id: true, regionId: true, regionalOfficeId: true },
+        }),
+      ])
+      if (fromSupervisor && managerScopeDenied(managerScope, { regionId: fromSupervisor.regionId, regionalOfficeId: fromSupervisor.regionalOfficeId })) {
+        return forbidden("Forbidden: source supervisor is outside your scope.")
+      }
+      if (toSupervisor && managerScopeDenied(managerScope, { regionId: toSupervisor.regionId, regionalOfficeId: toSupervisor.regionalOfficeId })) {
+        return forbidden("Forbidden: target supervisor is outside your scope.")
+      }
+    }
+
     const currentAssignments = await prisma.guardSupervisorAssignment.findMany({
       where: {
         supervisorId: fromSupervisorId,
         status: "ACTIVE",
       },
       include: {
-        guard: { select: { id: true, name: true, parwestId: true } },
+        guard: { select: { id: true, name: true, parwestId: true, regionId: true, regionalOfficeId: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 500,
     })
+
+    if (managerScope) {
+      const outOfScope = currentAssignments.some((assignment) =>
+        managerScopeDenied(managerScope, {
+          regionId: assignment.guard.regionId,
+          regionalOfficeId: assignment.guard.regionalOfficeId,
+        })
+      )
+      if (outOfScope) {
+        return forbidden("Forbidden: one or more guard assignments are outside your scope.")
+      }
+    }
 
     const rows: PreviewRow[] = currentAssignments.map((assignment) => ({
       id: assignment.id,
@@ -75,38 +109,74 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for supervisor switching yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for supervisor switching yet.")
     }
     console.error("Error previewing supervisor switch:", error)
-    return NextResponse.json({ message: "Failed to preview supervisor switch" }, { status: 500 })
+    return internalServerError("Failed to preview supervisor switch")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session?.user?.id) return unauthorized()
     const body = await request.json()
     const fromSupervisorId = String(body?.fromSupervisorId || "").trim()
     const toSupervisorId = String(body?.toSupervisorId || "").trim()
     const reason = body?.reason ? String(body.reason) : null
+    const managerScope = deriveManagerScope(session)
 
     if (!fromSupervisorId || !toSupervisorId) {
-      return NextResponse.json({ message: "fromSupervisorId and toSupervisorId are required." }, { status: 400 })
+      return badRequest("fromSupervisorId and toSupervisorId are required.")
     }
 
     if (fromSupervisorId === toSupervisorId) {
-      return NextResponse.json({ message: "From and to supervisors cannot be same." }, { status: 400 })
+      return badRequest("From and to supervisors cannot be same.")
     }
 
     if (isMockEnabled()) {
       return NextResponse.json({ switchedCount: 2, reason, switchedBy: session.user.id })
     }
 
+    if (managerScope) {
+      const [fromSupervisor, toSupervisor] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: fromSupervisorId },
+          select: { id: true, regionId: true, regionalOfficeId: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: toSupervisorId },
+          select: { id: true, regionId: true, regionalOfficeId: true },
+        }),
+      ])
+      if (fromSupervisor && managerScopeDenied(managerScope, { regionId: fromSupervisor.regionId, regionalOfficeId: fromSupervisor.regionalOfficeId })) {
+        return forbidden("Forbidden: source supervisor is outside your scope.")
+      }
+      if (toSupervisor && managerScopeDenied(managerScope, { regionId: toSupervisor.regionId, regionalOfficeId: toSupervisor.regionalOfficeId })) {
+        return forbidden("Forbidden: target supervisor is outside your scope.")
+      }
+    }
+
     const activeAssignments = await prisma.guardSupervisorAssignment.findMany({
       where: { supervisorId: fromSupervisorId, status: "ACTIVE" },
-      select: { id: true, guardId: true },
+      select: {
+        id: true,
+        guardId: true,
+        guard: { select: { regionId: true, regionalOfficeId: true } },
+      },
     })
+
+    if (managerScope) {
+      const outOfScope = activeAssignments.some((assignment) =>
+        managerScopeDenied(managerScope, {
+          regionId: assignment.guard.regionId,
+          regionalOfficeId: assignment.guard.regionalOfficeId,
+        })
+      )
+      if (outOfScope) {
+        return forbidden("Forbidden: one or more guard assignments are outside your scope.")
+      }
+    }
 
     if (activeAssignments.length === 0) {
       return NextResponse.json({ switchedCount: 0, reason, switchedBy: session.user.id })
@@ -138,14 +208,14 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ switchedCount: activeAssignments.length, reason, switchedBy: session.user.id })
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for supervisor switching yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for supervisor switching yet.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid supervisor reference." }, { status: 400 })
+    if (typeof error === "object" && error !== null && "code" in error && String((error as { code?: unknown }).code) === "P2003") {
+      return badRequest("Invalid supervisor reference.")
     }
     console.error("Error applying supervisor switch:", error)
-    return NextResponse.json({ message: "Failed to switch supervisor" }, { status: 500 })
+    return internalServerError("Failed to switch supervisor")
   }
 }

@@ -1,12 +1,13 @@
 "use client"
 
 import { LucideIcon } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
 
 interface PlaceholderTabProps {
     title: string
     description: string
     icon: LucideIcon
-    data?: any[]
+    data?: GuardLooseRow[]
 }
 
 export default function PlaceholderTab({ title, description, icon: Icon, data = [] }: PlaceholderTabProps) {

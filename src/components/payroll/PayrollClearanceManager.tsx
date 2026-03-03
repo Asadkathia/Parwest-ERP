@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -18,7 +18,7 @@ export default function PayrollClearanceManager() {
   const [filters, setFilters] = useState({ search: "", month: "" })
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const params = new URLSearchParams()
     if (filters.search) params.set("search", filters.search)
     if (filters.month) params.set("month", filters.month)
@@ -28,11 +28,14 @@ export default function PayrollClearanceManager() {
       return
     }
     setRows(await response.json())
-  }
+  }, [filters.month, filters.search])
 
   useEffect(() => {
-    load().catch(() => null)
-  }, [filters.search, filters.month])
+    const timer = setTimeout(() => {
+      void load()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [load])
 
   const processClearance = async (row: Row) => {
     const response = await fetch(`/api/payroll/salary/${row.id}`, {

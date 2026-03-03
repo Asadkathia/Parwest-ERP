@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,7 +11,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const managerScope = deriveManagerScope(session)
 
@@ -31,7 +32,7 @@ export async function PATCH(
     })
 
     if (!existing) {
-      return NextResponse.json({ message: "Loan not found." }, { status: 404 })
+      return notFound("Loan not found.")
     }
     if (
       managerScope &&
@@ -40,7 +41,7 @@ export async function PATCH(
         regionalOfficeId: existing.guard?.regionalOfficeId || null,
       })
     ) {
-      return NextResponse.json({ message: "Forbidden: loan is outside your scope." }, { status: 403 })
+      return forbidden("Forbidden: loan is outside your scope.")
     }
 
     const updated = await prisma.loan.update({
@@ -66,6 +67,6 @@ export async function PATCH(
     return NextResponse.json(updated)
   } catch (error) {
     console.error("Error updating payroll loan:", error)
-    return NextResponse.json({ message: "Failed to update payroll loan" }, { status: 500 })
+    return internalServerError("Failed to update payroll loan")
   }
 }

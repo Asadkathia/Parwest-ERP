@@ -1,6 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { importLinks, moduleHubScreens } from "@/lib/parity/screenConfigs"
+import ImportsLifecycleManager from "@/components/imports/ImportsLifecycleManager"
 
 export default function ImportsPage() {
-  return <ConfiguredInteractiveScreen config={moduleHubScreens.importsHub} links={importLinks} />
+  return <ImportsLifecycleManager initialModule="users" />
 }

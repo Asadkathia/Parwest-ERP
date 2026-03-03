@@ -1,8 +1,13 @@
-import { mockGuardProfile, mockGuardsList, mockInactiveGuards, mockResidences, mockTrainings } from "@/lib/mockData/guards"
+import { mockGuardProfile, mockGuardsList, mockResidences, mockTrainings } from "@/lib/mockData/guards"
 import { mockClientsList } from "@/lib/mockData/clients"
 import { mockDeploymentsList } from "@/lib/mockData/deployments"
 
-type AnyRecord = Record<string, any>
+type AnyRecord = Record<string, unknown>
+type MockTransactionCallback = (client: ReturnType<typeof createMockPrismaClient>) => unknown
+
+function asRecord(value: unknown): AnyRecord {
+  return (value && typeof value === "object" ? value : {}) as AnyRecord
+}
 
 const now = () => new Date()
 const cuid = () => `mock_${Math.random().toString(36).slice(2, 10)}`
@@ -88,35 +93,65 @@ const branches = [
   },
 ]
 
-const guards = mockGuardsList.map((g: any, idx) => ({
-  id: g.id,
-  parwestId: g.parwestId,
-  name: g.name,
-  cnic: g.cnic,
-  phone: g.phone || null,
-  email: g.email || null,
-  dateOfBirth: g.dateOfBirth ? new Date(g.dateOfBirth) : null,
-  age: g.age ?? null,
-  fatherName: g.fatherName || null,
-  religion: g.religion || null,
-  maritalStatus: g.maritalStatus || null,
-  education: g.education || null,
-  addressPermanent: g.addressPermanent || null,
-  addressCurrent: g.addressCurrent || null,
-  emergencyContact: g.emergencyContact || null,
-  status: g.status,
-  isExService: !!g.isExService,
+const guards = mockGuardsList.map((g, idx) => {
+  const guard = g as {
+    id: string
+    parwestId: string
+    name: string
+    cnic: string
+    phone?: string | null
+    email?: string | null
+    dateOfBirth?: string | Date | null
+    age?: number | null
+    fatherName?: string | null
+    religion?: string | null
+    maritalStatus?: string | null
+    education?: string | null
+    addressPermanent?: string | null
+    addressCurrent?: string | null
+    emergencyContact?: string | null
+    status: string
+    isExService?: boolean
+    bankName?: string | null
+    bankAccountNumber?: string | null
+    bankAccountType?: string | null
+    joiningDate?: string | Date | null
+    bankDetails?: {
+      bankName?: string | null
+      accountNumber?: string | null
+      accountType?: string | null
+    } | null
+  }
+
+  return {
+  id: guard.id,
+  parwestId: guard.parwestId,
+  name: guard.name,
+  cnic: guard.cnic,
+  phone: guard.phone || null,
+  email: guard.email || null,
+  dateOfBirth: guard.dateOfBirth ? new Date(guard.dateOfBirth) : null,
+  age: guard.age ?? null,
+  fatherName: guard.fatherName || null,
+  religion: guard.religion || null,
+  maritalStatus: guard.maritalStatus || null,
+  education: guard.education || null,
+  addressPermanent: guard.addressPermanent || null,
+  addressCurrent: guard.addressCurrent || null,
+  emergencyContact: guard.emergencyContact || null,
+  status: guard.status,
+  isExService: Boolean(guard.isExService),
   exServiceRank: null,
   exServiceRegiment: null,
-  bankName: g.bankName || g.bankDetails?.bankName || null,
-  bankAccountNumber: g.bankAccountNumber || g.bankDetails?.accountNumber || null,
-  bankAccountType: g.bankAccountType || g.bankDetails?.accountType || "SAVING",
-  joiningDate: g.joiningDate ? new Date(g.joiningDate) : null,
+  bankName: guard.bankName || guard.bankDetails?.bankName || null,
+  bankAccountNumber: guard.bankAccountNumber || guard.bankDetails?.accountNumber || null,
+  bankAccountType: guard.bankAccountType || guard.bankDetails?.accountType || "SAVING",
+  joiningDate: guard.joiningDate ? new Date(guard.joiningDate) : null,
   regionalOfficeId: "office-lhr",
   regionId: idx % 2 === 0 ? "lahore" : "karachi",
   createdAt: now(),
   updatedAt: now(),
-}))
+}})
 
 const deployments = mockDeploymentsList.map((d) => ({
   id: d.id,
@@ -148,19 +183,21 @@ const deployments = mockDeploymentsList.map((d) => ({
   updatedAt: now(),
 }))
 
-const attendances = guards.flatMap((g, idx) => {
+const attendances = guards.flatMap((g) => {
   const base = mockGuardProfile.attendance || []
   if (!base.length) return []
-  return base.slice(0, 5).map((a: any, i: number) => ({
+  return base.slice(0, 5).map((a, i: number) => {
+    const attendance = a as { date?: string | Date; status?: string; shift?: string; reason?: string | null }
+    return ({
     id: `att-${g.id}-${i}`,
     guardId: g.id,
-    date: new Date(a.date || now()),
-    status: a.status || "PRESENT",
-    shiftType: a.shift || "DAY",
-    notes: a.reason || null,
+    date: new Date(attendance.date || now()),
+    status: attendance.status || "PRESENT",
+    shiftType: attendance.shift || "DAY",
+    notes: attendance.reason || null,
     createdAt: now(),
     updatedAt: now(),
-  }))
+  })})
 })
 
 const residences = mockResidences.map((r) => ({
@@ -175,22 +212,44 @@ const residences = mockResidences.map((r) => ({
   updatedAt: now(),
 }))
 
-const trainings = mockTrainings.map((t: any) => ({
-  id: t.id,
-  regionalOffice: t.regionalOffice,
-  client: t.client,
-  branch: t.branch,
-  supervisor: t.supervisor || t.branchSupervisor || null,
-  manager: t.manager || t.branchManager || null,
-  guardName: t.guardName || t.guards || null,
-  guardId: t.guardId || null,
-  trainedBy: t.trainedBy || t.conductedBy || null,
-  date: new Date(t.date || t.dateOfOJT),
-  armored: t.armored ?? (t.armorer ? true : false),
-  remarks: t.remarks,
+const trainings = mockTrainings.map((t) => {
+  const training = t as {
+    id: string
+    regionalOffice?: string | null
+    client?: string | null
+    branch?: string | null
+    supervisor?: string | null
+    branchSupervisor?: string | null
+    manager?: string | null
+    branchManager?: string | null
+    guardName?: string | null
+    guards?: string | null
+    guardId?: string | null
+    trainedBy?: string | null
+    conductedBy?: string | null
+    date?: string | Date
+    dateOfOJT?: string | Date
+    armored?: boolean
+    armorer?: unknown
+    remarks?: string | null
+  }
+
+  return ({
+  id: training.id,
+  regionalOffice: training.regionalOffice,
+  client: training.client,
+  branch: training.branch,
+  supervisor: training.supervisor || training.branchSupervisor || null,
+  manager: training.manager || training.branchManager || null,
+  guardName: training.guardName || training.guards || null,
+  guardId: training.guardId || null,
+  trainedBy: training.trainedBy || training.conductedBy || null,
+  date: new Date(training.date || training.dateOfOJT || now()),
+  armored: training.armored ?? (training.armorer ? true : false),
+  remarks: training.remarks,
   createdAt: now(),
   updatedAt: now(),
-}))
+})})
 
 const ticketCategories = [
   { id: "tc-general", name: "General", description: "General issues", color: "#3B82F6", createdAt: now(), updatedAt: now() },
@@ -238,12 +297,15 @@ function matchWhere(row: AnyRecord, where: AnyRecord | undefined): boolean {
       return value.every((cond) => matchWhere(row, cond))
     }
     if (value && typeof value === "object" && "contains" in value) {
-      return String(row[key] ?? "").toLowerCase().includes(String((value as AnyRecord).contains).toLowerCase())
+      const containsValue = (value as { contains?: unknown }).contains
+      return String(row[key] ?? "").toLowerCase().includes(String(containsValue).toLowerCase())
     }
     if (value && typeof value === "object" && ("gte" in value || "lte" in value)) {
-      const rv = row[key] instanceof Date ? row[key].getTime() : new Date(row[key]).getTime()
-      const gte = (value as AnyRecord).gte ? new Date((value as AnyRecord).gte).getTime() : null
-      const lte = (value as AnyRecord).lte ? new Date((value as AnyRecord).lte).getTime() : null
+      const rowValue = row[key] as string | number | Date | undefined
+      const rv = rowValue instanceof Date ? rowValue.getTime() : new Date(rowValue || 0).getTime()
+      const range = value as { gte?: string | Date; lte?: string | Date }
+      const gte = range.gte ? new Date(range.gte).getTime() : null
+      const lte = range.lte ? new Date(range.lte).getTime() : null
       if (gte != null && rv < gte) return false
       if (lte != null && rv > lte) return false
       return true
@@ -257,50 +319,56 @@ function applyOrderBy<T extends AnyRecord>(rows: T[], orderBy: AnyRecord | undef
   const [key, dir] = Object.entries(orderBy)[0] ?? []
   if (!key) return rows
   return [...rows].sort((a, b) => {
-    const av = a[key]
-    const bv = b[key]
+    const av = a[key] as string | number | boolean | Date | null | undefined
+    const bv = b[key] as string | number | boolean | Date | null | undefined
     if (av === bv) return 0
+    if (av == null) return -1
+    if (bv == null) return 1
     const out = av > bv ? 1 : -1
     return dir === "desc" ? -out : out
   })
 }
 
 function includeRelations(model: string, row: AnyRecord, include: AnyRecord | undefined) {
-  if (!include) return row
+  const includeObj = asRecord(include)
+  if (!Object.keys(includeObj).length) return row
   const next = { ...row }
 
   if (model === "guard") {
-    if (include.region) next.region = regions.find((r) => r.id === row.regionId) || null
-    if (include.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
-    if (include.attendances) {
+    if (includeObj.region) next.region = regions.find((r) => r.id === row.regionId) || null
+    if (includeObj.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
+    if (includeObj.attendances) {
+      const attendanceInclude = asRecord(includeObj.attendances)
       let rows = attendances.filter((a) => a.guardId === row.id)
-      rows = rows.filter((a) => matchWhere(a, include.attendances.where))
-      rows = applyOrderBy(rows, include.attendances.orderBy)
-      if (typeof include.attendances.take === "number") rows = rows.slice(0, include.attendances.take)
+      rows = rows.filter((a) => matchWhere(a, asRecord(attendanceInclude.where)))
+      rows = applyOrderBy(rows, asRecord(attendanceInclude.orderBy))
+      if (typeof attendanceInclude.take === "number") rows = rows.slice(0, attendanceInclude.take)
       next.attendances = rows
     }
   }
 
   if (model === "client") {
-    if (include.region) next.region = regions.find((r) => r.id === row.regionId) || null
-    if (include.branches) {
-      const branchInclude = typeof include.branches === "object" ? include.branches.include : undefined
-      const branchOrderBy = typeof include.branches === "object" ? include.branches.orderBy : undefined
+    if (includeObj.region) next.region = regions.find((r) => r.id === row.regionId) || null
+    if (includeObj.branches) {
+      const branchArgs = asRecord(includeObj.branches)
+      const branchInclude = asRecord(branchArgs.include)
+      const branchOrderBy = asRecord(branchArgs.orderBy)
       let clientBranches = branches.filter((b) => b.clientId === row.id)
       clientBranches = applyOrderBy(clientBranches, branchOrderBy)
       next.branches = clientBranches.map((b) => includeRelations("branch", b, branchInclude))
     }
-    if (include._count) next._count = { branches: branches.filter((b) => b.clientId === row.id).length }
+    if (includeObj._count) next._count = { branches: branches.filter((b) => b.clientId === row.id).length }
   }
 
   if (model === "branch") {
-    if (include.client) next.client = clients.find((c) => c.id === row.clientId) || null
-    if (include.deployments) {
-      const whereStatus = include.deployments?.where?.status
+    if (includeObj.client) next.client = clients.find((c) => c.id === row.clientId) || null
+    if (includeObj.deployments) {
+      const deploymentArgs = asRecord(includeObj.deployments)
+      const whereStatus = asRecord(deploymentArgs.where).status
       const branchDeployments = deployments.filter((d) => d.branchId === row.id)
       const deploymentRows = whereStatus ? branchDeployments.filter((d) => d.status === whereStatus) : branchDeployments
-      const deploymentInclude = typeof include.deployments === "object" ? include.deployments.include : undefined
-      const deploymentOrderBy = typeof include.deployments === "object" ? include.deployments.orderBy : undefined
+      const deploymentInclude = asRecord(deploymentArgs.include)
+      const deploymentOrderBy = asRecord(deploymentArgs.orderBy)
       next.deployments = applyOrderBy(deploymentRows, deploymentOrderBy).map((d) =>
         includeRelations("deployment", d, deploymentInclude)
       )
@@ -308,43 +376,44 @@ function includeRelations(model: string, row: AnyRecord, include: AnyRecord | un
   }
 
   if (model === "deployment") {
-    if (include.guard) {
+    if (includeObj.guard) {
       const guard = guards.find((g) => g.id === row.guardId) || null
       if (!guard) {
         next.guard = null
-      } else if (typeof include.guard === "object" && include.guard.select) {
+      } else if (asRecord(includeObj.guard).select) {
         const selected: AnyRecord = {}
-        const select = include.guard.select as AnyRecord
+        const select = asRecord(asRecord(includeObj.guard).select)
         for (const key of Object.keys(select)) {
           if (!select[key]) continue
           if (key === "attendances") {
+            const attendanceSelect = asRecord(select.attendances)
             let rows = attendances.filter((a) => a.guardId === guard.id)
-            rows = rows.filter((a) => matchWhere(a, select.attendances.where))
-            rows = applyOrderBy(rows, select.attendances.orderBy)
-            if (typeof select.attendances.take === "number") rows = rows.slice(0, select.attendances.take)
+            rows = rows.filter((a) => matchWhere(a, asRecord(attendanceSelect.where)))
+            rows = applyOrderBy(rows, asRecord(attendanceSelect.orderBy))
+            if (typeof attendanceSelect.take === "number") rows = rows.slice(0, attendanceSelect.take)
             selected.attendances = rows
           } else {
-            selected[key] = (guard as AnyRecord)[key]
+            selected[key] = guard[key as keyof typeof guard]
           }
         }
         if (!selected.attendances) selected.attendances = []
         next.guard = selected
       } else {
-        next.guard = includeRelations("guard", guard, typeof include.guard === "object" ? include.guard.include : undefined)
+        next.guard = includeRelations("guard", guard, asRecord(asRecord(includeObj.guard).include))
       }
     }
-    if (include.client) next.client = clients.find((c) => c.id === row.clientId) || null
-    if (include.branch) next.branch = branches.find((b) => b.id === row.branchId) || null
-    if (include.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
+    if (includeObj.client) next.client = clients.find((c) => c.id === row.clientId) || null
+    if (includeObj.branch) next.branch = branches.find((b) => b.id === row.branchId) || null
+    if (includeObj.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
   }
 
   if (model === "user") {
-    if (include.role) next.role = roles.find((r) => r.id === row.roleId) || null
-    if (include.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
+    if (includeObj.role) next.role = roles.find((r) => r.id === row.roleId) || null
+    if (includeObj.regionalOffice) next.regionalOffice = regionalOffices.find((o) => o.id === row.regionalOfficeId) || null
   }
 
   if (model === "regionalOffice") {
-    if (include.region) next.region = regions.find((r) => r.id === row.regionId) || null
+    if (includeObj.region) next.region = regions.find((r) => r.id === row.regionId) || null
   }
 
   return next
@@ -353,63 +422,72 @@ function includeRelations(model: string, row: AnyRecord, include: AnyRecord | un
 function makeModelClient(model: string) {
   return {
     findMany: async (args: AnyRecord = {}) => {
+      const query = asRecord(args)
       let rows = stores[model] || []
-      rows = rows.filter((row) => matchWhere(row, args.where))
-      rows = applyOrderBy(rows, args.orderBy)
-      if (typeof args.skip === "number") rows = rows.slice(args.skip)
-      if (typeof args.take === "number") rows = rows.slice(0, args.take)
-      return rows.map((row) => includeRelations(model, row, args.include)).map((row) => {
-        if (!args.select) return row
+      rows = rows.filter((row) => matchWhere(row, asRecord(query.where)))
+      rows = applyOrderBy(rows, asRecord(query.orderBy))
+      if (typeof query.skip === "number") rows = rows.slice(query.skip)
+      if (typeof query.take === "number") rows = rows.slice(0, query.take)
+      return rows.map((row) => includeRelations(model, row, asRecord(query.include))).map((row) => {
+        if (!query.select) return row
+        const selectedFields = asRecord(query.select)
         const selected: AnyRecord = {}
-        for (const key of Object.keys(args.select)) if (args.select[key]) selected[key] = row[key]
+        for (const key of Object.keys(selectedFields)) if (selectedFields[key]) selected[key] = row[key]
         return selected
       })
     },
 
     findUnique: async (args: AnyRecord = {}) => {
-      const where = args.where || {}
+      const query = asRecord(args)
+      const where = asRecord(query.where)
       const row = (stores[model] || []).find((entry) => Object.entries(where).every(([k, v]) => entry[k] === v))
       if (!row) return null
-      const included = includeRelations(model, row, args.include)
-      if (!args.select) return included
+      const included = includeRelations(model, row, asRecord(query.include))
+      if (!query.select) return included
+      const selectedFields = asRecord(query.select)
       const selected: AnyRecord = {}
-      for (const key of Object.keys(args.select)) if (args.select[key]) selected[key] = included[key]
+      for (const key of Object.keys(selectedFields)) if (selectedFields[key]) selected[key] = included[key]
       return selected
     },
 
     findFirst: async (args: AnyRecord = {}) => {
-      const rows = await (makeModelClient(model).findMany as any)({ ...args, take: 1 })
+      const rows = (await makeModelClient(model).findMany({ ...args, take: 1 })) as AnyRecord[]
       return rows[0] ?? null
     },
 
     count: async (args: AnyRecord = {}) => {
-      const rows = (stores[model] || []).filter((row) => matchWhere(row, args.where))
+      const query = asRecord(args)
+      const rows = (stores[model] || []).filter((row) => matchWhere(row, asRecord(query.where)))
       return rows.length
     },
 
     create: async (args: AnyRecord = {}) => {
-      const data = { id: cuid(), ...args.data, createdAt: now(), updatedAt: now() }
+      const query = asRecord(args)
+      const data = { id: cuid(), ...asRecord(query.data), createdAt: now(), updatedAt: now() }
       stores[model] = stores[model] || []
       stores[model].push(data)
-      return includeRelations(model, data, args.include)
+      return includeRelations(model, data, asRecord(query.include))
     },
 
     update: async (args: AnyRecord = {}) => {
-      const where = args.where || {}
+      const query = asRecord(args)
+      const where = asRecord(query.where)
       const idx = (stores[model] || []).findIndex((entry) => Object.entries(where).every(([k, v]) => entry[k] === v))
       if (idx === -1) throw new Error(`Mock ${model} not found for update`)
-      stores[model][idx] = { ...stores[model][idx], ...args.data, updatedAt: now() }
-      return includeRelations(model, stores[model][idx], args.include)
+      stores[model][idx] = { ...stores[model][idx], ...asRecord(query.data), updatedAt: now() }
+      return includeRelations(model, stores[model][idx], asRecord(query.include))
     },
 
     upsert: async (args: AnyRecord = {}) => {
-      const existing = await (makeModelClient(model).findUnique as any)({ where: args.where })
-      if (existing) return (makeModelClient(model).update as any)({ where: args.where, data: args.update || {}, include: args.include })
-      return (makeModelClient(model).create as any)({ data: args.create || {}, include: args.include })
+      const query = asRecord(args)
+      const existing = await makeModelClient(model).findUnique({ where: query.where })
+      if (existing) return makeModelClient(model).update({ where: query.where, data: asRecord(query.update), include: query.include })
+      return makeModelClient(model).create({ data: asRecord(query.create), include: query.include })
     },
 
     delete: async (args: AnyRecord = {}) => {
-      const where = args.where || {}
+      const query = asRecord(args)
+      const where = asRecord(query.where)
       const idx = (stores[model] || []).findIndex((entry) => Object.entries(where).every(([k, v]) => entry[k] === v))
       if (idx === -1) throw new Error(`Mock ${model} not found for delete`)
       const [deleted] = stores[model].splice(idx, 1)
@@ -423,7 +501,9 @@ export function createMockPrismaClient() {
     {
       $disconnect: async () => undefined,
       $connect: async () => undefined,
-      $transaction: async (cb: any) => (typeof cb === "function" ? cb(createMockPrismaClient()) : cb),
+      $transaction: async (
+        cb: unknown
+      ) => (typeof cb === "function" ? (cb as MockTransactionCallback)(createMockPrismaClient()) : cb),
     } as AnyRecord,
     {
       get(target, prop: string) {

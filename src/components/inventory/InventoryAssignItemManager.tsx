@@ -39,7 +39,10 @@ export default function InventoryAssignItemManager() {
   }
 
   useEffect(() => {
-    load().catch(() => null)
+    const timer = setTimeout(() => {
+      void load()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const submit = async () => {

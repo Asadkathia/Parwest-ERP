@@ -125,8 +125,8 @@ export default function DeploymentEditForm({ deployment, guards, clients, region
 
             router.push(`/deployments/${deployment.id}`)
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to update deployment")
             setLoading(false)
         }
     }

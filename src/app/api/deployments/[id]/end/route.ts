@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 export async function POST(
     request: NextRequest,
@@ -10,7 +12,7 @@ export async function POST(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -20,27 +22,34 @@ export async function POST(
         // Validate deployment exists and is active
         const existingDeployment = await prisma.deployment.findUnique({
             where: { id },
+            select: {
+                id: true,
+                status: true,
+                regionalOfficeId: true,
+                deploymentDate: true,
+            },
         })
 
         if (!existingDeployment) {
-            return NextResponse.json(
-                { message: "Deployment not found" },
-                { status: 404 }
-            )
+            return notFound("Deployment not found")
         }
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existingDeployment.regionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: deployment is outside your scope.")
         }
 
         if (existingDeployment.status === "INACTIVE") {
-            return NextResponse.json(
-                { message: "Deployment is already ended" },
-                { status: 400 }
-            )
+            return conflict("Deployment is already ended.")
         }
 
         // Validate end date
-        const endDate = new Date(body.endDate)
+        if (isWorkflowRuleEnabled("deployments.requireEndDate") && !body?.endDate) {
+            return badRequest("endDate is required.")
+        }
+
+        const endDate = body?.endDate ? new Date(String(body.endDate)) : new Date()
+        if (Number.isNaN(endDate.getTime())) {
+            return badRequest("Invalid endDate value.")
+        }
         const deploymentDate = new Date(existingDeployment.deploymentDate)
         const today = new Date()
 
@@ -49,18 +58,12 @@ export async function POST(
         const deploymentDateOnly = new Date(deploymentDate.getFullYear(), deploymentDate.getMonth(), deploymentDate.getDate())
         const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-        if (endDateOnly < deploymentDateOnly) {
-            return NextResponse.json(
-                { message: "End date cannot be before deployment date" },
-                { status: 400 }
-            )
+        if (isWorkflowRuleEnabled("deployments.disallowEndDateBeforeDeploymentDate") && endDateOnly < deploymentDateOnly) {
+            return badRequest("End date cannot be before deployment date")
         }
 
-        if (endDateOnly > todayOnly) {
-            return NextResponse.json(
-                { message: "End date cannot be in the future" },
-                { status: 400 }
-            )
+        if (isWorkflowRuleEnabled("deployments.disallowFutureEndDate") && endDateOnly > todayOnly) {
+            return badRequest("End date cannot be in the future")
         }
 
         // End the deployment
@@ -79,19 +82,9 @@ export async function POST(
             },
         })
 
-        return NextResponse.json(
-            { message: "Deployment ended successfully", deployment },
-            { status: 200 }
-        )
-    } catch (error: any) {
+        return ok({ message: "Deployment ended successfully", deployment })
+    } catch (error: unknown) {
         console.error("Error ending deployment:", error)
-        return NextResponse.json(
-            {
-                message: "Failed to end deployment",
-                error: error.message,
-                details: error.toString()
-            },
-            { status: 500 }
-        )
+        return internalServerError("Failed to end deployment")
     }
 }

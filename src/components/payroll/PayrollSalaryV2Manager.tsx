@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -21,9 +21,10 @@ type Row = {
 export default function PayrollSalaryV2Manager() {
   const [rows, setRows] = useState<Row[]>([])
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [calculating, setCalculating] = useState(false)
   const [filters, setFilters] = useState({ month: "", paymentStatus: "", search: "" })
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const params = new URLSearchParams()
     if (filters.month) params.set("month", filters.month)
     if (filters.paymentStatus) params.set("paymentStatus", filters.paymentStatus)
@@ -34,11 +35,11 @@ export default function PayrollSalaryV2Manager() {
       return
     }
     setRows(await response.json())
-  }
+  }, [filters.month, filters.paymentStatus, filters.search])
 
   useEffect(() => {
-    load().catch(() => null)
-  }, [filters.month, filters.paymentStatus, filters.search])
+    void load()
+  }, [load])
 
   const updateStatus = async (id: string, paymentStatus: string) => {
     const response = await fetch(`/api/payroll/salary/${id}`, {
@@ -53,6 +54,39 @@ export default function PayrollSalaryV2Manager() {
     }
     setNotice({ type: "success", message: `Payment status set to ${paymentStatus}.` })
     await load()
+  }
+
+  const calculateSalary = async (finalize: boolean) => {
+    if (!filters.month) {
+      setNotice({ type: "error", message: "Select a month before running salary calculation." })
+      return
+    }
+
+    setCalculating(true)
+    setNotice(null)
+    try {
+      const response = await fetch("/api/payroll/salary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: filters.month, finalize }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) {
+        setNotice({ type: "error", message: body?.message || "Failed to calculate salary rows." })
+        return
+      }
+      setNotice({
+        type: "success",
+        message: finalize
+          ? `Calculated ${body?.calculated || 0} rows and finalized ${body?.finalized || 0} as UNPAID.`
+          : `Calculated ${body?.calculated || 0} salary rows.`,
+      })
+      await load()
+    } catch {
+      setNotice({ type: "error", message: "Failed to calculate salary rows." })
+    } finally {
+      setCalculating(false)
+    }
   }
 
   return (
@@ -70,6 +104,14 @@ export default function PayrollSalaryV2Manager() {
             <option value="UNPAID">UNPAID</option>
           </select>
           <input className="ui-input" placeholder="Search guard" value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} />
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <ActionButton variant="secondary" onClick={() => calculateSalary(false)} disabled={calculating}>
+            {calculating ? "Calculating..." : "Calculate Salary"}
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => calculateSalary(true)} disabled={calculating}>
+            {calculating ? "Finalizing..." : "Finalize Payroll"}
+          </ActionButton>
         </div>
       </section>
 

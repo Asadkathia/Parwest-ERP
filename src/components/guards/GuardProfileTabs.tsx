@@ -20,6 +20,7 @@ import ServiceHistoryTab from "@/components/guards/tabs/ServiceHistoryTab"
 import InsuranceTab from "@/components/guards/tabs/InsuranceTab"
 import StatusHistoryTab from "@/components/guards/tabs/StatusHistoryTab"
 import PBADocumentsTab from "@/components/guards/tabs/PBADocumentsTab"
+import type { GuardTabModel } from "@/components/guards/tabs/types"
 import {
     User,
     FileText,
@@ -40,7 +41,7 @@ import {
 } from "lucide-react"
 
 interface GuardProfileTabsProps {
-    guard: any
+    guard: GuardTabModel
     baseUrl: string
 }
 

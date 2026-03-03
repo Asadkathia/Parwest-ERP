@@ -1,15 +1,17 @@
 "use client"
 
 import { UserCircle2, ShieldCheck, CalendarDays, Clock3 } from "lucide-react"
+import type { GuardTabModel } from "@/components/guards/tabs/types"
 
 interface ProfileTabProps {
-    guard: any
+    guard: GuardTabModel
 }
 
+const CURRENT_YEAR = new Date().getFullYear()
+
 export default function ProfileTab({ guard }: ProfileTabProps) {
-    const serviceYears = guard.joiningDate
-        ? Math.max(0, Math.floor((Date.now() - new Date(guard.joiningDate).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-        : 0
+    const joiningYear = guard.joiningDate ? new Date(guard.joiningDate).getFullYear() : null
+    const serviceYears = joiningYear ? Math.max(0, CURRENT_YEAR - joiningYear) : 0
 
     const metrics = [
         { label: "Years of Service", value: `${serviceYears} yrs`, icon: Clock3 },

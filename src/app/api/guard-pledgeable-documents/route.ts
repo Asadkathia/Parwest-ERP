@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, conflict, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
   {
@@ -22,7 +23,7 @@ const MOCK_ROWS = [
 export async function GET() {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.guardPledgeableDocument.findMany({
@@ -30,20 +31,20 @@ export async function GET() {
     })
     return NextResponse.json(rows)
   } catch (error) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for guard pledgeable documents yet." }, { status: 503 })
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
     console.error("Error fetching guard pledgeable documents:", error)
-    return NextResponse.json({ message: "Failed to fetch documents." }, { status: 500 })
+    return internalServerError("Failed to fetch documents.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const body = await request.json()
     const name = String(body?.name || "").trim()
     const description = body?.description ? String(body.description) : null
-    if (!name) return NextResponse.json({ message: "Name is required." }, { status: 400 })
+    if (!name) return badRequest("Name is required.")
 
     if (isMockEnabled()) {
       return NextResponse.json(
@@ -56,10 +57,10 @@ export async function POST(request: NextRequest) {
       data: { name, description },
     })
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for guard pledgeable documents yet." }, { status: 503 })
-    if (String(error?.code) === "P2002") return NextResponse.json({ message: "Document type already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
+    if (String((error as { code?: string }).code) === "P2002") return conflict("Document type already exists.")
     console.error("Error creating guard pledgeable document:", error)
-    return NextResponse.json({ message: "Failed to create document type." }, { status: 500 })
+    return internalServerError("Failed to create document type.")
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -15,6 +15,8 @@ type DocumentRow = {
 }
 
 export default function GuardPledgeableDocumentsManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<DocumentRow[]>([])
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -24,7 +26,7 @@ export default function GuardPledgeableDocumentsManager() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setNotice(null)
     try {
@@ -32,17 +34,17 @@ export default function GuardPledgeableDocumentsManager() {
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to load document types.")
       setRows(Array.isArray(payload) ? payload : [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setRows([])
-      setNotice({ type: "error", message: error?.message || "Failed to load document types." })
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to load document types.") })
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   const reset = () => {
     setEditingId(null)
@@ -75,8 +77,8 @@ export default function GuardPledgeableDocumentsManager() {
       setNotice({ type: "success", message: editingId ? "Document type updated." : "Document type created." })
       reset()
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to save document type." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to save document type.") })
     } finally {
       setSaving(false)
     }
@@ -91,8 +93,8 @@ export default function GuardPledgeableDocumentsManager() {
       setNotice({ type: "success", message: "Document type deleted." })
       if (editingId === id) reset()
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to delete document type." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to delete document type.") })
     }
   }
 

@@ -10,6 +10,7 @@ type Region = { id: string; name: string }
 type Office = { id: string; regionId: string; name: string }
 type User = { id: string; name: string; roleId?: string | null; regionalOfficeId?: string | null; role?: { id: string; name: string } | null }
 type Role = { id: string; name: string }
+type ApiOffice = { id: string; regionId: string; name: string }
 
 type ImpactedGuard = {
   id: string
@@ -59,7 +60,7 @@ export default function SwitchSupervisorManager() {
         }
         if (cancelled) return
         setRegions(Array.isArray(regionsJson) ? regionsJson : [])
-        setOffices(Array.isArray(officesJson) ? officesJson.map((o: any) => ({ id: o.id, regionId: o.regionId, name: o.name })) : [])
+        setOffices(Array.isArray(officesJson) ? (officesJson as ApiOffice[]).map((o) => ({ id: o.id, regionId: o.regionId, name: o.name })) : [])
         setUsers(Array.isArray(usersJson) ? usersJson : [])
         setRoles(Array.isArray(rolesJson) ? rolesJson : [])
       } catch (loadError) {

@@ -64,16 +64,16 @@ export default async function ClientsPage() {
       stats.inactive = inactive
       stats.totalBranches = totalBranches
     } catch (error) {
-      clients = mockClientsList.slice(0, 20)
-      stats.total = clients.length
-      stats.active = clients.filter((c) => c.status === "ACTIVE").length
-      stats.inactive = clients.filter((c) => c.status === "INACTIVE").length
-      stats.totalBranches = clients.reduce((sum, c) => sum + c.branchCount, 0)
+      clients = []
+      stats.total = 0
+      stats.active = 0
+      stats.inactive = 0
+      stats.totalBranches = 0
 
       if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Showing fallback client mock data."
+        dbWarning = "Database schema is not fully migrated yet. Client data is unavailable."
       } else {
-        dbWarning = `Unable to load client data (${toErrorMessage(error, "Unknown database error")}). Showing fallback mock data.`
+        dbWarning = `Unable to load client data (${toErrorMessage(error, "Unknown database error")}).`
       }
       console.error("ClientsPage query failed:", error)
     }
@@ -94,10 +94,16 @@ export default async function ClientsPage() {
         title="Clients"
         subtitle="Manage clients and their branch locations"
         action={
-          <Link href="/clients/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Client
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Branch Client
+            </Link>
+            <Link href="/clients/new?mode=branchless" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Branchless Client
+            </Link>
+          </div>
         }
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}

@@ -6,7 +6,7 @@ import { Building, MapPin, Building2, BriefcaseBusiness } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import StatusChip from "@/components/ui/status-chip"
-import { getMockBranchType } from "@/lib/mockData"
+import { deriveBranchModel } from "@/lib/branches/model"
 
 export default async function BranchesPage({ searchParams }: { searchParams?: Promise<{ type?: string }> }) {
   const session = await auth()
@@ -25,7 +25,7 @@ export default async function BranchesPage({ searchParams }: { searchParams?: Pr
 
   const filteredBranches = branches.filter((branch) => {
     if (!params.type || params.type === "ALL") return true
-    return getMockBranchType(branch.id) === params.type
+    return deriveBranchModel(branch.client?.type) === params.type
   })
 
   const stats = {
@@ -33,8 +33,8 @@ export default async function BranchesPage({ searchParams }: { searchParams?: Pr
     headOffices: branches.filter((b) => b.isHeadOffice).length,
     cities: new Set(branches.map((b) => b.city).filter(Boolean)).size,
     withDeployments: branches.filter((b) => (b.deployments?.length || 0) > 0).length,
-    islamic: branches.filter((b) => getMockBranchType(b.id) === "ISLAMIC").length,
-    conventional: branches.filter((b) => getMockBranchType(b.id) === "CONVENTIONAL").length,
+    islamic: branches.filter((b) => deriveBranchModel(b.client?.type) === "ISLAMIC").length,
+    conventional: branches.filter((b) => deriveBranchModel(b.client?.type) === "CONVENTIONAL").length,
   }
 
   return (
@@ -114,7 +114,10 @@ export default async function BranchesPage({ searchParams }: { searchParams?: Pr
                   <td className="px-6 py-4 text-sm">{branch.province || "—"}</td>
                   <td className="px-6 py-4 text-sm">{branch.client?.type || "—"}</td>
                   <td className="px-6 py-4 text-sm">
-                    <StatusChip label={getMockBranchType(branch.id)} variant={getMockBranchType(branch.id) === "ISLAMIC" ? "warning" : "neutral"} />
+                    <StatusChip
+                      label={deriveBranchModel(branch.client?.type)}
+                      variant={deriveBranchModel(branch.client?.type) === "ISLAMIC" ? "warning" : "neutral"}
+                    />
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip label={String(branch.deployments?.length || 0)} variant="neutral" />

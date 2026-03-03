@@ -25,7 +25,7 @@ interface DataTableProps<T> {
     emptyVariant?: "plain" | "card"
 }
 
-export default function DataTable<T extends Record<string, any>>({
+export default function DataTable<T extends Record<string, unknown>>({
     rows,
     columns,
     getRowKey,
@@ -44,6 +44,9 @@ export default function DataTable<T extends Record<string, any>>({
     const [sortKey, setSortKey] = useState<string>("")
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
+    const getValueByKey = (row: T, key: keyof T | string): unknown =>
+        typeof key === "string" ? (row as Record<string, unknown>)[key] : row[key]
+
     const filteredRows = useMemo(() => {
         if (!query.trim()) return rows
         const lowered = query.toLowerCase()
@@ -59,8 +62,8 @@ export default function DataTable<T extends Record<string, any>>({
         if (!sortKey) return filteredRows
 
         return [...filteredRows].sort((a, b) => {
-            const av = String(a[sortKey] ?? "")
-            const bv = String(b[sortKey] ?? "")
+            const av = String((a as Record<string, unknown>)[sortKey] ?? "")
+            const bv = String((b as Record<string, unknown>)[sortKey] ?? "")
             const compare = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" })
             return sortDir === "asc" ? compare : -compare
         })
@@ -83,7 +86,8 @@ export default function DataTable<T extends Record<string, any>>({
     const resolveRowKey = (row: T, index: number) => {
         if (getRowKey) return getRowKey(row, index)
         if (rowKey && row[rowKey as keyof T] != null) return String(row[rowKey as keyof T])
-        if (row.id != null) return String(row.id)
+        const id = (row as Record<string, unknown>).id
+        if (id != null) return String(id)
         return String(index)
     }
 
@@ -142,7 +146,7 @@ export default function DataTable<T extends Record<string, any>>({
                                             key={String(column.key)}
                                             className={`${density === "compact" ? "px-6 py-2.5" : "px-6 py-4"} text-sm`}
                                         >
-                                            {column.render ? column.render(row) : String(row[column.key] ?? "—")}
+                                            {column.render ? column.render(row) : String(getValueByKey(row, column.key) ?? "—")}
                                         </td>
                                     ))}
                                 </tr>

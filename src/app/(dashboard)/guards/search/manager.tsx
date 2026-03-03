@@ -8,6 +8,7 @@ import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import StatusChip from "@/components/ui/status-chip"
+import GuardAvatar from "@/components/guards/GuardAvatar"
 
 type Guard = {
   id: string
@@ -15,6 +16,7 @@ type Guard = {
   name: string
   cnic: string
   phone: string | null
+  photoUrl?: string | null
   status: string
   education: string | null
   supervisorName?: string | null
@@ -171,8 +173,8 @@ export default function SearchGuardsManager() {
           isArchived: typeof guard.isArchived === "boolean" ? guard.isArchived : index % 7 === 0,
         }))
       )
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
       setGuards([])
     } finally {
       setLoading(false)
@@ -503,6 +505,11 @@ export default function SearchGuardsManager() {
           density="compact"
           pageSize={rowsPerPage}
           columns={[
+            {
+              key: "photo",
+              header: "Photo",
+              render: (guard) => <GuardAvatar guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl} />,
+            },
             { key: "parwestId", header: "Parwest ID", sortable: true },
             { key: "name", header: "Name", sortable: true },
             { key: "cnic", header: "CNIC", sortable: true },

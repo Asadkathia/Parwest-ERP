@@ -1,0 +1,113 @@
+name: Nightly Strict Real Profile
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+concurrency:
+  group: nightly-strict-real-profile
+  cancel-in-progress: true
+
+jobs:
+  strict-real-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      STRICT_PROFILE_PORT: 3011
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in DATABASE_URL NEXTAUTH_SECRET; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Run strict real-DB integration profile
+        run: npm run test:integration:strict-real
+
+      - name: Generate strict-run health report
+        run: STRICT_HEALTH_OUTPUT=/tmp/strict-run-health.md npm run ops:strict-health
+
+      - name: Publish strict-run job summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          if (!summaryPath) process.exit(0);
+
+          const resultsPath = '/tmp/api-test-results.json';
+          const healthPath = '/tmp/strict-run-health.md';
+          const lines = [];
+
+          lines.push('## Strict Real Profile Summary');
+          lines.push('');
+          lines.push(`Workflow result: \`${process.env.JOB_STATUS || 'unknown'}\``);
+
+          if (fs.existsSync(resultsPath)) {
+            try {
+              const parsed = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+              const summary = parsed?.summary || {};
+              lines.push('');
+              lines.push('### Integration Metrics');
+              lines.push(`- Total: ${Number(summary.total || 0)}`);
+              lines.push(`- Passed: ${Number(summary.passed || 0)}`);
+              lines.push(`- Failed: ${Number(summary.failed || 0)}`);
+            } catch (error) {
+              lines.push('');
+              lines.push(`- Could not parse \`${resultsPath}\`: ${error.message}`);
+            }
+          } else {
+            lines.push('');
+            lines.push(`- Integration result artifact not found: \`${resultsPath}\``);
+          }
+
+          if (fs.existsSync(healthPath)) {
+            lines.push('');
+            lines.push('### Health Report');
+            const content = fs.readFileSync(healthPath, 'utf8').trim();
+            lines.push(content.length ? content : '_Health report file is empty._');
+          } else {
+            lines.push('');
+            lines.push(`- Health report artifact not found: \`${healthPath}\``);
+          }
+
+          fs.appendFileSync(summaryPath, lines.join('\n') + '\n');
+          NODE
+        env:
+          JOB_STATUS: ${{ job.status }}
+
+      - name: Upload strict-run artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: strict-real-profile-artifacts
+          path: |
+            /tmp/api-test-results.json
+            /tmp/strict-run-health.md

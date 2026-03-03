@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
+        const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
         const parwestId = searchParams.get("parwestId")?.trim()
@@ -29,6 +32,7 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        const scopeFilter = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
         const records = await prisma.attendance.findMany({
             where: {
                 ...(resolvedGuardId ? { guardId: resolvedGuardId } : {}),
@@ -40,6 +44,7 @@ export async function GET(request: NextRequest) {
                         },
                     }
                     : {}),
+                ...(Object.keys(scopeFilter).length > 0 ? { guard: { is: scopeFilter } } : {}),
             },
             orderBy: { date: "desc" },
             include: {
@@ -56,9 +61,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(records)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching attendance:", error)
-        return NextResponse.json({ message: "Failed to fetch attendance" }, { status: 500 })
+        return internalServerError("Failed to fetch attendance")
     }
 }
 
@@ -66,16 +71,26 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
+        const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
 
         if (!body.guardId || !body.date || !body.status) {
-            return NextResponse.json(
-                { message: "guardId, date and status are required" },
-                { status: 400 }
-            )
+            return badRequest("guardId, date and status are required")
+        }
+        if (managerScope) {
+            const guard = await prisma.guard.findUnique({
+                where: { id: String(body.guardId) },
+                select: { regionId: true, regionalOfficeId: true },
+            })
+            if (!guard) {
+                return notFound("Guard not found")
+            }
+            if (managerScopeDenied(managerScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
+                return forbidden("Forbidden: guard is outside your scope.")
+            }
         }
 
         const attendanceDate = new Date(body.date)
@@ -112,8 +127,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(attendance, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error upserting attendance:", error)
-        return NextResponse.json({ message: "Failed to save attendance" }, { status: 500 })
+        return internalServerError("Failed to save attendance")
     }
 }

@@ -12,6 +12,8 @@ type Row = {
 }
 
 export default function InventoryCategoryManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<Row[]>([])
   const [name, setName] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -34,7 +36,10 @@ export default function InventoryCategoryManager() {
   }
 
   useEffect(() => {
-    loadRows().catch(() => null)
+    const timer = setTimeout(() => {
+      void loadRows()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const reset = () => {
@@ -63,8 +68,8 @@ export default function InventoryCategoryManager() {
       setNotice({ type: "success", message: editingId ? "Category updated." : "Category created." })
       reset()
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Unable to save category." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Unable to save category.") })
     }
   }
 
@@ -77,8 +82,8 @@ export default function InventoryCategoryManager() {
       }
       setNotice({ type: "success", message: "Category deleted." })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Unable to delete category." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Unable to delete category.") })
     }
   }
 

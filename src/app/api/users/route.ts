@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isMockEnabled } from "@/lib/mockData"
+import { getPrismaCode } from "@/lib/prisma-errors"
+import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_USERS = [
   {
@@ -31,14 +35,19 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")?.trim()
+    const regionId = searchParams.get("regionId")?.trim() || undefined
     const status = searchParams.get("status")?.trim() || undefined
     const roleId = searchParams.get("roleId")?.trim() || undefined
     const regionalOfficeId = searchParams.get("regionalOfficeId")?.trim() || undefined
+    const managerScope = deriveManagerScope(session)
+    if (managerScope && managerScopeDenied(managerScope, { regionId: regionId || null, regionalOfficeId: regionalOfficeId || null })) {
+      return forbidden("Forbidden: cannot query users outside your scope.")
+    }
 
     if (isMockEnabled()) {
       const rows = MOCK_USERS.filter((user) => {
@@ -54,10 +63,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: any = {}
+    const where: Prisma.UserWhereInput = {}
+    if (regionId) where.regionId = regionId
     if (status) where.status = status
     if (roleId) where.roleId = roleId
     if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
+    Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -79,7 +90,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(users)
   } catch (error) {
     console.error("Error fetching users:", error)
-    return NextResponse.json({ message: "Failed to fetch users" }, { status: 500 })
+    return internalServerError("Failed to fetch users")
   }
 }
 
@@ -87,7 +98,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const body = await request.json()
@@ -99,12 +110,13 @@ export async function POST(request: NextRequest) {
     const contactNumber = body?.contactNumber ? String(body.contactNumber) : null
     const regionId = body?.regionId ? String(body.regionId) : null
     const regionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+    const managerScope = deriveManagerScope(session)
+    if (managerScope && managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+      return forbidden("Forbidden: cannot create user outside your scope.")
+    }
 
     if (!name || !email || !password || !roleId) {
-      return NextResponse.json(
-        { message: "name, email, password, and roleId are required." },
-        { status: 400 }
-      )
+      return badRequest("name, email, password, and roleId are required.")
     }
 
     if (isMockEnabled()) {
@@ -126,33 +138,47 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const created = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        roleId,
-        status,
-        contactNumber,
-        regionId,
-        regionalOfficeId,
-      },
-      include: {
-        role: { select: { id: true, name: true } },
-        region: { select: { id: true, name: true } },
-        regionalOffice: { select: { id: true, name: true } },
-      },
+    const actorId = session.user?.id || null
+    const created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          roleId,
+          status,
+          contactNumber,
+          regionId,
+          regionalOfficeId,
+        },
+        include: {
+          role: { select: { id: true, name: true } },
+          region: { select: { id: true, name: true } },
+          regionalOffice: { select: { id: true, name: true } },
+        },
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          event: "USER_CREATED",
+          module: "USERS",
+          description: `Created user ${user.id} (${user.email})`,
+        },
+      })
+
+      return user
     })
 
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2002") {
-      return NextResponse.json({ message: "Email already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (getPrismaCode(error) === "P2002") {
+      return conflict("Email already exists.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid role, region, or office." }, { status: 400 })
+    if (getPrismaCode(error) === "P2003") {
+      return badRequest("Invalid role, region, or office.")
     }
     console.error("Error creating user:", error)
-    return NextResponse.json({ message: "Failed to create user" }, { status: 500 })
+    return internalServerError("Failed to create user")
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function GET(
   _request: NextRequest,
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await context.params
 
     if (isMockEnabled()) {
@@ -26,11 +27,11 @@ export async function GET(
         status: { select: { id: true, name: true } },
       },
     })
-    if (!ticket) return NextResponse.json({ message: "Ticket not found." }, { status: 404 })
+    if (!ticket) return notFound("Ticket not found.")
     return NextResponse.json(ticket)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching ticket:", error)
-    return NextResponse.json({ message: "Failed to fetch ticket" }, { status: 500 })
+    return internalServerError("Failed to fetch ticket")
   }
 }
 
@@ -41,12 +42,12 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const { id } = await context.params
     const body = await request.json()
-    const data: any = {}
+    const data: Record<string, unknown> = {}
 
     if (body.subject != null) data.subject = String(body.subject)
     if (body.description !== undefined) data.description = body.description ? String(body.description) : null
@@ -56,7 +57,7 @@ export async function PATCH(
     if (body.statusId != null) data.statusId = String(body.statusId)
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ message: "No valid fields provided." }, { status: 400 })
+      return badRequest("No valid fields provided.")
     }
 
     if (isMockEnabled()) {
@@ -76,14 +77,14 @@ export async function PATCH(
     })
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Ticket not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Ticket not found.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid relation reference." }, { status: 400 })
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid relation reference.")
     }
     console.error("Error updating ticket:", error)
-    return NextResponse.json({ message: "Failed to update ticket" }, { status: 500 })
+    return internalServerError("Failed to update ticket")
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 type Mode = "report" | "query"
 
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const body = await request.json().catch(() => ({}))
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     const mode = (body?.mode === "report" ? "report" : "query") as Mode
 
     if (!prompt) {
-      return NextResponse.json({ message: "Prompt is required" }, { status: 400 })
+      return badRequest("Prompt is required")
     }
 
     const answer = mode === "report" ? await buildSummaryReport() : await runPromptQuery(prompt)
@@ -120,6 +121,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("AI report route error", error)
-    return NextResponse.json({ message: "Failed to process AI query" }, { status: 500 })
+    return internalServerError("Failed to process AI query")
   }
 }

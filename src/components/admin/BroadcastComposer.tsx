@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import ActionButton from "@/components/ui/action-button"
-import type { AudienceScope, BroadcastMessage } from "@/lib/mockData"
+import type { AudienceScope, BroadcastMessage } from "@/lib/admin/types"
 
 type Props = {
   onCreate: (message: BroadcastMessage) => void

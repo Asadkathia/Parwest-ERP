@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -28,7 +28,7 @@ export default function UserSearchManager() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -49,7 +49,7 @@ export default function UserSearchManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [roleId, search, status])
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +70,7 @@ export default function UserSearchManager() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [load])
 
   const rowsForExport = useMemo(
     () =>

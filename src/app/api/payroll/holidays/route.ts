@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
   { id: "mock-holiday-1", name: "Pakistan Day", date: "2026-03-23T00:00:00.000Z", notes: "National holiday" },
@@ -11,7 +12,7 @@ const MOCK_ROWS = [
 export async function GET() {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
@@ -21,28 +22,28 @@ export async function GET() {
     return NextResponse.json(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for payroll holidays yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for payroll holidays yet.")
     }
     console.error("Error fetching payroll holidays:", error)
-    return NextResponse.json({ message: "Failed to fetch holidays." }, { status: 500 })
+    return internalServerError("Failed to fetch holidays.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const body = await request.json()
     const name = String(body?.name || "").trim()
     const dateRaw = String(body?.date || "").trim()
     const notes = body?.notes ? String(body.notes) : null
 
     if (!name || !dateRaw) {
-      return NextResponse.json({ message: "name and date are required." }, { status: 400 })
+      return badRequest("name and date are required.")
     }
     const date = new Date(dateRaw)
     if (Number.isNaN(date.getTime())) {
-      return NextResponse.json({ message: "Invalid date value." }, { status: 400 })
+      return badRequest("Invalid date value.")
     }
 
     if (isMockEnabled()) {
@@ -55,9 +56,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for payroll holidays yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for payroll holidays yet.")
     }
     console.error("Error creating payroll holiday:", error)
-    return NextResponse.json({ message: "Failed to create holiday." }, { status: 500 })
+    return internalServerError("Failed to create holiday.")
   }
 }

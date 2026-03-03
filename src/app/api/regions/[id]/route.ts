@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,14 +11,14 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const { id } = await context.params
     const body = await request.json()
     const name = String(body?.name || "").trim()
 
     if (!name) {
-      return NextResponse.json({ message: "Region name is required." }, { status: 400 })
+      return badRequest("Region name is required.")
     }
 
     if (isMockEnabled()) {
@@ -30,15 +31,15 @@ export async function PATCH(
     })
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Region not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Region not found.")
     }
-    if (String(error?.code) === "P2002") {
-      return NextResponse.json({ message: "Region already exists." }, { status: 409 })
+    if (String((error as { code?: string }).code) === "P2002") {
+      return conflict("Region already exists.")
     }
     console.error("Error updating region:", error)
-    return NextResponse.json({ message: "Failed to update region" }, { status: 500 })
+    return internalServerError("Failed to update region")
   }
 }
 
@@ -49,7 +50,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const { id } = await context.params
 
@@ -59,14 +60,14 @@ export async function DELETE(
 
     await prisma.region.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Region not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Region not found.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Region is in use by offices/users/guards/clients." }, { status: 409 })
+    if (String((error as { code?: string }).code) === "P2003") {
+      return conflict("Region is in use by offices/users/guards/clients.")
     }
     console.error("Error deleting region:", error)
-    return NextResponse.json({ message: "Failed to delete region" }, { status: 500 })
+    return internalServerError("Failed to delete region")
   }
 }

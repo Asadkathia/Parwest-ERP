@@ -1,13 +1,27 @@
 "use client"
 
 import { MapPin, Calendar } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type DeploymentRecord = {
+    id: string
+    client?: string
+    branch?: string
+    status?: string
+    designation?: string
+    shiftType?: string
+    startDate?: string
+    endDate?: string | null
+}
 
 interface DeploymentHistoryTabProps {
-    deployments: any[]
+    deployments: GuardLooseRow[]
 }
 
 export default function DeploymentHistoryTab({ deployments }: DeploymentHistoryTabProps) {
-    const formatDate = (date: string | null) => {
+    const rows = deployments as DeploymentRecord[]
+
+    const formatDate = (date?: string | null) => {
         if (!date) return "Present"
         return new Date(date).toLocaleDateString("en-US", {
             year: "numeric",
@@ -27,7 +41,8 @@ export default function DeploymentHistoryTab({ deployments }: DeploymentHistoryT
         }
     }
 
-    const calculateDuration = (startDate: string, endDate: string | null) => {
+    const calculateDuration = (startDate?: string, endDate?: string | null) => {
+        if (!startDate) return "—"
         const start = new Date(startDate)
         const end = endDate ? new Date(endDate) : new Date()
         const diffTime = Math.abs(end.getTime() - start.getTime())
@@ -42,26 +57,26 @@ export default function DeploymentHistoryTab({ deployments }: DeploymentHistoryT
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Deployment History</h2>
                 <div className="text-sm text-gray-600">
-                    Total Deployments: <span className="font-semibold">{deployments.length}</span>
+                    Total Deployments: <span className="font-semibold">{rows.length}</span>
                 </div>
             </div>
 
-            {deployments.length === 0 ? (
+            {rows.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No deployment history found</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {deployments.map((deployment) => (
+                    {rows.map((deployment) => (
                         <div key={deployment.id} className="bg-white rounded-lg border p-6 hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex-1">
                                     <h3 className="text-lg font-semibold">{deployment.client}</h3>
                                     <p className="text-gray-600">{deployment.branch}</p>
                                 </div>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(deployment.status)}`}>
-                                    {deployment.status}
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(deployment.status || "INACTIVE")}`}>
+                                    {deployment.status || "INACTIVE"}
                                 </span>
                             </div>
 

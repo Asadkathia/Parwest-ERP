@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { Search, RotateCcw } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
@@ -261,7 +262,14 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             header: "Logo",
             render: (row) =>
               row.logoUrl ? (
-                <img src={row.logoUrl} alt={row.name} className="h-8 w-8 rounded-md object-cover border border-[var(--border)]" />
+                <Image
+                  src={row.logoUrl}
+                  alt={row.name}
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="h-8 w-8 rounded-md object-cover border border-[var(--border)]"
+                />
               ) : (
                 <span className="text-[var(--text-muted)]">—</span>
               ),

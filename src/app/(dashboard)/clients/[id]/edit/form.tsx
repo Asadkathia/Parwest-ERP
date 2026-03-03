@@ -78,8 +78,8 @@ export default function ClientEditForm({ client, regions }: Props) {
 
             router.push(`/clients/${client.id}`)
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setLoading(false)
         }
     }

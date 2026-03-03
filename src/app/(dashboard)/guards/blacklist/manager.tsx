@@ -39,8 +39,8 @@ export default function BlacklistManager() {
             }
             const data = await response.json()
             setRows(data)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setRows([])
         } finally {
             setLoading(false)

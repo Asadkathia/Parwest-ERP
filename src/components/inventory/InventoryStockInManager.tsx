@@ -6,6 +6,7 @@ import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
 type Option = { id: string; name: string }
+type ApiOfficeRow = { id: string; name: string }
 
 export default function InventoryStockInManager() {
   const [categories, setCategories] = useState<Option[]>([])
@@ -30,7 +31,10 @@ export default function InventoryStockInManager() {
   useEffect(() => {
     fetch("/api/inventory/categories").then((r) => r.json()).then((d) => setCategories(d || [])).catch(() => null)
     fetch("/api/inventory/vendors").then((r) => r.json()).then((d) => setVendors(d || [])).catch(() => null)
-    fetch("/api/regional-offices").then((r) => r.json()).then((d) => setOffices((d || []).map((x: any) => ({ id: x.id, name: x.name })))).catch(() => null)
+    fetch("/api/regional-offices")
+      .then((r) => r.json())
+      .then((d) => setOffices(((d as ApiOfficeRow[]) || []).map((x) => ({ id: x.id, name: x.name }))))
+      .catch(() => null)
   }, [])
 
   const submit = async () => {

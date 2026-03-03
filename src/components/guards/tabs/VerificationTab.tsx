@@ -1,12 +1,22 @@
 "use client"
 
 import { CheckCircle, XCircle, Clock } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type VerificationRecord = {
+    status?: string
+    type?: string
+    verifiedBy?: string
+    verifiedDate?: string | null
+    expiryDate?: string | null
+}
 
 interface VerificationTabProps {
-    verifications: any[]
+    verifications: GuardLooseRow[]
 }
 
 export default function VerificationTab({ verifications }: VerificationTabProps) {
+    const rows = verifications as VerificationRecord[]
     const formatDate = (date: string | null) => {
         if (!date) return "—"
         return new Date(date).toLocaleDateString("en-US", {
@@ -42,8 +52,8 @@ export default function VerificationTab({ verifications }: VerificationTabProps)
         }
     }
 
-    const verifiedCount = verifications.filter(v => v.status === "VERIFIED").length
-    const pendingCount = verifications.filter(v => v.status === "PENDING").length
+    const verifiedCount = rows.filter(v => v.status === "VERIFIED").length
+    const pendingCount = rows.filter(v => v.status === "PENDING").length
 
     return (
         <div className="space-y-6">
@@ -52,7 +62,7 @@ export default function VerificationTab({ verifications }: VerificationTabProps)
                 <div className="flex items-center gap-4">
                     <div className="text-sm">
                         <span className="text-gray-600">Verified: </span>
-                        <span className="font-semibold text-green-600">{verifiedCount}/{verifications.length}</span>
+                        <span className="font-semibold text-green-600">{verifiedCount}/{rows.length}</span>
                     </div>
                     {pendingCount > 0 && (
                         <div className="text-sm">
@@ -64,25 +74,25 @@ export default function VerificationTab({ verifications }: VerificationTabProps)
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {verifications.map((verification, index) => (
+                {rows.map((verification, index) => (
                     <div key={index} className="bg-white rounded-lg border p-6">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                {getStatusIcon(verification.status)}
+                                {getStatusIcon(verification.status || "PENDING")}
                                 <div>
-                                    <h3 className="font-semibold">{verification.type.replace(/_/g, " ")}</h3>
+                                    <h3 className="font-semibold">{(verification.type || "UNSPECIFIED").replace(/_/g, " ")}</h3>
                                     <p className="text-sm text-gray-600">Verified by: {verification.verifiedBy}</p>
                                 </div>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(verification.status)}`}>
-                                {verification.status}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(verification.status || "PENDING")}`}>
+                                {verification.status || "PENDING"}
                             </span>
                         </div>
 
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-600">Verified Date:</span>
-                                <span className="font-medium">{formatDate(verification.verifiedDate)}</span>
+                                <span className="font-medium">{formatDate(verification.verifiedDate || null)}</span>
                             </div>
                             {verification.expiryDate && (
                                 <div className="flex justify-between">

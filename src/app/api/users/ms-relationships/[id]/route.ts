@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
-import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 export async function DELETE(
   _request: NextRequest,
@@ -10,19 +12,64 @@ export async function DELETE(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = (await context.params) as { id: string }
+    const managerScope = deriveManagerScope(session)
 
     if (isMockEnabled()) return NextResponse.json({ success: true })
 
-    await prisma.managerSupervisorAssignment.delete({ where: { id } })
+    const actorId = session.user?.id || null
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.managerSupervisorAssignment.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          managerId: true,
+          supervisorId: true,
+          regionalOfficeId: true,
+          manager: { select: { regionId: true, regionalOfficeId: true } },
+          supervisor: { select: { regionId: true, regionalOfficeId: true } },
+        },
+      })
+      if (!existing) {
+        throw new Error("REL_NOT_FOUND")
+      }
+      if (
+        managerScope &&
+        (
+          managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId }) ||
+          managerScopeDenied(managerScope, {
+            regionId: existing.manager?.regionId || null,
+            regionalOfficeId: existing.manager?.regionalOfficeId || null,
+          }) ||
+          managerScopeDenied(managerScope, {
+            regionId: existing.supervisor?.regionId || null,
+            regionalOfficeId: existing.supervisor?.regionalOfficeId || null,
+          })
+        )
+      ) {
+        throw new Error("SCOPE_FORBIDDEN")
+      }
+
+      await tx.managerSupervisorAssignment.delete({ where: { id } })
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          event: "MANAGER_SUPERVISOR_UNASSIGNED",
+          module: "USERS",
+          description: `Removed manager/supervisor relationship ${id} (manager ${existing.managerId}, supervisor ${existing.supervisorId})`,
+        },
+      })
+    })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === "REL_NOT_FOUND") return notFound("Relationship not found.")
+    if (error instanceof Error && error.message === "SCOPE_FORBIDDEN") return forbidden("Forbidden: relationship is outside your scope.")
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for manager/supervisor assignments yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for manager/supervisor assignments yet.")
     }
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Relationship not found." }, { status: 404 })
+    if (getPrismaCode(error) === "P2025") return notFound("Relationship not found.")
     console.error("Error deleting manager/supervisor relationship:", error)
-    return NextResponse.json({ message: "Failed to delete relationship" }, { status: 500 })
+    return internalServerError("Failed to delete relationship")
   }
 }

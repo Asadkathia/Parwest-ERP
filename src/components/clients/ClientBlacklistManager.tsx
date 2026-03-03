@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
@@ -9,18 +9,21 @@ import InlineAlert from "@/components/ui/inline-alert"
 
 type Row = {
   id: string
+  name: string
   email: string
   blacklistedBy: string
   blacklistedOn: string
   reason?: string
 }
-
-const initialRows: Row[] = [
-  { id: "1", email: "testing@testing.com", blacklistedBy: "SUPERUSER", blacklistedOn: "2018-05-28 07:14:05", reason: "Compliance hold" },
-]
+type ApiBlacklistRow = {
+  id: string
+  name?: string | null
+  email?: string | null
+  updatedAt?: string | null
+}
 
 export default function ClientBlacklistManager() {
-  const [rows, setRows] = useState<Row[]>(initialRows)
+  const [rows, setRows] = useState<Row[]>([])
   const [email, setEmail] = useState("")
   const [entries, setEntries] = useState("10")
   const [tableSearch, setTableSearch] = useState("")
@@ -35,35 +38,89 @@ export default function ClientBlacklistManager() {
         .filter((row) => {
           if (!tableSearch.trim()) return true
           const q = tableSearch.toLowerCase()
-          return row.email.toLowerCase().includes(q) || row.blacklistedBy.toLowerCase().includes(q)
+          return row.email.toLowerCase().includes(q) || row.name.toLowerCase().includes(q) || row.blacklistedBy.toLowerCase().includes(q)
         })
         .slice(0, Number.parseInt(entries, 10) || 10),
     [rows, tableSearch, entries]
   )
 
-  const onAdd = () => {
+  useEffect(() => {
+    let isMounted = true
+    const run = async () => {
+      try {
+        const response = await fetch("/api/clients/blacklist", { cache: "no-store" })
+        const data = await response.json()
+        if (!response.ok) {
+          if (isMounted) setError(data?.message || "Failed to load blacklisted clients.")
+          return
+        }
+        if (isMounted) {
+          setRows(
+            Array.isArray(data)
+              ? (data as ApiBlacklistRow[]).map((row) => ({
+                  id: String(row.id),
+                  name: String(row.name || "Unknown Client"),
+                  email: String(row.email || ""),
+                  blacklistedBy: "System",
+                  blacklistedOn: row.updatedAt ? new Date(row.updatedAt).toISOString().replace("T", " ").slice(0, 19) : "",
+                  reason: undefined,
+                }))
+              : []
+          )
+        }
+      } catch {
+        if (isMounted) setError("Failed to load blacklisted clients.")
+      }
+    }
+    run()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const onAdd = async () => {
     if (!email.trim()) {
       setError("Email is required.")
       return
     }
     setError("")
 
+    const response = await fetch("/api/clients/blacklist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data?.message || "Failed to blacklist client.")
+      return
+    }
+
     setRows((prev) => [
       {
-        id: String(prev.length + 1),
-        email: email.trim().toLowerCase(),
-        blacklistedBy: "ADMIN",
-        blacklistedOn: new Date().toISOString().replace("T", " ").slice(0, 19),
+        id: String(data.id),
+        name: String(data.name || "Unknown Client"),
+        email: String(data.email || email.trim().toLowerCase()),
+        blacklistedBy: "System",
+        blacklistedOn: data.updatedAt ? new Date(data.updatedAt).toISOString().replace("T", " ").slice(0, 19) : new Date().toISOString().replace("T", " ").slice(0, 19),
         reason: undefined,
       },
-      ...prev,
+      ...prev.filter((row) => row.id !== String(data.id)),
     ])
     setEmail("")
     setNotice("Client blacklisted.")
   }
 
-  const onDelete = (id: string) => {
-    setRows((prev) => prev.filter((row) => row.id !== id))
+  const onDelete = async (id: string) => {
+    const response = await fetch(`/api/clients/blacklist?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data?.message || "Failed to remove client from blacklist.")
+      return
+    }
+    setRows((prev) => prev.filter((row) => row.id !== String(data.id)))
     setNotice("Client removed from blacklist.")
   }
 
@@ -120,6 +177,7 @@ export default function ClientBlacklistManager() {
       <DataTable
         rows={filteredRows}
         columns={[
+          { key: "name", header: "Client", sortable: true },
           { key: "email", header: "Email #", sortable: true },
           { key: "blacklistedBy", header: "Black Listed By", sortable: true },
           { key: "blacklistedOn", header: "Black Listed On", sortable: true },

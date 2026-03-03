@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 export async function GET(
   _request: NextRequest,
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   try {
     const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session?.user?.id) return unauthorized()
     const { id } = await context.params
 
     if (isMockEnabled()) {
@@ -24,14 +25,14 @@ export async function GET(
         approver: { select: { id: true, name: true } },
       },
     })
-    if (!req) return NextResponse.json({ message: "Requisition not found." }, { status: 404 })
+    if (!req) return notFound("Requisition not found.")
     return NextResponse.json(req)
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for requisitions yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for requisitions yet.")
     }
     console.error("Error fetching requisition:", error)
-    return NextResponse.json({ message: "Failed to fetch requisition" }, { status: 500 })
+    return internalServerError("Failed to fetch requisition")
   }
 }
 
@@ -41,10 +42,10 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session?.user?.id) return unauthorized()
     const { id } = await context.params
     const body = await request.json()
-    const data: any = {}
+    const data: Record<string, unknown> = {}
 
     if (body.status != null) data.status = String(body.status)
     if (body.decisionNotes !== undefined) data.decisionNotes = body.decisionNotes ? String(body.decisionNotes) : null
@@ -59,7 +60,7 @@ export async function PATCH(
     }
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ message: "No valid fields provided." }, { status: 400 })
+      return badRequest("No valid fields provided.")
     }
 
     if (isMockEnabled()) {
@@ -75,12 +76,12 @@ export async function PATCH(
       },
     })
     return NextResponse.json(updated)
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for requisitions yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for requisitions yet.")
     }
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Requisition not found." }, { status: 404 })
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Requisition not found.")
     console.error("Error updating requisition:", error)
-    return NextResponse.json({ message: "Failed to update requisition" }, { status: 500 })
+    return internalServerError("Failed to update requisition")
   }
 }

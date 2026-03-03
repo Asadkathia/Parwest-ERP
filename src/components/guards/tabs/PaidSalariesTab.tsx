@@ -1,9 +1,10 @@
 "use client"
 
-import { DollarSign, Download, FileText } from "lucide-react"
+import { DollarSign, Download } from "lucide-react"
+import type { PaidSalaryRecord } from "@/components/guards/tabs/types"
 
 interface PaidSalariesTabProps {
-    salaries: any[]
+    salaries: PaidSalaryRecord[]
 }
 
 export default function PaidSalariesTab({ salaries }: PaidSalariesTabProps) {

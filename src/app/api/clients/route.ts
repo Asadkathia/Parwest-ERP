@@ -4,12 +4,14 @@ import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
 import { mockClientsList } from "@/lib/mockData/clients"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
         const regionId = searchParams.get("regionId")
         const status = searchParams.get("status")
 
-        const where: any = {}
+        const where: Prisma.ClientWhereInput = {}
         if (regionId) where.regionId = regionId
         if (status) where.status = status
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
                 .filter((client) => (where.status ? client.status === where.status : true))
                 .filter((client) =>
                     applyManagerScope([client], managerScope, {
-                        regionId: (row) => (row as any).regionId,
+                        regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
                     }).length > 0
                 )
                 .map((client) => ({
@@ -51,12 +53,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(clients)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching clients:", error)
-        return NextResponse.json(
-            { message: "Failed to fetch clients" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to fetch clients")
     }
 }
 
@@ -64,14 +63,14 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
         const bodyRegionId = body?.regionId ? String(body.regionId) : null
         if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
-            return NextResponse.json({ message: "Forbidden: cannot create client outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: cannot create client outside your scope.")
         }
 
         if (isMockEnabled()) {
@@ -111,11 +110,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(client, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating client:", error)
-        return NextResponse.json(
-            { message: "Failed to create client" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to create client")
     }
 }

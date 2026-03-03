@@ -1,24 +1,35 @@
 "use client"
 
 import { Home } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type ResidenceRecord = {
+    id: string
+    address?: string
+    status?: string
+    supervisor?: string
+    assignDate?: string
+    vacateDate?: string
+}
 
 interface ResidenceHistoryTabProps {
-    residenceHistory: any[]
+    residenceHistory: GuardLooseRow[]
 }
 
 export default function ResidenceHistoryTab({ residenceHistory }: ResidenceHistoryTabProps) {
+    const records = residenceHistory as ResidenceRecord[]
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">Residence History</h2>
 
-            {residenceHistory.length === 0 ? (
+            {records.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <Home className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No residence records found</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {residenceHistory.map((record) => (
+                    {records.map((record) => (
                         <div key={record.id} className="bg-white rounded-lg border p-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <h3 className="font-semibold">{record.address}</h3>
@@ -55,4 +66,3 @@ export default function ResidenceHistoryTab({ residenceHistory }: ResidenceHisto
         </div>
     )
 }
-

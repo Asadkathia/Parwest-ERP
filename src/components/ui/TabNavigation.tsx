@@ -2,7 +2,7 @@
 
 import { LucideIcon } from "lucide-react"
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
 export interface Tab {
     id: string
@@ -16,7 +16,6 @@ interface TabNavigationProps {
 }
 
 export default function TabNavigation({ tabs, baseUrl }: TabNavigationProps) {
-    const pathname = usePathname()
     const searchParams = useSearchParams()
     const activeTab = searchParams.get("tab") || tabs[0]?.id
 

@@ -88,8 +88,8 @@ export default function GuardEditForm({ guard, regions, regionalOffices }: Props
 
             router.push(`/guards/${guard.id}`)
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setLoading(false)
         }
     }
@@ -219,14 +219,14 @@ export default function GuardEditForm({ guard, regions, regionalOffices }: Props
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Father's Name
+                                Father&apos;s Name
                             </label>
                             <input
                                 type="text"
                                 name="fatherName"
                                 defaultValue={guard.fatherName || ""}
                                 className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Father's name"
+                                placeholder="Father&apos;s name"
                             />
                         </div>
 

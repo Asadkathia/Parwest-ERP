@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -18,7 +18,7 @@ export default function PayrollBulkSalarySlipsManager() {
   const [filters, setFilters] = useState({ month: "", search: "" })
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const params = new URLSearchParams()
     if (filters.month) params.set("month", filters.month)
     if (filters.search) params.set("search", filters.search)
@@ -28,11 +28,14 @@ export default function PayrollBulkSalarySlipsManager() {
       return
     }
     setRows(await response.json())
-  }
+  }, [filters.month, filters.search])
 
   useEffect(() => {
-    load().catch(() => null)
-  }, [filters.month, filters.search])
+    const timer = setTimeout(() => {
+      void load()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [load])
 
   const generate = () => {
     if (rows.length === 0) {

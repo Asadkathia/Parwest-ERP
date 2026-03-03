@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
-import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+import {
+  getInventoryDemandStatuses,
+  isInitialInventoryDemandStatus,
+  normalizeInventoryDemandStatus,
+} from "@/lib/inventory/demand-status"
 
 const MOCK_ROWS = [
   {
@@ -20,7 +28,7 @@ const MOCK_ROWS = [
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") || undefined
     const categoryId = searchParams.get("categoryId") || undefined
@@ -36,7 +44,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: any = {}
+    const where: Prisma.InventoryDemandWhereInput = {}
     if (status) where.status = status
     if (categoryId) where.categoryId = categoryId
     if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
@@ -52,29 +60,35 @@ export async function GET(request: NextRequest) {
     })
     return NextResponse.json(rows)
   } catch (error) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for inventory demand yet." }, { status: 503 })
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for inventory demand yet.")
     console.error("Error fetching inventory demands:", error)
-    return NextResponse.json({ message: "Failed to fetch demands." }, { status: 500 })
+    return internalServerError("Failed to fetch demands.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const body = await request.json()
     const quantity = Number(body?.quantity)
     const categoryId = body?.categoryId ? String(body.categoryId) : null
     const regionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
     const requiredBy = body?.requiredBy ? new Date(String(body.requiredBy)) : null
     const reason = body?.reason ? String(body.reason) : null
-    const status = String(body?.status || "PENDING")
+    const status = normalizeInventoryDemandStatus(body?.status || "PENDING")
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      return NextResponse.json({ message: "quantity must be a positive number." }, { status: 400 })
+      return badRequest("quantity must be a positive number.")
     }
     if (requiredBy && Number.isNaN(requiredBy.getTime())) {
-      return NextResponse.json({ message: "Invalid requiredBy date." }, { status: 400 })
+      return badRequest("Invalid requiredBy date.")
+    }
+    if (!status) {
+      return badRequest(`Invalid demand status. Allowed values: ${getInventoryDemandStatuses().join(", ")}.`)
+    }
+    if (isWorkflowRuleEnabled("inventoryDemand.requirePendingInitialStatus") && !isInitialInventoryDemandStatus(status)) {
+      return badRequest("New demands must be created with PENDING status.")
     }
 
     if (isMockEnabled()) {
@@ -108,10 +122,10 @@ export async function POST(request: NextRequest) {
       },
     })
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for inventory demand yet." }, { status: 503 })
-    if (String(error?.code) === "P2003") return NextResponse.json({ message: "Invalid category or regional office." }, { status: 400 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for inventory demand yet.")
+    if (getPrismaCode(error) === "P2003") return badRequest("Invalid category or regional office.")
     console.error("Error creating inventory demand:", error)
-    return NextResponse.json({ message: "Failed to create demand." }, { status: 500 })
+    return internalServerError("Failed to create demand.")
   }
 }

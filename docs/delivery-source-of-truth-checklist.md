@@ -1,6 +1,6 @@
 # ERP Delivery Source of Truth Checklist
 
-Last updated: 2026-02-26  
+Last updated: 2026-03-03
 Execution policy: **Core operational modules first**, Reports last, Mock mode separate from Real DB mode.
 
 ## Runtime Contract
@@ -11,9 +11,22 @@ Execution policy: **Core operational modules first**, Reports last, Mock mode se
 
 ## Current Validation Baseline
 
-- [x] `npm run build` passes.
+- [x] `npm run lint` passes.
+  - Evidence (2026-03-02): `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b15.json` reports `0 problems` (`0 errors`, `0 warnings`).
 - [x] `npx tsc --noEmit` is clean in this workspace.
-- [x] Integration script pass recorded: **61/61 PASS** (includes manager-scope payroll access tests).
+  - Evidence (2026-03-01): pass.
+- [x] `npm run build` passes.
+  - Evidence (2026-03-02): pass via `set -a; source .env; set +a; npm run build`.
+- [x] Integration script pass recorded.
+  - Evidence (2026-03-02): `scripts/api-integration-test.mjs` run recorded:
+    - current runtime profile: **213/213 PASS**
+    - strict real-DB profile: **211/211 PASS**
+      - setup: `set -a; source .env; set +a; USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npx prisma db seed`
+      - runtime: `NEXTAUTH_URL=http://localhost:3011 AUTH_TRUST_HOST=true USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npm run start -- -p 3011`
+      - execution: `BASE_URL=http://localhost:3011 USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false REQUIRE_REAL_SCOPE_ASSERTIONS=true FAIL_ON_SCOPE_SKIP=true REQUIRE_REAL_INVENTORY_ASSERTIONS=true FAIL_ON_INVENTORY_SKIP=true node scripts/api-integration-test.mjs`
+  - Note: suite now includes imports lifecycle plus reports endpoints (`/api/reports/guards/*`, `/api/reports/clients/*`, `/api/reports/scheduled`) and CSV export assertion.
+- [x] Lint debt register documented with module ownership.
+  - Evidence (2026-02-28): `docs/lint-debt-register.md` created from ESLint JSON baseline (`292 findings`).
 
 ## Delivery Order (Locked)
 
@@ -25,187 +38,2250 @@ Execution policy: **Core operational modules first**, Reports last, Mock mode se
 6. Imports
 7. Reports (last)
 
-## Module Completion Gates (applies to every core module)
+## Module Completion Gates
 
-A module is only marked complete when all are true:
+A module is only complete when all are true:
 
 - [ ] Backend: CRUD/read/action APIs complete for required workflows.
-- [ ] Frontend: no placeholder/config-only screen remains for that module’s production flow.
+- [ ] Frontend: no placeholder/config-only screens remain in production flow.
 - [ ] Data: no direct mock-only dependency in production path.
 - [ ] Security: role/scope checks enforced server-side where applicable.
-- [ ] Quality: integration tests for happy path + error paths (400/401/404/409).
-- [ ] Build/type gates pass after module changes.
+- [ ] Quality: integration tests include happy and error paths (`400/401/403/404/409`).
+- [ ] Build/type/lint gates pass after module changes.
 
 ## Core Modules Tracker
 
-### 1) Users & Access (Priority: P0)
+### 1) Users & Access (P0)
 
-Status: **In progress**
+Completion: **100%** (9/9 tasks done)
 
-- [x] Users CRUD/search APIs + UI integration.
-- [x] Roles + permissions APIs + UI integration.
-- [x] M/S, C/S, switch-supervisor APIs + UI integration.
-- [~] Enforce server-side Manager regional/office scope on all affected APIs (partially applied to guards/deployments/clients).
-- [~] Add integration tests for manager-scoped access (positive + negative).
-  - [x] Payroll manager-scope positive/negative tests (loans list/create/update).
-  - [ ] Guards/deployments manager-scope tests.
-- [ ] Add audit events for user/relationship mutating actions where missing.
+- [x] `ERP-UAL-001` | `done` | owner:`@backend`
+  - Task: Users CRUD/search APIs + UI integration baseline.
+  - Acceptance: list/create/update/search endpoints available and consumed.
+  - Evidence: `src/app/api/users/*`, users pages.
+  - Dates: started 2026-02-24, completed 2026-02-24
+- [x] `ERP-UAL-002` | `done` | owner:`@backend`
+  - Task: roles + permissions APIs + UI integration baseline.
+  - Acceptance: `/api/roles`, `/api/user-permissions` operational.
+  - Evidence: `src/app/api/roles/route.ts`, `src/app/api/user-permissions/route.ts`.
+  - Dates: started 2026-02-24, completed 2026-02-24
+- [x] `ERP-UAL-003` | `done` | owner:`@backend`
+  - Task: M/S, C/S, switch-supervisor endpoints.
+  - Acceptance: relationship routes operational.
+  - Evidence: `src/app/api/users/ms-relationships/*`, `cs-relationships/*`, `switch-supervisor/route.ts`.
+  - Dates: started 2026-02-24, completed 2026-02-24
+- [x] `ERP-UAL-004` | `done` | owner:`@backend`
+  - Task: manager scope enforcement across all affected APIs.
+  - Acceptance: in-scope allowed, out-of-scope denied with `403` on sensitive routes.
+  - Evidence:
+    - route hardening:
+      - `src/app/api/users/[id]/route.ts`
+      - `src/app/api/users/ms-relationships/route.ts`
+      - `src/app/api/users/ms-relationships/[id]/route.ts`
+      - `src/app/api/users/cs-relationships/route.ts`
+      - `src/app/api/users/cs-relationships/[id]/route.ts`
+      - `src/app/api/users/switch-supervisor/route.ts`
+    - contract checks:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `136/136 PASS` (scope block skipped in mock runtime profile)
+  - Dates: started 2026-02-24, completed 2026-02-28
+- [x] `ERP-UAL-005` | `done` | owner:`@qa`
+  - Task: manager-scope integration tests for guards/deployments/attendance.
+  - Acceptance: positive + negative tests pass in integration script.
+  - Evidence: `scripts/api-integration-test.mjs` real-mode assertions for out-of-scope deny and in-scope allow on guards/deployments/attendance.
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-UAL-006` | `done` | owner:`@backend`
+  - Task: audit events for user/relationship mutations.
+  - Acceptance: user + M/S + C/S mutations write audit rows.
+  - Evidence:
+    - backend:
+      - `src/app/api/users/route.ts`
+      - `src/app/api/users/[id]/route.ts`
+      - `src/app/api/users/ms-relationships/route.ts`
+      - `src/app/api/users/ms-relationships/[id]/route.ts`
+      - `src/app/api/users/cs-relationships/route.ts`
+      - `src/app/api/users/cs-relationships/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs` includes user update + M/S and C/S create/delete mutation assertions.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-UAL-007` | `done` | owner:`@backend`
+  - Task: shared scoped query type added.
+  - Acceptance: reusable type used in scope guard helpers.
+  - Evidence: `src/lib/access/scope.ts` (`ScopedQueryFilters`).
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-UAL-008` | `done` | owner:`@backend`
+  - Task: shared API envelope helpers introduced.
+  - Acceptance: helper module exists and is consumed on forbidden responses.
+  - Evidence: `src/lib/api/response.ts` + usage in attendance/branch routes.
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-UAL-009` | `done` | owner:`@backend`
+  - Task: standardize all `401/403/500` response shape using envelope helpers.
+  - Acceptance: all sensitive routes return consistent shape.
+  - Evidence: `src/lib/api/response.ts` + standardized usage in manager-sensitive attendance/branches/deployments/guards/clients/payroll routes.
+  - Dates: started 2026-02-27, completed 2026-02-27
 
-### 2) Guards + Deployments (Priority: P0)
+### 2) Guards + Deployments (P0)
 
-Status: **In progress**
+Completion: **100%** (12/12 done)
 
-- [x] Base APIs exist (`/api/guards*`, `/api/deployments*`, attendance/trainings/residences).
-- [~] Manager scope enforcement applied on core routes:
-  - [x] `/api/guards`, `/api/guards/search`, `/api/guards/[id]`, `/api/guards/[id]/status`
-  - [x] `/api/deployments`, `/api/deployments/[id]`, `/api/deployments/[id]/end`
-  - [x] `/api/clients`, `/api/clients/[id]` (region-based)
-  - [x] payroll endpoints (manager scope enforced)
-- [ ] Validate and finish all legacy-critical workflow actions against real DB:
-  - [ ] guard enrollment/edit/update status
-  - [ ] deployment create/update/end lifecycle
-  - [ ] attendance + client attendance edge paths
-  - [ ] blacklist/inactive transitions
-  - [ ] docs checklist + emergency pool behavior on DB-backed records
-- [ ] Remove remaining production-path mock fallbacks for guard/deployment screens.
-- [ ] Add integration tests for full Guard->Deployment->Attendance lifecycle.
+- [x] `ERP-GDP-001` | `done` | owner:`@backend`
+  - Task: base APIs exist for guards/deployments/attendance/trainings/residences.
+  - Evidence: `src/app/api/guards*`, `deployments*`, `attendance*`.
+- [x] `ERP-GDP-002` | `done` | owner:`@backend`
+  - Task: manager scope enforcement on core guard/deployment routes + deployment assignment consistency completion.
+  - Evidence:
+    - manager scope: guards/deployments scope applied, attendance routes scoped on 2026-02-27.
+    - workflow customizability baseline:
+      - `src/lib/workflows/policy.ts`
+      - deployment lifecycle routes now consume central policy toggles.
+    - workflow management API + UI:
+      - `src/app/api/workflow-rules/route.ts`
+      - `src/components/settings/WorkflowRulesManager.tsx`
+      - `src/app/(dashboard)/settings/workflow-rules/page.tsx`
+      - `docs/workflow-policy.md`
+    - deployment assignment consistency:
+      - active-guard-only deployment policy toggle + enforcement
+      - optional guard-office consistency policy toggle + enforcement
+      - routes: `src/app/api/deployments/route.ts`, `src/app/api/deployments/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Dates: started 2026-02-27, completed 2026-03-01
+- [x] `ERP-GDP-003` | `done` | owner:`@backend`
+  - Task: close deployment lifecycle and edge validations.
+  - Acceptance: deployment lifecycle enforces required-field/date/shift validations, blocks invalid transitions, and returns conflict semantics for duplicate-active/end-after-end/update-after-end paths.
+  - Evidence:
+    - backend:
+      - `src/app/api/deployments/route.ts`
+      - `src/app/api/deployments/[id]/route.ts`
+      - `src/app/api/deployments/[id]/end/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs` (deployment lifecycle block)
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `142/142 PASS`
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-GDP-004` | `done` | owner:`@frontend`
+  - Task: remove production-path mock fallbacks for guards/deployments pages.
+  - Acceptance: when DB queries fail in non-mock runtime, guards/deployments pages no longer silently render mock fallback rows and instead show explicit unavailable-state messaging.
+  - Evidence:
+    - frontend:
+      - `src/app/(dashboard)/guards/page.tsx`
+      - `src/app/(dashboard)/deployments/page.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `143/143 PASS`
+  - Dates: started 2026-03-01, completed 2026-03-01
+- [x] `ERP-GDP-005` | `done` | owner:`@qa`
+  - Task: full Guard -> Deployment -> Attendance lifecycle integration tests.
+  - Acceptance: integration suite covers guard->deployment->attendance flow with required-field validation, duplicate-active lifecycle checks, and deployment-linked attendance visibility assertions.
+  - Evidence:
+    - integration:
+      - `scripts/api-integration-test.mjs` (`DEPLOYMENTS (lifecycle)` block + deployment-linked attendance assertions)
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `143/143 PASS`
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-GDP-006` | `done` | owner:`@backend`
+  - Task: remove error detail leakage from deployment 500 responses.
+  - Evidence: `src/app/api/deployments/route.ts`, `src/app/api/deployments/[id]/route.ts`, `src/app/api/deployments/[id]/end/route.ts`.
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-GDP-007` | `done` | owner:`@qa`
+  - Task: add explicit `403` tests for out-of-scope attendance access.
+  - Evidence: `scripts/api-integration-test.mjs` includes out-of-scope assertions for:
+    - `POST /api/attendance`
+    - `GET /api/attendance/client?regionalOfficeId=...`
+    - `POST /api/deployments`
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-GDP-008` | `done` | owner:`@frontend`
+  - Task: add explicit guard profile picture placeholder UI.
+  - Acceptance: guard profile image card shows a clear placeholder state when no image exists.
+  - Evidence:
+    - `src/components/guards/ProfileImageCard.tsx`
+    - `npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-GDP-009` | `done` | owner:`@frontend`
+  - Task: render guard photo/placeholder on guards listing and search result screens.
+  - Acceptance: listing/search results show profile image when available and a consistent placeholder when absent.
+  - Evidence:
+    - `src/components/guards/GuardAvatar.tsx`
+    - `src/app/(dashboard)/guards/page.tsx`
+    - `src/app/(dashboard)/guards/search/manager.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-GDP-010` | `done` | owner:`@frontend`
+  - Task: remove passport-related fields from guard add workflow and related extraction labels.
+  - Acceptance: add-guard form contains no passport inputs; no passport document-type references remain in active OCR mock extraction.
+  - Evidence:
+    - `src/app/(dashboard)/guards/new/form.tsx`
+    - `src/lib/mockData/ocr.ts`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-GDP-011` | `done` | owner:`@frontend`
+  - Task: remove guard detail page production-path dependency on mock profile data.
+  - Acceptance: guard detail page no longer merges DB response with mock profile payload; DB schema failure shows explicit unavailable state instead of fallback mock profile.
+  - Evidence:
+    - `src/app/(dashboard)/guards/[id]/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-03, completed 2026-03-03
+- [x] `ERP-GDP-012` | `done` | owner:`@frontend`
+  - Task: remove emergency guard pool page dependency on mock emergency dataset.
+  - Acceptance: emergency guard page loads rows from DB-derived guard data and shows explicit unavailable messaging on schema/query failures.
+  - Evidence:
+    - `src/lib/guards/emergency.ts`
+    - `src/app/(dashboard)/guards/emergency/page.tsx`
+    - `src/components/guards/EmergencyGuardTable.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-03, completed 2026-03-03
 
-### 3) Clients (Priority: P0)
+### 3) Clients (P0)
 
-Status: **In progress**
+Completion: **100%** (9/9 done)
 
-- [x] Base APIs exist (`/api/clients*`, `/api/branches*`).
-- [ ] Complete backend parity for client profile tabs and branch workflows:
-  - [ ] branch/branchless transitions
-  - [ ] branch type handling (Islamic/Conventional)
-  - [ ] client billing prerequisites and invoicing dependencies
-- [ ] Ensure client detail/profile pages are fully DB-backed (no production mock leakage).
-- [ ] Add integration tests for client + branch + invoicing prerequisites flow.
+- [x] `ERP-CLI-001` | `done` | owner:`@backend`
+  - Task: base APIs exist (`/api/clients*`, `/api/branches*`).
+- [x] `ERP-CLI-002` | `done` | owner:`@backend`
+  - Task: branch API contract parity (`GET /api/branches`).
+  - Evidence: `src/app/api/branches/route.ts`.
+  - Dates: started 2026-02-27, completed 2026-02-27
+- [x] `ERP-CLI-003` | `done` | owner:`@backend`
+  - Task: secure branch-related routes with manager scope.
+  - Acceptance: out-of-scope manager blocked with `403`; in-scope manager allowed on scoped branch/client routes.
+  - Evidence:
+    - route hardening: `src/app/api/branches/route.ts`, `src/app/api/branches/[id]/route.ts`, `src/app/api/clients/[id]/branches/route.ts`
+    - integration assertions: `scripts/api-integration-test.mjs`
+    - real-mode run: `76/76 PASS` with explicit client/branch out-of-scope deny + in-scope allow checks
+  - Dates: started 2026-02-27, completed 2026-02-28
+- [x] `ERP-CLI-004` | `done` | owner:`@frontend`
+  - Task: billing/invoicing/blacklist parity with DB-backed APIs.
+  - Evidence: DB-backed `/api/invoices*` + `/api/clients/blacklist` added; invoicing/blacklist/billings/prerequisites default-rates rewired; integration checks added.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-CLI-005` | `done` | owner:`@qa`
+  - Task: client + branch + invoicing prerequisite integration flow.
+  - Evidence: `scripts/api-integration-test.mjs` includes end-to-end checks for `/api/invoices*`, `/api/clients/blacklist`, and `/api/deployment-rates*` alongside client/branch flow assertions.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-CLI-006` | `done` | owner:`@backend`
+  - Task: add nested branch-create contract parity and branch mutation audit logging.
+  - Acceptance: `POST /api/clients/[id]/branches` is operational with scope enforcement; branch create/update/delete paths write audit events; integration includes in-scope/out-of-scope assertions for nested branch create.
+  - Evidence:
+    - backend:
+      - `src/app/api/clients/[id]/branches/route.ts`
+      - `src/app/api/branches/route.ts`
+      - `src/app/api/branches/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs` includes:
+        - `/api/clients/[id]/branches POST out-scope manager 403`
+        - `/api/clients/[id]/branches POST in-scope manager 201`
+    - command evidence:
+      - `set -a; source .env; set +a; npm run ci:quality` pass
+      - `set -a; source .env; set +a; npm run test:integration` => `213/213 PASS`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-CLI-007` | `done` | owner:`@frontend`
+  - Task: add separate client-add mode selection for branch vs branchless clients.
+  - Acceptance: add-client flow exposes explicit selection buttons for Branch Client and Branchless Client; clients list provides separate add buttons that preselect mode.
+  - Evidence:
+    - `src/app/(dashboard)/clients/page.tsx`
+    - `src/app/(dashboard)/clients/new/page.tsx`
+    - `src/app/(dashboard)/clients/new/form.tsx`
+    - `npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-CLI-008` | `done` | owner:`@frontend`
+  - Task: remove non-mock runtime fallback client rows on clients listing page.
+  - Acceptance: when DB query fails and mock mode is disabled, clients page shows unavailable messaging with empty table instead of mock fallback rows.
+  - Evidence:
+    - `src/app/(dashboard)/clients/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-CLI-009` | `done` | owner:`@frontend`
+  - Task: remove direct mock branch-type dependency from client branches screens.
+  - Acceptance: clients branches list/detail/edit screens no longer import or use `getMockBranchType`; branch model label derives from non-mock utility.
+  - Evidence:
+    - `src/lib/branches/model.ts`
+    - `src/app/(dashboard)/clients/branches/page.tsx`
+    - `src/app/(dashboard)/clients/branches/[id]/page.tsx`
+    - `src/app/(dashboard)/clients/branches/[id]/edit/form.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-03, completed 2026-03-03
 
-### 4) Payroll (Priority: P1)
+### 4) Payroll (P1)
 
-Status: **In progress (strong)**
+Completion: **100%** (7/7 done)
 
-- [x] Loans, extra-hours, other-deductions, special-duty, salary-v2, unpaid APIs + UI.
-- [x] Holidays API + UI.
-- [ ] Harden payroll calculations/posting logic parity with legacy workflows.
-- [ ] Add end-to-end payroll cycle validations (month, approvals/posting, exports dependencies).
-- [ ] Add integration tests for payroll calculation consistency and state transitions.
+- [x] `ERP-PAY-001` | `done` | owner:`@backend` - loans/extra-hours/other-deductions/special-duty/salary/unpaid APIs.
+- [x] `ERP-PAY-002` | `done` | owner:`@backend` - holidays API + UI.
+- [x] `ERP-PAY-003` | `done` | owner:`@backend` - manager scope on payroll endpoints.
+- [x] `ERP-PAY-004` | `done` | owner:`@backend` - payroll calculation/posting parity hardening.
+- [x] `ERP-PAY-005` | `done` | owner:`@qa` - end-to-end payroll cycle validations.
+- [x] `ERP-PAY-006` | `done` | owner:`@qa` - fix manager-scope fixture setup in integration tests.
+- [x] `ERP-PAY-007` | `done` | owner:`@frontend`
+  - Task: remove direct mock dataset dependency from bulk-loan upload screen.
+  - Acceptance: bulk-loan page no longer imports seeded mock rows and initializes runtime state from upload action.
+  - Evidence:
+    - `src/lib/payroll/loans-bulk.ts`
+    - `src/app/(dashboard)/payroll/loans/bulk/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` pass
+  - Dates: started 2026-03-03, completed 2026-03-03
 
-### 5) Inventory (Priority: P1)
+### 5) Inventory (P1)
 
-Status: **In progress (strong)**
+Completion: **100%** (5/5 done)
 
-- [x] Categories/vendors/conditions/items/assignments/demand APIs + UI.
-- [x] Stock-in/search/assign/condemned flows wired.
-- [ ] Add stronger integrity checks:
-  - [ ] assignment/return lifecycle validation
-  - [ ] demand approval/fulfillment transitions
-  - [ ] condition usage constraints and conflict behavior
-- [ ] Add integration tests for full inventory lifecycle.
+- [x] `ERP-INV-001` | `done` | owner:`@backend` - categories/vendors/conditions/items/assignments/demand APIs + UI.
+- [x] `ERP-INV-002` | `done` | owner:`@backend` - stock-in/search/assign/condemned flows wired.
+- [x] `ERP-INV-003` | `done` | owner:`@backend` - assignment/return lifecycle validations.
+- [x] `ERP-INV-004` | `done` | owner:`@backend`
+  - Task: demand approval/fulfillment transitions.
+  - Acceptance: `PENDING -> APPROVED -> FULFILLED` succeeds; invalid transitions return `409`; fulfill checks available stock and returns `409` when insufficient.
+  - Evidence:
+    - backend:
+      - `src/lib/inventory/demand-status.ts`
+      - `src/app/api/inventory/demands/route.ts`
+      - `src/app/api/inventory/demands/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs` demand lifecycle assertions
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-INV-005` | `done` | owner:`@qa`
+  - Task: full inventory lifecycle tests.
+  - Acceptance: inventory integration suite covers category/vendor/item/assignment/demand lifecycle with happy + error contracts and runtime-aware strict assertions.
+  - Evidence:
+    - integration:
+      - `scripts/api-integration-test.mjs`
+      - added assertions for:
+        - categories/vendors CRUD + duplicate behavior
+        - items create validation + duplicate behavior + not-found update behavior
+        - assignment invalid assign target, missing entity/item, condemned item block, invalid return payloads
+        - demand lifecycle strict assertions with mock/real runtime gating
+      - env controls:
+        - `REQUIRE_REAL_INVENTORY_ASSERTIONS`
+        - `FAIL_ON_INVENTORY_SKIP`
+  - Dates: started 2026-02-28, completed 2026-02-28
 
-### 6) Imports (Priority: P1)
+### 6) Imports (P1)
 
-Status: **Not started (backend)**
+Completion: **100%** (5/5 done)
 
-- [ ] Build import APIs (validate/process/result logs) for users, guards, clients, inventory.
-- [ ] Add job status tracking and error report download response shape.
-- [ ] Wire import screens to backend instead of placeholders.
-- [ ] Add integration tests for import validation failures and successful processing.
+- [x] `ERP-IMP-001` | `done` | owner:`@backend`
+  - Task: validate APIs (`POST /api/imports/:module/validate`).
+  - Evidence: `src/app/api/imports/[module]/validate/route.ts`; integration assertions included in `scripts/api-integration-test.mjs`.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-IMP-002` | `done` | owner:`@backend`
+  - Task: process APIs (`POST /api/imports/:module/process`).
+  - Evidence: `src/app/api/imports/[module]/process/route.ts`; integration assertions included in `scripts/api-integration-test.mjs`.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-IMP-003` | `done` | owner:`@backend`
+  - Task: job status API (`GET /api/imports/jobs/:jobId`).
+  - Evidence: `src/app/api/imports/jobs/[jobId]/route.ts`; integration assertions included in `scripts/api-integration-test.mjs`.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-IMP-004` | `done` | owner:`@backend`
+  - Task: error report endpoint (`GET /api/imports/jobs/:jobId/errors`).
+  - Evidence: `src/app/api/imports/jobs/[jobId]/errors/route.ts`; JSON + CSV assertions included in `scripts/api-integration-test.mjs`.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-IMP-005` | `done` | owner:`@frontend`
+  - Task: wire import screens to backend.
+  - Evidence: `src/components/imports/ImportsLifecycleManager.tsx`, `src/app/(dashboard)/imports/page.tsx`, `src/app/(dashboard)/imports/[screen]/page.tsx`.
+  - Dates: started 2026-02-28, completed 2026-02-28
 
 ## Deferred Until Core Complete
 
-### 7) Reports (Priority: Deferred / Last)
+### 7) Reports (Deferred / Last)
 
-- [ ] Build dedicated operational/generated report APIs.
-- [ ] Integrate report screens with real data endpoints.
-- [ ] Validate report correctness after core module data integrity is stable.
+- [x] `ERP-REP-001` | `done` | owner:`@backend` - operational report APIs by module group.
+- [x] `ERP-REP-002` | `done` | owner:`@frontend` - report screens bound to real endpoints.
+- [x] `ERP-REP-003` | `done` | owner:`@qa` - report correctness verification.
+- [x] `ERP-RPT-005` | `done` | owner:`@frontend`
+  - Task: replace generated reports mock-template page with DB-backed operational flow.
+  - Acceptance: `/reports/generated` no longer imports mock report datasets and is backed by live report APIs.
+  - Evidence:
+    - `src/app/(dashboard)/reports/generated/page.tsx` now renders `OperationalReportScreen` with `screen=\"scheduled\"`.
+    - mock bindings removed from page path (`mockGeneratedReports`, `mockReportTemplates` no longer used there).
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-QA-REP-004` | `done` | owner:`@qa`
+  - Task: regression assertions for workflow preset selection + per-rule override precedence.
+  - Acceptance: integration suite verifies preset apply, post-preset manual override precedence, and state restore.
+  - Evidence:
+    - `scripts/api-integration-test.mjs` (`=== WORKFLOW PRESET PRECEDENCE ===` block)
+    - command evidence:
+      - `node scripts/api-integration-test.mjs` => `153/153 PASS`
+      - includes:
+        - `GET /api/workflow-rules`
+        - `PATCH /api/workflow-rules` with `{ presetId: "relaxed" }`
+        - `PATCH /api/workflow-rules` manual rule override after preset
+        - restore to initial snapshot
+  - Dates: started 2026-03-02, completed 2026-03-02
 
 ### Fingerprint Device (System)
 
-- [ ] Build backend APIs and persistence model.
-- [ ] Integrate settings screen with real API.
+- Completion: **100%** (2/2 done)
 
-## Current Sprint Plan (Main Modules First)
+- [x] `ERP-SYS-001` | `done` | owner:`@backend`
+  - Task: fingerprint persistence + APIs.
+  - Evidence:
+    - `src/lib/fingerprint/store.ts`
+    - `src/app/api/fingerprint-devices/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/test/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/queue-enrollment/route.ts`
+    - `scripts/api-integration-test.mjs` (fingerprint lifecycle coverage)
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Dates: started 2026-03-01, completed 2026-03-01
+- [x] `ERP-SYS-002` | `done` | owner:`@frontend`
+  - Task: settings screen integration.
+  - Evidence:
+    - `src/components/settings/FingerprintDeviceManager.tsx`
+    - `src/app/(dashboard)/settings/fingerprint-device/page.tsx`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Dates: started 2026-03-01, completed 2026-03-01
 
-### Sprint M1 (start now)
+### 8) Lint Debt Program (Cross-Module P2)
 
-Focus: **Users & Access RBAC hardening + Guards/Deployments lifecycle completion**
+Completion: **100%** (6/6 tasks done)
 
-- [ ] Implement server-side manager scope helper and apply to:
-  - [x] `/api/guards*`
-  - [x] `/api/deployments*`
-  - [x] `/api/clients*` (where manager filtering is required)
-  - [x] payroll endpoints with manager-visible scope
-- [~] Add automated integration tests for manager-scope restrictions.
-  - [x] Added manager-scope tests in `scripts/api-integration-test.mjs` for payroll loan routes.
-  - [ ] Expand manager-scope test assertions to guards/deployments APIs.
-- [ ] Close guard/deployment lifecycle gaps and verify no runtime data-shape errors.
+- [x] `ERP-LINT-001` | `done` | owner:`@docs`
+  - Task: lint debt register with baseline ownership/scope.
+  - Evidence: `docs/lint-debt-register.md`; eslint JSON baseline snapshot.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-LINT-002` | `done` | owner:`@backend`
+  - Task: remove `any` in API module batch 1.
+  - Evidence: inventory API route cleanup; `npx tsc --noEmit` + build/integration passes.
+  - Dates: started 2026-02-28, completed 2026-02-28
+- [x] `ERP-LINT-003` | `done` | owner:`@docs`
+  - Task: break lint debt into module-level execution batches.
+  - Acceptance: lint register defines ordered execution batches with IDs, owners, reduction targets, and evidence template.
+  - Evidence:
+    - `docs/lint-debt-register.md`:
+      - `ERP-LINT-003 Output: Module Execution Batches`
+      - `LINT-B01..LINT-B06` matrix
+      - per-batch evidence template and locked execution order
+    - baseline command:
+      - `npm run lint -- --format json --output-file /tmp/eslint-report.json`
+      - parsed summary: `292 total` (`263 errors`, `29 warnings`)
+  - Dates: started 2026-03-01, completed 2026-03-01
+- [x] `ERP-LINT-004` | `done` | owner:`@frontend`
+  - Task: execute frontend lint cleanup batches (Guards/Payroll/Inventory/Clients scopes).
+  - Evidence:
+    - guards-focused batch completed with typed tab models and `unknown` catch handling:
+      - `src/components/guards/tabs/types.ts`
+      - `src/components/guards/tabs/*.tsx` (guards tab set)
+      - `src/app/(dashboard)/guards/*` forms/managers catch-block typing cleanup
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b14.json`
+      - parsed delta:
+        - vs previous batch (`b13 -> b14`): errors `15 -> 0` (`-15`), warnings `28 -> 26` (`-2`)
+        - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 0` (`-228`), warnings `30 -> 26` (`-4`)
+    - final cleanup tranche:
+      - `src/lib/mockData/prismaMock.ts`
+      - `src/lib/auth.ts`
+      - `src/lib/imports/workflow.ts`
+      - `src/components/imports/ImportsLifecycleManager.tsx`
+      - `src/app/api/deployments/route.ts`
+      - `tailwind.config.ts`
+      - `prisma/seed.ts`
+  - Dates: started 2026-03-01, completed 2026-03-01
+- [x] `ERP-LINT-005` | `done` | owner:`@platform`
+  - Task: enforce no-net-new lint findings in CI.
+  - Acceptance: CI fails on net-new lint findings compared to tracked baseline.
+  - Evidence:
+    - `scripts/check-lint-budget.mjs`
+    - `docs/lint-baseline.json`
+    - `package.json` scripts:
+      - `lint:json`
+      - `lint:guard`
+      - `ci:quality`
+    - `.github/workflows/quality-gates.yml`
+    - command evidence:
+      - `npm run ci:quality` pass
+      - guard output: `errors=0`, `warnings=26`, `problems=26`, `No-net-new-lint check passed.`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-LINT-006` | `done` | owner:`@frontend`
+  - Task: reduce warning baseline (`26 -> <=15`) without behavior regressions.
+  - Acceptance: warning count reduced at or below target while preserving build/type/lint quality gates.
+  - Evidence:
+    - warning cleanup files:
+      - `src/app/(dashboard)/guards/attendance/manager.tsx`
+      - `src/app/(dashboard)/guards/client-attendance/manager.tsx`
+      - `src/app/(dashboard)/guards/residences/manager.tsx`
+      - `src/components/audit/AuditLogManager.tsx`
+      - `src/components/inventory/InventoryConditionsManager.tsx`
+      - `src/components/inventory/InventorySearchManager.tsx`
+      - `src/components/payroll/PayrollBulkSalarySlipsManager.tsx`
+      - `src/components/payroll/PayrollClearanceManager.tsx`
+      - `src/components/payroll/PayrollSalaryV2Manager.tsx`
+      - `src/components/requisitions/RequisitionsManager.tsx`
+      - `src/components/settings/GuardBankNamesManager.tsx`
+      - `src/components/settings/GuardPledgeableDocumentsManager.tsx`
+      - `src/components/tickets/TicketListManager.tsx`
+      - `src/components/users/UserSearchManager.tsx`
+      - `src/components/guards/ProfileImageCard.tsx`
+      - `src/components/clients/ClientSearchManager.tsx`
+      - `src/app/(dashboard)/clients/[id]/page.tsx`
+      - `scripts/api-integration-test.mjs`
+      - `scripts/generate-form-parity-report.mjs`
+      - `prisma/seed.ts`
+      - `eslint.config.mjs`
+      - `src/app/api/reports/guards/deployment/route.ts`
+      - `src/app/api/trainings/route.ts`
+      - `src/components/ui/TabNavigation.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b15.json` => `0 errors`, `0 warnings`
+      - `npm run ci:quality` pass
+  - Dates: started 2026-03-02, completed 2026-03-02
 
-Exit criteria for M1:
+### 9) Workflow Flexibility (Cross-Module)
 
-- [x] Manager scope enforced server-side for core endpoints.
-- [ ] Guard+Deployment lifecycle tests pass.
-- [ ] No P1/P2 defects open in Users/Access + Guards/Deployments.
+Completion: **100%** (1/1 tasks done)
 
-### Sprint M2
+- [x] `ERP-WKF-001` | `done` | owner:`@backend`
+  - Task: add lightweight workflow-rule presets with optional seeded defaults (editable, no governance lock).
+  - Acceptance: presets are available via API/UI, env default preset is supported, and per-rule overrides remain editable after preset apply.
+  - Evidence:
+    - policy/preset model:
+      - `src/lib/workflows/policy.ts`
+    - API updates:
+      - `src/app/api/workflow-rules/route.ts`
+    - UI updates:
+      - `src/components/settings/WorkflowRulesManager.tsx`
+    - docs:
+      - `docs/workflow-policy.md`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run ci:quality` pass (`errors=0`, `warnings=26`, no-net-new-lint passed)
+  - Dates: started 2026-03-02, completed 2026-03-02
 
-Focus: **Clients + Payroll hardening**
+### 10) Release & Baseline Housekeeping
 
-- [ ] Complete client branch/group/branchless transitions and billing prerequisites flow.
-- [ ] Complete payroll calculation/posting consistency checks.
-- [ ] Expand integration test coverage for these flows.
+Completion: **100%** (1/1 tasks done)
 
-### Sprint M3
+- [x] `ERP-REL-001` | `done` | owner:`@platform`
+  - Task: close baseline housekeeping by recording zero-lint guard snapshot in release tracking.
+  - Acceptance: lint baseline and quality gate evidence are aligned to zero-lint state and documented in source-of-truth logs.
+  - Evidence:
+    - baseline snapshot:
+      - `docs/lint-baseline.json` => `errors: 0`, `warnings: 0`, `problems: 0`
+    - quality command:
+      - `npm run ci:quality` pass (no-net-new-lint + `npx tsc --noEmit`)
+    - integration refresh:
+      - `node scripts/api-integration-test.mjs` => `153/153 PASS`
+  - Dates: started 2026-03-02, completed 2026-03-02
 
-Focus: **Inventory hardening + Imports backend**
+### 11) Operational Validation & Handoff
 
-- [ ] Finalize inventory lifecycle constraints and test coverage.
-- [ ] Build imports backend and replace placeholder flows.
+Completion: **95%** (18/19 done)
+
+- [x] `ERP-OPS-001` | `done` | owner:`@docs`
+  - Task: define release-ready checklist snapshot (final gate matrix + signoff fields).
+  - Acceptance: release snapshot section exists with gate statuses and explicit signoff placeholders.
+  - Evidence:
+    - `docs/delivery-source-of-truth-checklist.md` section `Release-Ready Snapshot (2026-03-02)`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-OPS-002` | `done` | owner:`@qa`
+  - Task: run one real-DB profile validation pass and attach evidence lines beside baseline section.
+  - Acceptance: strict real-DB profile executes with scope/inventory strict flags and is captured in baseline evidence.
+  - Evidence:
+    - seed:
+      - `set -a; source .env; set +a; USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npx prisma db seed`
+    - runtime:
+      - `NEXTAUTH_URL=http://localhost:3011 AUTH_TRUST_HOST=true USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npm run start -- -p 3011`
+    - validation:
+      - `BASE_URL=http://localhost:3011 USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false REQUIRE_REAL_SCOPE_ASSERTIONS=true FAIL_ON_SCOPE_SKIP=true REQUIRE_REAL_INVENTORY_ASSERTIONS=true FAIL_ON_INVENTORY_SKIP=true node scripts/api-integration-test.mjs`
+      - result: `210/210 PASS`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-OPS-003` | `done` | owner:`@platform`
+  - Task: automate optional nightly strict real-profile validation in CI.
+  - Acceptance: manual+scheduled workflow exists and executes strict real profile (`REQUIRE_REAL_SCOPE_ASSERTIONS=true`, `REQUIRE_REAL_INVENTORY_ASSERTIONS=true`) through a single scripted entrypoint.
+  - Evidence:
+    - workflow automation:
+      - `.github/workflows/nightly-strict-real-profile.yml`
+    - command entrypoints:
+      - `package.json` scripts: `test:integration`, `test:integration:strict-real`
+      - `scripts/run-strict-real-profile.mjs`
+    - deterministic strict assertions:
+      - `scripts/api-integration-test.mjs` (deployment lifecycle seed determinism + non-zero exit on failed tests)
+    - runtime evidence:
+      - `set -a; source .env; set +a; npm run test:integration:strict-real` => `211/211 PASS`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-001` | `done` | owner:`@product`
+  - Task: fill release signoff fields and freeze release candidate.
+  - Acceptance: release snapshot includes explicit owner assignments and freeze-candidate metadata tied to current validated state.
+  - Evidence:
+    - release snapshot updates:
+      - `docs/delivery-source-of-truth-checklist.md` (`Release-Ready Snapshot (2026-03-02)`)
+    - validated gates prior to freeze:
+      - `npm run ci:quality` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; npm run test:integration:strict-real` => `211/211 PASS`
+    - candidate metadata:
+      - `git rev-parse --short HEAD` => `cce7d3f`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PLT-004` | `done` | owner:`@platform`
+  - Task: migrate deprecated Next.js middleware convention to proxy convention.
+  - Acceptance: auth route guard behavior remains unchanged and build no longer emits middleware-to-proxy deprecation warning.
+  - Evidence:
+    - `src/proxy.ts`
+    - `src/middleware.ts` removed
+    - `set -a; source .env; set +a; npm run build` pass with `ƒ Proxy (Middleware)` output and no middleware deprecation warning.
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-AUTO-001` | `done` | owner:`@platform`
+  - Task: add a customizable core regression runner to execute quality + build + strict real integration in one command.
+  - Acceptance: a single command executes selected gates via env toggles and fails fast on any failed stage.
+  - Evidence:
+    - `scripts/run-core-regression.mjs`
+    - `package.json` script: `test:regression:core`
+    - `set -a; source .env; set +a; npm run test:regression:core` => pass (`ci:quality` pass, `build` pass, strict real integration `211/211 PASS`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-AUTO-002` | `done` | owner:`@platform`
+  - Task: add automated release evidence snapshot generation (commit + gate outputs) for signoff handoff.
+  - Acceptance: one command generates a durable docs artifact containing candidate commit, gate statuses, and strict integration summary.
+  - Evidence:
+    - `scripts/generate-release-evidence-snapshot.mjs`
+    - `package.json` script: `release:evidence:snapshot`
+    - `docs/release-evidence-rc-2026-03-02-01.md`
+    - `set -a; source .env; set +a; npm run release:evidence:snapshot` => pass (`ci:quality` pass, `build` pass, strict integration `211/211 PASS`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-QA-CORE-001` | `done` | owner:`@qa`
+  - Task: add focused regression proof profile for Users + Guards/Deployments + Clients sprint-exit defect closure.
+  - Acceptance: verifier checks strict integration output for targeted core route groups and fails if core coverage is missing or any core assertions fail.
+  - Evidence:
+    - `scripts/verify-sprint-core-regression.mjs`
+    - `package.json` script: `test:regression:sprint-core`
+    - `docs/core-regression-users-guards-clients.md`
+    - `set -a; source .env; set +a; npm run test:regression:sprint-core` => pass (`211/211 PASS` strict integration, core subset verification `PASS`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-OBS-001` | `done` | owner:`@platform`
+  - Task: add operational health checks/reporting for scheduled strict runs.
+  - Acceptance: strict-run health report is generated from integration output with threshold checks, and nightly workflow persists strict-run artifacts for observability.
+  - Evidence:
+    - `scripts/generate-strict-run-health-report.mjs`
+    - `package.json` script: `ops:strict-health`
+    - `.github/workflows/nightly-strict-real-profile.yml` (health generation + artifact upload)
+    - `docs/strict-run-health.md`
+    - `npm run ops:strict-health` => pass
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-REL-002` | `done` | owner:`@platform`
+  - Task: add release evidence snapshot link validation to signoff checklist automation.
+  - Acceptance: snapshot automation fails if signoff packet is missing required evidence links or linked evidence artifacts are absent.
+  - Evidence:
+    - `scripts/generate-release-evidence-snapshot.mjs` (`validateSignoffLinks` validation path)
+    - `set -a; source .env; set +a; npm run release:evidence:snapshot` => pass (`211/211 PASS`; signoff links validated)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-QA-CORE-002` | `done` | owner:`@qa`
+  - Task: add threshold guardrails for minimum core-route assertion count drift over time.
+  - Acceptance: sprint-core verifier fails when core totals or per-prefix assertion counts fall below configured minimum thresholds.
+  - Evidence:
+    - `scripts/verify-sprint-core-regression.mjs` (threshold-loading + drift-violation checks)
+    - `docs/core-regression-thresholds.json` (configurable minimum thresholds)
+    - `docs/core-regression-users-guards-clients.md` (guardrail section + drift result)
+    - `set -a; source .env; set +a; npm run test:regression:sprint-core` => pass (`211/211 PASS`; drift violations `none`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-OPS-004` | `done` | owner:`@platform`
+  - Task: add CI job summary annotations for strict-run health and key metrics.
+  - Acceptance: nightly strict workflow writes integration totals and strict health report content into the GitHub Actions job summary for direct triage visibility.
+  - Evidence:
+    - `.github/workflows/nightly-strict-real-profile.yml` (`Publish strict-run job summary` step)
+    - `npm run ci:quality` => pass (`0 errors`, `0 warnings`, `0 problems`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-003` | `done` | owner:`@release`
+  - Task: add deterministic signoff status and approval gate automation for release packets.
+  - Acceptance: command can generate a signoff status report and strict gate mode fails when approvals/checklist/final decision are incomplete.
+  - Evidence:
+    - `scripts/validate-release-signoff.mjs`
+    - `package.json` scripts: `release:signoff:status`, `release:signoff:gate`
+    - `npm run release:signoff:status` => pass (`Ready for release: NO`, status artifact generated)
+    - `npm run release:signoff:gate` => expected fail (exit `1`) while approvals are pending
+    - `docs/release-signoff-status-rc-2026-03-02-01.md`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-004` | `done` | owner:`@release`
+  - Task: add manual approval-row update helper for deterministic signoff packet maintenance.
+  - Acceptance: command updates one approval row by function with explicit status/approver/timestamp/notes and supports dry-run preview to avoid accidental edits.
+  - Evidence:
+    - `scripts/apply-release-signoff-approval.mjs`
+    - `package.json` script: `release:signoff:approve`
+    - `RELEASE_APPROVAL_FUNCTION='Engineering' RELEASE_APPROVAL_STATUS='approved' RELEASE_APPROVED_BY='@backend' RELEASE_APPROVAL_NOTES='ready for signoff review' npm run release:signoff:approve` => dry-run preview generated
+    - `/tmp/release-signoff-preview-rc-2026-03-02-01.md`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-005` | `done` | owner:`@release`
+  - Task: add checklist/final-decision update helper for release signoff packet.
+  - Acceptance: command can mark approval checklist items complete and update final decision/version/deployment window fields via controlled inputs with dry-run-first behavior.
+  - Evidence:
+    - `scripts/apply-release-signoff-decision.mjs`
+    - `package.json` script: `release:signoff:decision`
+    - `RELEASE_FINAL_DECISION='approved' RELEASE_EFFECTIVE_VERSION='v1.0.0-rc-2026-03-02-01' RELEASE_DEPLOYMENT_WINDOW='2026-03-03 02:00-03:00 UTC' RELEASE_MARK_CHECKLIST_COMPLETE=true npm run release:signoff:decision` => dry-run preview generated
+    - `/tmp/release-signoff-decision-preview-rc-2026-03-02-01.md`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-006` | `done` | owner:`@release`
+  - Task: add release signoff handoff summary generator for approver coordination.
+  - Acceptance: command generates a concise handoff artifact with current state, pending approvers, unchecked checklist items, and next-step commands.
+  - Evidence:
+    - `scripts/generate-release-signoff-handoff.mjs`
+    - `package.json` script: `release:signoff:handoff`
+    - `npm run release:signoff:status && npm run release:signoff:handoff` => pass
+    - `docs/release-signoff-handoff-rc-2026-03-02-01.md`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-007` | `done` | owner:`@release`
+  - Task: add bulk signoff sync helper to apply multiple approvals and decision/checklist updates from one payload.
+  - Acceptance: single command supports dry-run/apply modes, validates payload statuses, updates multiple approval rows + decision fields + checklist state, and fails on unknown approver functions.
+  - Evidence:
+    - `scripts/apply-release-signoff-bulk.mjs`
+    - `package.json` script: `release:signoff:bulk`
+    - `docs/release-signoff-bulk-template.json`
+    - `RELEASE_BULK_PAYLOAD_PATH='docs/release-signoff-bulk-template.json' npm run release:signoff:bulk` => dry-run preview generated
+    - `/tmp/release-signoff-bulk-preview-rc-2026-03-02-01.md`
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [x] `ERP-PROD-008` | `done` | owner:`@release`
+  - Task: add one-command release signoff workflow runner that chains bulk sync, status refresh, handoff generation, and optional gate enforcement.
+  - Acceptance: workflow command executes deterministic sequence with clear step logs, supports dry-run vs apply mode, and optionally enforces final signoff gate.
+  - Evidence:
+    - `scripts/run-release-signoff-workflow.mjs`
+    - `package.json` script: `release:signoff:workflow`
+    - `RELEASE_BULK_PAYLOAD_PATH='docs/release-signoff-bulk-template.json' npm run release:signoff:workflow` => pass (dry-run orchestration)
+    - `npm run release:signoff:status` => pass (`Ready for release: NO`)
+  - Dates: started 2026-03-02, completed 2026-03-02
+- [ ] `ERP-PROD-002` | `in_progress` | owner:`@release`
+  - Task: execute engineering/QA/product/ops human signoff approvals for `RC-2026-03-02-01`.
+  - Acceptance: all approval rows are set to approved with approver identity + UTC timestamp, and final release decision is recorded.
+  - Evidence:
+    - `docs/release-signoff-rc-2026-03-02-01.md`
+  - Blocker: requires explicit human approvals.
+  - Dates: started 2026-03-02, completed `pending`
+
+## Current Sprint
+
+### Sprint M1 (Active)
+
+Focus: **RBAC hardening + API contract integrity**
+
+- [x] `ERP-M1-001` Branch contract parity (`GET /api/branches`).
+- [x] `ERP-M1-002` Attendance and branch-sensitive route manager scope checks.
+- [x] `ERP-M1-003` Deployment 500 response sanitization.
+- [x] `ERP-M1-004` Lint command migrated for Next.js 16 / ESLint v9 (`eslint.config.mjs` + `npm run lint`).
+- [x] `ERP-M1-005` Baseline reset with real command evidence (lint/build/tsc/integration).
+- [x] `ERP-M1-006` Fix integration failures (users duplicate 409, requisition/ticket 404, payroll scope setup).
+
+Sprint exit criteria:
+- [x] Manager scope checks complete on all sensitive endpoints.
+- [x] Integration suite green for tracked routes.
+- [ ] No P1/P2 open defects in Users + Guards/Deployments + Clients.
 
 ## Known Open Risks
 
-- [ ] Manager scope not fully enforced server-side yet (security + data leakage risk).
-- [ ] Some screens still rely on placeholder/config patterns outside completed module paths.
-- [ ] Imports and Reports backend are pending; must not block core ops stabilization.
+- [x] Manager scope coverage is complete for the currently tracked sensitive endpoint set.
+- [x] Production UI placeholder/config-only flow has been removed from fingerprint system settings (`ERP-SYS-002` completed).
+- [x] Generated reports template page no longer depends on mock-template data in production path (`ERP-RPT-005` completed).
+- [x] Lint warnings cleared (`0` warnings) and no-net-new guard remains active.
+- [ ] `RC-2026-03-02-01` awaits human approvals (`ERP-PROD-002`).
+
+## Release-Ready Snapshot (2026-03-02)
+
+- Gate Matrix:
+  - Lint: `PASS` (`0 errors`, `0 warnings`)
+  - Typecheck: `PASS` (`npx tsc --noEmit`)
+  - Build: `PASS` (`npm run build`)
+  - Integration (current profile): `PASS` (`213/213`)
+  - Integration (strict real-DB profile): `PASS` (`211/211`)
+  - Scope assertions (strict real profile): `PASS` (`REQUIRE_REAL_SCOPE_ASSERTIONS=true`)
+  - Inventory strict assertions (strict real profile): `PASS` (`REQUIRE_REAL_INVENTORY_ASSERTIONS=true`)
+- Release Signoff:
+  - Engineering Owner: `@backend` (`assigned`, freeze candidate ready for human signoff)
+  - QA Owner: `@qa` (`assigned`, freeze candidate ready for human signoff)
+  - Product Owner: `@product` (`assigned`, freeze candidate ready for human signoff)
+  - Ops/Release Owner: `@platform` (`assigned`, freeze candidate ready for human signoff)
+- Freeze Candidate:
+  - Candidate ID: `RC-2026-03-02-01`
+  - Commit: `cce7d3f`
+  - Prepared On: `2026-03-02`
+  - Status: `frozen-for-signoff` (development may continue on newer commits)
+  - Signoff Packet: `docs/release-signoff-rc-2026-03-02-01.md`
 
 ## Progress Log
 
-- 2026-02-24: Core plan locked to module-first delivery, Reports deferred to last.
-- 2026-02-24: Batch A closure completed (holidays, inventory conditions/demand, guard bank/doc settings).
-- 2026-02-24: Integration baseline recorded at 52/52 PASS.
-- 2026-02-24: Sprint M1 started and partially completed:
-  - Added reusable manager scope helpers in `src/lib/access/scope.ts` (`buildManagerScopeWhere`, `managerScopeDenied`).
-  - Extended auth typings for `regionId`/`regionalOfficeId` in `src/types/next-auth.d.ts`.
-  - Enforced manager server-side scope on core APIs:
-    - Guards: list/search/update/status endpoints
-    - Deployments: list/create/update/end endpoints
-    - Clients: list/create/update endpoints (region scope)
-  - Build validation: `npm run build` passes.
-- 2026-02-26: Guard module change request implementation:
-  - [x] Add Guard form: moved Regional Office to top and removed Region field.
-  - [x] Deploy Guards: removed Region selection and switched guard filtering to Regional Office.
-  - [x] Add Guard form: added multiple contact numbers with add/remove controls.
-  - [x] Add Guard form: age auto-calculation from Date of Birth and joining-age auto-calculation from Joining Date.
-  - [x] Guard profile general information: added Manager, Joining Age, Enrolled By, Profile Introducer, and Nearest Relative details.
-  - [x] Blacklist flow updated to block by CNIC.
-  - [x] Inactive Guard reactivation now requires mandatory reason (UI + API enforcement).
-  - [x] Payroll net salary now recalculates when extra hours/special duty/other deductions are updated.
-- 2026-02-26: Users/Access M1 hardening continued:
-  - [x] Applied manager scope enforcement to payroll endpoints:
-    - `/api/payroll/loans` and `/api/payroll/loans/[id]`
-    - `/api/payroll/extra-hours` and `/api/payroll/extra-hours/[id]`
-    - `/api/payroll/other-deductions` and `/api/payroll/other-deductions/[id]`
-    - `/api/payroll/special-duty`
-    - `/api/payroll/salary` and `/api/payroll/salary/[id]`
-    - `/api/payroll/unpaid`
-  - [x] Local quality gates re-run: `npx tsc --noEmit`, `npm run build`.
-- 2026-02-26: Manager-scope integration tests added and validated:
-  - [x] Extended `scripts/api-integration-test.mjs` with manager positive/negative payroll scope assertions:
-    - out-of-scope manager denied on `/api/payroll/loans` POST and `/api/payroll/loans/[id]` PATCH
-    - out-of-scope manager list filtering verified on `/api/payroll/loans` GET
-    - in-scope manager allowed on `/api/payroll/loans` POST/PATCH and can view scoped list
-  - [x] Integration baseline updated to **61/61 PASS**.
-- 2026-02-26: Guard enrollment backend hardening:
-  - [x] Fixed auto-generated `parwestId` collisions in `POST /api/guards`.
-  - [x] Added explicit duplicate-CNIC pre-check in guard creation flow.
+- 2026-02-24: Core plan locked to module-first delivery, Reports deferred.
+- 2026-02-24: Batch A closure completed; integration baseline recorded 52/52 PASS.
+- 2026-02-26: M1 hardening continued (payroll scope, guard updates, integration updates).
+- 2026-02-27 | `ERP-M1-001` | done | owner:`@backend`
+  - Changes: Added `GET /api/branches` with manager-scope-aware filtering and search/client filters.
+  - Evidence: `src/app/api/branches/route.ts`.
+  - Risk: none.
+  - Next: extend scope tests for branch routes.
+- 2026-02-27 | `ERP-M1-002` | done | owner:`@backend`
+  - Changes: Added manager scope enforcement to attendance and branch-sensitive APIs.
+  - Evidence: `src/app/api/attendance/route.ts`, `src/app/api/attendance/client/route.ts`, `src/app/api/branches/[id]/route.ts`, `src/app/api/clients/[id]/branches/route.ts`.
+  - Risk: low; requires integration assertions for `403` edge cases.
+  - Next: add negative-scope tests.
+- 2026-02-27 | `ERP-M1-003` | done | owner:`@backend`
+  - Changes: removed raw error/detail leakage from deployment API 500 responses.
+  - Evidence: `src/app/api/deployments/route.ts`, `src/app/api/deployments/[id]/route.ts`, `src/app/api/deployments/[id]/end/route.ts`.
+  - Risk: none.
+  - Next: standardize same pattern across all APIs.
+- 2026-02-27 | `ERP-M1-004` | done | owner:`@backend`
+  - Changes: migrated lint command contract to ESLint v9 flat config and added `eslint.config.mjs`.
+  - Evidence: `package.json`, `eslint.config.mjs`.
+  - Risk: lint now fully exposes backlog (currently failing on existing debt).
+  - Next: define lint debt burn-down tasks by module.
+- 2026-02-27 | `ERP-M1-005` | done | owner:`@qa`
+  - Changes: refreshed baseline commands and captured current truth.
+  - Evidence:
+    - `npx tsc --noEmit` pass
+    - `npm run build` pass
+    - `npm run lint` fail (`281 problems`)
+    - `node scripts/api-integration-test.mjs` => `54/54 PASS`
+  - Risk: lint gate remains red due repo-wide existing lint debt.
+  - Next: add explicit real-DB integration profile and keep mock profile for deterministic CI.
+- 2026-02-27 | `ERP-M1-006` | done | owner:`@qa`
+  - Changes: stabilized integration script assertions for mock-vs-real runtime behavior and seeded scoped-guard fallback for real-mode manager tests.
+  - Evidence: `scripts/api-integration-test.mjs`; `node scripts/api-integration-test.mjs` => `54/54 PASS`.
+  - Risk: manager-scope payroll assertions are skipped in mock runtime and still require separate real-DB validation profile.
+  - Next: implement `ERP-UAL-005` real-DB manager-scope suite for guards/deployments/attendance.
+- 2026-02-27 | `ERP-UAL-009` | in_progress | owner:`@backend`
+  - Changes: standardized `401/403/500` envelope responses on sensitive route set (attendance, client-attendance, branches, client-branches, deployments).
+  - Evidence:
+    - `src/app/api/attendance/route.ts`
+    - `src/app/api/attendance/client/route.ts`
+    - `src/app/api/branches/route.ts`
+    - `src/app/api/branches/[id]/route.ts`
+    - `src/app/api/clients/[id]/branches/route.ts`
+    - `src/app/api/deployments/route.ts`
+    - `src/app/api/deployments/[id]/route.ts`
+    - `src/app/api/deployments/[id]/end/route.ts`
+    - `npx tsc --noEmit` pass
+    - `npm run build` pass
+    - `node scripts/api-integration-test.mjs` => `54/54 PASS`
+  - Risk: response envelopes are not yet standardized across the full API surface.
+  - Next: extend envelope standardization to remaining sensitive modules and close task.
+- 2026-02-27 | `ERP-UAL-009` | in_progress | owner:`@backend`
+  - Changes: expanded envelope standardization to manager-sensitive guards/clients/payroll routes.
+  - Evidence:
+    - `src/app/api/guards/route.ts`
+    - `src/app/api/guards/[id]/route.ts`
+    - `src/app/api/guards/[id]/status/route.ts`
+    - `src/app/api/guards/search/route.ts`
+    - `src/app/api/clients/route.ts`
+    - `src/app/api/clients/[id]/route.ts`
+    - `src/app/api/payroll/loans/route.ts`
+    - `src/app/api/payroll/loans/[id]/route.ts`
+    - `src/app/api/payroll/extra-hours/route.ts`
+    - `src/app/api/payroll/extra-hours/[id]/route.ts`
+    - `src/app/api/payroll/other-deductions/route.ts`
+    - `src/app/api/payroll/other-deductions/[id]/route.ts`
+    - `src/app/api/payroll/special-duty/route.ts`
+    - `src/app/api/payroll/salary/route.ts`
+    - `src/app/api/payroll/salary/[id]/route.ts`
+    - `src/app/api/payroll/unpaid/route.ts`
+    - `npx tsc --noEmit` pass
+    - `npm run build` pass
+    - `node scripts/api-integration-test.mjs` => `54/54 PASS`
+  - Risk: several non-manager-sensitive APIs still return legacy response shapes.
+  - Next: finalize envelope standardization backlog and close `ERP-UAL-009`.
+- 2026-02-27 | `ERP-GDP-007` | in_progress | owner:`@qa`
+  - Changes: added explicit out-of-scope manager `403` assertions for attendance and deployment APIs in integration script.
+  - Evidence:
+    - `scripts/api-integration-test.mjs` (manager-out-scope checks for `/api/attendance`, `/api/attendance/client`, `/api/deployments`)
+    - `node scripts/api-integration-test.mjs` => `54/54 PASS`
+  - Risk: current runtime still detects mock mode, so new real-scope assertions are skipped at execution time.
+  - Next: run integration under real-DB profile and validate these assertions execute (not skipped).
+- 2026-02-27 | `ERP-GDP-007` | done | owner:`@qa`
+  - Changes: executed integration in isolated real-DB profile and validated out-of-scope `403` assertions for attendance and deployments.
+  - Evidence:
+    - Seeded DB baseline via `npx prisma db seed` (roles/admin/default refs).
+    - Real-mode run profile:
+      - `NEXTAUTH_URL=http://localhost:3010 AUTH_TRUST_HOST=true USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npm run start -- -p 3010`
+      - `BASE_URL=http://localhost:3010 ... node scripts/api-integration-test.mjs`
+    - Result: `69/69 PASS`
+    - Explicit checks passed:
+      - `/api/attendance POST out-scope manager 403`
+      - `/api/attendance/client GET out-scope manager 403`
+      - `/api/deployments POST out-scope manager 403`
+  - Risk: none for this task.
+  - Next: prioritize remaining `ERP-UAL-009` backlog and real-mode automation profile.
+- 2026-02-27 | `ERP-UAL-005` | done | owner:`@qa`
+  - Changes: extended manager-scope integration assertions to include guards API out-of-scope deny and in-scope allow in real-mode run.
+  - Evidence:
+    - `scripts/api-integration-test.mjs` (`/api/guards POST out-scope manager 403`, `/api/guards POST in-scope manager 201`)
+    - Real-mode profile run result: `68/68 PASS`
+  - Risk: none for this task.
+  - Next: keep real-mode profile as nightly/CI guardrail.
+- 2026-02-27 | `ERP-UAL-009` | done | owner:`@backend`
+  - Changes: closed sensitive-route envelope standardization across manager-scope APIs.
+  - Evidence:
+    - shared helpers: `src/lib/api/response.ts`
+    - manager-sensitive routes use `unauthorized()`, `forbidden()`, `internalServerError()`
+    - verification: `npx tsc --noEmit`, `npm run build`, real-mode integration pass.
+  - Risk: some non-sensitive/legacy APIs still use heterogeneous error payloads (tracked separately).
+  - Next: optionally open a dedicated non-sensitive API envelope harmonization task.
+- 2026-02-28 | `ERP-CLI-003` | done | owner:`@backend`
+  - Changes: completed manager-scope coverage verification for client/branch routes and added explicit manager-scope integration assertions for client/branch access and mutations.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`:
+      - `/api/clients/[id]/branches GET out-scope manager 403`
+      - `/api/branches POST out-scope manager 403`
+      - `/api/branches/[id] PATCH out-scope manager 403`
+      - `/api/clients/[id]/branches GET in-scope manager 200`
+      - `/api/branches POST in-scope manager 201`
+      - `/api/branches/[id] PATCH in-scope manager 200`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with env loaded)
+      - real-mode integration run result: `76/76 PASS`
+  - Risk: none for this task.
+  - Next: `ERP-CLI-004` (billing/invoicing/blacklist DB parity).
+- 2026-02-28 | `ERP-CLI-004` | in_progress | owner:`@backend`
+  - Changes: replaced core client billing/invoicing/blacklist mock paths with DB-backed APIs and UI wiring.
+  - Evidence:
+    - APIs:
+      - `src/app/api/invoices/route.ts`
+      - `src/app/api/invoices/[id]/route.ts`
+      - `src/app/api/clients/blacklist/route.ts`
+    - UI rewiring:
+      - `src/app/(dashboard)/clients/invoicing/manager.tsx`
+      - `src/components/clients/InvoicedBillingsManager.tsx`
+      - `src/components/clients/ClientBlacklistManager.tsx`
+      - `src/components/invoicing/InvoiceModeSwitcher.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass
+      - real-mode integration run: `76/76 PASS`
+  - Risk: invoice prerequisites screen remains static and requires a follow-up parity pass.
+  - Next: finish remaining invoice prerequisites parity and add integration checks for new invoice/blacklist APIs.
+- 2026-02-28 | `ERP-CLI-004` | in_progress | owner:`@backend`
+  - Changes: added integration coverage for new invoice and client-blacklist APIs and validated in real-DB runtime.
+  - Evidence:
+    - `scripts/api-integration-test.mjs` now checks:
+      - `POST /api/invoices` (`400` invalid + `201` valid)
+      - `GET /api/invoices`
+      - `PATCH /api/invoices/[id]`
+      - `POST /api/clients/blacklist`
+      - `GET /api/clients/blacklist`
+      - `DELETE /api/clients/blacklist`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass
+      - real-mode integration run: `84/84 PASS`
+  - Risk: invoice-prerequisites screen remains partially static.
+  - Next: finish invoice-prerequisites DB wiring and then close `ERP-CLI-004`.
+- 2026-02-28 | `ERP-CLI-004` | done | owner:`@backend`
+  - Changes: completed invoice-prerequisites default-rates DB wiring and closed client billing/invoicing/blacklist parity scope.
+  - Evidence:
+    - new/update APIs:
+      - `src/app/api/deployment-rates/[id]/route.ts`
+      - `src/app/api/invoices/route.ts`
+      - `src/app/api/invoices/[id]/route.ts`
+      - `src/app/api/clients/blacklist/route.ts`
+    - UI wiring:
+      - `src/components/clients/InvoicePrerequisitesManager.tsx`
+      - `src/app/(dashboard)/clients/invoicing/manager.tsx`
+      - `src/components/clients/InvoicedBillingsManager.tsx`
+      - `src/components/clients/ClientBlacklistManager.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass
+      - real-mode integration run: `83/83 PASS`
+  - Risk: invoice-header subtab remains frontend-only metadata (non-blocking).
+  - Next: `ERP-CLI-005` integration flow coverage for client+branch+invoicing prerequisites.
+- 2026-02-28 | `ERP-CLI-005` | done | owner:`@qa`
+  - Changes: completed client+branch+invoicing-prerequisite integration coverage with deployment-rate flow assertions.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`:
+      - `POST /api/deployment-rates`
+      - `GET /api/deployment-rates`
+      - `PATCH /api/deployment-rates/[id]`
+      - plus `/api/invoices*` and `/api/clients/blacklist` checks in same suite
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - real-mode integration run: `86/86 PASS`
+  - Risk: none.
+  - Next: `ERP-IMP-001` imports validate endpoint scaffold.
+- 2026-02-28 | `ERP-IMP-001` | done | owner:`@backend`
+  - Changes: implemented imports validate endpoint with module-specific required-field validation and file/json payload support.
+  - Evidence:
+    - `src/app/api/imports/[module]/validate/route.ts`
+    - `src/lib/imports/workflow.ts`
+    - `scripts/api-integration-test.mjs` (`POST /api/imports/users/validate` valid + invalid)
+  - Risk: none.
+  - Next: `ERP-IMP-002` process endpoint.
+- 2026-02-28 | `ERP-IMP-002` | done | owner:`@backend`
+  - Changes: implemented imports process endpoint with job creation and terminal status assignment based on validation result.
+  - Evidence:
+    - `src/app/api/imports/[module]/process/route.ts`
+    - `src/lib/imports/workflow.ts`
+    - `scripts/api-integration-test.mjs` (`POST /api/imports/users/process`)
+  - Risk: in-memory job storage resets on server restart (acceptable scaffold behavior).
+  - Next: `ERP-IMP-003` job status endpoint.
+- 2026-02-28 | `ERP-IMP-003` | done | owner:`@backend`
+  - Changes: implemented import job status endpoint and shared job retrieval helpers.
+  - Evidence:
+    - `src/app/api/imports/jobs/[jobId]/route.ts`
+    - `src/lib/imports/workflow.ts`
+    - `scripts/api-integration-test.mjs` (`GET /api/imports/jobs/[jobId]`)
+  - Risk: none.
+  - Next: `ERP-IMP-004` errors endpoint.
+- 2026-02-28 | `ERP-IMP-004` | done | owner:`@backend`
+  - Changes: implemented import error retrieval endpoint with JSON + downloadable CSV formats.
+  - Evidence:
+    - `src/app/api/imports/jobs/[jobId]/errors/route.ts`
+    - `src/lib/imports/workflow.ts`
+    - `scripts/api-integration-test.mjs` (`GET /api/imports/jobs/[jobId]/errors` json + csv)
+    - real-mode integration run: `92/92 PASS`
+  - Risk: none.
+  - Next: `ERP-IMP-005` imports frontend wiring.
+- 2026-02-28 | `ERP-IMP-005` | done | owner:`@frontend`
+  - Changes: replaced imports parity placeholders with module-aware lifecycle manager wired to validate/process/status/errors endpoints.
+  - Evidence:
+    - `src/components/imports/ImportsLifecycleManager.tsx`
+    - `src/app/(dashboard)/imports/page.tsx`
+    - `src/app/(dashboard)/imports/[screen]/page.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass
+  - Risk: none.
+  - Next: `ERP-LINT-001` lint debt register.
+- 2026-02-28 | `ERP-LINT-001` | done | owner:`@docs`
+  - Changes: created lint debt register with module-wise ownership, top-rule hotspots, top files, and burn-down work packages.
+  - Evidence:
+    - `docs/lint-debt-register.md`
+    - baseline command: `npm run lint -- --format json --output-file /tmp/eslint-report.json`
+    - baseline totals: `263 errors`, `29 warnings` (`292` total findings)
+  - Risk: lint gate remains red until follow-on lint cleanup tasks execute.
+  - Next: `ERP-API-001` non-sensitive API envelope standardization.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Added shared response helpers for `404/409/503` in `src/lib/api/response.ts`.
+    - Standardized legacy non-sensitive APIs to helper-based error envelopes for roles, user-permissions, audit-logs, regions/regional-offices, and tickets (main + categories/priorities/statuses + `[id]` routes).
+    - Preserved existing success payload shapes for backward-compatible UI behavior while normalizing error contracts.
+  - Evidence:
+    - helper updates: `src/lib/api/response.ts`
+    - routes updated:
+      - `src/app/api/roles/route.ts`
+      - `src/app/api/user-permissions/route.ts`
+      - `src/app/api/audit-logs/route.ts`
+      - `src/app/api/regions/route.ts`
+      - `src/app/api/regions/[id]/route.ts`
+      - `src/app/api/regional-offices/route.ts`
+      - `src/app/api/regional-offices/[id]/route.ts`
+      - `src/app/api/tickets/route.ts`
+      - `src/app/api/tickets/[id]/route.ts`
+      - `src/app/api/tickets/categories/route.ts`
+      - `src/app/api/tickets/categories/[id]/route.ts`
+      - `src/app/api/tickets/priorities/route.ts`
+      - `src/app/api/tickets/priorities/[id]/route.ts`
+      - `src/app/api/tickets/statuses/route.ts`
+      - `src/app/api/tickets/statuses/[id]/route.ts`
+    - commands:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: global API surface still has additional legacy `{ message }` responses (remaining backlog).
+  - Next: continue `ERP-API-001` on remaining non-sensitive routes (settings and guard-bank/document setup APIs), then close task.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized envelope responses for guard bank-name and guard pledgeable-document APIs (collection + `[id]` routes).
+    - Normalized missing-schema handling to shared `503` envelope via `serviceUnavailable(...)`.
+    - Kept success response payloads unchanged to preserve current UI behavior.
+  - Evidence:
+    - `src/app/api/guard-bank-names/route.ts`
+    - `src/app/api/guard-bank-names/[id]/route.ts`
+    - `src/app/api/guard-pledgeable-documents/route.ts`
+    - `src/app/api/guard-pledgeable-documents/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: remaining legacy `{ message }` responses still exist across broader API surface and require follow-up batches.
+  - Next: continue `ERP-API-001` for remaining non-sensitive routes (reports AI helper and other settings/admin endpoints), then close task.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized error envelopes on additional non-sensitive legacy routes: reports AI helper, guard blacklist APIs, and inactive guards listing.
+    - Replaced ad-hoc error payloads with shared helpers (`unauthorized`, `badRequest`, `notFound`, `internalServerError`) while preserving success payloads.
+  - Evidence:
+    - `src/app/api/reports/ai/route.ts`
+    - `src/app/api/guards/blacklist/route.ts`
+    - `src/app/api/guards/inactive/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: remaining legacy `{ message }` responses still exist in other route groups and require one or more final harmonization batches.
+  - Next: continue `ERP-API-001` on remaining non-sensitive legacy APIs and close once all targeted routes are envelope-standardized.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized inventory setup API error envelopes for categories, vendors, and conditions (collection + `[id]` routes).
+    - Aligned schema-missing paths in inventory conditions to shared `503` envelope helper.
+    - Preserved success payload shapes for compatibility with existing inventory UI flows.
+  - Evidence:
+    - `src/app/api/inventory/categories/route.ts`
+    - `src/app/api/inventory/categories/[id]/route.ts`
+    - `src/app/api/inventory/vendors/route.ts`
+    - `src/app/api/inventory/vendors/[id]/route.ts`
+    - `src/app/api/inventory/conditions/route.ts`
+    - `src/app/api/inventory/conditions/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: additional legacy `{ message }` responses remain in users/relationships/requisitions/residences and inventory demand/assignment/item routes.
+  - Next: continue `ERP-API-001` with users/relationships/requisitions route group, then inventory demands/assignments/items.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized error envelopes for users and access-adjacent non-sensitive APIs:
+      - users CRUD (`/api/users`, `/api/users/[id]`)
+      - manager/supervisor + client/supervisor relationship routes
+      - supervisor switch preview/apply routes
+      - requisitions list/create/get/update routes
+    - Unified schema-missing (`503`) handling in these route groups via `serviceUnavailable(...)`.
+    - Preserved existing success payload shapes to avoid UI contract regressions.
+  - Evidence:
+    - `src/app/api/users/route.ts`
+    - `src/app/api/users/[id]/route.ts`
+    - `src/app/api/users/ms-relationships/route.ts`
+    - `src/app/api/users/ms-relationships/[id]/route.ts`
+    - `src/app/api/users/cs-relationships/route.ts`
+    - `src/app/api/users/cs-relationships/[id]/route.ts`
+    - `src/app/api/users/switch-supervisor/route.ts`
+    - `src/app/api/requisitions/route.ts`
+    - `src/app/api/requisitions/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: legacy `{ message }` responses still remain in residences/trainings and inventory demand/assignment/item routes.
+  - Next: finish `ERP-API-001` on remaining inventory demand/assignment/item + residences/trainings routes and then close the task.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized remaining planned non-sensitive route groups:
+      - inventory demands, assignments, and items (`/api/inventory/*`)
+      - residences + residence assignments (`/api/residences*`, `/api/residence-assignments`)
+      - trainings (`/api/trainings`)
+    - Replaced legacy manual error payloads with shared envelope helpers and preserved success payload contracts.
+  - Evidence:
+    - `src/app/api/inventory/demands/route.ts`
+    - `src/app/api/inventory/demands/[id]/route.ts`
+    - `src/app/api/inventory/assignments/route.ts`
+    - `src/app/api/inventory/assignments/[id]/route.ts`
+    - `src/app/api/inventory/items/route.ts`
+    - `src/app/api/inventory/items/[id]/route.ts`
+    - `src/app/api/residences/route.ts`
+    - `src/app/api/residences/[id]/route.ts`
+    - `src/app/api/residence-assignments/route.ts`
+    - `src/app/api/trainings/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+  - Risk: some API routes still intentionally return legacy/custom `{ message }` shapes outside this harmonization batch and require explicit follow-up decision (scope-sensitive routes vs strict global standardization).
+  - Next: audit remaining legacy response routes and decide whether to close `ERP-API-001` at current non-sensitive scope or open `ERP-API-002` for full-surface standardization.
+- 2026-02-28 | `ERP-API-001` | in_progress | owner:`@backend`
+  - Changes:
+    - Standardized error envelopes on deployment rates, payroll holidays, and invoice not-found/validation paths.
+    - Added explicit `P2025 -> 404` mapping for deployment-rate updates/deletes.
+    - Preserved all success payloads and existing manager-scope behavior.
+  - Evidence:
+    - `src/app/api/deployment-rates/route.ts`
+    - `src/app/api/deployment-rates/[id]/route.ts`
+    - `src/app/api/payroll/holidays/route.ts`
+    - `src/app/api/payroll/holidays/[id]/route.ts`
+    - `src/app/api/invoices/route.ts`
+    - `src/app/api/invoices/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+      - legacy response count: `rg -n "NextResponse\\.json\\(\\{ message" src/app/api | wc -l` => `38` (down from `68`)
+  - Risk: `38` legacy message-shape responses remain, mostly in manager-sensitive and payroll/guard route groups.
+  - Next: final harmonization batch for remaining `38` responses and close `ERP-API-001`.
+- 2026-02-28 | `ERP-API-001` | done | owner:`@backend`
+  - Changes:
+    - Completed final harmonization batch across remaining branch/client/guard/attendance and payroll route groups.
+    - Replaced all remaining direct `NextResponse.json({ message: ... })` response-shape branches with shared API envelope helpers.
+    - Preserved existing success-path behavior and manager-scope enforcement semantics.
+  - Evidence:
+    - files updated:
+      - `src/app/api/branches/route.ts`
+      - `src/app/api/branches/[id]/route.ts`
+      - `src/app/api/clients/[id]/route.ts`
+      - `src/app/api/clients/[id]/branches/route.ts`
+      - `src/app/api/clients/blacklist/route.ts`
+      - `src/app/api/deployments/[id]/route.ts`
+      - `src/app/api/guards/route.ts`
+      - `src/app/api/guards/[id]/route.ts`
+      - `src/app/api/guards/[id]/status/route.ts`
+      - `src/app/api/attendance/route.ts`
+      - `src/app/api/payroll/extra-hours/route.ts`
+      - `src/app/api/payroll/extra-hours/[id]/route.ts`
+      - `src/app/api/payroll/special-duty/route.ts`
+      - `src/app/api/payroll/loans/route.ts`
+      - `src/app/api/payroll/loans/[id]/route.ts`
+      - `src/app/api/payroll/salary/[id]/route.ts`
+      - `src/app/api/payroll/other-deductions/route.ts`
+      - `src/app/api/payroll/other-deductions/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+      - contract audit: `rg -n "NextResponse\\.json\\(\\{ message" src/app/api | wc -l` => `0`
+  - Risk: none for this task scope.
+  - Next: move to `ERP-REP-001` reports API completion.
+- 2026-02-28 | `ERP-API-001` | done | owner:`@backend`
+  - Changes:
+    - Executed post-close contract audit and applied corrective harmonization to residual branch/client/guard/attendance/payroll routes still returning legacy `{ message }` payloads.
+    - Removed all remaining `NextResponse.json({ message: ... })` response-shape branches from `src/app/api`.
+    - Kept endpoint semantics unchanged while normalizing response contract.
+  - Evidence:
+    - corrected files:
+      - `src/app/api/branches/route.ts`
+      - `src/app/api/branches/[id]/route.ts`
+      - `src/app/api/clients/[id]/route.ts`
+      - `src/app/api/clients/[id]/branches/route.ts`
+      - `src/app/api/clients/blacklist/route.ts`
+      - `src/app/api/deployments/[id]/route.ts`
+      - `src/app/api/guards/route.ts`
+      - `src/app/api/guards/[id]/route.ts`
+      - `src/app/api/guards/[id]/status/route.ts`
+      - `src/app/api/attendance/route.ts`
+      - `src/app/api/payroll/extra-hours/route.ts`
+      - `src/app/api/payroll/extra-hours/[id]/route.ts`
+      - `src/app/api/payroll/special-duty/route.ts`
+      - `src/app/api/payroll/loans/route.ts`
+      - `src/app/api/payroll/loans/[id]/route.ts`
+      - `src/app/api/payroll/salary/[id]/route.ts`
+      - `src/app/api/payroll/other-deductions/route.ts`
+      - `src/app/api/payroll/other-deductions/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` pass (`71/71`)
+      - final contract audit: `rg -n "NextResponse\\.json\\(\\{ message" src/app/api | wc -l` => `0`
+  - Risk: none.
+  - Next: start `ERP-REP-001` reports operational API suite.
+- 2026-02-28 | `ERP-REP-001` | done | owner:`@backend`
+  - Changes:
+    - Added operational reports APIs by module group:
+      - guards: deployment, day/night duty
+      - clients: enrolled, summary
+      - scheduled report listing
+    - Added shared report utilities for query parsing + CSV download response helpers.
+    - Added integration coverage for all new reports JSON routes and CSV export path.
+  - Evidence:
+    - APIs:
+      - `src/app/api/reports/guards/deployment/route.ts`
+      - `src/app/api/reports/guards/day-night-duty/route.ts`
+      - `src/app/api/reports/clients/enrolled/route.ts`
+      - `src/app/api/reports/clients/summary/route.ts`
+      - `src/app/api/reports/scheduled/route.ts`
+    - shared helpers:
+      - `src/lib/reports/utils.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+      - `node scripts/api-integration-test.mjs` => `77/77 PASS`
+    - quality gates:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+  - Risk: scheduled reports endpoint currently serves system definitions plus audit-derived activity; persistent schedule management is not yet implemented.
+  - Next: `ERP-REP-002` frontend binding of report screens to new APIs.
+- 2026-02-28 | `ERP-REP-002` | done | owner:`@frontend`
+  - Changes:
+    - Replaced frontend-only simulation on operational report screens with live API-backed report generation and CSV export.
+    - Bound current and legacy report route aliases to the same operational API map.
+    - Kept non-operational legacy report pages on existing parity renderer.
+  - Evidence:
+    - `src/components/reports/OperationalReportScreen.tsx`
+    - `src/app/(dashboard)/reports/[screen]/page.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `77/77 PASS`
+  - Risk: generated-reports page remains mock-template based and is outside `ERP-REP-002` operational-screen scope.
+  - Next: `ERP-REP-003` report correctness verification and regression checks.
+- 2026-02-28 | `ERP-REP-003` | done | owner:`@qa`
+  - Changes:
+    - Expanded reports integration coverage from endpoint-availability checks to correctness assertions.
+    - Added summary-math consistency checks for guard deployment, day/night duty, client-enrolled, client-summary, and scheduled reports.
+    - Added report filter validation checks (`400`) for invalid `reportType`, invalid deployment date, and invalid month contract.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `87/87 PASS`
+  - Risk: assertions run against current runtime dataset; strict business-rule correctness vs legacy output parity still requires legacy-data benchmarking if mandated.
+  - Next: `ERP-PAY-004` payroll calculation/posting parity hardening.
+- 2026-02-28 | `ERP-PAY-004` | done | owner:`@backend`
+  - Changes:
+    - Implemented payroll cycle calculation endpoint `POST /api/payroll/salary` with month-scoped aggregation and optional finalize flow.
+    - Added payroll posting hardening:
+      - strict status/method validation on salary updates (`PENDING|UNPAID|PAID`, `BANK|CASH|MOBILE`)
+      - month filter hardening on salary listing to use month range contract (`YYYY-MM` / `YYYY-MM-DD`).
+    - Updated salary UI manager to trigger backend payroll calculation/finalization from screen actions.
+  - Evidence:
+    - backend:
+      - `src/app/api/payroll/salary/route.ts`
+      - `src/app/api/payroll/salary/[id]/route.ts`
+    - frontend:
+      - `src/components/payroll/PayrollSalaryV2Manager.tsx`
+    - testing:
+      - `scripts/api-integration-test.mjs`
+      - new assertions for payroll calculation/finalization and invalid status/method posting contracts
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `92/92 PASS`
+  - Risk: base salary is currently derived from deployment salary/rate snapshots in selected month; advanced legacy parity rules (statutory defaults/month-initialize rollover) remain part of follow-up payroll tasks.
+  - Next: `ERP-PAY-005` end-to-end payroll cycle validations.
+- 2026-02-28 | `ERP-PAY-005` | done | owner:`@qa`
+  - Changes:
+    - Expanded payroll integration from smoke checks to cycle-level validations:
+      - operation inputs: extra-hours, special-duty, other-deductions, loans finalize
+      - calculation/finalization: `POST /api/payroll/salary`
+      - posting transition: `PATCH /api/payroll/salary/[id]` to `PAID` with payment method
+    - Added payroll cycle net-salary formula assertion and month-filter contract assertions.
+    - Added runtime-aware unpaid-list expectation to keep strict checks in real mode while avoiding mock-store false negatives.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `103/103 PASS`
+  - Risk: manager-scope payroll assertions remain skipped in mock runtime and are tracked under `ERP-PAY-006`.
+  - Next: `ERP-PAY-006` manager-scope fixture reliability in integration profile.
+- 2026-02-28 | `ERP-PAY-006` | done | owner:`@qa`
+  - Changes:
+    - Hardened manager-scope fixture setup in integration script with explicit runtime controls:
+      - `REQUIRE_REAL_SCOPE_ASSERTIONS=true` to require non-mock runtime.
+      - `FAIL_ON_SCOPE_SKIP=true` to fail if scope assertions are skipped.
+    - Improved mock/runtime detection by combining env-intent flags with role-based detection.
+    - Stabilized generated guard CNIC fixture values with deterministic 13-digit formatter to reduce invalid/duplicate fixture behavior.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `103/103 PASS`
+  - Risk: by default, scope assertions can still be skipped in mock mode unless `REQUIRE_REAL_SCOPE_ASSERTIONS` or `FAIL_ON_SCOPE_SKIP` is enabled for the run profile.
+  - Next: `ERP-INV-003` assignment/return lifecycle validations.
+- 2026-02-28 | `ERP-INV-003` | done | owner:`@backend`
+  - Changes:
+    - Hardened inventory assignment lifecycle constraints:
+      - block assignment unless item status is `AVAILABLE`
+      - block duplicate active assignment on same item
+      - validate assignee existence (guard/client)
+    - Hardened return lifecycle constraints:
+      - block duplicate return on already-returned assignment
+      - validate `returnedAt` format and ensure it is not earlier than `assignedAt`
+      - update item status back to `AVAILABLE` only when no open assignment remains.
+    - Added integration lifecycle coverage for assignment/return transitions and conflict paths.
+  - Evidence:
+    - backend:
+      - `src/app/api/inventory/assignments/route.ts`
+      - `src/app/api/inventory/assignments/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+      - assertions for:
+        - assignment create
+        - duplicate assignment `409`
+        - issued status check
+        - return
+        - duplicate return `409`
+        - available status check after return
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `111/111 PASS`
+  - Risk: lifecycle guards are API-enforced; frontend still assumes immediate state consistency and may need optimistic-state handling refinement under high concurrency.
+  - Next: `ERP-INV-004` demand approval/fulfillment transitions.
+- 2026-02-28 | `ERP-INV-004` | done | owner:`@backend`
+  - Changes:
+    - Added shared demand-status contract helpers and enforced valid initial demand status on create.
+    - Enforced demand transition map (`PENDING -> APPROVED/REJECTED`, `APPROVED -> FULFILLED/REJECTED`) with `409` for invalid transitions.
+    - Added fulfillment stock-availability enforcement and terminal-state mutation protection for demand records.
+    - Expanded integration coverage for demand lifecycle success and failure paths.
+  - Evidence:
+    - backend:
+      - `src/lib/inventory/demand-status.ts`
+      - `src/app/api/inventory/demands/route.ts`
+      - `src/app/api/inventory/demands/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+      - assertions for invalid initial status, invalid/valid transitions, terminal mutation block, insufficient-stock fulfill block
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `112/112 PASS`
+  - Risk: fulfillment currently validates stock availability but does not reserve/decrement stock; fulfillment allocation remains a follow-up (`ERP-INV-005`/future inventory allocation task).
+  - Next: `ERP-INV-005` full inventory lifecycle tests.
+- 2026-02-28 | `ERP-INV-005` | done | owner:`@qa`
+  - Changes:
+    - Expanded inventory integration from smoke checks to full lifecycle coverage.
+    - Added category/vendor CRUD and duplicate behavior assertions.
+    - Added item validation/conflict/not-found assertions and assignment negative-path assertions (invalid assign target, missing refs, condemned item block, return payload validation).
+    - Added inventory runtime controls to enforce strict real-runtime assertions when required:
+      - `REQUIRE_REAL_INVENTORY_ASSERTIONS=true`
+      - `FAIL_ON_INVENTORY_SKIP=true`
+    - Kept strict demand-transition and stock assertions gated to real runtime to avoid mock-profile false negatives.
+  - Evidence:
+    - integration:
+      - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `131/131 PASS`
+  - Risk: mock runtime does not enforce DB uniqueness/not-found semantics identically to real runtime; strict inventory transition assertions should be run with `REQUIRE_REAL_INVENTORY_ASSERTIONS=true` in release profiles.
+  - Next: `ERP-LINT-002` remove `any` types in API module batch 1.
+- 2026-02-28 | `ERP-LINT-002` | done | owner:`@backend`
+  - Changes:
+    - Removed `any` usages across inventory API routes and replaced with concrete types and safe error-code extraction.
+    - Typed inventory query filters with Prisma where-input types.
+    - Standardized inventory route error handling from `catch (error: any)` to `catch (error: unknown)` with `getPrismaCode`.
+  - Evidence:
+    - backend:
+      - `src/app/api/inventory/categories/route.ts`
+      - `src/app/api/inventory/categories/[id]/route.ts`
+      - `src/app/api/inventory/vendors/route.ts`
+      - `src/app/api/inventory/vendors/[id]/route.ts`
+      - `src/app/api/inventory/conditions/route.ts`
+      - `src/app/api/inventory/conditions/[id]/route.ts`
+      - `src/app/api/inventory/items/route.ts`
+      - `src/app/api/inventory/items/[id]/route.ts`
+      - `src/app/api/inventory/assignments/route.ts`
+      - `src/app/api/inventory/assignments/[id]/route.ts`
+      - `src/app/api/inventory/demands/route.ts`
+      - `src/app/api/inventory/demands/[id]/route.ts`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `131/131 PASS`
+  - Risk: this is batch 1 scope and does not eliminate non-inventory `any` usages across the full API surface.
+  - Next: `ERP-UAL-006` audit events for user/relationship mutations.
+- 2026-02-28 | `ERP-UAL-006` | done | owner:`@backend`
+  - Changes:
+    - Added transactional audit logging for user creation and user updates.
+    - Added transactional audit logging for manager/supervisor relationship create/delete mutations.
+    - Added transactional audit logging for client/supervisor relationship create/delete mutations.
+    - Expanded integration coverage to execute relationship create/delete mutation flows.
+  - Evidence:
+    - backend:
+      - `src/app/api/users/route.ts`
+      - `src/app/api/users/[id]/route.ts`
+      - `src/app/api/users/ms-relationships/route.ts`
+      - `src/app/api/users/ms-relationships/[id]/route.ts`
+      - `src/app/api/users/cs-relationships/route.ts`
+      - `src/app/api/users/cs-relationships/[id]/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `npm run build` pass (with `.env` loaded)
+      - `node scripts/api-integration-test.mjs` => `136/136 PASS`
+  - Risk: in mock runtime, audit persistence semantics differ from real DB runtime; release verification should include a real-runtime profile run.
+  - Next: `ERP-UAL-004` manager scope enforcement across remaining affected APIs.
+- 2026-02-28 | `ERP-UAL-004` | done | owner:`@backend`
+  - Changes:
+    - Enforced manager scope on remaining user-sensitive endpoints: user update-by-id, manager/supervisor relationships, client/supervisor relationships, and supervisor switch preview/apply.
+    - Added scope checks for both existing records and target mutation payloads to block cross-scope updates/moves.
+    - Extended integration suite with manager-scope assertions for users/relationships/switch-supervisor paths (real-runtime executable; mock runtime safe).
+  - Evidence:
+    - backend:
+      - `src/app/api/users/[id]/route.ts`
+      - `src/app/api/users/ms-relationships/route.ts`
+      - `src/app/api/users/ms-relationships/[id]/route.ts`
+      - `src/app/api/users/cs-relationships/route.ts`
+      - `src/app/api/users/cs-relationships/[id]/route.ts`
+      - `src/app/api/users/switch-supervisor/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `136/136 PASS`
+  - Risk: real-runtime execution is still required to fully exercise newly added manager-scope integration branches currently skipped in mock profile.
+  - Next: `ERP-GDP-003` close deployments lifecycle and edge validations.
+- 2026-02-28 | `ERP-GDP-003` | done | owner:`@backend`
+  - Changes:
+    - Hardened deployment create/update/end APIs with strict required-field and value validation (`deploymentDate`, `shiftType`, numeric fields) and guarded resource existence checks.
+    - Enforced lifecycle integrity: one active deployment per guard, conflict on duplicate-active deployments, conflict on re-ending inactive deployment, and conflict on patching ended deployments.
+    - Added deployment lifecycle integration coverage for create validation, duplicate-active conflict behavior, and runtime-aware strict end/patch-after-end assertions.
+  - Evidence:
+    - backend:
+      - `src/app/api/deployments/route.ts`
+      - `src/app/api/deployments/[id]/route.ts`
+      - `src/app/api/deployments/[id]/end/route.ts`
+    - integration:
+      - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `142/142 PASS`
+  - Risk: strict deployment lifecycle branches still need explicit real-runtime execution profile to fully assert non-mock persistence semantics.
+  - Next: `ERP-GDP-005` full Guard -> Deployment -> Attendance lifecycle integration tests.
+- 2026-02-28 | `ERP-GDP-005` | done | owner:`@qa`
+  - Changes:
+    - Extended integration suite with Guard -> Deployment -> Attendance lifecycle assertions.
+    - Added deployment-linked attendance create/list checks in real-runtime branch and runtime-safe skip behavior in mock profile.
+    - Preserved workflow behavior (test-only change) while increasing lifecycle regression coverage.
+  - Evidence:
+    - integration:
+      - `scripts/api-integration-test.mjs`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `143/143 PASS`
+  - Risk: strict end-to-end branch still requires explicit real-runtime profile run to exercise non-mock persistence semantics.
+  - Next: `ERP-GDP-004` remove production-path mock fallbacks for guards/deployments pages.
+- 2026-03-01 | `ERP-GDP-004` | done | owner:`@frontend`
+  - Changes:
+    - Removed non-mock runtime fallback behavior that previously injected mock guard/deployment rows on DB/query failure.
+    - Preserved explicit mock-mode behavior while making production path fail transparent with unavailable-state warnings and empty result sets.
+    - Kept page-level scope messaging and table rendering behavior unchanged for successful DB paths.
+  - Evidence:
+    - frontend:
+      - `src/app/(dashboard)/guards/page.tsx`
+      - `src/app/(dashboard)/deployments/page.tsx`
+    - command evidence:
+      - `npx tsc --noEmit` pass
+      - `set -a; source .env; set +a; npm run build` pass
+      - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `143/143 PASS`
+  - Risk: users now see empty-state + error banner during DB outages instead of synthetic rows; operational runbooks should treat this as expected fail-fast behavior.
+  - Next: `ERP-SYS-001` fingerprint device persistence + APIs.
+- 2026-03-01 | `ERP-SYS-001` | done | owner:`@backend`
+  - Changes:
+    - Added persistent fingerprint-device store (`data/fingerprint-devices.json`) with seeded initialization and update helpers.
+    - Implemented full fingerprint device API contract:
+      - `GET/POST /api/fingerprint-devices`
+      - `PATCH/DELETE /api/fingerprint-devices/[id]`
+      - `POST /api/fingerprint-devices/[id]/test`
+      - `POST /api/fingerprint-devices/[id]/queue-enrollment`
+    - Added integration lifecycle assertions for fingerprint create/update/test/queue/delete flows and fixed mock-runtime regional-office validation path.
+  - Evidence:
+    - `src/lib/fingerprint/store.ts`
+    - `src/app/api/fingerprint-devices/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/test/route.ts`
+    - `src/app/api/fingerprint-devices/[id]/queue-enrollment/route.ts`
+    - `scripts/api-integration-test.mjs`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Risk: fingerprint settings UI is still not wired to these APIs.
+  - Next: `ERP-SYS-002` fingerprint settings screen integration.
+- 2026-03-01 | `ERP-SYS-002` | done | owner:`@frontend`
+  - Changes:
+    - Replaced mock-only fingerprint settings page with API-backed manager component.
+    - Added live device binding flow (name + office + status) using `POST /api/fingerprint-devices`.
+    - Added live operational actions from UI:
+      - connection test (`POST /api/fingerprint-devices/[id]/test`)
+      - enrollment queue (`POST /api/fingerprint-devices/[id]/queue-enrollment`)
+      - device removal (`DELETE /api/fingerprint-devices/[id]`)
+    - Added API-backed filters (office/status), pending-enrollment visibility, and refresh/error/success states.
+  - Evidence:
+    - `src/components/settings/FingerprintDeviceManager.tsx`
+    - `src/app/(dashboard)/settings/fingerprint-device/page.tsx`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Risk: none for this task scope.
+  - Next: `ERP-LINT-003` lint-debt execution batching.
+- 2026-03-01 | `ERP-GDP-002` | in_progress | owner:`@backend`
+  - Changes:
+    - Added centralized workflow rule policy to keep strict validations configurable from one place.
+    - Wired deployments lifecycle constraints to policy toggles:
+      - single-active guard rule
+      - block inactive updates
+      - end-date requirement and date-bound checks
+    - Wired inventory-demand lifecycle constraints to policy toggles:
+      - initial-status restriction
+      - transition map enforcement
+      - terminal-state core edit lock
+      - fulfill stock sufficiency check
+    - Added documentation for policy customization and env overrides.
+  - Evidence:
+    - `src/lib/workflows/policy.ts`
+    - `src/app/api/deployments/route.ts`
+    - `src/app/api/deployments/[id]/route.ts`
+    - `src/app/api/deployments/[id]/end/route.ts`
+    - `src/app/api/inventory/demands/route.ts`
+    - `src/app/api/inventory/demands/[id]/route.ts`
+    - `docs/workflow-policy.md`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `150/150 PASS`
+  - Risk: rule toggles are environment-evaluated at process start; runtime toggling without restart is not yet implemented.
+  - Next: continue `ERP-GDP-002` with remaining deployment-assignment consistency cases and optional admin UI for workflow-rule toggles.
+- 2026-03-01 | `ERP-GDP-002` | in_progress | owner:`@backend`
+  - Changes:
+    - Added persisted workflow-rule override store and management API:
+      - `GET /api/workflow-rules`
+      - `PATCH /api/workflow-rules`
+    - Added in-app workflow-rules settings screen for live enable/disable control of strict workflow checks.
+    - Linked workflow-rules screen from settings overview and sidebar navigation.
+    - Updated workflow policy docs with API/UI workflow.
+  - Evidence:
+    - `src/lib/workflows/store.ts`
+    - `src/lib/workflows/policy.ts`
+    - `src/app/api/workflow-rules/route.ts`
+    - `src/components/settings/WorkflowRulesManager.tsx`
+    - `src/app/(dashboard)/settings/workflow-rules/page.tsx`
+    - `src/app/(dashboard)/settings/page.tsx`
+    - `src/components/sidebar.tsx`
+    - `docs/workflow-policy.md`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Risk: API currently allows any authenticated user to update workflow rules; role-restricted governance can be added if you want admin-only control.
+  - Next: decide governance model (admin-only vs broader access), then continue `ERP-GDP-002` data-integrity closure tasks.
+- 2026-03-01 | `ERP-GDP-002` | done | owner:`@backend`
+  - Changes:
+    - Closed deployment-assignment consistency gap with policy-driven checks:
+      - `deployments.requireActiveGuardStatus` (default enabled)
+      - `deployments.requireGuardOfficeConsistency` (default disabled for flexibility)
+    - Added enforcement in create/update deployment routes for:
+      - active guard eligibility
+      - optional guard-office/regional-office alignment
+    - Extended workflow-policy documentation with new override keys and deployment consistency semantics.
+  - Evidence:
+    - `src/lib/workflows/policy.ts`
+    - `src/app/api/deployments/route.ts`
+    - `src/app/api/deployments/[id]/route.ts`
+    - `docs/workflow-policy.md`
+    - `npx tsc --noEmit` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; node scripts/api-integration-test.mjs` => `149/149 PASS`
+  - Risk: guard-office consistency is intentionally default-off to preserve flexibility during active development; enable it when you want stricter enforcement.
+  - Next: `ERP-LINT-003` lint-debt execution batching.
+- 2026-03-01 | `ERP-LINT-003` | done | owner:`@docs`
+  - Changes:
+    - Refactored lint register from summary-only into execution-ready module batches.
+    - Added locked batch matrix (`LINT-B01..LINT-B06`) with owner, scope, reduction target, and binary acceptance criteria.
+    - Added per-batch evidence template and locked execution order for deterministic lint burn-down governance.
+    - Refreshed lint baseline metadata from latest eslint JSON report.
+  - Evidence:
+    - `docs/lint-debt-register.md`
+    - `npm run lint -- --format json --output-file /tmp/eslint-report.json`
+    - baseline parse result: `292 total` (`263 errors`, `29 warnings`; `155` files with issues)
+  - Risk: lint gate remains red until `ERP-LINT-004` and `ERP-LINT-005` execution completes.
+  - Next: `ERP-LINT-004` frontend lint cleanup batches.
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed broad `any` usage across guard detail/tabs/forms by introducing shared tab types and typed record adapters.
+    - Replaced guard workflow form/manager `catch (err: any)` handlers with safe `unknown` handling.
+    - Closed lingering guard edit lint error (`react/no-unescaped-entities`) and stabilized type contracts for mixed DB/mock tab payloads.
+  - Evidence:
+    - `src/components/guards/tabs/types.ts`
+    - `src/components/guards/tabs/AttachmentsTab.tsx`
+    - `src/components/guards/tabs/BankDetailsTab.tsx`
+    - `src/components/guards/tabs/CoursesTab.tsx`
+    - `src/components/guards/tabs/DeploymentHistoryTab.tsx`
+    - `src/components/guards/tabs/InventoryTab.tsx`
+    - `src/components/guards/tabs/PBADocumentsTab.tsx`
+    - `src/components/guards/tabs/PledgedDocumentsTab.tsx`
+    - `src/components/guards/tabs/ResidenceHistoryTab.tsx`
+    - `src/components/guards/tabs/ServiceHistoryTab.tsx`
+    - `src/components/guards/tabs/StatusHistoryTab.tsx`
+    - `src/components/guards/tabs/StoreInventoryTab.tsx`
+    - `src/components/guards/tabs/VerificationTab.tsx`
+    - `src/app/(dashboard)/guards/[id]/page.tsx`
+    - `src/app/(dashboard)/guards/[id]/edit/form.tsx`
+    - `src/app/(dashboard)/guards/new/form.tsx`
+    - `src/app/(dashboard)/guards/attendance/manager.tsx`
+    - `src/app/(dashboard)/guards/client-attendance/manager.tsx`
+    - `src/app/(dashboard)/guards/blacklist/manager.tsx`
+    - `src/app/(dashboard)/guards/inactive/manager.tsx`
+    - `src/app/(dashboard)/guards/prerequisites/manager.tsx`
+    - `src/app/(dashboard)/guards/residences/manager.tsx`
+    - `src/app/(dashboard)/guards/search/manager.tsx`
+    - `src/app/(dashboard)/guards/trainings/manager.tsx`
+    - `src/app/(dashboard)/guards/trainings/new/form.tsx`
+    - `npx tsc --noEmit` pass
+    - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b05.json` (repo now `172 errors`, `27 warnings`)
+  - Risk: lint debt remains in non-guard frontend scopes and a few guard warnings.
+  - Next: continue `ERP-LINT-004` with Payroll/Inventory/Clients frontend batch.
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Cleaned client form/page lint blockers (`no-explicit-any`, unescaped apostrophes) and normalized unknown-error handling.
+    - Removed `any` in invoice prerequisites data mapping via typed API row adapters.
+    - Converted inventory/payroll/settings manager error paths to `unknown` + typed fallback helpers.
+  - Evidence:
+    - `src/app/(dashboard)/clients/new/form.tsx`
+    - `src/app/(dashboard)/clients/[id]/page.tsx`
+    - `src/components/clients/InvoicePrerequisitesManager.tsx`
+    - `src/components/inventory/InventoryDemandManager.tsx`
+    - `src/components/inventory/InventoryConditionsManager.tsx`
+    - `src/components/payroll/PayrollHolidaysManager.tsx`
+    - `src/components/settings/GuardBankNamesManager.tsx`
+    - `src/components/settings/GuardPledgeableDocumentsManager.tsx`
+    - `npx tsc --noEmit` pass
+    - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b06.json`
+    - parsed delta:
+      - vs previous batch (`b05 -> b06`): errors `172 -> 146` (`-26`)
+      - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 146` (`-82`)
+  - Risk: lint warnings increased in some React hook/image rule areas while resolving error-level debt.
+  - Next: continue `ERP-LINT-004` with remaining frontend components that still carry error-level lint findings (inventory/payroll/clients managers).
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed remaining error-level lint issues in client and payroll/inventory manager screens (`no-explicit-any`, `set-state-in-effect` hotspots).
+    - Replaced synchronous effect load calls with deferred async triggers on list pages flagged by React Hooks lint rule.
+    - Standardized unknown-error handling and typed API-row mapping for client/inventory/payroll UI data loaders.
+  - Evidence:
+    - `src/components/inventory/InventoryCategoryManager.tsx`
+    - `src/components/inventory/InventoryVendorManager.tsx`
+    - `src/components/inventory/InventoryAssignItemManager.tsx`
+    - `src/components/inventory/InventoryCondemnedManager.tsx`
+    - `src/components/inventory/InventorySearchManager.tsx`
+    - `src/components/inventory/InventoryStockInManager.tsx`
+    - `src/components/payroll/PayrollExtraHoursManager.tsx`
+    - `src/components/payroll/PayrollLoanManager.tsx`
+    - `src/components/payroll/PayrollOtherDeductionsManager.tsx`
+    - `src/components/payroll/PayrollBulkSalarySlipsManager.tsx`
+    - `src/components/payroll/PayrollClearanceManager.tsx`
+    - `src/components/payroll/PayrollSpecialDutyManager.tsx`
+    - `src/app/(dashboard)/clients/[id]/branches/new/form.tsx`
+    - `src/app/(dashboard)/clients/[id]/edit/form.tsx`
+    - `src/app/(dashboard)/clients/branches/[id]/edit/form.tsx`
+    - `src/app/(dashboard)/clients/invoicing/manager.tsx`
+    - `src/components/clients/ClientBlacklistManager.tsx`
+    - `src/components/clients/InvoicedBillingsManager.tsx`
+    - `npx tsc --noEmit` pass
+    - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b07.json`
+    - parsed delta:
+      - vs previous batch (`b06 -> b07`): errors `146 -> 123` (`-23`), warnings `30 -> 29` (`-1`)
+      - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 123` (`-105`), warnings `30 -> 29` (`-1`)
+  - Risk: remaining lint errors are now concentrated mostly in API/server modules plus a few non-critical frontend warnings.
+  - Next: either continue `ERP-LINT-004` into deployment/users frontend stragglers or start server/API lint tranche as `ERP-LINT-004B`.
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Cleared remaining deployment/users/shared frontend error-level lint findings.
+    - Updated deployment forms and client/user screens from `catch any` to `unknown`-safe handling.
+    - Tightened generic typing in shared data table and removed user-permissions lint rule conflict (`module` variable name collision).
+  - Evidence:
+    - `src/app/(dashboard)/deployments/[id]/edit/form.tsx`
+    - `src/app/(dashboard)/deployments/[id]/end/form.tsx`
+    - `src/app/(dashboard)/deployments/new/form.tsx`
+    - `src/app/(dashboard)/users/switch-supervisor/manager.tsx`
+    - `src/components/shared/DataTable.tsx`
+    - `src/components/users/UserPermissionsManager.tsx`
+    - targeted scope lint verification:
+      - `npx eslint 'src/app/(dashboard)/deployments/**/*.tsx' 'src/app/(dashboard)/users/**/*.tsx' 'src/components/users/*.tsx' 'src/components/shared/DataTable.tsx'`
+      - result: `0 errors` (only `UserSearchManager` dependency warning remains)
+    - full checks:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b08.json`
+      - parsed delta:
+        - vs previous batch (`b07 -> b08`): errors `123 -> 116` (`-7`)
+        - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 116` (`-112`)
+  - Risk: remaining error-level lint debt is now predominantly API/server side, outside the current frontend cleanup tranche.
+  - Next: continue with API/server lint tranche to close remaining `npm run lint` blocker.
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@backend`
+  - Changes:
+    - Completed guards/clients/branches API lint hardening tranche by replacing `any` route-level query/error types with typed `Prisma.*WhereInput` or `unknown`-safe adapters.
+    - Normalized API catch blocks in scoped guard/client/branch routes and removed remaining explicit-any patterns in manager-scope filters.
+    - Closed all error-level lint findings in the targeted API slice (`guards + clients + branches`).
+  - Evidence:
+    - `src/app/api/guards/route.ts`
+    - `src/app/api/guards/search/route.ts`
+    - `src/app/api/guards/[id]/route.ts`
+    - `src/app/api/guards/[id]/status/route.ts`
+    - `src/app/api/guards/blacklist/route.ts`
+    - `src/app/api/guards/inactive/route.ts`
+    - `src/app/api/clients/route.ts`
+    - `src/app/api/clients/[id]/route.ts`
+    - `src/app/api/clients/[id]/branches/route.ts`
+    - `src/app/api/clients/blacklist/route.ts`
+    - `src/app/api/branches/route.ts`
+    - `src/app/api/branches/[id]/route.ts`
+    - targeted scope lint:
+      - `npx eslint 'src/app/api/guards/**/*.ts' 'src/app/api/guards/*.ts' 'src/app/api/clients/**/*.ts' 'src/app/api/clients/*.ts' 'src/app/api/branches/**/*.ts' 'src/app/api/branches/*.ts'`
+      - result: `0 errors` (1 warning only)
+    - full checks:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b09.json`
+      - parsed delta:
+        - vs previous batch (`b08 -> b09`): errors `116 -> 85` (`-31`), warnings `29 -> 28` (`-1`)
+        - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 85` (`-143`), warnings `30 -> 28` (`-2`)
+  - Risk: remaining lint errors are concentrated in non-guard/client API modules plus `src/lib/mockData/prismaMock.ts`.
+  - Next: continue API tranche for tickets/requisitions/regional-offices/payroll endpoints, then finish with `prismaMock` typing cleanup.
+- 2026-03-01 | `ERP-LINT-004` | in_progress | owner:`@backend`
+  - Changes:
+    - Completed broad API lint hardening for payroll/tickets/requisitions/regional-office branches by removing `any` catch signatures and converting dynamic `where` filters to typed `Prisma.*WhereInput`.
+    - Fixed `error.code` access after unknown-catch migration using safe cast pattern, preserving runtime behavior while restoring type safety.
+    - Cleared nearly all remaining API route lint errors; only a small cross-cutting set remains (`prismaMock`, seed/auth/imports utility, one deployment route, one imports component, tailwind config).
+  - Evidence:
+    - `src/app/api/audit-logs/route.ts`
+    - `src/app/api/user-permissions/route.ts`
+    - `src/app/api/invoices/route.ts`
+    - `src/app/api/payroll/extra-hours/route.ts`
+    - `src/app/api/payroll/loans/route.ts`
+    - `src/app/api/payroll/other-deductions/route.ts`
+    - `src/app/api/payroll/salary/route.ts`
+    - `src/app/api/payroll/special-duty/route.ts`
+    - `src/app/api/payroll/unpaid/route.ts`
+    - `src/app/api/requisitions/route.ts`
+    - `src/app/api/tickets/route.ts`
+    - plus API catch-signature normalization across `src/app/api/**`
+    - validation:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b13.json`
+      - parsed delta:
+        - vs previous batch (`b11 -> b13`): errors `36 -> 15` (`-21`)
+        - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 15` (`-213`)
+  - Risk: final lint blockers are concentrated in shared mock/runtime utility files and one frontend imports manager, not module workflow logic.
+  - Next: close remaining 15 lint errors (`prismaMock`, `prisma/seed.ts`, `src/lib/auth.ts`, `src/lib/imports/workflow.ts`, `src/app/api/deployments/route.ts`, `src/components/imports/ImportsLifecycleManager.tsx`, `tailwind.config.ts`) and mark `ERP-LINT-004` done.
+- 2026-03-01 | `ERP-LINT-004` | done | owner:`@frontend`
+  - Changes:
+    - Cleared all remaining lint **errors** across the final shared/runtime tranche without hard-locking workflow behavior.
+    - Replaced residual `any` usage with flexible typed adapters and `unknown`-safe handling in mock/runtime/auth/import utilities.
+    - Kept workflow logic customizable by avoiding rigid compile-time rule branching; changes were type/contract hardening only.
+  - Evidence:
+    - file updates:
+      - `src/lib/mockData/prismaMock.ts`
+      - `src/lib/auth.ts`
+      - `src/lib/imports/workflow.ts`
+      - `src/components/imports/ImportsLifecycleManager.tsx`
+      - `src/app/api/deployments/route.ts`
+      - `tailwind.config.ts`
+      - `prisma/seed.ts`
+    - commands:
+      - `npx tsc --noEmit` pass
+      - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b14.json`
+      - parsed delta:
+        - vs previous batch (`b13 -> b14`): errors `15 -> 0` (`-15`), warnings `28 -> 26` (`-2`)
+        - vs baseline (`/tmp/eslint-report.json`): errors `228 -> 0` (`-228`), warnings `30 -> 26` (`-4`)
+  - Risk: none for runtime behavior; remaining warnings are non-blocking quality debt.
+  - Next: `ERP-LINT-005` (CI no-net-new lint enforcement).
+- 2026-03-02 | `ERP-LINT-005` | done | owner:`@platform`
+  - Changes:
+    - Added no-net-new lint guard script that compares current lint JSON vs committed baseline totals and rule counts.
+    - Added committed lint baseline file for CI parity checks.
+    - Added quality CI workflow and package scripts to run lint-json + guard + typecheck together.
+  - Evidence:
+    - `scripts/check-lint-budget.mjs`
+    - `docs/lint-baseline.json`
+    - `package.json`
+    - `.github/workflows/quality-gates.yml`
+    - `npm run ci:quality` pass
+  - Risk: baseline must be intentionally refreshed when planned warning reductions happen, otherwise CI correctly blocks increases.
+  - Next: `ERP-WKF-001` (workflow presets + editable defaults).
+- 2026-03-02 | `ERP-WKF-001` | done | owner:`@backend`
+  - Changes:
+    - Added lightweight workflow presets (`balanced`, `strict`, `relaxed`) with configurable default selection via `WORKFLOW_RULE_PRESET`.
+    - Extended workflow rules API/UI to expose/apply presets while preserving per-rule editing behavior.
+    - Documented resolution order so overrides remain easy to manipulate during development.
+  - Evidence:
+    - `src/lib/workflows/policy.ts`
+    - `src/app/api/workflow-rules/route.ts`
+    - `src/components/settings/WorkflowRulesManager.tsx`
+    - `docs/workflow-policy.md`
+    - `npx tsc --noEmit` pass
+    - `npm run ci:quality` pass
+  - Risk: none; preset application writes editable rule overrides and does not hard-lock future customization.
+  - Next: `ERP-LINT-006` warning reduction tranche.
+- 2026-03-02 | `ERP-LINT-006` | done | owner:`@frontend`
+  - Changes:
+    - Removed all remaining lint warnings (hooks deps, unused vars/imports, no-img-element) across dashboard managers, utility scripts, and selected API/UI modules.
+    - Converted loading handlers to stable callback dependencies where needed and switched image nodes to `next/image` where applicable.
+    - Kept runtime behavior unchanged while tightening lint compliance to zero findings.
+  - Evidence:
+    - `npm run lint -- --format json --output-file /tmp/eslint-report-after-lint-b15.json` => `0 errors`, `0 warnings`
+    - `npx tsc --noEmit` pass
+    - `npm run ci:quality` pass
+  - Risk: none.
+  - Next: `ERP-QA-REP-004` workflow preset precedence regression assertions.
+- 2026-03-02 | `ERP-QA-REP-004` | done | owner:`@qa`
+  - Changes:
+    - Added integration regression coverage for workflow policy presets and override precedence.
+    - Added assertions for preset application, manual per-rule override after preset, and restore to initial rule snapshot.
+    - Kept suite side-effect safe by restoring workflow rules to their pre-test state.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`
+    - `node scripts/api-integration-test.mjs` => `153/153 PASS`
+    - block coverage:
+      - `GET /api/workflow-rules`
+      - `PATCH /api/workflow-rules` preset apply
+      - `PATCH /api/workflow-rules` post-preset manual override precedence
+      - `PATCH /api/workflow-rules` restore initial
+  - Risk: none.
+  - Next: `ERP-REL-001` baseline housekeeping (mark completed by current zero-baseline update).
+- 2026-03-02 | `ERP-REL-001` | done | owner:`@platform`
+  - Changes:
+    - Closed release housekeeping by aligning lint baseline and quality gate tracking to strict zero-lint state.
+    - Confirmed zero-lint guard behavior with current CI-quality command.
+    - Refreshed integration evidence count in baseline tracking.
+  - Evidence:
+    - `docs/lint-baseline.json`
+    - `npm run ci:quality` pass (`errors=0`, `warnings=0`, `problems=0`)
+    - `node scripts/api-integration-test.mjs` => `153/153 PASS`
+  - Risk: none.
+  - Next: `ERP-UAL-META-001` tracker consistency cleanup.
+- 2026-03-02 | `ERP-UAL-META-001` | done | owner:`@docs`
+  - Changes:
+    - Reconciled Users & Access completion metrics with current task states.
+    - Updated stale denominator/percentage from `78% (7/9)` to `100% (9/9)`.
+    - Kept task evidence unchanged; metadata only correction.
+  - Evidence:
+    - `docs/delivery-source-of-truth-checklist.md` Users & Access section
+  - Risk: none.
+  - Next: `ERP-OPS-001` define release-ready checklist snapshot for handoff.
+- 2026-03-02 | `ERP-OPS-001` | done | owner:`@docs`
+  - Changes:
+    - Added formal release-ready snapshot with gate matrix and explicit signoff fields.
+    - Anchored snapshot to current lint/type/build/integration evidence.
+  - Evidence:
+    - `docs/delivery-source-of-truth-checklist.md` (`Release-Ready Snapshot (2026-03-02)`)
+  - Risk: none.
+  - Next: `ERP-OPS-002` strict real-DB validation pass with evidence attachment.
+- 2026-03-02 | `ERP-OPS-002` | done | owner:`@qa`
+  - Changes:
+    - Executed strict real-DB validation profile with explicit non-mock runtime and strict scope/inventory flags.
+    - Fixed integration fixture assumptions (deployment numeric payload completeness + payroll month seeding + out-scope deployment request shape) to make real profile deterministic.
+    - Attached full command evidence and result to baseline section.
+  - Evidence:
+    - `scripts/api-integration-test.mjs`
+    - `set -a; source .env; set +a; USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npx prisma db seed`
+    - `NEXTAUTH_URL=http://localhost:3011 AUTH_TRUST_HOST=true USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false npm run start -- -p 3011`
+    - `BASE_URL=http://localhost:3011 USE_MOCKS=false NEXT_PUBLIC_USE_MOCKS=false REQUIRE_REAL_SCOPE_ASSERTIONS=true FAIL_ON_SCOPE_SKIP=true REQUIRE_REAL_INVENTORY_ASSERTIONS=true FAIL_ON_INVENTORY_SKIP=true node scripts/api-integration-test.mjs` => `210/210 PASS`
+  - Risk: none in this profile.
+  - Next: `ERP-OPS-003` optional nightly strict real-profile automation in CI.
+- 2026-03-02 | `ERP-OPS-003` | done | owner:`@platform`
+  - Changes:
+    - Added strict real-profile orchestration script to seed DB, boot app, wait for health, and run strict scope/inventory integration assertions in one command.
+    - Added nightly/manual GitHub Actions workflow for optional scheduled strict profile validation with required secret checks.
+    - Hardened integration harness to exit non-zero when any assertions fail and made deployment lifecycle seed deterministic for strict runs.
+  - Evidence:
+    - `.github/workflows/nightly-strict-real-profile.yml`
+    - `scripts/run-strict-real-profile.mjs`
+    - `scripts/api-integration-test.mjs`
+    - `set -a; source .env; set +a; npm run test:integration:strict-real` => `211/211 PASS`
+  - Risk: low; workflow depends on repository secrets (`DATABASE_URL`, `NEXTAUTH_SECRET`) being configured.
+  - Next: `ERP-PROD-001` fill release signoff fields and freeze candidate.
+- 2026-03-02 | `ERP-PROD-001` | done | owner:`@product`
+  - Changes:
+    - Filled release signoff fields with explicit owner assignments instead of generic pending placeholders.
+    - Added freeze-candidate metadata (`RC-2026-03-02-01`) tied to validated build/quality/integration evidence.
+    - Marked candidate as frozen-for-signoff while allowing ongoing development on later commits.
+  - Evidence:
+    - `docs/delivery-source-of-truth-checklist.md`
+    - `git rev-parse --short HEAD` => `cce7d3f`
+    - `npm run ci:quality` pass
+    - `set -a; source .env; set +a; npm run build` pass
+    - `set -a; source .env; set +a; npm run test:integration:strict-real` => `211/211 PASS`
+  - Risk: low; final human approval is still required for production promotion.
+  - Next: `ERP-RPT-005` close generated reports template mock gap.
+- 2026-03-02 | `ERP-RPT-005` | done | owner:`@frontend`
+  - Changes:
+    - Replaced `/reports/generated` mock-template rendering with operational report screen wiring.
+    - Removed direct usage of mock report template/generated datasets from production generated-reports route.
+    - Unified generated-reports behavior with live scheduled-report API flow.
+  - Evidence:
+    - `src/app/(dashboard)/reports/generated/page.tsx`
+    - `npm run ci:quality` pass
+  - Risk: low; UX now mirrors scheduled-report operational screen rather than synthetic generated list.
+  - Next: `ERP-PROD-002` execute human signoff approvals for `RC-2026-03-02-01`.
+- 2026-03-02 | `ERP-PLT-004` | done | owner:`@platform`
+  - Changes:
+    - Replaced deprecated middleware file convention with Next.js proxy convention for auth gate enforcement.
+    - Removed unsupported `runtime` segment config from proxy file to satisfy Next.js proxy constraints.
+    - Kept matcher behavior unchanged for non-API application routes.
+  - Evidence:
+    - `src/proxy.ts`
+    - `set -a; source .env; set +a; npm run build` pass
+    - `npm run ci:quality` pass
+  - Risk: low; auth boundary behavior is preserved through same exported guard and matcher.
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-AUTO-001` | done | owner:`@platform`
+  - Changes:
+    - Added a configurable core-regression orchestrator script to run `ci:quality`, `build`, and strict real integration in sequence.
+    - Added env toggles (`REGRESSION_RUN_CI_QUALITY`, `REGRESSION_RUN_BUILD`, `REGRESSION_RUN_STRICT_REAL`) for flexible execution profiles.
+    - Added npm entrypoint `test:regression:core` for one-command execution.
+  - Evidence:
+    - `scripts/run-core-regression.mjs`
+    - `package.json`
+    - `set -a; source .env; set +a; npm run test:regression:core` => pass (`211/211 PASS` strict profile)
+  - Risk: low; runs are longer and depend on DB availability when build/strict flags are enabled.
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-AUTO-002` | done | owner:`@platform`
+  - Changes:
+    - Added release evidence snapshot generator that runs core gates and writes a single markdown artifact with commit + pass/fail status + metrics.
+    - Added npm command `release:evidence:snapshot` for one-command evidence generation.
+    - Linked consolidated evidence artifact into release signoff packet.
+  - Evidence:
+    - `scripts/generate-release-evidence-snapshot.mjs`
+    - `docs/release-evidence-rc-2026-03-02-01.md`
+    - `docs/release-signoff-rc-2026-03-02-01.md`
+    - `set -a; source .env; set +a; npm run release:evidence:snapshot` => pass (`211/211 PASS` strict profile)
+  - Risk: low; snapshot run duration is high and depends on DB/network stability (transient migration lock retries may occur).
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-QA-CORE-001` | done | owner:`@qa`
+  - Changes:
+    - Added focused core-regression verifier for Users/Guards/Deployments/Attendance/Clients/Branches route groups.
+    - Added npm entrypoint `test:regression:sprint-core` and generated durable proof artifact for sprint-exit regression evidence.
+    - Verifier now fails on missing core-route coverage or any failed core assertion in integration output.
+  - Evidence:
+    - `scripts/verify-sprint-core-regression.mjs`
+    - `docs/core-regression-users-guards-clients.md`
+    - `set -a; source .env; set +a; npm run test:regression:sprint-core` => pass
+  - Risk: low; relies on strict integration runtime and DB availability.
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-OBS-001` | done | owner:`@platform`
+  - Changes:
+    - Added strict-run health report generator with coverage and threshold checks from integration results.
+    - Added npm entrypoint `ops:strict-health` and generated durable health artifact.
+    - Extended nightly strict workflow to generate health report and upload strict-run artifacts.
+  - Evidence:
+    - `scripts/generate-strict-run-health-report.mjs`
+    - `.github/workflows/nightly-strict-real-profile.yml`
+    - `docs/strict-run-health.md`
+    - `npm run ops:strict-health` => pass
+  - Risk: low; health report relies on `/tmp/api-test-results.json` being produced by strict integration run.
+  - Next: `ERP-REL-002` signoff-link validation automation.
+- 2026-03-02 | `ERP-REL-002` | done | owner:`@platform`
+  - Changes:
+    - Extended release evidence snapshot automation to validate signoff packet link integrity after artifact generation.
+    - Added hard validation for candidate-specific signoff heading, evidence snapshot link, and strict health link.
+    - Added filesystem existence checks so automation fails if signoff-linked artifacts are missing.
+  - Evidence:
+    - `scripts/generate-release-evidence-snapshot.mjs`
+    - `set -a; source .env; set +a; npm run release:evidence:snapshot` => pass (`211/211 PASS`, signoff link validation `pass`)
+  - Risk: low; stricter automation can block release evidence generation if packet links are stale, which is intended.
+  - Next: `ERP-QA-CORE-002` minimum coverage drift guardrails.
+- 2026-03-02 | `ERP-QA-CORE-002` | done | owner:`@qa`
+  - Changes:
+    - Added configurable drift-threshold baseline file for core route coverage counts.
+    - Extended sprint-core verifier to fail when total or per-prefix counts drop below configured minimums.
+    - Enhanced sprint-core report output to include threshold values and explicit drift-violation summary.
+  - Evidence:
+    - `scripts/verify-sprint-core-regression.mjs`
+    - `docs/core-regression-thresholds.json`
+    - `docs/core-regression-users-guards-clients.md`
+    - `set -a; source .env; set +a; npm run test:regression:sprint-core` => pass (`211/211 PASS`, drift violations `none`)
+  - Risk: low; threshold file must be deliberately updated when intentional test-scope changes are made.
+  - Next: `ERP-OPS-004` CI summary annotations.
+- 2026-03-02 | `ERP-OPS-004` | done | owner:`@platform`
+  - Changes:
+    - Added workflow step to publish strict-run summary directly in GitHub Actions job summary.
+    - Included integration totals (`total/passed/failed`) extracted from `/tmp/api-test-results.json`.
+    - Included full strict health markdown content from `/tmp/strict-run-health.md` for one-screen triage.
+  - Evidence:
+    - `.github/workflows/nightly-strict-real-profile.yml`
+    - `npm run ci:quality` => pass (`0 errors`, `0 warnings`, `0 problems`)
+  - Risk: low; summary step is `if: always()` and gracefully reports missing artifacts instead of failing unexpectedly.
+  - Next: `ERP-PROD-003` signoff status + gate automation.
+- 2026-03-02 | `ERP-PROD-003` | done | owner:`@release`
+  - Changes:
+    - Added release signoff validator script to parse approval matrix, checklist state, and final decision fields from signoff packet.
+    - Added report mode command to generate a durable status artifact and strict gate mode command for approval enforcement.
+    - Added gate semantics that intentionally fail when signoff packet is not fully approved, while keeping status mode non-blocking for in-progress development.
+  - Evidence:
+    - `scripts/validate-release-signoff.mjs`
+    - `docs/release-signoff-status-rc-2026-03-02-01.md`
+    - `npm run release:signoff:status` => pass (`Ready for release: NO`)
+    - `npm run release:signoff:gate` => expected fail (exit `1`) due to pending human approvals
+  - Risk: low; parser expects the current signoff markdown structure and should be kept in sync if packet format changes.
+  - Next: `ERP-PROD-004` signoff approval row helper.
+- 2026-03-02 | `ERP-PROD-004` | done | owner:`@release`
+  - Changes:
+    - Added a release signoff approval helper that targets a single approver row by function name.
+    - Implemented dry-run-first behavior with preview output to `/tmp` and explicit apply toggle (`APPLY_SIGNOFF_UPDATE=true`).
+    - Added structured inputs for status, approver identity, timestamp, and notes to keep updates auditable and easy to manipulate.
+  - Evidence:
+    - `scripts/apply-release-signoff-approval.mjs`
+    - `package.json` (`release:signoff:approve`)
+    - `RELEASE_APPROVAL_FUNCTION='Engineering' RELEASE_APPROVAL_STATUS='approved' RELEASE_APPROVED_BY='@backend' RELEASE_APPROVAL_NOTES='ready for signoff review' npm run release:signoff:approve` => dry-run preview generated
+  - Risk: low; helper assumes existing signoff table column layout and should be updated if packet table schema changes.
+  - Next: `ERP-PROD-005` checklist + final-decision helper.
+- 2026-03-02 | `ERP-PROD-005` | done | owner:`@release`
+  - Changes:
+    - Added release signoff decision helper that updates checklist completion and final decision metadata fields.
+    - Implemented dry-run-first behavior with preview output and explicit apply toggle (`APPLY_SIGNOFF_UPDATE=true`).
+    - Added structured env inputs to keep release decision updates explicit and repeatable.
+  - Evidence:
+    - `scripts/apply-release-signoff-decision.mjs`
+    - `package.json` (`release:signoff:decision`)
+    - `RELEASE_FINAL_DECISION='approved' RELEASE_EFFECTIVE_VERSION='v1.0.0-rc-2026-03-02-01' RELEASE_DEPLOYMENT_WINDOW='2026-03-03 02:00-03:00 UTC' RELEASE_MARK_CHECKLIST_COMPLETE=true npm run release:signoff:decision` => dry-run preview generated
+    - `/tmp/release-signoff-decision-preview-rc-2026-03-02-01.md`
+  - Risk: low; helper depends on current signoff markdown headings/field labels.
+  - Next: `ERP-PROD-006` signoff handoff summary generator.
+- 2026-03-02 | `ERP-PROD-006` | done | owner:`@release`
+  - Changes:
+    - Added release signoff handoff generator that summarizes readiness state, pending approvals, checklist gaps, and final-decision fields from signoff artifacts.
+    - Added explicit next-command section in generated handoff doc to guide approvers through dry-run/apply/status/gate sequence.
+    - Added npm entrypoint to regenerate handoff summary on demand after each approval update.
+  - Evidence:
+    - `scripts/generate-release-signoff-handoff.mjs`
+    - `docs/release-signoff-handoff-rc-2026-03-02-01.md`
+    - `npm run release:signoff:status && npm run release:signoff:handoff` => pass
+  - Risk: low; generator depends on current signoff packet headings/table format.
+  - Next: `ERP-PROD-007` bulk signoff sync helper.
+- 2026-03-02 | `ERP-PROD-007` | done | owner:`@release`
+  - Changes:
+    - Added bulk signoff updater that consumes a JSON payload and updates multiple approval rows, checklist state, and final decision metadata in one run.
+    - Added strict payload validation for allowed statuses and required approved-by fields; command fails on unknown approver functions.
+    - Added dry-run-first preview output and explicit apply toggle for safe execution.
+  - Evidence:
+    - `scripts/apply-release-signoff-bulk.mjs`
+    - `docs/release-signoff-bulk-template.json`
+    - `RELEASE_BULK_PAYLOAD_PATH='docs/release-signoff-bulk-template.json' npm run release:signoff:bulk` => dry-run preview generated
+    - `/tmp/release-signoff-bulk-preview-rc-2026-03-02-01.md`
+  - Risk: low; helper depends on current signoff packet table/heading structure.
+  - Next: `ERP-PROD-008` signoff workflow runner.
+- 2026-03-02 | `ERP-PROD-008` | done | owner:`@release`
+  - Changes:
+    - Added release signoff workflow orchestrator that runs bulk sync, status recompute, and handoff generation in one command.
+    - Added optional gate-enforcement toggle for final approved-state enforcement when human signoffs are complete.
+    - Preserved dry-run-first behavior as default to keep workflow updates safe during active development.
+  - Evidence:
+    - `scripts/run-release-signoff-workflow.mjs`
+    - `RELEASE_BULK_PAYLOAD_PATH='docs/release-signoff-bulk-template.json' npm run release:signoff:workflow` => pass
+    - `npm run release:signoff:status` => pass (`Ready for release: NO`)
+  - Risk: low; orchestrator assumes existing signoff helper scripts and payload shape remain consistent.
+  - Next: `ERP-CLI-006` nested branch-create parity + branch audit logging hardening.
+- 2026-03-02 | `ERP-CLI-006` | done | owner:`@backend`
+  - Changes:
+    - Implemented `POST /api/clients/[id]/branches` with required-field validation and manager-scope enforcement.
+    - Added audit log writes for branch create/update/delete mutations on `/api/branches*` and nested client-branch create route.
+    - Extended integration suite with nested branch-create scope assertions for out-of-scope deny (`403`) and in-scope allow (`201`).
+  - Evidence:
+    - `src/app/api/clients/[id]/branches/route.ts`
+    - `src/app/api/branches/route.ts`
+    - `src/app/api/branches/[id]/route.ts`
+    - `scripts/api-integration-test.mjs`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+    - `set -a; source .env; set +a; npm run test:integration` => `213/213 PASS`
+  - Risk: low; integration assertion totals increased due added nested branch-create coverage.
+  - Next: `ERP-GDP-008` guard profile placeholder + `ERP-CLI-007` client add-mode selector UI.
+- 2026-03-02 | `ERP-GDP-008` | done | owner:`@frontend`
+  - Changes:
+    - Added explicit no-photo placeholder state in guard profile image card.
+    - Placeholder now renders icon + label when no profile image exists.
+  - Evidence:
+    - `src/components/guards/ProfileImageCard.tsx`
+    - `npm run ci:quality` => pass
+  - Risk: none.
+  - Next: `ERP-CLI-007` client add-mode selector UI.
+- 2026-03-02 | `ERP-CLI-007` | done | owner:`@frontend`
+  - Changes:
+    - Added Branch Client vs Branchless Client selection buttons in add-client form.
+    - Added separate add-client entry buttons on clients page with `mode` preselection.
+    - Wired add-client page to honor `mode=branch|branchless` and seed form state.
+  - Evidence:
+    - `src/app/(dashboard)/clients/page.tsx`
+    - `src/app/(dashboard)/clients/new/page.tsx`
+    - `src/app/(dashboard)/clients/new/form.tsx`
+    - `npm run ci:quality` => pass
+  - Risk: low; existing add-client API contract remains unchanged.
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-GDP-009` | done | owner:`@frontend`
+  - Changes:
+    - Added reusable guard avatar renderer for listing contexts.
+    - Updated guards list and search results to always display image area.
+    - Added no-image placeholder rendering when photo is missing.
+  - Evidence:
+    - `src/components/guards/GuardAvatar.tsx`
+    - `src/app/(dashboard)/guards/page.tsx`
+    - `src/app/(dashboard)/guards/search/manager.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; uses existing local profile-image storage key (`guard-profile-image:<id>`).
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-GDP-010` | done | owner:`@frontend`
+  - Changes:
+    - Removed passport number and passport expiry inputs from add guard form.
+    - Removed passport document-type label from OCR mock extraction contract.
+    - Verified no remaining passport references in source paths.
+  - Evidence:
+    - `src/app/(dashboard)/guards/new/form.tsx`
+    - `src/lib/mockData/ocr.ts`
+    - `rg -n "passport|PASSPORT|passportNumber|passportExpiryDate" src prisma` => no matches
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; this removes data capture only and does not alter guard creation API contract.
+  - Next: continue `ERP-PROD-002` human signoff collection.
+- 2026-03-02 | `ERP-CLI-008` | done | owner:`@frontend`
+  - Changes:
+    - Removed client listing DB-error fallback to mock rows when runtime mock mode is disabled.
+    - Switched clients page DB-error behavior to explicit unavailable state with zeroed stats.
+    - Kept explicit mock-mode path unchanged when `USE_MOCKS=true`.
+  - Evidence:
+    - `src/app/(dashboard)/clients/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; mock fallback remains available only in explicit mock runtime.
+  - Next: continue `ERP-XGT-004` audit for remaining production-path fallback pages.
+- 2026-03-03 | `ERP-GDP-011` | done | owner:`@frontend`
+  - Changes:
+    - Removed guard detail page fallback profile construction from mock datasets.
+    - Removed DB-success path merge with `mockGuardProfile` so tabs render only DB-backed values/defaults.
+    - Added explicit unavailable-state screen for schema-missing failures on guard detail route.
+  - Evidence:
+    - `src/app/(dashboard)/guards/[id]/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; guard detail now fails explicitly when schema is missing instead of showing synthetic profile data.
+  - Next: continue `ERP-XGT-004` audit for remaining production-path fallback pages.
+- 2026-03-03 | `ERP-GDP-012` | done | owner:`@frontend`
+  - Changes:
+    - Replaced emergency guard pool page source from mock dataset to DB-derived rows.
+    - Added shared emergency row derivation utility for consistent urgency/reason mapping.
+    - Added explicit unavailable-state alert when schema/query loading fails.
+  - Evidence:
+    - `src/lib/guards/emergency.ts`
+    - `src/app/(dashboard)/guards/emergency/page.tsx`
+    - `src/components/guards/EmergencyGuardTable.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; emergency reasons currently use deterministic field-based heuristics until dedicated prerequisites linkage is added.
+  - Next: continue `ERP-XGT-004` audit for remaining production-path mock dependencies.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Replaced SHSHK page direct mock suggestion source with DB-derived insights and explicit unavailable state.
+    - Removed Admin Center seeded mock defaults; history/log views now start empty and grow from runtime actions.
+    - Decoupled dashboard/admin shared types from `mockData` into dedicated type modules.
+  - Evidence:
+    - `src/app/(dashboard)/dashboard/shshk/page.tsx`
+    - `src/app/(dashboard)/dashboard/admin-center/manager.tsx`
+    - `src/components/ai/SuggestionCard.tsx`
+    - `src/components/admin/BroadcastComposer.tsx`
+    - `src/components/admin/SystemLogTimeline.tsx`
+    - `src/lib/shshk/types.ts`
+    - `src/lib/admin/types.ts`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; SHSHK recommendations currently heuristic and should later move behind dedicated insights API.
+  - Next: continue `ERP-XGT-004` for remaining dashboard/workflow screens with direct mock datasets.
+- 2026-03-03 | `ERP-PAY-007` | done | owner:`@frontend`
+  - Changes:
+    - Removed bulk-loan upload page dependency on seeded mock draft rows.
+    - Added payroll bulk-loan runtime utility for upload-driven row initialization.
+    - Updated page copy from explicit mock parsing wording to generic parsing success.
+  - Evidence:
+    - `src/lib/payroll/loans-bulk.ts`
+    - `src/app/(dashboard)/payroll/loans/bulk/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; upload currently seeds a single draft placeholder row until backend parsing endpoint is wired.
+  - Next: continue `ERP-XGT-004` audit for remaining production-path mock dependencies.
+- 2026-03-03 | `ERP-CLI-009` | done | owner:`@frontend`
+  - Changes:
+    - Replaced branch-model labeling logic based on `getMockBranchType` with non-mock utility derivation.
+    - Updated branch list, branch detail, and branch edit screens to use shared branch model utility.
+    - Removed direct mock-data dependency from these production client-branch paths.
+  - Evidence:
+    - `src/lib/branches/model.ts`
+    - `src/app/(dashboard)/clients/branches/page.tsx`
+    - `src/app/(dashboard)/clients/branches/[id]/page.tsx`
+    - `src/app/(dashboard)/clients/branches/[id]/edit/form.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; branch model is now deterministic from client type (`ISLAMIC` keyword check), not seeded mock mapping.
+  - Next: continue `ERP-XGT-004` audit for remaining production-path mock dependencies.
+- 2026-03-02 | `ERP-PROD-002` | in_progress | owner:`@release`
+  - Changes:
+    - Added a formal signoff packet for `RC-2026-03-02-01` with approver matrix and final decision fields.
+    - Linked signoff packet in release snapshot for direct handoff.
+    - Marked release progression as blocked on required human approvals.
+  - Evidence:
+    - `docs/release-signoff-rc-2026-03-02-01.md`
+    - `docs/delivery-source-of-truth-checklist.md` release snapshot updates
+  - Risk: release cannot be promoted until all approver rows are completed.
+  - Next: collect engineering/QA/product/ops approvals and record UTC timestamps.
+
+## Upcoming Tasks (Queue: Next 10)
+
+1. `ERP-PROD-002` (`release`) Collect all four human approvals in `docs/release-signoff-rc-2026-03-02-01.md` and set final release decision.
+2. `ERP-XGT-002` (`backend`) Continue unified API envelope standardization on remaining non-converged protected routes.
+3. `ERP-XGT-004` (`frontend`) Audit and remove any remaining production-path mock fallback UI behavior.

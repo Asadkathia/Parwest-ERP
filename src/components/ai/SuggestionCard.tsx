@@ -1,5 +1,5 @@
 import StatusChip from "@/components/ui/status-chip"
-import { ShshkSuggestion } from "@/lib/mockData"
+import type { ShshkSuggestion } from "@/lib/shshk/types"
 
 function priorityVariant(priority: ShshkSuggestion["priority"]) {
   if (priority === "HIGH") return "danger"

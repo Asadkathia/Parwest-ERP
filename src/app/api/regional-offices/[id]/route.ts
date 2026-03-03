@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,11 +11,11 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const { id } = await context.params
     const body = await request.json()
-    const data: any = {}
+    const data: Record<string, unknown> = {}
 
     if (body.name != null) data.name = String(body.name).trim()
     if (body.seriesCode != null) data.seriesCode = String(body.seriesCode).trim().toUpperCase()
@@ -25,7 +26,7 @@ export async function PATCH(
     if (body.fax !== undefined) data.fax = body.fax ? String(body.fax) : null
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ message: "No valid fields provided." }, { status: 400 })
+      return badRequest("No valid fields provided.")
     }
 
     if (isMockEnabled()) {
@@ -38,18 +39,18 @@ export async function PATCH(
       include: { region: true },
     })
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Regional office not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Regional office not found.")
     }
-    if (String(error?.code) === "P2002") {
-      return NextResponse.json({ message: "Office name/series code already exists." }, { status: 409 })
+    if (String((error as { code?: string }).code) === "P2002") {
+      return conflict("Office name/series code already exists.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid region selected." }, { status: 400 })
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid region selected.")
     }
     console.error("Error updating regional office:", error)
-    return NextResponse.json({ message: "Failed to update regional office" }, { status: 500 })
+    return internalServerError("Failed to update regional office")
   }
 }
 
@@ -60,7 +61,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
     const { id } = await context.params
 
@@ -70,14 +71,14 @@ export async function DELETE(
 
     await prisma.regionalOffice.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Regional office not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Regional office not found.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Regional office is in use." }, { status: 409 })
+    if (String((error as { code?: string }).code) === "P2003") {
+      return conflict("Regional office is in use.")
     }
     console.error("Error deleting regional office:", error)
-    return NextResponse.json({ message: "Failed to delete regional office" }, { status: 500 })
+    return internalServerError("Failed to delete regional office")
   }
 }

@@ -88,8 +88,8 @@ export default function NewTrainingForm() {
 
             router.push("/guards/trainings")
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
         } finally {
             setLoading(false)
         }

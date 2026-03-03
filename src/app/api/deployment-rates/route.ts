@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const { searchParams } = new URL(request.url)
@@ -37,9 +38,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(latest ? rates[0] || null : rates)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching deployment rates:", error)
-        return NextResponse.json({ message: "Failed to fetch deployment rates" }, { status: 500 })
+        return internalServerError("Failed to fetch deployment rates")
     }
 }
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
@@ -73,8 +74,8 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(rate, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating deployment rate:", error)
-        return NextResponse.json({ message: "Failed to create deployment rate" }, { status: 500 })
+        return internalServerError("Failed to create deployment rate")
     }
 }

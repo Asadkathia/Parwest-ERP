@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -38,7 +38,7 @@ export default function ResidencesManager() {
     const [success, setSuccess] = useState("")
     const [form, setForm] = useState(defaultForm)
 
-    const loadResidences = async () => {
+    const loadResidences = useCallback(async () => {
         try {
             setLoading(true)
             setError("")
@@ -54,17 +54,17 @@ export default function ResidencesManager() {
 
             const data = await response.json()
             setRows(data)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setRows([])
         } finally {
             setLoading(false)
         }
-    }
+    }, [query])
 
     useEffect(() => {
-        loadResidences()
-    }, [])
+        void loadResidences()
+    }, [loadResidences])
 
     const saveResidence = async (e: React.FormEvent) => {
         e.preventDefault()

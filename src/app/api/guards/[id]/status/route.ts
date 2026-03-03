@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
     request: NextRequest,
@@ -10,7 +11,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -19,7 +20,7 @@ export async function PATCH(
         const status = body.status
 
         if (!status) {
-            return NextResponse.json({ message: "status is required" }, { status: 400 })
+            return badRequest("status is required")
         }
 
         const existingGuard = await prisma.guard.findUnique({
@@ -27,15 +28,15 @@ export async function PATCH(
             select: { id: true, name: true, cnic: true, status: true, regionId: true, regionalOfficeId: true },
         })
         if (!existingGuard) {
-            return NextResponse.json({ message: "Guard not found" }, { status: 404 })
+            return notFound("Guard not found")
         }
         if (managerScope && managerScopeDenied(managerScope, { regionId: existingGuard.regionId, regionalOfficeId: existingGuard.regionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: guard is outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: guard is outside your scope.")
         }
 
         const reason = typeof body.reason === "string" ? body.reason.trim() : ""
         if (existingGuard.status === "INACTIVE" && status === "ACTIVE" && !reason) {
-            return NextResponse.json({ message: "Reactivation reason is required." }, { status: 400 })
+            return badRequest("Reactivation reason is required.")
         }
 
         const guard = await prisma.guard.update({
@@ -56,8 +57,8 @@ export async function PATCH(
         }
 
         return NextResponse.json(guard)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating guard status:", error)
-        return NextResponse.json({ message: "Failed to update guard status" }, { status: 500 })
+        return internalServerError("Failed to update guard status")
     }
 }

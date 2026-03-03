@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_REGIONS = [
     { id: "mock-region-punjab", name: "Punjab", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
@@ -18,12 +19,9 @@ export async function GET() {
             orderBy: { name: "asc" },
         })
         return NextResponse.json(regions, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching regions:", error)
-        return NextResponse.json(
-            { message: "Failed to fetch regions" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to fetch regions")
     }
 }
 
@@ -31,13 +29,13 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
         const name = String(body?.name || "").trim()
         if (!name) {
-            return NextResponse.json({ message: "Region name is required." }, { status: 400 })
+            return badRequest("Region name is required.")
         }
 
         if (isMockEnabled()) {
@@ -54,14 +52,11 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json(region, { status: 201 })
-    } catch (error: any) {
-        if (String(error?.code) === "P2002") {
-            return NextResponse.json({ message: "Region already exists." }, { status: 409 })
+    } catch (error: unknown) {
+        if (String((error as { code?: string }).code) === "P2002") {
+            return conflict("Region already exists.")
         }
         console.error("Error creating region:", error)
-        return NextResponse.json(
-            { message: "Failed to create region" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to create region")
     }
 }

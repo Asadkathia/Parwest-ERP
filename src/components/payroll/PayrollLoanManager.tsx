@@ -27,6 +27,7 @@ type LoanRow = {
     parwestId: string
   }
 }
+type GuardApiRow = { id: string; name: string; parwestId: string }
 
 const STATUS_OPTIONS = ["PENDING", "FINALIZED"]
 
@@ -59,7 +60,7 @@ export default function PayrollLoanManager() {
     if (!response.ok) throw new Error("Failed to load guards")
     const data = await response.json()
     setGuards(
-      (data || []).map((guard: any) => ({
+      ((data as GuardApiRow[]) || []).map((guard) => ({
         id: guard.id,
         name: guard.name,
         parwestId: guard.parwestId,
@@ -139,8 +140,8 @@ export default function PayrollLoanManager() {
         status: "PENDING",
       })
       await fetchRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to create loan." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Failed to create loan." })
     } finally {
       setSaving(false)
     }

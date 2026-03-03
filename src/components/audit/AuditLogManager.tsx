@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -37,7 +37,7 @@ export default function AuditLogManager() {
     [rows]
   )
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -57,11 +57,11 @@ export default function AuditLogManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [dateFrom, dateTo, eventFilter, moduleFilter, search])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   return (
     <div className="space-y-6">

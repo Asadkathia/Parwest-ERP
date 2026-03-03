@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
-type Region = { id: string; name: string }
 type RegionalOffice = { id: string; name: string }
 type Client = { id: string; name: string }
 type Branch = { id: string; name: string }
@@ -63,7 +62,7 @@ export default function ClientAttendanceManager() {
     const [entries, setEntries] = useState("10")
     const [tableSearch, setTableSearch] = useState("")
 
-    const loadMasterData = async () => {
+    const loadMasterData = useCallback(async () => {
         try {
             const [officesRes, clientsRes] = await Promise.all([
                 fetch("/api/regional-offices"),
@@ -83,9 +82,9 @@ export default function ClientAttendanceManager() {
             setRegionalOffices(LEGACY_REGIONAL_OFFICES)
             setClients(LEGACY_CLIENTS)
         }
-    }
+    }, [])
 
-    const loadBranches = async (selectedClientId: string) => {
+    const loadBranches = useCallback(async (selectedClientId: string) => {
         if (!selectedClientId) {
             setBranches([])
             return
@@ -102,9 +101,9 @@ export default function ClientAttendanceManager() {
         } catch {
             setBranches([])
         }
-    }
+    }, [])
 
-    const loadClientAttendance = async () => {
+    const loadClientAttendance = useCallback(async () => {
         try {
             setLoading(true)
             setError("")
@@ -124,23 +123,23 @@ export default function ClientAttendanceManager() {
 
             const data = await response.json()
             setRows(data)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setRows([])
         } finally {
             setLoading(false)
         }
-    }
+    }, [branchId, clientId, endDate, regionalOfficeId, startDate])
 
     useEffect(() => {
-        loadMasterData()
-        loadClientAttendance()
-    }, [])
+        void loadMasterData()
+        void loadClientAttendance()
+    }, [loadClientAttendance, loadMasterData])
 
     useEffect(() => {
-        loadBranches(clientId)
+        void loadBranches(clientId)
         setBranchId("")
-    }, [clientId])
+    }, [clientId, loadBranches])
 
     return (
         <div className="space-y-6 max-w-7xl">

@@ -35,8 +35,8 @@ export default function InactiveGuardsManager() {
 
             const data = await response.json()
             setGuards(data)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setGuards([])
         } finally {
             setLoading(false)

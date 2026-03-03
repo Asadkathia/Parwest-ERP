@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import EmptyState from "@/components/ui/empty-state"
 import FilterBar from "@/components/ui/filter-bar"
@@ -17,16 +17,22 @@ type RateRow = {
   enqueue: "Yes" | "No"
 }
 
-const TABS = ["Default Rates", "Client Provinces", "Client Cities", "Guard Types", "Invoice Header"] as const
-const PROVINCE_OPTIONS = ["All Pakistan", "Punjab", "Sindh", "Balochistan", "KPK", "ICT Islamabad", "Gilgit Baltistan", "AJK Kashmir"]
-const CITY_OPTIONS = ["Lahore", "Karachi", "Gujranwala", "Multan", "Faisalabad", "Islamabad", "Peshawar", "Quetta"]
-const GUARD_TYPE_OPTIONS = ["Guard", "location supervisor", "cpo", "SO", "ASO", "LSO", "Receptionist", "CCTV Operator", "Complaint Receiver"]
+type RegionRow = { id: string; name: string }
+type BranchRow = { id: string; name: string }
+type ApiRate = {
+  id: string
+  region?: { name?: string | null } | null
+  branch?: { name?: string | null } | null
+  deployAs?: string | null
+  guardType?: string | null
+  salary?: number | string | null
+  shiftType?: string | null
+}
+type ApiRegion = { id: string; name: string }
+type ApiBranch = { id: string; name: string }
 
-const initialRates: RateRow[] = [
-  { id: "1", province: "Punjab", city: "Lahore", guardType: "Guard", effectiveRate: 35000, enqueue: "Yes" },
-  { id: "2", province: "Punjab", city: "Gujranwala", guardType: "Supervisor", effectiveRate: 48000, enqueue: "No" },
-  { id: "3", province: "Sindh", city: "Karachi", guardType: "Guard", effectiveRate: 37000, enqueue: "Yes" },
-]
+const TABS = ["Default Rates", "Client Provinces", "Client Cities", "Guard Types", "Invoice Header"] as const
+const GUARD_TYPE_OPTIONS = ["Guard", "Supervisor", "CPO", "SO", "ASO", "LSO", "Receptionist", "CCTV Operator", "Complaint Receiver"]
 
 export default function InvoicePrerequisitesManager() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Default Rates")
@@ -37,18 +43,56 @@ export default function InvoicePrerequisitesManager() {
   const [enqueue, setEnqueue] = useState<"Yes" | "No">("Yes")
   const [entries, setEntries] = useState("10")
   const [search, setSearch] = useState("")
-  const [rows, setRows] = useState<RateRow[]>(initialRates)
-  const [name, setName] = useState("")
-  const [provinceName, setProvinceName] = useState("")
-  const [cityName, setCityName] = useState("")
-  const [guardTypeName, setGuardTypeName] = useState("")
+  const [rows, setRows] = useState<RateRow[]>([])
+  const [regions, setRegions] = useState<RegionRow[]>([])
+  const [branches, setBranches] = useState<BranchRow[]>([])
   const [invoiceHeaderName, setInvoiceHeaderName] = useState("")
   const [notice, setNotice] = useState("")
-  const [confirmAction, setConfirmAction] = useState<null | "reset" | "submit-default">(
-    null
-  )
+  const [error, setError] = useState("")
   const [editingRate, setEditingRate] = useState<RateRow | null>(null)
   const [editRateValue, setEditRateValue] = useState("")
+
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      try {
+        const [ratesRes, regionsRes, branchesRes] = await Promise.all([
+          fetch("/api/deployment-rates", { cache: "no-store" }),
+          fetch("/api/regions", { cache: "no-store" }),
+          fetch("/api/branches", { cache: "no-store" }),
+        ])
+
+        const [ratesData, regionsData, branchesData] = await Promise.all([ratesRes.json(), regionsRes.json(), branchesRes.json()])
+        if (!ratesRes.ok) {
+          if (isMounted) setError(ratesData?.message || "Failed to load default rates.")
+          return
+        }
+
+        if (isMounted) {
+          setRows(
+            Array.isArray(ratesData)
+              ? (ratesData as ApiRate[]).map((row) => ({
+                  id: String(row.id),
+                  province: String(row?.region?.name || "All Pakistan"),
+                  city: String(row?.deployAs || row?.branch?.name || "All"),
+                  guardType: String(row?.guardType || "Guard"),
+                  effectiveRate: Number(row?.salary || 0),
+                  enqueue: row?.shiftType === "BOTH" ? "Yes" : "No",
+                }))
+              : []
+          )
+          setRegions(Array.isArray(regionsData) ? (regionsData as ApiRegion[]).map((r) => ({ id: String(r.id), name: String(r.name) })) : [])
+          setBranches(Array.isArray(branchesData) ? (branchesData as ApiBranch[]).map((b) => ({ id: String(b.id), name: String(b.name) })) : [])
+        }
+      } catch {
+        if (isMounted) setError("Failed to load invoice prerequisites.")
+      }
+    }
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -60,17 +104,41 @@ export default function InvoicePrerequisitesManager() {
     })
   }, [rows, province, city, guardType, search])
 
-  const onSave = () => {
-    if (!province || !city || !guardType || !effectiveRate) return
+  const onSave = async () => {
+    setError("")
+    if (!province || !city || !guardType || !effectiveRate) {
+      setError("Province, city, guard type and effective rate are required.")
+      return
+    }
+
+    const regionId = regions.find((r) => r.name === province)?.id
+    const payload = {
+      regionId: regionId || undefined,
+      deployAs: city,
+      guardType,
+      salary: Number(effectiveRate),
+      shiftType: enqueue === "Yes" ? "BOTH" : "DAY",
+    }
+
+    const response = await fetch("/api/deployment-rates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data?.message || "Failed to save default rate.")
+      return
+    }
 
     setRows((prev) => [
       {
-        id: String(prev.length + 1),
-        province,
-        city,
-        guardType,
-        effectiveRate: Number(effectiveRate),
-        enqueue,
+        id: String(data.id),
+        province: String(data?.region?.name || province),
+        city: String(data?.deployAs || city),
+        guardType: String(data?.guardType || guardType),
+        effectiveRate: Number(data?.salary || effectiveRate),
+        enqueue: data?.shiftType === "BOTH" ? "Yes" : "No",
       },
       ...prev,
     ])
@@ -83,17 +151,28 @@ export default function InvoicePrerequisitesManager() {
     setEditRateValue(String(row.effectiveRate))
   }
 
-  const onApplyEditRate = () => {
+  const onApplyEditRate = async () => {
     if (!editingRate) return
+    setError("")
     const parsed = Number.parseFloat(editRateValue)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setNotice("Enter a valid rate before submit.")
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError("Enter a valid non-negative rate.")
       return
     }
+
+    const response = await fetch(`/api/deployment-rates/${editingRate.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ salary: parsed }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data?.message || "Failed to update rate.")
+      return
+    }
+
     setRows((prev) =>
-      prev.map((row) =>
-        row.id === editingRate.id ? { ...row, effectiveRate: parsed } : row
-      )
+      prev.map((row) => (row.id === editingRate.id ? { ...row, effectiveRate: Number(data?.salary || parsed) } : row))
     )
     setEditingRate(null)
     setEditRateValue("")
@@ -111,28 +190,20 @@ export default function InvoicePrerequisitesManager() {
     setNotice("Filters reset.")
   }
 
-  const clientProvinceRows = useMemo(
-    () =>
-      [...new Set(rows.map((row) => row.province))]
-        .filter((item) => !provinceName || item.toLowerCase().includes(provinceName.toLowerCase()))
-        .map((item, index) => ({ id: String(index + 1), provinceName: item })),
-    [rows, provinceName]
+  const provinceRows = useMemo(
+    () => [...new Set(rows.map((row) => row.province))].map((name, index) => ({ id: String(index + 1), provinceName: name })),
+    [rows]
   )
-
-  const clientCityRows = useMemo(
-    () =>
-      rows
-        .filter((row) => !cityName || row.city.toLowerCase().includes(cityName.toLowerCase()))
-        .map((row, index) => ({ id: String(index + 1), cityName: row.city, province: row.province })),
-    [rows, cityName]
+  const cityRows = useMemo(
+    () => [...new Set(rows.map((row) => `${row.city}__${row.province}`))].map((key, index) => {
+      const [cityName, provinceName] = key.split("__")
+      return { id: String(index + 1), cityName, province: provinceName }
+    }),
+    [rows]
   )
-
   const guardTypeRows = useMemo(
-    () =>
-      [...new Set(rows.map((row) => row.guardType))]
-        .filter((item) => !guardTypeName || item.toLowerCase().includes(guardTypeName.toLowerCase()))
-        .map((item, index) => ({ id: String(index + 1), guardTypeName: item, enqueue })),
-    [rows, guardTypeName, enqueue]
+    () => [...new Set(rows.map((row) => row.guardType))].map((name, index) => ({ id: String(index + 1), guardTypeName: name, enqueue })),
+    [rows, enqueue]
   )
 
   const tabClass = (tab: (typeof TABS)[number]) =>
@@ -144,10 +215,9 @@ export default function InvoicePrerequisitesManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Contract Default Rates"
-        subtitle="Client Invoice Pre-requisites"
-      />
+      <SectionTitle title="Contract Default Rates" subtitle="Client Invoice Pre-requisites" />
+      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? <InlineAlert type="success" message={notice} /> : null}
 
       <FilterBar className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -165,51 +235,38 @@ export default function InvoicePrerequisitesManager() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Province</label>
-                <select name="Select Province" value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">
+                <select value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">
                   <option value="">--Select Province--</option>
-                  {PROVINCE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
+                  {regions.map((option) => (
+                    <option key={option.id} value={option.name}>{option.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-                <select name="Select City" value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
-                  <option value="">--Select City--</option>
-                  {CITY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Select City / Branch</label>
+                <select value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
+                  <option value="">--Select City / Branch--</option>
+                  {branches.map((option) => (
+                    <option key={option.id} value={option.name}>{option.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Guard Type</label>
-                <select name="Select Guard Type" value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
+                <select value={guardType} onChange={(e) => setGuardType(e.target.value)} className="ui-select">
                   <option value="">--Guard Type--</option>
                   {GUARD_TYPE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
+                    <option key={option} value={option}>{option}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Effective Rate</label>
-                <input
-                  name="Effective Rate"
-                  type="number"
-                  value={effectiveRate}
-                  onChange={(e) => setEffectiveRate(e.target.value)}
-                  className="ui-input"
-                  placeholder="Effective Rate"
-                />
+                <input type="number" value={effectiveRate} onChange={(e) => setEffectiveRate(e.target.value)} className="ui-input" placeholder="Effective Rate" />
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Enqueue</label>
-                <select name="Enqueue" value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")} className="ui-select">
+                <select value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")} className="ui-select">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
@@ -217,40 +274,23 @@ export default function InvoicePrerequisitesManager() {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Show 102550100200 entries</label>
-                <select name="Show 102550100200 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Entries</label>
+                <select value={entries} onChange={(e) => setEntries(e.target.value)} className="ui-select">
                   {["10", "25", "50", "100", "200"].map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
-                <input name="Search:" value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search:" />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Search</label>
+                <input value={search} onChange={(e) => setSearch(e.target.value)} className="ui-input" placeholder="Search" />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <ActionButton onClick={() => setNotice("Search applied.")}>SEARCH!</ActionButton>
-              <ActionButton variant="secondary" onClick={() => setConfirmAction("reset")}>
-                Reset
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => setConfirmAction("submit-default")}>
-                Submit
-              </ActionButton>
-              <input type="hidden" name="Client Province" value={province} />
-              <input type="hidden" name="Client Cities" value={city} />
-              <input type="hidden" name="Guard Types" value={guardType} />
-              <input type="hidden" name="Edit Rate" value="true" />
-              <input type="hidden" name="ID" value="1" />
-              <input type="hidden" name="Province Name" value={provinceName || province} />
-              <input type="hidden" name="City Name" value={cityName || city} />
-              <input type="hidden" name="Guard Type" value={guardType} />
-              <input type="hidden" name="Guard Type Name" value={guardTypeName || guardType} />
+              <ActionButton onClick={onSave}>Submit</ActionButton>
+              <ActionButton variant="secondary" onClick={resetDefaults}>Reset</ActionButton>
             </div>
           </FilterBar>
-          {notice ? <InlineAlert type="success" message={notice} /> : null}
 
           <DataTable
             rows={filteredRows.slice(0, Number.parseInt(entries, 10) || 10)}
@@ -264,11 +304,7 @@ export default function InvoicePrerequisitesManager() {
                 key: "action",
                 header: "Edit Rate",
                 render: (row) => (
-                  <button
-                    type="button"
-                    className="text-[var(--brand)] hover:underline"
-                    onClick={() => onEditRate(row)}
-                  >
+                  <button type="button" className="text-[var(--brand)] hover:underline" onClick={() => onEditRate(row)}>
                     Edit
                   </button>
                 ),
@@ -280,128 +316,54 @@ export default function InvoicePrerequisitesManager() {
           />
         </>
       ) : activeTab === "Client Provinces" ? (
-        <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input name="Name" value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
-            </div>
-              <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
-                <input name="Province Name" value={provinceName} onChange={(e) => setProvinceName(e.target.value)} className="ui-input" placeholder="Province" />
-              </div>
-              <div className="flex items-end">
-                <ActionButton onClick={() => setNotice("Client province saved.")}>Submit</ActionButton>
-              </div>
-            </div>
-            <DataTable
-            rows={clientProvinceRows.slice(0, Number.parseInt(entries, 10) || 10)}
-            columns={[
-              { key: "id", header: "ID", sortable: true },
-              { key: "provinceName", header: "Province Name", sortable: true },
-            ]}
-            getRowKey={(row) => row.id}
-            searchable={false}
-            emptyText="No provinces found."
-          />
-          {notice ? <InlineAlert type="success" message={notice} /> : null}
-        </FilterBar>
+        <DataTable
+          rows={provinceRows}
+          columns={[
+            { key: "id", header: "ID", sortable: true },
+            { key: "provinceName", header: "Province Name", sortable: true },
+          ]}
+          getRowKey={(row) => row.id}
+          searchable={false}
+          emptyText="No provinces found."
+        />
       ) : activeTab === "Client Cities" ? (
-        <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input name="Name" value={name} onChange={(e) => setName(e.target.value)} className="ui-input" placeholder="Name" />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
-              <input name="City Name" value={cityName} onChange={(e) => setCityName(e.target.value)} className="ui-input" placeholder="Province" />
-            </div>
-              <div className="flex items-end">
-                <ActionButton onClick={() => setNotice("Client city saved.")}>Submit</ActionButton>
-              </div>
-            </div>
-            <DataTable
-            rows={clientCityRows.slice(0, Number.parseInt(entries, 10) || 10)}
-            columns={[
-              { key: "id", header: "ID", sortable: true },
-              { key: "cityName", header: "City Name", sortable: true },
-              { key: "province", header: "Province", sortable: true },
-            ]}
-            getRowKey={(row) => row.id}
-            searchable={false}
-            emptyText="No cities found."
-          />
-          {notice ? <InlineAlert type="success" message={notice} /> : null}
-        </FilterBar>
+        <DataTable
+          rows={cityRows}
+          columns={[
+            { key: "id", header: "ID", sortable: true },
+            { key: "cityName", header: "City Name", sortable: true },
+            { key: "province", header: "Province", sortable: true },
+          ]}
+          getRowKey={(row) => row.id}
+          searchable={false}
+          emptyText="No cities found."
+        />
       ) : activeTab === "Guard Types" ? (
+        <DataTable
+          rows={guardTypeRows}
+          columns={[
+            { key: "id", header: "ID", sortable: true },
+            { key: "guardTypeName", header: "Guard Type Name", sortable: true },
+            { key: "enqueue", header: "Enqueue", sortable: true },
+          ]}
+          getRowKey={(row) => row.id}
+          searchable={false}
+          emptyText="No guard types found."
+        />
+      ) : (
         <FilterBar className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input name="Guard Type Name" value={guardTypeName} onChange={(e) => setGuardTypeName(e.target.value)} className="ui-input" placeholder="Name" />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Enqueue</label>
-              <select name="Enqueue" className="ui-select" value={enqueue} onChange={(e) => setEnqueue(e.target.value as "Yes" | "No")}>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
-            </div>
-              <div className="flex items-end">
-                <ActionButton onClick={() => setNotice("Guard type saved.")}>Submit</ActionButton>
-              </div>
-            </div>
-            <DataTable
-            rows={guardTypeRows.slice(0, Number.parseInt(entries, 10) || 10)}
-            columns={[
-              { key: "id", header: "ID", sortable: true },
-              { key: "guardTypeName", header: "Guard Type Name", sortable: true },
-              { key: "enqueue", header: "Enqueue", sortable: true },
-            ]}
-            getRowKey={(row) => row.id}
-            searchable={false}
-            emptyText="No guard types found."
-          />
-          {notice ? <InlineAlert type="success" message={notice} /> : null}
-        </FilterBar>
-      ) : activeTab === "Invoice Header" ? (
-        <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input name="Name" value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
+              <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div className="flex items-end">
               <ActionButton onClick={() => setNotice("Invoice header saved.")}>Submit</ActionButton>
             </div>
           </div>
-          {notice ? <InlineAlert type="success" message={notice} /> : null}
           <EmptyState title="Invoice Header" description="Header presets can be managed here in frontend mode." />
         </FilterBar>
-      ) : (
-        <EmptyState title="No data" description="No records found." />
       )}
-
-      {confirmAction ? (
-        <ConfirmDialog
-          title={confirmAction === "reset" ? "Reset Filters" : "Submit Default Rate"}
-          message={
-            confirmAction === "reset"
-              ? "Are you sure you want to reset all filter fields?"
-              : "Are you sure you want to submit this default rate?"
-          }
-          onNo={() => setConfirmAction(null)}
-          onYes={() => {
-            if (confirmAction === "reset") {
-              resetDefaults()
-            } else {
-              onSave()
-            }
-            setConfirmAction(null)
-          }}
-        />
-      ) : null}
 
       {editingRate ? (
         <FormDialog title="Edit Rate" onClose={() => setEditingRate(null)}>
@@ -410,49 +372,14 @@ export default function InvoicePrerequisitesManager() {
               {editingRate.province} / {editingRate.city} / {editingRate.guardType}
             </p>
             <label className="block text-sm text-[var(--text-muted)]">Effective Rate</label>
-            <input
-              type="number"
-              className="ui-input"
-              value={editRateValue}
-              onChange={(e) => setEditRateValue(e.target.value)}
-              placeholder="Effective Rate"
-            />
+            <input type="number" className="ui-input" value={editRateValue} onChange={(e) => setEditRateValue(e.target.value)} placeholder="Effective Rate" />
             <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setEditingRate(null)}>
-                Close
-              </ActionButton>
-              <ActionButton onClick={onApplyEditRate}>Submit</ActionButton>
+              <ActionButton variant="secondary" onClick={() => setEditingRate(null)}>Cancel</ActionButton>
+              <ActionButton onClick={onApplyEditRate}>Save</ActionButton>
             </div>
           </div>
         </FormDialog>
       ) : null}
-    </div>
-  )
-}
-
-function ConfirmDialog({
-  title,
-  message,
-  onYes,
-  onNo,
-}: {
-  title: string
-  message: string
-  onYes: () => void
-  onNo: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
-        <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <ActionButton variant="secondary" onClick={onNo}>
-            No
-          </ActionButton>
-          <ActionButton onClick={onYes}>Yes</ActionButton>
-        </div>
-      </div>
     </div>
   )
 }
@@ -463,7 +390,7 @@ function FormDialog({
   onClose,
 }: {
   title: string
-  children: ReactNode
+  children: React.ReactNode
   onClose: () => void
 }) {
   return (
@@ -471,9 +398,7 @@ function FormDialog({
       <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-          <button type="button" onClick={onClose} className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]">
-            x
-          </button>
+          <button type="button" className="text-[var(--text-muted)] hover:text-[var(--text)]" onClick={onClose}>X</button>
         </div>
         {children}
       </div>

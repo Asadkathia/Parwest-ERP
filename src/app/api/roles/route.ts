@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROLES = [
   { id: "mock-role-admin", name: "Admin", description: "System administrator" },
@@ -14,7 +15,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     if (isMockEnabled()) {
@@ -28,7 +29,7 @@ export async function GET() {
     return NextResponse.json(roles)
   } catch (error) {
     console.error("Error fetching roles:", error)
-    return NextResponse.json({ message: "Failed to fetch roles" }, { status: 500 })
+    return internalServerError("Failed to fetch roles")
   }
 }
 
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const body = await request.json()
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     const description = body?.description ? String(body.description) : null
 
     if (!name) {
-      return NextResponse.json({ message: "Role name is required." }, { status: 400 })
+      return badRequest("Role name is required.")
     }
 
     if (isMockEnabled()) {
@@ -59,11 +60,11 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(role, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2002") {
-      return NextResponse.json({ message: "Role name already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2002") {
+      return conflict("Role name already exists.")
     }
     console.error("Error creating role:", error)
-    return NextResponse.json({ message: "Failed to create role" }, { status: 500 })
+    return internalServerError("Failed to create role")
   }
 }

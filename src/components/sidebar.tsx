@@ -136,6 +136,7 @@ const navItems: NavNode[] = [
             { title: "User Types", href: "/settings/user-types", icon: Users },
             { title: "Guard Bank Names", href: "/settings/guard-bank-names", icon: DollarSign },
             { title: "Fingerprint Device", href: "/settings/fingerprint-device", icon: Settings },
+            { title: "Workflow Rules", href: "/settings/workflow-rules", icon: Settings },
             { title: "System Settings", href: "/settings/system", icon: Settings },
         ],
     },

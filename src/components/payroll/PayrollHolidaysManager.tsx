@@ -16,6 +16,8 @@ type HolidayRow = {
 }
 
 export default function PayrollHolidaysManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<HolidayRow[]>([])
   const [name, setName] = useState("")
   const [date, setDate] = useState("")
@@ -33,9 +35,9 @@ export default function PayrollHolidaysManager() {
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to load holidays.")
       setRows(Array.isArray(payload) ? payload : [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setRows([])
-      setNotice({ type: "error", message: error?.message || "Failed to load holidays." })
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to load holidays.") })
     } finally {
       setLoading(false)
     }
@@ -69,8 +71,8 @@ export default function PayrollHolidaysManager() {
       setNotes("")
       setNotice({ type: "success", message: "Holiday created." })
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to create holiday." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to create holiday.") })
     } finally {
       setSaving(false)
     }
@@ -84,8 +86,8 @@ export default function PayrollHolidaysManager() {
       if (!response.ok) throw new Error(payload?.message || "Failed to delete holiday.")
       setNotice({ type: "success", message: "Holiday deleted." })
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to delete holiday." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to delete holiday.") })
     }
   }
 

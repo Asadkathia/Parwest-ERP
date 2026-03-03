@@ -1,5 +1,5 @@
 import StatusChip from "@/components/ui/status-chip"
-import { AdminLogEntry } from "@/lib/mockData"
+import type { AdminLogEntry } from "@/lib/admin/types"
 
 function severityVariant(severity: AdminLogEntry["severity"]) {
   if (severity === "CRITICAL") return "danger"

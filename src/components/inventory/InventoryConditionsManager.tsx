@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -15,6 +15,8 @@ type ConditionRow = {
 }
 
 export default function InventoryConditionsManager() {
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback
   const [rows, setRows] = useState<ConditionRow[]>([])
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -24,7 +26,7 @@ export default function InventoryConditionsManager() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setNotice(null)
     try {
@@ -32,17 +34,17 @@ export default function InventoryConditionsManager() {
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to load conditions.")
       setRows(Array.isArray(payload) ? payload : [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setRows([])
-      setNotice({ type: "error", message: error?.message || "Failed to load conditions." })
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to load conditions.") })
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   const resetForm = () => {
     setName("")
@@ -74,8 +76,8 @@ export default function InventoryConditionsManager() {
       setNotice({ type: "success", message: editingId ? "Condition updated." : "Condition created." })
       resetForm()
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to save condition." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to save condition.") })
     } finally {
       setSaving(false)
     }
@@ -90,8 +92,8 @@ export default function InventoryConditionsManager() {
       setNotice({ type: "success", message: "Condition deleted." })
       if (editingId === id) resetForm()
       await load()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Failed to delete condition." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: getErrorMessage(error, "Failed to delete condition.") })
     }
   }
 

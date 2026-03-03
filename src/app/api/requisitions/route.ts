@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
   {
@@ -21,7 +23,7 @@ const MOCK_ROWS = [
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") || undefined
     const moduleName = searchParams.get("module") || undefined
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: any = {}
+    const where: Prisma.RequisitionWhereInput = {}
     if (status) where.status = status
     if (moduleName) where.module = moduleName
     if (priority) where.priority = priority
@@ -62,17 +64,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for requisitions yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for requisitions yet.")
     }
     console.error("Error fetching requisitions:", error)
-    return NextResponse.json({ message: "Failed to fetch requisitions" }, { status: 500 })
+    return internalServerError("Failed to fetch requisitions")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session?.user?.id) return unauthorized()
     const body = await request.json()
     const title = String(body?.title || "").trim()
     const description = body?.description ? String(body.description) : null
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest) {
     const priority = String(body?.priority || "NORMAL").trim()
 
     if (!title || !moduleName) {
-      return NextResponse.json({ message: "title and module are required." }, { status: 400 })
+      return badRequest("title and module are required.")
     }
 
     if (isMockEnabled()) {
@@ -115,14 +117,14 @@ export async function POST(request: NextRequest) {
       },
     })
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
-      return NextResponse.json({ message: "Schema not migrated for requisitions yet." }, { status: 503 })
+      return serviceUnavailable("Schema not migrated for requisitions yet.")
     }
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid requester reference." }, { status: 400 })
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid requester reference.")
     }
     console.error("Error creating requisition:", error)
-    return NextResponse.json({ message: "Failed to create requisition" }, { status: 500 })
+    return internalServerError("Failed to create requisition")
   }
 }

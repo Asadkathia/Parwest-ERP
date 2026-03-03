@@ -38,10 +38,6 @@ function dedupeNormalized(arr) {
   return m
 }
 
-async function exists(filePath) {
-  try { await fs.access(filePath); return true } catch { return false }
-}
-
 async function listTsxFiles(dir) {
   const out = []
   async function walk(d) {

@@ -1,13 +1,14 @@
 "use client"
 
-import { User, Mail, Phone, Calendar, MapPin, Building } from "lucide-react"
+import { User, Phone, MapPin, Building } from "lucide-react"
+import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
 
 interface GeneralInformationProps {
-    guard: any // Will be properly typed later
+    guard: GuardTabModel
 }
 
 export default function GeneralInformationTab({ guard }: GeneralInformationProps) {
-    const formatDate = (date: Date | string | null) => {
+    const formatDate = (date?: Date | string | null) => {
         if (!date) return "—"
         return new Date(date).toLocaleDateString("en-US", {
             year: "numeric",
@@ -36,8 +37,8 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
             {/* Status Badge */}
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">General Information</h2>
-                <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
-                    {guard.status}
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(guard.status || "PENDING")}`}>
+                    {guard.status || "PENDING"}
                 </span>
             </div>
 
@@ -61,11 +62,11 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         <p className="font-medium">{guard.cnic}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Father's Name</p>
+                        <p className="text-sm text-gray-600">Father&apos;s Name</p>
                         <p className="font-medium">{guard.fatherName || "—"}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Mother's Name</p>
+                        <p className="text-sm text-gray-600">Mother&apos;s Name</p>
                         <p className="font-medium">{guard.motherName || "—"}</p>
                     </div>
                     <div>
@@ -158,7 +159,11 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                         <p className="text-sm text-gray-600">Regional Office</p>
-                        <p className="font-medium">{guard.regionalOffice || "—"}</p>
+                        <p className="font-medium">
+                            {typeof guard.regionalOffice === "string"
+                                ? guard.regionalOffice
+                                : guard.regionalOffice?.name || "—"}
+                        </p>
                     </div>
                     <div>
                         <p className="text-sm text-gray-600">Manager</p>
@@ -189,7 +194,7 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     <p className="text-sm text-gray-600">No nearest relative details available.</p>
                 ) : (
                     <div className="space-y-4">
-                        {nearestRelativeList.map((relative: any, index: number) => (
+                        {nearestRelativeList.map((relative: NearestRelative, index: number) => (
                             <div key={`${relative.name || "relative"}-${index}`} className="rounded-md border p-4">
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                                     <div>

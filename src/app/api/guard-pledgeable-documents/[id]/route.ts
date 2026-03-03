@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, conflict, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,20 +11,20 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await context.params
     const body = await request.json()
     const data: { name?: string; description?: string | null } = {}
 
     if (body.name !== undefined) {
       const name = String(body.name || "").trim()
-      if (!name) return NextResponse.json({ message: "Name is required." }, { status: 400 })
+      if (!name) return badRequest("Name is required.")
       data.name = name
     }
     if (body.description !== undefined) {
       data.description = body.description ? String(body.description) : null
     }
-    if (Object.keys(data).length === 0) return NextResponse.json({ message: "No fields provided." }, { status: 400 })
+    if (Object.keys(data).length === 0) return badRequest("No fields provided.")
 
     if (isMockEnabled()) return NextResponse.json({ id, ...data })
 
@@ -32,12 +33,12 @@ export async function PATCH(
       data,
     })
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for guard pledgeable documents yet." }, { status: 503 })
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Document type not found." }, { status: 404 })
-    if (String(error?.code) === "P2002") return NextResponse.json({ message: "Document type already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Document type not found.")
+    if (String((error as { code?: string }).code) === "P2002") return conflict("Document type already exists.")
     console.error("Error updating guard pledgeable document:", error)
-    return NextResponse.json({ message: "Failed to update document type." }, { status: 500 })
+    return internalServerError("Failed to update document type.")
   }
 }
 
@@ -47,7 +48,7 @@ export async function DELETE(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const { id } = await context.params
 
     if (isMockEnabled()) return NextResponse.json({ success: true, id })
@@ -56,10 +57,10 @@ export async function DELETE(
       where: { id },
     })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    if (isPrismaMissingSchemaError(error)) return NextResponse.json({ message: "Schema not migrated for guard pledgeable documents yet." }, { status: 503 })
-    if (String(error?.code) === "P2025") return NextResponse.json({ message: "Document type not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Document type not found.")
     console.error("Error deleting guard pledgeable document:", error)
-    return NextResponse.json({ message: "Failed to delete document type." }, { status: 500 })
+    return internalServerError("Failed to delete document type.")
   }
 }

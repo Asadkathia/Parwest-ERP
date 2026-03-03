@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
   { id: "mock-status-1", name: "New", color: "#3B82F6" },
@@ -12,30 +13,30 @@ const MOCK_ROWS = [
 export async function GET() {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
     const rows = await prisma.ticketStatus.findMany({ orderBy: { name: "asc" } })
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching ticket statuses:", error)
-    return NextResponse.json({ message: "Failed to fetch ticket statuses" }, { status: 500 })
+    return internalServerError("Failed to fetch ticket statuses")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const body = await request.json()
     const name = String(body?.name || "").trim()
     const color = body?.color ? String(body.color) : null
-    if (!name) return NextResponse.json({ message: "name is required." }, { status: 400 })
+    if (!name) return badRequest("name is required.")
     if (isMockEnabled()) return NextResponse.json({ id: `mock-status-${Date.now()}`, name, color }, { status: 201 })
     const created = await prisma.ticketStatus.create({ data: { name, color } })
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2002") return NextResponse.json({ message: "Status already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2002") return conflict("Status already exists.")
     console.error("Error creating ticket status:", error)
-    return NextResponse.json({ message: "Failed to create ticket status" }, { status: 500 })
+    return internalServerError("Failed to create ticket status")
   }
 }

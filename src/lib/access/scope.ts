@@ -6,6 +6,11 @@ export type ManagerScope = {
   regionalOfficeIds: string[]
 }
 
+export type ScopedQueryFilters = {
+  regionId?: string | null
+  regionalOfficeId?: string | null
+}
+
 export function isManagerRole(role: string | null | undefined) {
   const value = (role || "").toLowerCase()
   return value.includes("manager")
@@ -64,10 +69,7 @@ export function buildManagerScopeWhere(
 
 export function managerScopeDenied(
   scope: ManagerScope | null,
-  values: {
-    regionId?: string | null
-    regionalOfficeId?: string | null
-  }
+  values: ScopedQueryFilters
 ) {
   if (!scope) return false
 

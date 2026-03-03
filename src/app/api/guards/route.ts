@@ -5,12 +5,14 @@ import { isMockEnabled } from "@/lib/mockData"
 import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const managerScope = deriveManagerScope(session)
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
         const regionalOfficeId = searchParams.get("regionalOfficeId")
         const status = searchParams.get("status")
 
-        const where: any = {}
+        const where: Prisma.GuardWhereInput = {}
         if (regionId) where.regionId = regionId
         if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
         if (status) where.status = status
@@ -31,8 +33,8 @@ export async function GET(request: NextRequest) {
                 .filter((guard) => (where.status ? guard.status === where.status : true))
                 .filter((guard) =>
                     applyManagerScope([guard], managerScope, {
-                        regionId: (row) => (row as any).regionId,
-                        regionalOfficeId: (row) => (row as any).regionalOfficeId,
+                        regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
+                        regionalOfficeId: (row) => (row as Record<string, unknown>).regionalOfficeId as string | null | undefined,
                     }).length > 0
                 )
                 .map((guard) => ({
@@ -61,12 +63,9 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(guards)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching guards:", error)
-        return NextResponse.json(
-            { message: "Failed to fetch guards" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to fetch guards")
     }
 }
 
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const managerScope = deriveManagerScope(session)
@@ -83,10 +82,10 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const cnic = String(body?.cnic || "").trim()
         if (!cnic) {
-            return NextResponse.json({ message: "CNIC is required." }, { status: 400 })
+            return badRequest("CNIC is required.")
         }
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
-            return NextResponse.json({ message: "CNIC format must be XXXXX-XXXXXXX-X." }, { status: 400 })
+            return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId, regionalOfficeId: bodyRegionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: cannot create guard outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: cannot create guard outside your scope.")
         }
 
         try {
@@ -108,7 +107,7 @@ export async function POST(request: NextRequest) {
                 select: { id: true },
             })
             if (blocked) {
-                return NextResponse.json({ message: "This CNIC is blacklisted and cannot be enrolled." }, { status: 403 })
+                return forbidden("This CNIC is blacklisted and cannot be enrolled.")
             }
         } catch (error) {
             if (!isPrismaMissingSchemaError(error)) throw error
@@ -134,10 +133,7 @@ export async function POST(request: NextRequest) {
             select: { id: true },
         })
         if (existingCnic) {
-            return NextResponse.json(
-                { message: "A guard with this CNIC already exists" },
-                { status: 400 }
-            )
+            return badRequest("A guard with this CNIC already exists")
         }
 
         const generateNextParwestId = async () => {
@@ -192,11 +188,12 @@ export async function POST(request: NextRequest) {
                     data: createGuardPayload(parwestId),
                 })
                 return NextResponse.json(guard, { status: 201 })
-            } catch (error: any) {
+            } catch (error: unknown) {
                 lastCreateError = error
-                const message = String(error?.message || "").toLowerCase()
-                const code = String(error?.code || "")
-                const target = String(error?.meta?.target || "").toLowerCase()
+                const errorLike = error as { message?: unknown; code?: unknown; meta?: { target?: unknown } }
+                const message = String(errorLike.message || "").toLowerCase()
+                const code = String(errorLike.code || "")
+                const target = String(errorLike.meta?.target || "").toLowerCase()
                 const parwestIdConflict =
                     (code === "P2002" && target.includes("parwestid")) ||
                     message.includes("parwestid")
@@ -207,19 +204,14 @@ export async function POST(request: NextRequest) {
         }
 
         throw lastCreateError ?? new Error("Failed to generate unique Parwest ID")
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating guard:", error)
+        const errorLike = error as { code?: unknown }
 
-        if (error.code === "P2002") {
-            return NextResponse.json(
-                { message: "A guard with this CNIC already exists" },
-                { status: 400 }
-            )
+        if (String(errorLike.code || "") === "P2002") {
+            return badRequest("A guard with this CNIC already exists")
         }
 
-        return NextResponse.json(
-            { message: "Failed to create guard" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to create guard")
     }
 }

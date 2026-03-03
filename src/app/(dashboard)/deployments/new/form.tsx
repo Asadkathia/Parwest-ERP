@@ -71,8 +71,8 @@ export default function DeploymentForm({ guards, clients, regionalOffices }: Pro
 
             router.push("/deployments")
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to create deployment")
             setLoading(false)
         }
     }

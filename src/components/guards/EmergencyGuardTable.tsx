@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import StatusChip from "@/components/ui/status-chip"
-import { EmergencyGuardRow, EmergencyReason } from "@/lib/mockData"
+import type { EmergencyGuardRow, EmergencyReason } from "@/lib/guards/emergency"
 
 function urgencyVariant(urgency: EmergencyGuardRow["urgency"]) {
   if (urgency === "HIGH") return "danger"

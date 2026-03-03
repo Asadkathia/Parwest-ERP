@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PUT(
     request: NextRequest,
@@ -10,7 +11,7 @@ export async function PUT(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -23,14 +24,14 @@ export async function PUT(
         })
 
         if (!existingClient) {
-            return NextResponse.json({ message: "Client not found" }, { status: 404 })
+            return notFound("Client not found")
         }
         if (managerScope && managerScopeDenied(managerScope, { regionId: existingClient.regionId })) {
-            return NextResponse.json({ message: "Forbidden: client is outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: client is outside your scope.")
         }
         const bodyRegionId = body?.regionId ? String(body.regionId) : null
         if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
-            return NextResponse.json({ message: "Forbidden: cannot move client outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: cannot move client outside your scope.")
         }
 
         // Update client
@@ -53,11 +54,8 @@ export async function PUT(
         })
 
         return NextResponse.json(client, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating client:", error)
-        return NextResponse.json(
-            { message: "Failed to update client" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to update client")
     }
 }

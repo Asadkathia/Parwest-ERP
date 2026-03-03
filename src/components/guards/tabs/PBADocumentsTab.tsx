@@ -1,12 +1,22 @@
 "use client"
 
 import { FileText, BadgeCheck } from "lucide-react"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
+
+type PbaDocument = {
+    id: string
+    name?: string
+    type?: string
+    uploadedAt?: string
+    verificationStatus?: string
+}
 
 interface PBADocumentsTabProps {
-    documents: any[]
+    documents: GuardLooseRow[]
 }
 
 export default function PBADocumentsTab({ documents }: PBADocumentsTabProps) {
+    const rows = documents as PbaDocument[]
     const getStatusColor = (status: string) => {
         if (status === "VERIFIED") return "bg-green-100 text-green-800"
         if (status === "PENDING") return "bg-yellow-100 text-yellow-800"
@@ -17,7 +27,7 @@ export default function PBADocumentsTab({ documents }: PBADocumentsTabProps) {
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">PBA Documents</h2>
 
-            {documents.length === 0 ? (
+            {rows.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No PBA documents found</p>
@@ -35,7 +45,7 @@ export default function PBADocumentsTab({ documents }: PBADocumentsTabProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {documents.map((doc) => (
+                            {rows.map((doc) => (
                                 <tr key={doc.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm font-medium">{doc.name}</td>
                                     <td className="px-6 py-4 text-sm">{doc.type}</td>
@@ -45,7 +55,7 @@ export default function PBADocumentsTab({ documents }: PBADocumentsTabProps) {
                                             : "—"}
                                     </td>
                                     <td className="px-6 py-4 text-sm">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.verificationStatus)}`}>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.verificationStatus || "PENDING")}`}>
                                             {doc.verificationStatus || "—"}
                                         </span>
                                     </td>
@@ -64,4 +74,3 @@ export default function PBADocumentsTab({ documents }: PBADocumentsTabProps) {
         </div>
     )
 }
-

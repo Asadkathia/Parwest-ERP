@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { getPrismaCode } from "@/lib/prisma-errors"
+import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") || undefined
@@ -13,7 +16,7 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get("vendorId") || undefined
     const search = searchParams.get("search") || undefined
 
-    const where: any = {}
+    const where: Prisma.InventoryItemWhereInput = {}
     if (status) where.status = status
     if (categoryId) where.categoryId = categoryId
     if (vendorId) where.vendorId = vendorId
@@ -39,20 +42,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching inventory items:", error)
-    return NextResponse.json({ message: "Failed to fetch inventory items." }, { status: 500 })
+    return internalServerError("Failed to fetch inventory items.")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
 
     const body = await request.json()
     const uniqueNumber = String(body.uniqueNumber || "").trim()
     const categoryId = String(body.categoryId || "").trim()
     if (!uniqueNumber || !categoryId) {
-      return NextResponse.json({ message: "uniqueNumber and categoryId are required." }, { status: 400 })
+      return badRequest("uniqueNumber and categoryId are required.")
     }
 
     const created = await prisma.inventoryItem.create({
@@ -87,11 +90,11 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(created, { status: 201 })
-  } catch (error: any) {
-    if (String(error?.code) === "P2002") {
-      return NextResponse.json({ message: "Unique number already exists." }, { status: 409 })
+  } catch (error: unknown) {
+    if (getPrismaCode(error) === "P2002") {
+      return conflict("Unique number already exists.")
     }
     console.error("Error creating inventory item:", error)
-    return NextResponse.json({ message: "Failed to create inventory item." }, { status: 500 })
+    return internalServerError("Failed to create inventory item.")
   }
 }

@@ -9,6 +9,7 @@ const links = [
   { title: "User Types", href: "/settings/user-types" },
   { title: "Guard Bank Names", href: "/settings/guard-bank-names" },
   { title: "Fingerprint Device", href: "/settings/fingerprint-device" },
+  { title: "Workflow Rules", href: "/settings/workflow-rules" },
   { title: "System Settings", href: "/settings/system" },
 ]
 

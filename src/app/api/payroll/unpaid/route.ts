@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope } from "@/lib/access/scope"
+import { internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const managerScope = deriveManagerScope(session)
     const { searchParams } = new URL(request.url)
     const monthRaw = searchParams.get("month")
     const search = searchParams.get("search") || undefined
 
-    const where: any = { paymentStatus: "UNPAID" }
+    const where: Prisma.PayrollWhereInput = { paymentStatus: "UNPAID" }
     if (monthRaw) {
       const month = new Date(monthRaw)
       if (!Number.isNaN(month.getTime())) where.month = month
@@ -44,6 +46,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching unpaid payroll:", error)
-    return NextResponse.json({ message: "Failed to fetch unpaid salaries." }, { status: 500 })
+    return internalServerError("Failed to fetch unpaid salaries.")
   }
 }

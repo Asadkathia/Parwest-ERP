@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
+        const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
         const regionalOfficeId = searchParams.get("regionalOfficeId") || undefined
@@ -16,10 +19,19 @@ export async function GET(request: NextRequest) {
         const startDate = searchParams.get("startDate")
         const endDate = searchParams.get("endDate")
 
+        if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: regionalOfficeId || null })) {
+            return forbidden("Forbidden: cannot query attendance outside your scope.")
+        }
+
+        const scopedWhere = {
+            ...(regionalOfficeId ? { regionalOfficeId } : {}),
+            ...buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
+        }
+
         const deployments = await prisma.deployment.findMany({
             where: {
                 status: "ACTIVE",
-                ...(regionalOfficeId ? { regionalOfficeId } : {}),
+                ...scopedWhere,
                 ...(clientId ? { clientId } : {}),
                 ...(branchId ? { branchId } : {}),
             },
@@ -131,8 +143,8 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(rows)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching client attendance:", error)
-        return NextResponse.json({ message: "Failed to fetch client attendance" }, { status: 500 })
+        return internalServerError("Failed to fetch client attendance")
     }
 }

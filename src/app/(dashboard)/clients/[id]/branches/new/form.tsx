@@ -41,8 +41,8 @@ export default function BranchForm({ clientId, clientName }: Props) {
 
             router.push(`/clients/${clientId}`)
             router.refresh()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Unexpected error")
             setLoading(false)
         }
     }
@@ -59,6 +59,7 @@ export default function BranchForm({ clientId, clientName }: Props) {
                 {/* Basic Information */}
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
+                    <p className="mb-3 text-sm text-[var(--text-muted)]">Creating branch for: {clientName}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
                             <label className="block text-sm text-[var(--text-muted)] mb-1">

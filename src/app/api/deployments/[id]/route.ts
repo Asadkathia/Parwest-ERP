@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+
+function parseOptionalNumber(value: unknown) {
+    if (value === undefined) return undefined
+    if (value === null || value === "") return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function isValidShiftType(value: string) {
+    return value === "DAY" || value === "NIGHT" || value === "BOTH"
+}
 
 export async function PATCH(
     request: NextRequest,
@@ -10,7 +24,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -19,67 +33,163 @@ export async function PATCH(
 
         const existing = await prisma.deployment.findUnique({
             where: { id },
-            select: { id: true, regionalOfficeId: true },
+            select: { id: true, status: true, guardId: true, regionalOfficeId: true, clientId: true, endDate: true },
         })
         if (!existing) {
-            return NextResponse.json({ message: "Deployment not found" }, { status: 404 })
+            return notFound("Deployment not found")
+        }
+
+        if (isWorkflowRuleEnabled("deployments.blockInactiveUpdate") && existing.status !== "ACTIVE") {
+            return conflict("Cannot update an inactive deployment.")
         }
 
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: deployment is outside your scope.")
         }
 
-        const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        if (body?.status != null && String(body.status) !== "ACTIVE") {
+            return badRequest("Use /api/deployments/[id]/end to end a deployment.")
+        }
+
+        const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId).trim() : null
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: bodyRegionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: cannot move deployment outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: cannot move deployment outside your scope.")
         }
 
-        // Check if guard is being changed and if new guard has active deployments
-        if (body.guardId) {
-            const existingDeployment = await prisma.deployment.findFirst({
-                where: {
-                    guardId: body.guardId,
-                    status: "ACTIVE",
-                    id: { not: id }, // Exclude current deployment
-                },
-            })
+        const patchGuardId = body?.guardId ? String(body.guardId).trim() : undefined
+        const patchClientId = body?.clientId ? String(body.clientId).trim() : undefined
+        const patchBranchId = body?.branchId === null ? null : (body?.branchId ? String(body.branchId).trim() : undefined)
+        const patchRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId).trim() : undefined
+        const patchDeploymentDateRaw = body?.deploymentDate ? String(body.deploymentDate).trim() : undefined
+        const patchShiftType = body?.shiftType ? String(body.shiftType).trim().toUpperCase() : undefined
 
-            if (existingDeployment) {
-                return NextResponse.json(
-                    { message: "This guard already has an active deployment" },
-                    { status: 400 }
-                )
+        if (patchShiftType && !isValidShiftType(patchShiftType)) {
+            return badRequest("shiftType must be DAY, NIGHT, or BOTH.")
+        }
+
+        let parsedDeploymentDate: Date | undefined
+        if (patchDeploymentDateRaw) {
+            parsedDeploymentDate = new Date(patchDeploymentDateRaw)
+            if (Number.isNaN(parsedDeploymentDate.getTime())) {
+                return badRequest("Invalid deploymentDate value.")
+            }
+            if (existing.endDate && parsedDeploymentDate > existing.endDate) {
+                return badRequest("deploymentDate cannot be after endDate.")
             }
         }
 
-        // Update deployment
+        if (patchGuardId) {
+            const guard = await prisma.guard.findUnique({
+                where: { id: patchGuardId },
+                select: { id: true, status: true, regionalOfficeId: true },
+            })
+            if (!guard) return notFound("Guard not found.")
+            if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && String(guard.status) !== "ACTIVE") {
+                return conflict("Only ACTIVE guards can be deployed.")
+            }
+
+            if (isWorkflowRuleEnabled("deployments.singleActivePerGuard")) {
+                const existingDeployment = await prisma.deployment.findFirst({
+                    where: {
+                        guardId: patchGuardId,
+                        status: "ACTIVE",
+                        id: { not: id }, // Exclude current deployment
+                    },
+                    select: { id: true },
+                })
+
+                if (existingDeployment) {
+                    return conflict("This guard already has an active deployment.")
+                }
+            }
+        }
+
+        if (isWorkflowRuleEnabled("deployments.requireGuardOfficeConsistency")) {
+            const effectiveGuardId = patchGuardId ?? existing.guardId
+            const effectiveRegionalOfficeId = patchRegionalOfficeId ?? existing.regionalOfficeId
+            const effectiveGuard = await prisma.guard.findUnique({
+                where: { id: effectiveGuardId },
+                select: { id: true, regionalOfficeId: true },
+            })
+            if (!effectiveGuard) return notFound("Guard not found.")
+            if (effectiveGuard.regionalOfficeId && effectiveGuard.regionalOfficeId !== effectiveRegionalOfficeId) {
+                return badRequest("Guard regional office does not match deployment regional office.")
+            }
+        }
+
+        const finalClientId = patchClientId ?? existing.clientId
+        if (patchClientId) {
+            const client = await prisma.client.findUnique({ where: { id: patchClientId }, select: { id: true } })
+            if (!client) return notFound("Client not found.")
+        }
+
+        if (patchRegionalOfficeId) {
+            const office = await prisma.regionalOffice.findUnique({ where: { id: patchRegionalOfficeId }, select: { id: true } })
+            if (!office) return notFound("Regional office not found.")
+        }
+
+        if (patchBranchId !== undefined && patchBranchId !== null) {
+            const branch = await prisma.branch.findUnique({
+                where: { id: patchBranchId },
+                select: { id: true, clientId: true },
+            })
+            if (!branch) return notFound("Branch not found.")
+            if (branch.clientId !== finalClientId) {
+                return badRequest("Branch does not belong to the selected client.")
+            }
+        }
+
+        const numericRate = parseOptionalNumber(body?.rate)
+        const numericSalary = parseOptionalNumber(body?.salary)
+        const numericOvertime = parseOptionalNumber(body?.overtime)
+        const numericExtraHours = parseOptionalNumber(body?.extraHours)
+        const numericPostAllowance = parseOptionalNumber(body?.postAllowance)
+        if (
+            numericRate === undefined ||
+            numericSalary === undefined ||
+            numericOvertime === undefined ||
+            numericExtraHours === undefined ||
+            numericPostAllowance === undefined
+        ) {
+            return badRequest("Numeric fields contain invalid values.")
+        }
+
+        const data: Prisma.DeploymentUncheckedUpdateInput = {}
+        if (patchGuardId !== undefined) data.guardId = patchGuardId
+        if (patchClientId !== undefined) data.clientId = patchClientId
+        if (patchBranchId !== undefined) data.branchId = patchBranchId
+        if (patchRegionalOfficeId !== undefined) data.regionalOfficeId = patchRegionalOfficeId
+        if (parsedDeploymentDate !== undefined) data.deploymentDate = parsedDeploymentDate
+        if (body?.designation !== undefined) {
+            const designation = String(body.designation || "").trim()
+            if (!designation) {
+                return badRequest("designation cannot be empty.")
+            }
+            data.designation = designation
+        }
+        if (patchShiftType !== undefined) data.shiftType = patchShiftType
+        if (numericRate !== undefined) data.rate = numericRate
+        if (body?.notes !== undefined) data.notes = body.notes ? String(body.notes) : null
+        if (body?.guardType !== undefined) data.guardType = body.guardType ? String(body.guardType) : null
+        if (numericSalary !== undefined) data.salary = numericSalary
+        if (numericOvertime !== undefined) data.overtime = numericOvertime
+        if (numericExtraHours !== undefined) data.extraHours = numericExtraHours
+        if (numericPostAllowance !== undefined) data.postAllowance = numericPostAllowance
+        if (body?.dayShiftStart !== undefined) data.dayShiftStart = body.dayShiftStart ? String(body.dayShiftStart) : null
+        if (body?.dayShiftEnd !== undefined) data.dayShiftEnd = body.dayShiftEnd ? String(body.dayShiftEnd) : null
+        if (body?.nightShiftStart !== undefined) data.nightShiftStart = body.nightShiftStart ? String(body.nightShiftStart) : null
+        if (body?.nightShiftEnd !== undefined) data.nightShiftEnd = body.nightShiftEnd ? String(body.nightShiftEnd) : null
+        if (body?.deploymentType !== undefined) data.deploymentType = body.deploymentType ? String(body.deploymentType) : null
+        if (body?.isExtraGuard !== undefined) data.isExtraGuard = body.isExtraGuard === "on" || body.isExtraGuard === true
+        if (body?.comment !== undefined) data.comment = body.comment ? String(body.comment) : null
+
+        if (Object.keys(data).length === 0) {
+            return badRequest("No valid fields provided for update.")
+        }
+
         const deployment = await prisma.deployment.update({
             where: { id },
-            data: {
-                guardId: body.guardId,
-                clientId: body.clientId,
-                branchId: body.branchId || null,
-                regionalOfficeId: body.regionalOfficeId,
-                deploymentDate: new Date(body.deploymentDate),
-                designation: body.designation || null,
-                shiftType: body.shiftType,
-                rate: body.rate ? parseFloat(body.rate) : null,
-                status: body.status || "ACTIVE",
-                notes: body.notes || null,
-                // Extended fields
-                guardType: body.guardType || null,
-                salary: body.salary ? parseFloat(body.salary) : null,
-                overtime: body.overtime ? parseFloat(body.overtime) : null,
-                extraHours: body.extraHours ? parseFloat(body.extraHours) : null,
-                postAllowance: body.postAllowance ? parseFloat(body.postAllowance) : null,
-                dayShiftStart: body.dayShiftStart || null,
-                dayShiftEnd: body.dayShiftEnd || null,
-                nightShiftStart: body.nightShiftStart || null,
-                nightShiftEnd: body.nightShiftEnd || null,
-                deploymentType: body.deploymentType || "REGULAR",
-                isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
-                comment: body.comment || null,
-            },
+            data,
             include: {
                 guard: true,
                 client: true,
@@ -89,16 +199,9 @@ export async function PATCH(
         })
 
         return NextResponse.json(deployment, { status: 200 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating deployment:", error)
-        return NextResponse.json(
-            {
-                message: "Failed to update deployment",
-                error: error.message,
-                details: error.toString()
-            },
-            { status: 500 }
-        )
+        return internalServerError("Failed to update deployment")
     }
 }
 
@@ -109,7 +212,7 @@ export async function DELETE(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
 
@@ -117,13 +220,16 @@ export async function DELETE(
 
         const existing = await prisma.deployment.findUnique({
             where: { id },
-            select: { id: true, regionalOfficeId: true },
+            select: { id: true, status: true, regionalOfficeId: true },
         })
         if (!existing) {
-            return NextResponse.json({ message: "Deployment not found" }, { status: 404 })
+            return notFound("Deployment not found")
         }
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId })) {
-            return NextResponse.json({ message: "Forbidden: deployment is outside your scope." }, { status: 403 })
+            return forbidden("Forbidden: deployment is outside your scope.")
+        }
+        if (existing.status !== "ACTIVE") {
+            return conflict("Deployment is already ended.")
         }
 
         // Soft delete - set status to INACTIVE and add end date
@@ -131,19 +237,13 @@ export async function DELETE(
             where: { id },
             data: {
                 status: "INACTIVE",
-                // Note: endDate field doesn't exist in schema, just changing status
+                endDate: new Date(),
             },
         })
 
-        return NextResponse.json(
-            { message: "Deployment ended successfully", deployment },
-            { status: 200 }
-        )
-    } catch (error: any) {
+        return ok({ message: "Deployment ended successfully", deployment })
+    } catch (error: unknown) {
         console.error("Error ending deployment:", error)
-        return NextResponse.json(
-            { message: "Failed to end deployment" },
-            { status: 500 }
-        )
+        return internalServerError("Failed to end deployment")
     }
 }

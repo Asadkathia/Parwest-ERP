@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
+import { UserCircle2 } from "lucide-react"
 
 type Props = {
   guardId: string
@@ -46,10 +48,19 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
       <p className="text-sm font-semibold text-[var(--text)] mb-3">Profile Picture</p>
       <div className="flex items-center gap-4">
         {preview ? (
-          <img src={preview} alt={guardName} className="h-20 w-20 rounded-full object-cover border border-[var(--border)]" />
+          <Image
+            src={preview}
+            alt={guardName}
+            width={80}
+            height={80}
+            unoptimized
+            className="h-20 w-20 rounded-full object-cover border border-[var(--border)]"
+          />
         ) : (
-          <div className="h-20 w-20 rounded-full bg-[var(--surface-muted)] border border-[var(--border)] flex items-center justify-center text-lg font-semibold text-[var(--text-muted)]">
-            {initials || "GU"}
+          <div className="h-20 w-20 rounded-full bg-[var(--surface-muted)] border border-[var(--border)] flex flex-col items-center justify-center text-[var(--text-muted)]">
+            <UserCircle2 className="h-8 w-8 opacity-70" />
+            <span className="text-[10px] font-medium leading-none mt-1">No photo</span>
+            <span className="text-[10px] font-semibold leading-none mt-0.5">{initials || "GU"}</span>
           </div>
         )}
         <div className="space-y-2">

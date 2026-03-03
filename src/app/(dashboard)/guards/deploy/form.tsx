@@ -223,8 +223,8 @@ export default function DeployGuardForm() {
       } else {
         setNotice("Guard deployed successfully.")
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to deploy guard")
     } finally {
       setLoading(false)
     }
@@ -301,7 +301,7 @@ export default function DeployGuardForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard's Type</label>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard&apos;s Type</label>
               <select name="guard_type" value={guardType} onChange={(e) => setGuardType(e.target.value)} required className="ui-select">
                 <option value="">Type</option>
                 <option value="Guard">Guard</option>
@@ -334,15 +334,15 @@ export default function DeployGuardForm() {
               <h3 className="font-medium mb-2">Selected Guard Details:</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard's Name</label>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Name</label>
                   <input value={selectedGuardData.name} readOnly className="ui-input bg-slate-50" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard's Designations</label>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Designations</label>
                   <input value={designation || "Designation"} readOnly className="ui-input bg-slate-50" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard's Type</label>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Type</label>
                   <input value={guardType || "Type"} readOnly className="ui-input bg-slate-50" />
                 </div>
                 <div>

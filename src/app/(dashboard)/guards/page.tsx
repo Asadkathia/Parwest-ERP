@@ -7,6 +7,7 @@ import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
+import GuardAvatar from "@/components/guards/GuardAvatar"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { mockGuardsList } from "@/lib/mockData/guards"
@@ -27,6 +28,7 @@ export default async function GuardsPage() {
     regionId: string | null
     regionalOfficeId: string | null
     supervisorName: string | null
+    photoUrl?: string | null
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
@@ -44,6 +46,7 @@ export default async function GuardsPage() {
       regionId: null,
       regionalOfficeId: null,
       supervisorName: index % 2 === 0 ? "Fazal Mehdi" : "Muhammad Aslam",
+      photoUrl: null,
     }))
     stats.total = guards.length
     stats.active = guards.filter((g) => g.status === "ACTIVE").length
@@ -70,26 +73,16 @@ export default async function GuardsPage() {
       stats.pending = pending
       stats.inactive = inactive
     } catch (error) {
-      guards = mockGuardsList.slice(0, 20).map((guard, index) => ({
-        id: guard.id,
-        parwestId: guard.parwestId,
-        name: guard.name,
-        cnic: guard.cnic,
-        phone: guard.phone || null,
-        status: guard.status,
-        regionId: null,
-        regionalOfficeId: null,
-        supervisorName: index % 2 === 0 ? "Fazal Mehdi" : "Muhammad Aslam",
-      }))
-      stats.total = guards.length
-      stats.active = guards.filter((g) => g.status === "ACTIVE").length
-      stats.pending = guards.filter((g) => g.status === "PENDING").length
-      stats.inactive = guards.filter((g) => g.status === "INACTIVE").length
+      guards = []
+      stats.total = 0
+      stats.active = 0
+      stats.pending = 0
+      stats.inactive = 0
 
       if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Showing fallback guard mock data."
+        dbWarning = "Database schema is not fully migrated yet. Guard data is unavailable."
       } else {
-        dbWarning = `Unable to load guard data (${toErrorMessage(error, "Unknown database error")}). Showing fallback mock data.`
+        dbWarning = `Unable to load guard data (${toErrorMessage(error, "Unknown database error")}).`
       }
       console.error("GuardsPage query failed:", error)
     }
@@ -149,6 +142,7 @@ export default async function GuardsPage() {
           <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Parwest ID</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Photo</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">CNIC</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Phone</th>
@@ -161,7 +155,7 @@ export default async function GuardsPage() {
           <tbody className="divide-y divide-[var(--border)]">
             {guards.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={9} className="px-6 py-12 text-center text-[var(--text-muted)]">
                   <p className="text-base font-medium text-[var(--text)]">No guards found.</p>
                 </td>
               </tr>
@@ -169,6 +163,9 @@ export default async function GuardsPage() {
               guards.map((guard) => (
                 <tr key={guard.id} className="hover:bg-[var(--surface-muted)]">
                   <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{guard.parwestId}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">
+                    <GuardAvatar guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl} />
+                  </td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.name}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.cnic}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.phone || "—"}</td>

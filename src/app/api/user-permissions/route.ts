@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isMockEnabled } from "@/lib/mockData"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_MODULES = [
   "GUARDS",
@@ -17,18 +18,27 @@ const MOCK_MODULES = [
   "AUDIT",
 ]
 
+type PermissionPayload = {
+  module?: unknown
+  canCreate?: unknown
+  canView?: unknown
+  canUpdate?: unknown
+  canDelete?: unknown
+  canRequisition?: unknown
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
 
     if (!userId) {
-      return NextResponse.json({ message: "userId is required." }, { status: 400 })
+      return badRequest("userId is required.")
     }
 
     if (isMockEnabled()) {
@@ -54,7 +64,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows)
   } catch (error) {
     console.error("Error fetching user permissions:", error)
-    return NextResponse.json({ message: "Failed to fetch user permissions" }, { status: 500 })
+    return internalServerError("Failed to fetch user permissions")
   }
 }
 
@@ -62,7 +72,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+      return unauthorized()
     }
 
     const body = await request.json()
@@ -70,16 +80,17 @@ export async function PUT(request: NextRequest) {
     const permissions = Array.isArray(body?.permissions) ? body.permissions : []
 
     if (!userId) {
-      return NextResponse.json({ message: "userId is required." }, { status: 400 })
+      return badRequest("userId is required.")
     }
 
     if (permissions.length === 0) {
-      return NextResponse.json({ message: "permissions array is required." }, { status: 400 })
+      return badRequest("permissions array is required.")
     }
 
     if (isMockEnabled()) {
+      const normalized = permissions as PermissionPayload[]
       return NextResponse.json(
-        permissions.map((p: any, index: number) => ({
+        normalized.map((p, index: number) => ({
           id: `mock-perm-saved-${index}`,
           userId,
           module: String(p.module),
@@ -92,7 +103,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const data = permissions.map((p: any) => ({
+    const normalized = permissions as PermissionPayload[]
+    const data = normalized.map((p) => ({
       userId,
       module: String(p.module),
       canCreate: Boolean(p.canCreate),
@@ -113,11 +125,11 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json(rows)
-  } catch (error: any) {
-    if (String(error?.code) === "P2003") {
-      return NextResponse.json({ message: "Invalid userId." }, { status: 400 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2003") {
+      return badRequest("Invalid userId.")
     }
     console.error("Error saving user permissions:", error)
-    return NextResponse.json({ message: "Failed to save user permissions" }, { status: 500 })
+    return internalServerError("Failed to save user permissions")
   }
 }

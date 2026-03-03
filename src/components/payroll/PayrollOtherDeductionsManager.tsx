@@ -6,6 +6,7 @@ import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
 type GuardOption = { id: string; name: string; parwestId: string }
+type GuardApiRow = { id: string; name: string; parwestId: string }
 type Row = {
   id: string
   month: string
@@ -25,7 +26,7 @@ export default function PayrollOtherDeductionsManager() {
     const response = await fetch("/api/guards?status=ACTIVE")
     if (!response.ok) throw new Error("Failed to load guards")
     const data = await response.json()
-    setGuards((data || []).map((g: any) => ({ id: g.id, name: g.name, parwestId: g.parwestId })))
+    setGuards((data as GuardApiRow[] || []).map((g) => ({ id: g.id, name: g.name, parwestId: g.parwestId })))
   }, [])
 
   const loadRows = useCallback(async () => {
@@ -83,8 +84,8 @@ export default function PayrollOtherDeductionsManager() {
       setForm({ guardId: "", month: "", amount: "" })
       setNotice({ type: "success", message: "Other deduction saved." })
       await loadRows()
-    } catch (error: any) {
-      setNotice({ type: "error", message: error?.message || "Unable to save deduction." })
+    } catch (error: unknown) {
+      setNotice({ type: "error", message: error instanceof Error ? error.message : "Unable to save deduction." })
     }
   }
 

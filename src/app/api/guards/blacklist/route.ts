@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 function sanitizeCnic(value: string) {
     return value.trim()
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const { searchParams } = new URL(request.url)
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
         })
 
         return NextResponse.json(rows)
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (isPrismaMissingSchemaError(error)) {
             const guards = await prisma.guard.findMany({
                 where: { status: "BLACKLISTED" },
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(guards)
         }
         console.error("Error fetching blacklisted guards:", error)
-        return NextResponse.json({ message: "Failed to fetch blacklisted guards" }, { status: 500 })
+        return internalServerError("Failed to fetch blacklisted guards")
     }
 }
 
@@ -64,18 +65,18 @@ export async function POST(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json()
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
         const reason = typeof body.reason === "string" ? body.reason.trim() : null
         if (!cnic) {
-            return NextResponse.json({ message: "cnic is required" }, { status: 400 })
+            return badRequest("cnic is required")
         }
 
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
-            return NextResponse.json({ message: "CNIC format must be XXXXX-XXXXXXX-X." }, { status: 400 })
+            return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
         }
 
         const blacklistEntry = await prisma.blacklistedCnic.upsert({
@@ -107,9 +108,9 @@ export async function POST(request: NextRequest) {
             },
             { status: 200 }
         )
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error blacklisting CNIC:", error)
-        return NextResponse.json({ message: "Failed to blacklist CNIC" }, { status: 500 })
+        return internalServerError("Failed to blacklist CNIC")
     }
 }
 
@@ -117,7 +118,7 @@ export async function DELETE(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const body = await request.json().catch(() => ({}))
@@ -125,7 +126,7 @@ export async function DELETE(request: NextRequest) {
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
 
         if (!id && !cnic) {
-            return NextResponse.json({ message: "id or cnic is required" }, { status: 400 })
+            return badRequest("id or cnic is required")
         }
 
         const record = id
@@ -133,7 +134,7 @@ export async function DELETE(request: NextRequest) {
             : await prisma.blacklistedCnic.findUnique({ where: { cnic } })
 
         if (!record) {
-            return NextResponse.json({ message: "Blacklist record not found." }, { status: 404 })
+            return notFound("Blacklist record not found.")
         }
 
         await prisma.blacklistedCnic.delete({ where: { id: record.id } })
@@ -143,8 +144,8 @@ export async function DELETE(request: NextRequest) {
         })
 
         return NextResponse.json({ success: true, cnic: record.cnic })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error removing blacklisted CNIC:", error)
-        return NextResponse.json({ message: "Failed to remove blacklisted CNIC" }, { status: 500 })
+        return internalServerError("Failed to remove blacklisted CNIC")
     }
 }

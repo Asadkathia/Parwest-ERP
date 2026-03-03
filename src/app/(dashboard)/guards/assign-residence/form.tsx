@@ -114,8 +114,8 @@ export default function AssignResidenceForm() {
             setAssignDate("")
             setRevokeDate("")
             setComment("")
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to assign residence")
         } finally {
             setLoading(false)
         }
@@ -158,9 +158,9 @@ export default function AssignResidenceForm() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div><label className="block text-sm text-gray-600 mb-1">Guard's Name</label><input className="w-full border rounded-md px-3 py-2" value={selectedGuard?.name || ""} placeholder="Name" readOnly /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Guard's Designations</label><input className="w-full border rounded-md px-3 py-2" value="Designation" readOnly /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Guard's Type</label><input className="w-full border rounded-md px-3 py-2" value="Type" readOnly /></div>
+                    <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Name</label><input className="w-full border rounded-md px-3 py-2" value={selectedGuard?.name || ""} placeholder="Name" readOnly /></div>
+                    <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Designations</label><input className="w-full border rounded-md px-3 py-2" value="Designation" readOnly /></div>
+                    <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Type</label><input className="w-full border rounded-md px-3 py-2" value="Type" readOnly /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">Assign Date</label><input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">Revoke Date</label><input type="date" value={revokeDate} onChange={(e) => setRevokeDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                     <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Comment</label><input value={comment} onChange={(e) => setComment(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Comment" /></div>

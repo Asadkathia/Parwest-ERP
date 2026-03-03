@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+
+const ALLOWED_PAYMENT_STATUSES = new Set(["PENDING", "UNPAID", "PAID"])
+const ALLOWED_PAYMENT_METHODS = new Set(["BANK", "CASH", "MOBILE"])
 
 export async function PATCH(
   request: NextRequest,
@@ -9,10 +13,26 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session) return unauthorized()
     const managerScope = deriveManagerScope(session)
     const { id } = await params
     const body = await request.json()
+    const paymentStatus =
+      body.paymentStatus !== undefined && body.paymentStatus !== null
+        ? String(body.paymentStatus).toUpperCase()
+        : undefined
+    const paymentMethodRaw =
+      body.paymentMethod !== undefined && body.paymentMethod !== null
+        ? String(body.paymentMethod).trim()
+        : undefined
+    const paymentMethod = paymentMethodRaw ? paymentMethodRaw.toUpperCase() : paymentMethodRaw
+
+    if (paymentStatus && !ALLOWED_PAYMENT_STATUSES.has(paymentStatus)) {
+      return badRequest("paymentStatus must be PENDING, UNPAID, or PAID.")
+    }
+    if (paymentMethod !== undefined && paymentMethod !== "" && !ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+      return badRequest("paymentMethod must be BANK, CASH, or MOBILE.")
+    }
 
     const existing = await prisma.payroll.findUnique({
       where: { id },
@@ -27,7 +47,7 @@ export async function PATCH(
       },
     })
     if (!existing) {
-      return NextResponse.json({ message: "Payroll row not found." }, { status: 404 })
+      return notFound("Payroll row not found.")
     }
     if (
       managerScope &&
@@ -36,14 +56,19 @@ export async function PATCH(
         regionalOfficeId: existing.guard?.regionalOfficeId || null,
       })
     ) {
-      return NextResponse.json({ message: "Forbidden: payroll row is outside your scope." }, { status: 403 })
+      return forbidden("Forbidden: payroll row is outside your scope.")
     }
 
     const updated = await prisma.payroll.update({
       where: { id },
       data: {
-        paymentStatus: body.paymentStatus ? String(body.paymentStatus) : undefined,
-        paymentMethod: body.paymentMethod !== undefined ? (body.paymentMethod ? String(body.paymentMethod) : null) : undefined,
+        paymentStatus,
+        paymentMethod:
+          paymentMethod !== undefined
+            ? paymentMethod === ""
+              ? null
+              : paymentMethod
+            : undefined,
       },
       include: {
         guard: { select: { id: true, name: true, parwestId: true } },
@@ -51,11 +76,11 @@ export async function PATCH(
     })
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    if (String(error?.code) === "P2025") {
-      return NextResponse.json({ message: "Payroll row not found." }, { status: 404 })
+  } catch (error: unknown) {
+    if (String((error as { code?: string }).code) === "P2025") {
+      return notFound("Payroll row not found.")
     }
     console.error("Error updating payroll salary row:", error)
-    return NextResponse.json({ message: "Failed to update payroll row." }, { status: 500 })
+    return internalServerError("Failed to update payroll row.")
   }
 }

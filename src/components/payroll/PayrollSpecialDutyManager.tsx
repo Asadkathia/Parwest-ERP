@@ -30,7 +30,10 @@ export default function PayrollSpecialDutyManager() {
   }, [])
 
   useEffect(() => {
-    load().catch(() => null)
+    const timer = setTimeout(() => {
+      void load()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [load])
 
   const submit = async () => {

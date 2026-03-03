@@ -4,16 +4,40 @@ import { prisma } from "@/lib/db"
 import Link from "next/link"
 import { ArrowLeft, Edit } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
-import { mockGuardProfile, mockGuardsList } from "@/lib/mockData/guards"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
+import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
 
-function calculateAge(dateOfBirth?: Date | null, referenceDate?: Date | null) {
-    if (!dateOfBirth || !referenceDate) return null
-    let years = referenceDate.getFullYear() - dateOfBirth.getFullYear()
-    const monthDiff = referenceDate.getMonth() - dateOfBirth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < dateOfBirth.getDate())) {
+type GuardDetailModel = GuardTabModel & {
+    id: string
+    parwestId: string
+    name: string
+    cnic: string
+    phone?: string | null
+    email?: string | null
+    status: string
+    regionalOffice?: { name?: string | null } | null
+    managerName?: string | null
+    joiningAge?: number | null
+    enrolledBy?: string | null
+    profileIntroducer?: string | null
+    nearestRelatives?: NearestRelative[]
+}
+
+function toDateOrNull(value?: Date | string | null) {
+    if (!value) return null
+    const parsed = value instanceof Date ? value : new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function calculateAge(dateOfBirth?: Date | string | null, referenceDate?: Date | string | null) {
+    const birthDate = toDateOrNull(dateOfBirth)
+    const joinedDate = toDateOrNull(referenceDate)
+    if (!birthDate || !joinedDate) return null
+    let years = joinedDate.getFullYear() - birthDate.getFullYear()
+    const monthDiff = joinedDate.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && joinedDate.getDate() < birthDate.getDate())) {
         years--
     }
     return years >= 0 ? years : null
@@ -26,7 +50,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     const { id } = await params
 
     let dbWarning = ""
-    let guard: any = null
+    let guard: GuardDetailModel | null = null
 
     try {
         guard = await prisma.guard.findUnique({
@@ -40,62 +64,42 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         if (!isPrismaMissingSchemaError(error)) {
             throw error
         }
-
-        const fallbackGuard =
-            mockGuardsList.find((item) => item.id === id) ??
-            mockGuardsList[0] ??
-            mockGuardProfile
-
-        guard = {
-            id,
-            parwestId: fallbackGuard.parwestId ?? "—",
-            name: fallbackGuard.name ?? "Unknown Guard",
-            cnic: fallbackGuard.cnic ?? "—",
-            phone: fallbackGuard.phone ?? null,
-            email: fallbackGuard.email ?? null,
-            status: fallbackGuard.status ?? "PENDING",
-            dateOfBirth: null,
-            joiningDate: null,
-            region: null,
-            regionalOffice: null,
-        }
         dbWarning = `Database schema is not fully migrated (${toErrorMessage(
             error,
             "missing required tables"
-        )}). Showing fallback profile data.`
+        )}). Guard profile is unavailable.`
         console.error("GuardDetailPage query failed:", error)
     }
 
-    if (!guard) notFound()
+    if (!guard) {
+        if (dbWarning) {
+            return (
+                <div className="space-y-6">
+                    <InlineAlert type="error" message={dbWarning} />
+                    <div className="ui-card p-6 space-y-4">
+                        <h1 className="text-2xl font-semibold text-[var(--text)]">Guard profile unavailable</h1>
+                        <p className="text-sm text-[var(--text-muted)]">
+                            Guard detail could not be loaded because required database schema is unavailable.
+                        </p>
+                        <Link href="/guards" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Guards
+                        </Link>
+                    </div>
+                </div>
+            )
+        }
+        notFound()
+    }
 
-    // Merge database guard with mock data for tabs
     const guardWithTabs = {
         ...guard,
-        ...mockGuardProfile,
-        id: guard.id,
-        parwestId: guard.parwestId,
-        name: guard.name,
-        cnic: guard.cnic,
-        phone: guard.phone,
-        email: guard.email,
-        status: guard.status,
-        regionalOffice: guard.regionalOffice?.name || mockGuardProfile.regionalOffice,
-        supervisorName: (mockGuardProfile as { supervisorName?: string }).supervisorName || "Fazal Mehdi",
-        managerName: (guard as any).managerName || (mockGuardProfile as { managerName?: string }).managerName || "—",
-        joiningAge:
-            (guard as any).joiningAge ??
-            calculateAge(guard.dateOfBirth, guard.joiningDate) ??
-            (mockGuardProfile as { joiningAge?: number }).joiningAge ??
-            null,
-        enrolledBy: (guard as any).enrolledBy || (mockGuardProfile as { enrolledBy?: string }).enrolledBy || "—",
-        profileIntroducer:
-            (guard as any).profileIntroducer ||
-            (mockGuardProfile as { profileIntroducer?: string }).profileIntroducer ||
-            "—",
-        nearestRelatives:
-            (guard as any).nearestRelatives ||
-            (mockGuardProfile as { nearestRelatives?: Array<Record<string, string>> }).nearestRelatives ||
-            [],
+        regionalOffice: guard.regionalOffice?.name || null,
+        managerName: guard.managerName || "—",
+        joiningAge: guard.joiningAge ?? calculateAge(guard.dateOfBirth ?? null, guard.joiningDate ?? null) ?? null,
+        enrolledBy: guard.enrolledBy || "—",
+        profileIntroducer: guard.profileIntroducer || "—",
+        nearestRelatives: guard.nearestRelatives || [],
     }
 
     const getStatusColor = (status: string) => {
@@ -142,7 +146,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                     <div>
                         <h1 className="text-3xl font-bold">{guard.name}</h1>
                         <p className="text-gray-600 mt-1">Parwest ID: {guard.parwestId}</p>
-                        <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.supervisorName}</p>
+                        <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.managerName || "—"}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
                         {guard.status}

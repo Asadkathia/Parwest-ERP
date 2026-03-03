@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { internalServerError, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
     request: NextRequest,
@@ -9,7 +10,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+            return unauthorized()
         }
 
         const { id } = await params
@@ -29,8 +30,8 @@ export async function PATCH(
         })
 
         return NextResponse.json(residence)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating residence:", error)
-        return NextResponse.json({ message: "Failed to update residence" }, { status: 500 })
+        return internalServerError("Failed to update residence")
     }
 }
