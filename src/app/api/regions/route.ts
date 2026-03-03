@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_REGIONS = [
@@ -11,7 +11,7 @@ const MOCK_REGIONS = [
 
 export async function GET() {
     try {
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(MOCK_REGIONS, { status: 200 })
         }
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
             return badRequest("Region name is required.")
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(
                 { id: `mock-region-${Date.now()}`, name, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
                 { status: 201 }

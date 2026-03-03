@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
@@ -14,7 +14,7 @@ export async function GET() {
     const session = await auth()
     if (!session) return unauthorized()
 
-    if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
+    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.ticketCategory.findMany({
       orderBy: { name: "asc" },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     if (!name) return badRequest("name is required.")
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id: `mock-cat-${Date.now()}`, name, description, color }, { status: 201 })
     }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
@@ -16,7 +16,7 @@ export async function PATCH(
     const data: Record<string, unknown> = {}
     if (body.name != null) data.name = String(body.name)
     if (body.color !== undefined) data.color = body.color ? String(body.color) : null
-    if (isMockEnabled()) return NextResponse.json({ id, ...data })
+    if (isRuntimeMockEnabled()) return NextResponse.json({ id, ...data })
     const updated = await prisma.ticketStatus.update({ where: { id }, data })
     return NextResponse.json(updated)
   } catch (error: unknown) {
@@ -34,7 +34,7 @@ export async function DELETE(
     const session = await auth()
     if (!session) return unauthorized()
     const { id } = await context.params
-    if (isMockEnabled()) return NextResponse.json({ success: true })
+    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })
     await prisma.ticketStatus.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error: unknown) {

@@ -9,9 +9,8 @@ import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { isMockEnabled } from "@/lib/mockData"
-import { mockDeploymentsList } from "@/lib/mockData/deployments"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function DeploymentsPage() {
   const session = await auth()
@@ -29,46 +28,38 @@ export default async function DeploymentsPage() {
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0 }
-  const mockMode = isMockEnabled()
+  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
-  if (mockMode) {
-    deployments = mockDeploymentsList.slice(0, 20).map((row) => ({
-      ...row,
-      deploymentDate: new Date(row.deploymentDate),
-    }))
-    stats.total = deployments.length
-    stats.active = deployments.filter((d) => d.status === "ACTIVE").length
-    stats.inactive = deployments.filter((d) => d.status === "INACTIVE").length
-    dbWarning = "Mock mode enabled: showing deployment fallback data."
-  } else {
-    try {
-      const [rows, total, active, inactive] = await Promise.all([
-        prisma.deployment.findMany({
-          take: 20,
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.deployment.count(),
-        prisma.deployment.count({ where: { status: "ACTIVE" } }),
-        prisma.deployment.count({ where: { status: "INACTIVE" } }),
-      ])
-      deployments = rows
-      stats.total = total
-      stats.active = active
-      stats.inactive = inactive
-    } catch (error) {
-      deployments = []
-      stats.total = 0
-      stats.active = 0
-      stats.inactive = 0
-
-      if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Deployment data is unavailable."
-      } else {
-        dbWarning = `Unable to load deployment data (${toErrorMessage(error, "Unknown database error")}).`
-      }
-      console.error("DeploymentsPage query failed:", error)
+  try {
+    const [rows, total, active, inactive] = await Promise.all([
+      prisma.deployment.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.deployment.count(),
+      prisma.deployment.count({ where: { status: "ACTIVE" } }),
+      prisma.deployment.count({ where: { status: "INACTIVE" } }),
+    ])
+    deployments = rows
+    stats.total = total
+    stats.active = active
+    stats.inactive = inactive
+    if (mockMode) {
+      dbWarning = "Mock mode enabled: showing deployment data via runtime adapter."
     }
+  } catch (error) {
+    deployments = []
+    stats.total = 0
+    stats.active = 0
+    stats.inactive = 0
+
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Deployment data is unavailable."
+    } else {
+      dbWarning = `Unable to load deployment data (${toErrorMessage(error, "Unknown database error")}).`
+    }
+    console.error("DeploymentsPage query failed:", error)
   }
 
   deployments = applyManagerScope(deployments, scope, {

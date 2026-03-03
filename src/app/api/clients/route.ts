@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockClientsList } from "@/lib/mockData/clients"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         if (status) where.status = status
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const clients = mockClientsList
                 .filter((client) => (where.status ? client.status === where.status : true))
                 .filter((client) =>
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             return forbidden("Forbidden: cannot create client outside your scope.")
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const mock = {
                 id: `mock-client-${Date.now()}`,
                 name: String(body.name || "Mock Client"),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockDeploymentsList } from "@/lib/mockData/deployments"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
@@ -27,7 +27,7 @@ export async function GET() {
         }
         const managerScope = deriveManagerScope(session)
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(
                 applyManagerScope(mockDeploymentsList, managerScope, {
                     regionalOfficeId: (row) => {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
             return forbidden("Forbidden: cannot create deployment outside your scope.")
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const mockDeployment = {
                 id: `mock-deploy-${Date.now()}`,
                 guardId,

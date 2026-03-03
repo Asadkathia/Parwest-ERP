@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       return forbidden("Forbidden: cannot query users outside your scope.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows = MOCK_USERS.filter((user) => {
         if (status && user.status !== status) return false
         if (roleId && user.role.id !== roleId) return false
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       return badRequest("name, email, password, and roleId are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-user-${Date.now()}`,

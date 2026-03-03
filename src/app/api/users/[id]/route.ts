@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
@@ -33,7 +33,7 @@ export async function PATCH(
       return badRequest("No valid fields provided for update.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id, ...data })
     }
 

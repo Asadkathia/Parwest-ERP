@@ -9,9 +9,8 @@ import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { isMockEnabled } from "@/lib/mockData"
-import { mockClientsList } from "@/lib/mockData/clients"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function ClientsPage() {
   const session = await auth()
@@ -28,55 +27,49 @@ export default async function ClientsPage() {
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
-  const mockMode = isMockEnabled()
+  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
-  if (mockMode) {
-    clients = mockClientsList.slice(0, 20)
-    stats.total = clients.length
-    stats.active = clients.filter((c) => c.status === "ACTIVE").length
-    stats.inactive = clients.filter((c) => c.status === "INACTIVE").length
-    stats.totalBranches = clients.reduce((sum, c) => sum + c.branchCount, 0)
-    dbWarning = "Mock mode enabled: showing client fallback data."
-  } else {
-    try {
-      const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
-        prisma.client.findMany({
-          take: 20,
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.client.count(),
-        prisma.client.count({ where: { status: "ACTIVE" } }),
-        prisma.client.count({ where: { status: "INACTIVE" } }),
-        prisma.branch.count(),
-      ])
-      clients = clientRows.map((c) => ({
-        id: c.id,
-        name: c.name,
-        type: c.type,
-        city: c.city,
-        status: c.status,
-        regionId: c.regionId,
-        branchCount: 0,
-      }))
-      stats.total = total
-      stats.active = active
-      stats.inactive = inactive
-      stats.totalBranches = totalBranches
-    } catch (error) {
-      clients = []
-      stats.total = 0
-      stats.active = 0
-      stats.inactive = 0
-      stats.totalBranches = 0
-
-      if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Client data is unavailable."
-      } else {
-        dbWarning = `Unable to load client data (${toErrorMessage(error, "Unknown database error")}).`
-      }
-      console.error("ClientsPage query failed:", error)
+  try {
+    const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
+      prisma.client.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.client.count(),
+      prisma.client.count({ where: { status: "ACTIVE" } }),
+      prisma.client.count({ where: { status: "INACTIVE" } }),
+      prisma.branch.count(),
+    ])
+    clients = clientRows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      city: c.city,
+      status: c.status,
+      regionId: c.regionId,
+      branchCount: 0,
+    }))
+    stats.total = total
+    stats.active = active
+    stats.inactive = inactive
+    stats.totalBranches = totalBranches
+    if (mockMode) {
+      dbWarning = "Mock mode enabled: showing client data via runtime adapter."
     }
+  } catch (error) {
+    clients = []
+    stats.total = 0
+    stats.active = 0
+    stats.inactive = 0
+    stats.totalBranches = 0
+
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Client data is unavailable."
+    } else {
+      dbWarning = `Unable to load client data (${toErrorMessage(error, "Unknown database error")}).`
+    }
+    console.error("ClientsPage query failed:", error)
   }
 
   clients = applyManagerScope(clients, scope, {

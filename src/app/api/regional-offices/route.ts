@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_OFFICES = [
@@ -35,7 +35,7 @@ const MOCK_OFFICES = [
 
 export async function GET() {
     try {
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(MOCK_OFFICES, { status: 200 })
         }
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
             return badRequest("name, seriesCode and regionId are required.")
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(
                 {
                     id: `mock-office-${Date.now()}`,

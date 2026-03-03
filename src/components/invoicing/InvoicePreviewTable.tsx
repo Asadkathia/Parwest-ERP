@@ -1,4 +1,4 @@
-import { InvoiceDraft } from "@/lib/mockData"
+import type { InvoiceDraft } from "@/lib/invoicing/types"
 
 export default function InvoicePreviewTable({ draft }: { draft: InvoiceDraft }) {
   return (

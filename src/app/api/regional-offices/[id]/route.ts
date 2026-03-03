@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
@@ -29,7 +29,7 @@ export async function PATCH(
       return badRequest("No valid fields provided.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id, ...data, updatedAt: new Date().toISOString() })
     }
 
@@ -65,7 +65,7 @@ export async function DELETE(
     }
     const { id } = await context.params
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ success: true })
     }
 

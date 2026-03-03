@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const supervisorId = searchParams.get("supervisorId") || undefined
     const managerScope = deriveManagerScope(session)
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows = MOCK_ROWS.filter((row) => {
         if (managerId && row.manager.id !== managerId) return false
         if (supervisorId && row.supervisor.id !== supervisorId) return false
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       return badRequest("managerId and supervisorId are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-ms-${Date.now()}`,

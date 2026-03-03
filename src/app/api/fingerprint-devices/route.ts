@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { readFingerprintDevices, updateFingerprintDevices, type FingerprintDeviceStatus } from "@/lib/fingerprint/store"
 
 const VALID_STATUS: FingerprintDeviceStatus[] = ["ONLINE", "OFFLINE", "WARNING"]
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       return badRequest("status must be ONLINE, OFFLINE, or WARNING.")
     }
 
-    const office = isMockEnabled()
+    const office = isRuntimeMockEnabled()
       ? (() => {
           const officeName = MOCK_OFFICE_NAMES[officeId]
           return officeName ? { id: officeId, name: officeName } : null

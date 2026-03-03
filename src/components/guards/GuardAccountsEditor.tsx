@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { GuardBankAccount } from "@/lib/mockData/meetingAdditions"
+import type { GuardBankAccount } from "@/lib/guards/bank-accounts"
 
 type Props = {
   name?: string

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import StatusChip from "@/components/ui/status-chip"
-import { GeneratedReport, ReportTemplate, generateSystemReportRows, getFixedReportTimestamp } from "@/lib/mockData"
+import type { GeneratedReport, ReportTemplate } from "@/lib/reports/system-report-types"
 
 type Props = {
   templates: ReportTemplate[]
@@ -15,13 +15,26 @@ export default function SystemReportList({ templates, generated }: Props) {
   const [generatedState, setGeneratedState] = useState(generated)
   const [search, setSearch] = useState("")
 
+  const estimateRowCount = (templateId: string) => {
+    const existing = generatedState.find((item) => item.templateId === templateId)
+    if (existing) return existing.rowCount
+    const defaults: Record<string, number> = {
+      "rpt-1": 120,
+      "rpt-2": 80,
+      "rpt-3": 40,
+      "rpt-4": 25,
+      "rpt-5": 30,
+    }
+    return defaults[templateId] || 20
+  }
+
   const runNow = (templateId: string) => {
     setTemplateState((prev) => prev.map((item) => (item.id === templateId ? { ...item, status: "RUNNING" } : item)))
 
     window.setTimeout(() => {
       const template = templateState.find((item) => item.id === templateId)
-      const rows = generateSystemReportRows(templateId)
-      const timestamp = getFixedReportTimestamp()
+      const rowCount = estimateRowCount(templateId)
+      const timestamp = new Date().toISOString()
 
       setTemplateState((prev) =>
         prev.map((item) =>
@@ -36,7 +49,7 @@ export default function SystemReportList({ templates, generated }: Props) {
           templateName: template?.name || "Generated report",
           generatedAt: timestamp,
           status: "READY",
-          rowCount: rows.length,
+          rowCount,
         },
         ...prev,
       ])

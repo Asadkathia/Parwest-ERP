@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_TICKETS = [
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const priorityId = searchParams.get("priorityId") || undefined
     const categoryId = searchParams.get("categoryId") || undefined
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows = MOCK_TICKETS.filter((ticket) => {
         if (statusId && ticket.status.id !== statusId) return false
         if (priorityId && ticket.priority.id !== priorityId) return false
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       return badRequest("subject, categoryId, priorityId, and statusId are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-ticket-${Date.now()}`,

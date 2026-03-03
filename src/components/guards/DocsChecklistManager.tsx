@@ -1,7 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { mockGuardsList } from "@/lib/mockData"
+import { useEffect, useMemo, useState } from "react"
 
 type SubmittedDoc = {
   id: string
@@ -19,26 +18,72 @@ type GuardDocRow = {
   submittedDocs: SubmittedDoc[]
 }
 
-export default function DocsChecklistManager() {
-  const [rows, setRows] = useState<GuardDocRow[]>(() =>
-    mockGuardsList.slice(0, 20).map((guard) => {
-      const submitted = ((guard as { attachments?: Array<{ id?: string; name?: string; type?: string; url?: string }> }).attachments || []).map((doc, index) => ({
-        id: String(doc.id || `${guard.id}-doc-${index + 1}`),
-        name: doc.name || `Document ${index + 1}`,
-        type: doc.type,
-        url: doc.url,
-        selected: false,
-      }))
+type GuardListApiRow = {
+  id: string
+  parwestId?: string | null
+  name?: string | null
+  attachments?: Array<{ id?: string; name?: string; type?: string; url?: string }> | null
+}
 
-      return {
-        id: guard.id,
-        parwestId: guard.parwestId,
-        name: guard.name,
-        selected: false,
-        submittedDocs: submitted,
+const toSubmittedDocs = (
+  guardId: string,
+  attachments: GuardListApiRow["attachments"]
+): SubmittedDoc[] =>
+  (attachments || []).map((doc, index) => ({
+    id: String(doc.id || `${guardId}-doc-${index + 1}`),
+    name: doc.name || `Document ${index + 1}`,
+    type: doc.type,
+    url: doc.url,
+    selected: false,
+  }))
+
+export default function DocsChecklistManager() {
+  const [rows, setRows] = useState<GuardDocRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadRows = async () => {
+      try {
+        setLoading(true)
+        setLoadError(null)
+        const response = await fetch("/api/guards", { cache: "no-store" })
+        const payload: unknown = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          const message =
+            payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+              ? payload.error
+              : "Failed to load guards."
+          throw new Error(message)
+        }
+
+        const guards = Array.isArray(payload) ? (payload as GuardListApiRow[]) : []
+        const mapped = guards.slice(0, 200).map((guard) => ({
+          id: guard.id,
+          parwestId: String(guard.parwestId || "N/A"),
+          name: String(guard.name || "Unnamed Guard"),
+          selected: false,
+          submittedDocs: toSubmittedDocs(guard.id, guard.attachments),
+        }))
+        if (!mounted) return
+        setRows(mapped)
+      } catch (error: unknown) {
+        if (!mounted) return
+        setRows([])
+        setLoadError(error instanceof Error ? error.message : "Failed to load guards.")
+      } finally {
+        if (mounted) setLoading(false)
       }
-    })
-  )
+    }
+
+    void loadRows()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const selectedGuards = useMemo(() => rows.filter((row) => row.selected), [rows])
 
@@ -194,8 +239,16 @@ export default function DocsChecklistManager() {
                 <td className="px-4 py-2 text-sm">{row.submittedDocs.length}</td>
               </tr>
             ))}
+            {!loading && rows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-sm text-[var(--text-muted)]">
+                  {loadError ? `Unavailable: ${loadError}` : "No guards found."}
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
+        {loading ? <p className="px-4 py-3 text-sm text-[var(--text-muted)]">Loading guards...</p> : null}
       </section>
 
       <section className="ui-card p-4 space-y-4">

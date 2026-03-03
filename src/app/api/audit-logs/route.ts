@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 import type { Prisma } from "@prisma/client"
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const dateFromRaw = searchParams.get("dateFrom")
     const dateToRaw = searchParams.get("dateTo")
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       let rows = [...MOCK_AUDIT_LOGS]
       if (moduleFilter) rows = rows.filter((row) => row.module === moduleFilter)
       if (eventFilter) rows = rows.filter((row) => row.event === eventFilter)
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       return badRequest("event and module are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-audit-${Date.now()}`,

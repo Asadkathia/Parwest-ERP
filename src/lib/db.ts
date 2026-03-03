@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
-import { isMockEnabled } from '@/lib/mockData'
+import { isRuntimeMockEnabled } from '@/lib/runtime/mock-mode'
 import { createMockPrismaClient } from '@/lib/mockData/prismaMock'
 
-const mockMode = isMockEnabled()
+const mockMode = isRuntimeMockEnabled()
 const databaseUrl =
     process.env.DATABASE_URL ?? process.env.DATABASE_URL_UNPOOLED
 

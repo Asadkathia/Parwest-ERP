@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get("categoryId") || undefined
     const regionalOfficeId = searchParams.get("regionalOfficeId") || undefined
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows = MOCK_ROWS.filter((row) => {
         if (status && row.status !== status) return false
         if (categoryId && row.category.id !== categoryId) return false
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       return badRequest("New demands must be created with PENDING status.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-demand-${Date.now()}`,

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import ActionButton from "@/components/ui/action-button"
-import { OcrExtraction, simulateOcrExtraction } from "@/lib/mockData"
+import { OcrExtraction, simulateOcrExtraction } from "@/lib/ocr/simulation"
 
 type Props = {
   target: "guard" | "client"

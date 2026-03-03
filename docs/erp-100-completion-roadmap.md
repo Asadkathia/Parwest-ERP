@@ -38,9 +38,9 @@ A module is 100% complete only if all are true:
 Current snapshot (2026-03-03):
 - Total tracked tasks in this roadmap: `69`
 - Done: `7`
-- In progress: `0`
+- In progress: `1`
 - Blocked: `1`
-- Todo: `61`
+- Todo: `60`
 - Source-of-truth operational completion: see `docs/delivery-source-of-truth-checklist.md` (`95%`, `18/19` in Operational Validation & Handoff)
 
 ---
@@ -295,6 +295,14 @@ Current snapshot (2026-03-03):
 - 2026-03-03: `ERP-GRD-008` completed. Removed emergency guard pool mock dataset dependency and switched to DB-derived emergency rows with explicit unavailable-state handling.
 - 2026-03-03: `ERP-XGT-004` progressed. Removed SHSHK/Admin Center direct seeded mock dependencies from dashboard flow (`src/app/(dashboard)/dashboard/shshk/page.tsx`, `src/app/(dashboard)/dashboard/admin-center/manager.tsx`) and decoupled shared types from mockData.
 - 2026-03-03: `ERP-PAY-103` completed. Removed bulk-loan upload page seeded mock-row dependency and switched to upload-driven runtime draft initialization.
+- 2026-03-03: `ERP-XGT-004` progressed. Removed dashboard map card `mockDeploymentsList` import and replaced with deterministic illustrative rendering (`src/components/dashboard/GuardClientMapCard.tsx`).
+- 2026-03-03: `ERP-XGT-004` progressed. Migrated `PromptReportPanel` from direct mock lists to runtime API snapshot loading (`/api/guards`, `/api/clients`, `/api/deployments`) with safe fallback state.
+- 2026-03-03: `ERP-XGT-004` progressed. Removed `SystemReportList`/`InvoicePreviewTable` direct `mockData` coupling and moved shared report/invoice types to domain modules (`src/lib/reports/system-report-types.ts`, `src/lib/invoicing/types.ts`).
+- 2026-03-03: `ERP-XGT-004` progressed. Removed `DocsChecklistManager` direct `mockGuardsList` dependency and switched to runtime `/api/guards` loading with explicit loading/unavailable states (`src/components/guards/DocsChecklistManager.tsx`, `npm run ci:quality` pass).
+- 2026-03-03: `ERP-XGT-004` progressed. Removed direct `mockData` coupling from guard accounts editor and OCR upload panel by moving contracts to domain modules (`src/lib/guards/bank-accounts.ts`, `src/lib/ocr/simulation.ts`) and rewiring components (`src/components/guards/GuardAccountsEditor.tsx`, `src/components/ocr/OcrUploadPanel.tsx`).
+- 2026-03-03: `ERP-XGT-004` progressed. Removed direct `mockData` imports from topbar and guards/clients/deployments listing screens by introducing `src/lib/runtime/mock-mode.ts` and switching pages to runtime `prisma` adapter reads with explicit mock-mode messaging.
+- 2026-03-03: `ERP-XGT-004` progressed. Refactored runtime services to consume centralized mock-mode helper instead of `mockData` barrel (`src/lib/auth.ts`, `src/lib/db.ts`) while preserving authentication and DB adapter behavior.
+- 2026-03-03: `ERP-XGT-004` progressed. Completed large-batch API consistency refactor replacing `isMockEnabled` (`@/lib/mockData`) with `isRuntimeMockEnabled` (`@/lib/runtime/mock-mode`) across route handlers without changing route behavior; quality gates remained green.
 - 2026-03-02: `ERP-CLI-104` completed. Added Branch Client / Branchless Client mode selection buttons and preselected add flow (`mode=branch|branchless`).
 - 2026-03-02: `ERP-CLI-105` completed. Removed non-mock DB-error fallback client rows from clients listing page and retained explicit unavailable-state messaging.
 - 2026-03-03: `ERP-CLI-106` completed. Removed `getMockBranchType` dependency from client branches list/detail/edit and replaced with non-mock branch-model utility.

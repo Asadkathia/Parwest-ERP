@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -14,7 +14,7 @@ export async function GET(
     if (!session?.user?.id) return unauthorized()
     const { id } = await context.params
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id, title: "Mock Requisition", status: "PENDING", module: "General" })
     }
 
@@ -63,7 +63,7 @@ export async function PATCH(
       return badRequest("No valid fields provided.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id, ...data })
     }
 

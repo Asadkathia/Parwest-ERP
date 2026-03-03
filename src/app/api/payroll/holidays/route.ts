@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -14,7 +14,7 @@ export async function GET() {
     const session = await auth()
     if (!session) return unauthorized()
 
-    if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
+    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.payrollHoliday.findMany({
       orderBy: { date: "desc" },
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       return badRequest("Invalid date value.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ id: `mock-holiday-${Date.now()}`, name, date: date.toISOString(), notes }, { status: 201 })
     }
 

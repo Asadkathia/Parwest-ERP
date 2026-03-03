@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get("priority") || undefined
     const search = searchParams.get("search") || undefined
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows = MOCK_ROWS.filter((row) => {
         if (status && row.status !== status) return false
         if (moduleName && row.module !== moduleName) return false
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       return badRequest("title and module are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
           id: `mock-req-${Date.now()}`,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
@@ -59,7 +59,7 @@ export async function PATCH(
     }
     if (Object.keys(data).length === 0) return badRequest("No fields provided.")
 
-    if (isMockEnabled()) return NextResponse.json({ id, ...data })
+    if (isRuntimeMockEnabled()) return NextResponse.json({ id, ...data })
 
     const existing = await prisma.inventoryDemand.findUnique({
       where: { id },
@@ -149,7 +149,7 @@ export async function DELETE(
     if (!session) return unauthorized()
     const { id } = await context.params
 
-    if (isMockEnabled()) return NextResponse.json({ success: true, id })
+    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true, id })
 
     await prisma.inventoryDemand.delete({
       where: { id },

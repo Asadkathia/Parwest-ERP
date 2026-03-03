@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 import { internalServerError, unauthorized } from "@/lib/api/response"
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         const paymentMode = searchParams.get("paymentMode")
         const guardCategory = searchParams.get("guardCategory")
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const rows = mockGuardsList.filter((guard) => {
                 if (status && guard.status !== status) return false
                 if (education && (guard.education || "").toLowerCase() !== education.toLowerCase()) return false

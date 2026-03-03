@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROLES = [
@@ -18,7 +18,7 @@ export async function GET() {
       return unauthorized()
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(MOCK_ROLES)
     }
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       return badRequest("Role name is required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         { id: `mock-role-${Date.now()}`, name, description, createdAt: new Date().toISOString() },
         { status: 201 }

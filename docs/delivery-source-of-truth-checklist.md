@@ -2256,6 +2256,40 @@ Sprint exit criteria:
     - `set -a; source .env; set +a; npm run ci:quality` => pass
   - Risk: low; upload currently seeds a single draft placeholder row until backend parsing endpoint is wired.
   - Next: continue `ERP-XGT-004` audit for remaining production-path mock dependencies.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed dashboard guard/client map card import of `mockDeploymentsList`.
+    - Replaced with deterministic in-component illustrative point generation.
+    - Updated map subtitle from explicit mock wording to neutral illustrative wording.
+  - Evidence:
+    - `src/components/dashboard/GuardClientMapCard.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; map remains illustrative UI until geo/location backend is integrated.
+  - Next: continue `ERP-XGT-004` by replacing remaining component-level mock imports (`PromptReportPanel`, report helper views) with API/runtime-backed data.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed `PromptReportPanel` direct imports of `mockGuardsList`, `mockClientsList`, and `mockDeploymentsList`.
+    - Added runtime snapshot loading from `/api/guards`, `/api/clients`, and `/api/deployments` with safe error fallback state.
+    - Kept prompt narratives while wiring KPI/row values to runtime API-backed snapshot data.
+  - Evidence:
+    - `src/components/ai/PromptReportPanel.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; snapshot currently loads once on mount and may lag during long sessions until a future refresh control is added.
+  - Next: continue `ERP-XGT-004` for remaining mock-linked helper components (`SystemReportList`, report preview helpers).
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed `SystemReportList` dependency on mock report helpers/functions and moved report types into non-mock domain module.
+    - Removed `InvoicePreviewTable` type import from `mockData` and moved invoice draft type to domain module.
+    - Replaced report run timestamp/rowcount generation with runtime-safe local logic (no mock source coupling).
+  - Evidence:
+    - `src/components/reports/SystemReportList.tsx`
+    - `src/components/invoicing/InvoicePreviewTable.tsx`
+    - `src/lib/reports/system-report-types.ts`
+    - `src/lib/invoicing/types.ts`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+    - `rg -n "from \"@/lib/mockData|from '@/lib/mockData'" src/components/reports src/components/invoicing src/components/ai src/components/dashboard` => no matches
+  - Risk: low; SystemReportList now estimates row counts for generated entries until wired to live report-run backend.
+  - Next: continue `ERP-XGT-004` by auditing remaining app pages/components outside dashboard helpers for direct `mockData` imports.
 - 2026-03-03 | `ERP-CLI-009` | done | owner:`@frontend`
   - Changes:
     - Replaced branch-model labeling logic based on `getMockBranchType` with non-mock utility derivation.
@@ -2279,6 +2313,65 @@ Sprint exit criteria:
     - `docs/delivery-source-of-truth-checklist.md` release snapshot updates
   - Risk: release cannot be promoted until all approver rows are completed.
   - Next: collect engineering/QA/product/ops approvals and record UTC timestamps.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed `DocsChecklistManager` direct dependency on `mockGuardsList`.
+    - Switched guard docs checklist source to runtime `/api/guards` loading with explicit loading/error empty states.
+    - Preserved checklist/print workflow behavior while making submitted-doc rows derive from runtime payload attachments when available.
+  - Evidence:
+    - `src/components/guards/DocsChecklistManager.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; if `/api/guards` does not include attachments in current schema, doc checklist stays usable but shows zero submitted docs until document APIs are wired.
+  - Next: continue `ERP-XGT-004` by removing direct `mockData` dependency from `src/components/guards/GuardAccountsEditor.tsx` and `src/components/ocr/OcrUploadPanel.tsx`.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed `GuardAccountsEditor` bank-account type dependency on `mockData` by introducing a dedicated guard domain type module.
+    - Removed `OcrUploadPanel` direct import from `mockData` by introducing a dedicated OCR simulation module for development-stage autofill behavior.
+    - Kept OCR/guard-account workflows functionally unchanged so future workflow customization remains easy.
+  - Evidence:
+    - `src/lib/guards/bank-accounts.ts`
+    - `src/lib/ocr/simulation.ts`
+    - `src/components/guards/GuardAccountsEditor.tsx`
+    - `src/components/ocr/OcrUploadPanel.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; OCR remains simulated until backend OCR service is introduced, but is now decoupled from shared mock dataset exports.
+  - Next: continue `ERP-XGT-004` by auditing remaining direct `mockData` imports in production components/pages (`src/components/ui/topbar.tsx`, `src/app/(dashboard)/deployments/page.tsx`, `src/app/(dashboard)/guards/page.tsx`, `src/app/(dashboard)/clients/page.tsx`).
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed direct `mockData` imports from topbar and primary listing pages (guards/clients/deployments).
+    - Added standalone runtime mock-mode helper and switched these screens to runtime DB adapter reads (`prisma`) instead of direct mock lists.
+    - Preserved editable workflow behavior while keeping explicit mock-mode messaging on these pages.
+  - Evidence:
+    - `src/lib/runtime/mock-mode.ts`
+    - `src/components/ui/topbar.tsx`
+    - `src/app/(dashboard)/guards/page.tsx`
+    - `src/app/(dashboard)/clients/page.tsx`
+    - `src/app/(dashboard)/deployments/page.tsx`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; listing screens now rely on runtime adapter shape in mock mode, which is preferred for parity but may expose any adapter/schema drift earlier.
+  - Next: continue `ERP-XGT-004` by reducing remaining direct `mockData` usage in runtime services (`src/lib/auth.ts`, `src/lib/db.ts`, and selected API routes as per module order).
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Removed `src/lib/auth.ts` dependency on `isMockEnabled` from `mockData` and switched to shared runtime mock-mode helper.
+    - Removed `src/lib/db.ts` dependency on `isMockEnabled` from `mockData` and switched to shared runtime mock-mode helper.
+    - Kept authentication behavior and mock-prisma adapter selection logic unchanged.
+  - Evidence:
+    - `src/lib/auth.ts`
+    - `src/lib/db.ts`
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; behavior is functionally equivalent with a narrower dependency boundary.
+  - Next: continue `ERP-XGT-004` by replacing remaining `isMockEnabled` imports in module APIs with `src/lib/runtime/mock-mode.ts`.
+- 2026-03-03 | `ERP-XGT-004` | in_progress | owner:`@frontend`
+  - Changes:
+    - Replaced `isMockEnabled` imports/usages with `isRuntimeMockEnabled` across API routes to remove direct `mockData` barrel dependency.
+    - Kept all route-level mock-mode branches intact; this is a dependency-boundary refactor only.
+    - Completed this as a large-batch consistency pass over API modules (users, guards, deployments, clients, payroll, tickets, inventory, settings, regional data, audit logs).
+  - Evidence:
+    - `rg -n "import { isMockEnabled } from \"@/lib/mockData\"|\\bisMockEnabled\\(" src/app/api -S` => no matches
+    - `rg -n "isRuntimeMockEnabled\\(" src/app/api -S` => route coverage confirmed
+    - `set -a; source .env; set +a; npm run ci:quality` => pass
+  - Risk: low; naming/import-level migration only, but broad file touch means any future merge conflicts on API route headers may increase temporarily.
+  - Next: continue `ERP-XGT-004` by reducing remaining direct `mockData` dataset imports in APIs by introducing focused runtime data providers per module.
 
 ## Upcoming Tasks (Queue: Next 10)
 

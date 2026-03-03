@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return badRequest("fromSupervisorId and toSupervisorId are required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const rows: PreviewRow[] = [
         {
           id: "mock-switch-1",
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       return badRequest("From and to supervisors cannot be same.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json({ switchedCount: 2, reason, switchedBy: session.user.id })
     }
 

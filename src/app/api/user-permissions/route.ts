@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_MODULES = [
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       return badRequest("userId is required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         MOCK_MODULES.map((module) => ({
           id: `mock-perm-${module.toLowerCase()}`,
@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
       return badRequest("permissions array is required.")
     }
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       const normalized = permissions as PermissionPayload[]
       return NextResponse.json(
         normalized.map((p, index: number) => ({

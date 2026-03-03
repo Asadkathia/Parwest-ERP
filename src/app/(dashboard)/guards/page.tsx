@@ -10,9 +10,8 @@ import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { mockGuardsList } from "@/lib/mockData/guards"
-import { isMockEnabled } from "@/lib/mockData"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function GuardsPage() {
   const session = await auth()
@@ -32,60 +31,52 @@ export default async function GuardsPage() {
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
-  const mockMode = isMockEnabled()
+  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
-  if (mockMode) {
-    guards = mockGuardsList.slice(0, 20).map((guard, index) => ({
+  try {
+    const [guardRows, total, active, pending, inactive] = await Promise.all([
+      prisma.guard.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.guard.count(),
+      prisma.guard.count({ where: { status: "ACTIVE" } }),
+      prisma.guard.count({ where: { status: "PENDING" } }),
+      prisma.guard.count({ where: { status: "INACTIVE" } }),
+    ])
+    guards = guardRows.map((guard) => ({
       id: guard.id,
       parwestId: guard.parwestId,
       name: guard.name,
       cnic: guard.cnic,
       phone: guard.phone || null,
       status: guard.status,
-      regionId: null,
-      regionalOfficeId: null,
-      supervisorName: index % 2 === 0 ? "Fazal Mehdi" : "Muhammad Aslam",
+      regionId: guard.regionId || null,
+      regionalOfficeId: guard.regionalOfficeId || null,
+      supervisorName: null,
       photoUrl: null,
     }))
-    stats.total = guards.length
-    stats.active = guards.filter((g) => g.status === "ACTIVE").length
-    stats.pending = guards.filter((g) => g.status === "PENDING").length
-    stats.inactive = guards.filter((g) => g.status === "INACTIVE").length
-    dbWarning = "Mock mode enabled: showing guard fallback data."
-  } else {
-    try {
-      const [guardRows, total, active, pending, inactive] = await Promise.all([
-        prisma.guard.findMany({
-          take: 20,
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.guard.count(),
-        prisma.guard.count({ where: { status: "ACTIVE" } }),
-        prisma.guard.count({ where: { status: "PENDING" } }),
-        prisma.guard.count({ where: { status: "INACTIVE" } }),
-      ])
-      guards = guardRows
-        .map((guard) => ({ ...guard, supervisorName: null }))
-        .map((guard) => ({ ...guard, regionalOfficeId: guard.regionalOfficeId || null }))
-      stats.total = total
-      stats.active = active
-      stats.pending = pending
-      stats.inactive = inactive
-    } catch (error) {
-      guards = []
-      stats.total = 0
-      stats.active = 0
-      stats.pending = 0
-      stats.inactive = 0
-
-      if (isPrismaMissingSchemaError(error)) {
-        dbWarning = "Database schema is not fully migrated yet. Guard data is unavailable."
-      } else {
-        dbWarning = `Unable to load guard data (${toErrorMessage(error, "Unknown database error")}).`
-      }
-      console.error("GuardsPage query failed:", error)
+    stats.total = total
+    stats.active = active
+    stats.pending = pending
+    stats.inactive = inactive
+    if (mockMode) {
+      dbWarning = "Mock mode enabled: showing guard data via runtime adapter."
     }
+  } catch (error) {
+    guards = []
+    stats.total = 0
+    stats.active = 0
+    stats.pending = 0
+    stats.inactive = 0
+
+    if (isPrismaMissingSchemaError(error)) {
+      dbWarning = "Database schema is not fully migrated yet. Guard data is unavailable."
+    } else {
+      dbWarning = `Unable to load guard data (${toErrorMessage(error, "Unknown database error")}).`
+    }
+    console.error("GuardsPage query failed:", error)
   }
 
   guards = applyManagerScope(guards, scope, {

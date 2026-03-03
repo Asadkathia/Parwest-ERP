@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -16,7 +16,7 @@ export async function DELETE(
     const { id } = (await context.params) as { id: string }
     const managerScope = deriveManagerScope(session)
 
-    if (isMockEnabled()) return NextResponse.json({ success: true })
+    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })
 
     const actorId = session.user?.id || null
     await prisma.$transaction(async (tx) => {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         if (status) where.status = status
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const guards = mockGuardsList
                 .filter((guard) => (where.status ? guard.status === where.status : true))
                 .filter((guard) =>
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
             if (!isPrismaMissingSchemaError(error)) throw error
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             const mock = {
                 id: `mock-guard-${Date.now()}`,
                 parwestId: `PW-${String(Date.now()).slice(-5)}`,

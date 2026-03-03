@@ -1,7 +1,7 @@
 import { Bell } from "lucide-react"
 import { Input } from "@/components/ui/form-controls"
 import ActionButton from "@/components/ui/action-button"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 type Props = {
   name?: string | null
@@ -10,7 +10,7 @@ type Props = {
 }
 
 export default function Topbar({ name, role, signOutSlot }: Props) {
-  const mockMode = isMockEnabled()
+  const mockMode = isRuntimeMockEnabled()
 
   return (
     <header className="mx-3 mt-3 ui-card px-4 py-3 md:px-6">

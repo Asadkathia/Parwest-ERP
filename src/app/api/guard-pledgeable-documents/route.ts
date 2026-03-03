@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -24,7 +24,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (isMockEnabled()) return NextResponse.json(MOCK_ROWS)
+    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.guardPledgeableDocument.findMany({
       orderBy: { name: "asc" },
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const description = body?.description ? String(body.description) : null
     if (!name) return badRequest("Name is required.")
 
-    if (isMockEnabled()) {
+    if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         { id: `mock-doc-${Date.now()}`, name, description, createdAt: new Date().toISOString() },
         { status: 201 }

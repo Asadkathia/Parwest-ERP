@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { isMockEnabled } from "@/lib/mockData"
+import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockInactiveGuards } from "@/lib/mockData/guards"
 import { internalServerError, unauthorized } from "@/lib/api/response"
 
@@ -13,7 +13,7 @@ export async function GET() {
             return unauthorized()
         }
 
-        if (isMockEnabled()) {
+        if (isRuntimeMockEnabled()) {
             return NextResponse.json(mockInactiveGuards)
         }
 
