@@ -503,25 +503,28 @@ export default function SearchGuardsManager() {
           emptyText="No guards match selected filters."
           searchable={false}
           density="compact"
+          tableFixed
           pageSize={rowsPerPage}
           columns={[
             {
               key: "photo",
               header: "Photo",
+              className: "w-12",
               render: (guard) => <GuardAvatar guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl} />,
             },
-            { key: "parwestId", header: "Parwest ID", sortable: true },
-            { key: "name", header: "Name", sortable: true },
-            { key: "cnic", header: "CNIC", sortable: true },
-            { key: "phone", header: "Phone" },
-            { key: "client", header: "Client" },
-            { key: "supervisor", header: "Supervisor" },
-            { key: "paymentMode", header: "Payment Mode" },
-            { key: "guardCategory", header: "Category" },
-            { key: "verificationStatus", header: "Verification" },
+            { key: "parwestId", header: "Parwest ID", sortable: true, className: "w-24" },
+            { key: "name", header: "Name", sortable: true, className: "w-36 max-w-[9rem] truncate" },
+            { key: "cnic", header: "CNIC", sortable: true, className: "w-32" },
+            { key: "phone", header: "Phone", className: "w-28" },
+            { key: "client", header: "Client", className: "w-28 max-w-[7rem] truncate" },
+            { key: "supervisor", header: "Supervisor", className: "w-24 max-w-[6rem] truncate" },
+            { key: "paymentMode", header: "Pay Mode", className: "w-20" },
+            { key: "guardCategory", header: "Category", className: "w-20" },
+            { key: "verificationStatus", header: "Verification", className: "w-24" },
             {
               key: "status",
               header: "Status",
+              className: "w-20",
               render: (guard) => (
                 <StatusChip
                   label={guard.status}
@@ -532,8 +535,9 @@ export default function SearchGuardsManager() {
             {
               key: "action",
               header: "Action",
+              className: "w-28",
               render: (guard) => (
-                <div className="flex flex-wrap items-center gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Link href={`/guards/${guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
                     View
                   </Link>

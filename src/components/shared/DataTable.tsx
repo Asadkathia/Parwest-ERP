@@ -23,6 +23,7 @@ interface DataTableProps<T> {
     stickyHeader?: boolean
     rowHover?: boolean
     emptyVariant?: "plain" | "card"
+    tableFixed?: boolean
 }
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -38,6 +39,7 @@ export default function DataTable<T extends Record<string, unknown>>({
     stickyHeader = false,
     rowHover = true,
     emptyVariant = "plain",
+    tableFixed = false,
 }: DataTableProps<T>) {
     const [query, setQuery] = useState("")
     const [page, setPage] = useState(1)
@@ -107,12 +109,12 @@ export default function DataTable<T extends Record<string, unknown>>({
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <table className="w-full">
+            <div className="overflow-x-auto scrollbar-slim">
+                <table className={`w-full${tableFixed ? " table-fixed" : ""}`}>
                     <thead className={`bg-[var(--surface-muted)] border-b border-[var(--border)] ${stickyHeader ? "sticky top-0 z-10" : ""}`}>
                         <tr>
                             {columns.map((column) => (
-                                <th key={String(column.key)} className={`px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase ${column.className || ""}`}>
+                                <th key={String(column.key)} className={`${density === "compact" ? "px-3 py-2" : "px-6 py-3"} text-left text-xs font-semibold text-[var(--text-muted)] uppercase ${column.className || ""}`}>
                                     {column.sortable ? (
                                         <button className="inline-flex items-center gap-1" onClick={() => toggleSort(String(column.key))}>
                                             <span>{column.header}</span>
@@ -144,7 +146,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                                     {columns.map((column) => (
                                         <td
                                             key={String(column.key)}
-                                            className={`${density === "compact" ? "px-6 py-2.5" : "px-6 py-4"} text-sm`}
+                                            className={`${density === "compact" ? "px-3 py-2 text-xs" : "px-6 py-4 text-sm"} ${column.className || ""}`}
                                         >
                                             {column.render ? column.render(row) : String(getValueByKey(row, column.key) ?? "—")}
                                         </td>
