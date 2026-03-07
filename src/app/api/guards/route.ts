@@ -175,6 +175,8 @@ export async function POST(request: NextRequest) {
             bankName: body.bankName || null,
             bankAccountNumber: body.bankAccountNumber || null,
             bankAccountType: body.bankAccountType || null,
+            bankIban: body.bankIban || null,
+            bankBranchCode: body.bankBranchCode || null,
             joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
             regionId: bodyRegionId,
             regionalOfficeId: body.regionalOfficeId || null,

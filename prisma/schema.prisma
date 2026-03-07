@@ -154,6 +154,8 @@ model Guard {
   bankName          String?
   bankAccountNumber String?
   bankAccountType   String?
+  bankIban          String?
+  bankBranchCode    String?
   joiningDate       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

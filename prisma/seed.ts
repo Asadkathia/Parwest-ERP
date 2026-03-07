@@ -45,6 +45,8 @@ async function main() {
 
     console.log('✓ Created Admin role')
 
+
+
     // Create Manager role
     await prisma.role.upsert({
         where: { name: 'Manager' },

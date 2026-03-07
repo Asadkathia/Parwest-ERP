@@ -27,6 +27,7 @@ type SectionConfig = {
 
 const SECTION_CONFIG: SectionConfig[] = [
   { id: "general", label: "GENERAL INFORMATION" },
+  { id: "bankAccount", label: "GUARD BANK ACCOUNT DETAILS" },
   { id: "previousEmployment", label: "PREVIOUS EMPLOYMENT DETAILS" },
   { id: "address", label: "ADDRESS DETAIL" },
   { id: "education", label: "EDUCATION" },
@@ -118,6 +119,8 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const contactCounterRef = useRef(2)
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [joiningDate, setJoiningDate] = useState("")
+  const [maritalStatus, setMaritalStatus] = useState("")
+  const [exServiceType, setExServiceType] = useState("ARMY")
   const ageValue = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth])
   const joiningAgeValue = useMemo(() => calculateAge(dateOfBirth, joiningDate), [dateOfBirth, joiningDate])
 
@@ -421,9 +424,47 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             </div>
             <Field label="POLICE STATION *" name="policeStation" required />
             <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" />
-            <SelectField label="MARITAL STATUS" name="maritalStatus" options={MARITAL_STATUSES} placeholder="--Select Marital Status--" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">MARITAL STATUS</label>
+              <select
+                name="maritalStatus"
+                value={maritalStatus}
+                onChange={(e) => setMaritalStatus(e.target.value)}
+                className="ui-input"
+              >
+                <option value="">--Select Marital Status--</option>
+                {MARITAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
             <Field label="Manager" name="managerName" placeholder="Manager Name" />
             <Field label="Profile Introducer" name="profileIntroducer" placeholder="Profile Introducer" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.bankAccount ? (
+        <CollapsibleSection
+          title="GUARD BANK ACCOUNT DETAILS"
+          collapsed={collapsed.bankAccount}
+          onToggle={() => toggleSectionCollapse("bankAccount")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                ACCOUNT NO <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="bankAccountNumber"
+                required
+                className="ui-input"
+                placeholder="Account Number"
+              />
+            </div>
+            <Field label="IBAN" name="bankIban" placeholder="PK00XXXX0000000000000000" />
+            <Field label="BRANCH CODE" name="bankBranchCode" placeholder="Branch Code" />
           </div>
         </CollapsibleSection>
       ) : null}
@@ -438,10 +479,26 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             <span className="text-sm font-medium text-[var(--text)]">ex</span>
             {["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].map((option) => (
               <label key={option} className="inline-flex items-center gap-2 text-sm">
-                <input type="radio" name="exServiceType" value={option} defaultChecked={option === "ARMY"} className="h-4 w-4 accent-[var(--brand)]" />
+                <input
+                  type="radio"
+                  name="exServiceType"
+                  value={option}
+                  checked={exServiceType === option}
+                  onChange={() => setExServiceType(option)}
+                  className="h-4 w-4 accent-[var(--brand)]"
+                />
                 <span>{option}</span>
               </label>
             ))}
+            {exServiceType === "OTHER" ? (
+              <input
+                type="text"
+                name="exServiceOtherLabel"
+                defaultValue="Civilian"
+                className="h-8 w-28 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white px-2 text-sm text-[var(--text)] outline-none focus:border-[var(--brand)] focus:ring-1 focus:ring-[var(--brand)]"
+                placeholder="Specify..."
+              />
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -561,6 +618,13 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   <Field label="AGE" name={`family_${idx}_age`} placeholder="AGE" />
                   <Field label="PROFESSION" name={`family_${idx}_profession`} placeholder="PROFESSION" />
                   <Field label="ADDRESS" name={`family_${idx}_address`} placeholder="ADDRESS" />
+                  {maritalStatus === "married" ? (
+                    <>
+                      <Field label="B-FORM / CNIC (CHILD)" name={`family_${idx}_childCnic`} placeholder="B-Form / CNIC No" />
+                      <Field label="CHILD AGE" name={`family_${idx}_childAge`} placeholder="Age" />
+                      <Field label="CHILD DATE OF BIRTH" name={`family_${idx}_childDob`} type="date" />
+                    </>
+                  ) : null}
                 </div>
               </div>
             ))}

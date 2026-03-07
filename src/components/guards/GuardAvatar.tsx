@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { UserCircle2 } from "lucide-react"
 
@@ -21,10 +21,12 @@ const initialsFrom = (name: string) =>
 
 export default function GuardAvatar({ guardId, guardName, initialUrl, size = "sm" }: Props) {
   const storageKey = `guard-profile-image:${guardId}`
-  const [preview] = useState<string | null>(() => {
-    if (typeof window === "undefined") return initialUrl || null
-    return localStorage.getItem(storageKey) || initialUrl || null
-  })
+  const [preview, setPreview] = useState<string | null>(initialUrl || null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(storageKey)
+    if (stored) setPreview(stored)
+  }, [storageKey])
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
 
   const sizeClasses = size === "md" ? "h-12 w-12" : "h-10 w-10"
