@@ -60,20 +60,22 @@ const LEGACY_CLIENTS: Client[] = [
   { id: "legacy-client-samba", name: "Samba Bank Limited", type: "bank" },
 ]
 
+const LEGACY_BRANCH_DEFAULTS = { address: null, contactPerson: null, supervisorName: null, activeDeployments: 0 }
+
 const LEGACY_BRANCHES_BY_CLIENT: Record<string, Branch[]> = {
   "legacy-client-nbp": [
-    { id: "legacy-branch-nbp-ho", name: "NBP Head Office", code: "NBP-HO", city: "Lahore" },
-    { id: "legacy-branch-nbp-jail", name: "NBP Jail Road", code: "NBP-JR", city: "Lahore" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-nbp-ho", name: "NBP Head Office", code: "NBP-HO", city: "Lahore" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-nbp-jail", name: "NBP Jail Road", code: "NBP-JR", city: "Lahore" },
   ],
   "legacy-client-scb": [
-    { id: "legacy-branch-scb-main", name: "SCB Main Branch", code: "SCB-MAIN", city: "Karachi" },
-    { id: "legacy-branch-scb-cantt", name: "SCB Cantt Branch", code: "SCB-CNT", city: "Lahore" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-scb-main", name: "SCB Main Branch", code: "SCB-MAIN", city: "Karachi" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-scb-cantt", name: "SCB Cantt Branch", code: "SCB-CNT", city: "Lahore" },
   ],
   "legacy-client-ubl": [
-    { id: "legacy-branch-ubl-gulberg", name: "UBL Gulberg", code: "UBL-GLB", city: "Lahore" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-ubl-gulberg", name: "UBL Gulberg", code: "UBL-GLB", city: "Lahore" },
   ],
   "legacy-client-mcb": [
-    { id: "legacy-branch-mcb-fsd", name: "MCB Faisalabad", code: "MCB-FSD", city: "Faisalabad" },
+    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-mcb-fsd", name: "MCB Faisalabad", code: "MCB-FSD", city: "Faisalabad" },
   ],
 }
 
