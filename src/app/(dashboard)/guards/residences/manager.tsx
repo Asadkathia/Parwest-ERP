@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -11,8 +11,15 @@ type Residence = {
     ownerPhone: string | null
     supervisor: string | null
     capacity: number | null
-    occupied: number | null
     status: string
+    rentPayable: number | null
+    utilityBills: string | null
+    paymentMethod: string | null
+    referredBy: string | null
+    state: string | null
+    city: string | null
+    remarks: string | null
+    contractAttachment: string | null
     createdAt?: string
     _count?: { assignments: number }
 }
@@ -24,36 +31,42 @@ const defaultForm = {
     ownerPhone: "",
     supervisor: "",
     capacity: "",
-    occupied: "",
     status: "ACTIVE",
+    rentPayable: "",
+    utilityBills: "",
+    paymentMethod: "",
+    referredBy: "",
+    state: "",
+    city: "",
+    remarks: "",
+    contractAttachment: "",
 }
 
 export default function ResidencesManager() {
     const [query, setQuery] = useState("")
     const [entries, setEntries] = useState("10")
     const [selectDate, setSelectDate] = useState("")
+    const [filterState, setFilterState] = useState("")
+    const [filterCity, setFilterCity] = useState("")
     const [rows, setRows] = useState<Residence[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState("")
     const [form, setForm] = useState(defaultForm)
+    const fileRef = useRef<HTMLInputElement>(null)
 
     const loadResidences = useCallback(async () => {
         try {
             setLoading(true)
             setError("")
-
             const params = new URLSearchParams()
             if (query.trim()) params.set("q", query.trim())
-
             const response = await fetch(`/api/residences?${params.toString()}`)
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}))
                 throw new Error(data.message || "Failed to fetch residences")
             }
-
-            const data = await response.json()
-            setRows(data)
+            setRows(await response.json())
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error")
             setRows([])
@@ -62,29 +75,40 @@ export default function ResidencesManager() {
         }
     }, [query])
 
-    useEffect(() => {
-        void loadResidences()
-    }, [loadResidences])
+    useEffect(() => { void loadResidences() }, [loadResidences])
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = () => setForm((prev) => ({ ...prev, contractAttachment: reader.result as string }))
+        reader.readAsDataURL(file)
+    }
 
     const saveResidence = async (e: React.FormEvent) => {
         e.preventDefault()
         setError("")
         setSuccess("")
 
-        const payload = {
-            address: form.address,
-            ownerName: form.ownerName,
-            ownerPhone: form.ownerPhone,
-            supervisor: form.supervisor,
-            capacity: form.capacity,
-            occupied: form.occupied,
-            status: form.status,
-        }
-
         const response = await fetch(form.id ? `/api/residences/${form.id}` : "/api/residences", {
             method: form.id ? "PATCH" : "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                address: form.address,
+                ownerName: form.ownerName,
+                ownerPhone: form.ownerPhone,
+                supervisor: form.supervisor,
+                capacity: form.capacity,
+                status: form.status,
+                rentPayable: form.rentPayable,
+                utilityBills: form.utilityBills,
+                paymentMethod: form.paymentMethod,
+                referredBy: form.referredBy,
+                state: form.state,
+                city: form.city,
+                remarks: form.remarks,
+                contractAttachment: form.contractAttachment,
+            }),
         })
 
         if (!response.ok) {
@@ -95,6 +119,7 @@ export default function ResidencesManager() {
 
         setSuccess(form.id ? "Residence updated" : "Residence created")
         setForm(defaultForm)
+        if (fileRef.current) fileRef.current.value = ""
         await loadResidences()
     }
 
@@ -106,9 +131,17 @@ export default function ResidencesManager() {
             ownerPhone: row.ownerPhone || "",
             supervisor: row.supervisor || "",
             capacity: row.capacity?.toString() || "",
-            occupied: row.occupied?.toString() || "",
             status: row.status || "ACTIVE",
+            rentPayable: row.rentPayable?.toString() || "",
+            utilityBills: row.utilityBills || "",
+            paymentMethod: row.paymentMethod || "",
+            referredBy: row.referredBy || "",
+            state: row.state || "",
+            city: row.city || "",
+            remarks: row.remarks || "",
+            contractAttachment: row.contractAttachment || "",
         })
+        if (fileRef.current) fileRef.current.value = ""
     }
 
     const visibleRows = rows
@@ -117,12 +150,14 @@ export default function ResidencesManager() {
             const q = query.toLowerCase()
             return row.address.toLowerCase().includes(q) || (row.ownerName || "").toLowerCase().includes(q) || (row.supervisor || "").toLowerCase().includes(q)
         })
-        .filter((row) => {
-            if (!selectDate) return true
-            if (!row.createdAt) return false
-            return new Date(row.createdAt).toISOString().slice(0, 10) === selectDate
-        })
+        .filter((row) => !selectDate || (row.createdAt ? new Date(row.createdAt).toISOString().slice(0, 10) === selectDate : false))
+        .filter((row) => !filterState || (row.state || "").toLowerCase().includes(filterState.toLowerCase()))
+        .filter((row) => !filterCity || (row.city || "").toLowerCase().includes(filterCity.toLowerCase()))
         .slice(0, Number.parseInt(entries, 10) || 10)
+
+    const f = (key: keyof typeof defaultForm) =>
+        (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+            setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
     return (
         <div className="space-y-6">
@@ -131,49 +166,115 @@ export default function ResidencesManager() {
                 <p className="text-gray-600 mt-1">Manage residence records and update ownership/supervisor data</p>
             </div>
 
-            <form onSubmit={saveResidence} className="bg-white rounded-lg border p-4 space-y-3">
+            <form onSubmit={saveResidence} className="bg-white rounded-lg border p-5 space-y-4">
                 <h2 className="font-semibold">{form.id ? "Edit Residence" : "Create Residence"}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input name="Address" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Address" required />
-                    <input name="Owner Name" value={form.ownerName} onChange={(e) => setForm((prev) => ({ ...prev, ownerName: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Name" />
-                    <input name="Owner Phone" value={form.ownerPhone} onChange={(e) => setForm((prev) => ({ ...prev, ownerPhone: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Owner Phone" />
-                    <input name="Select Supervisor" value={form.supervisor} onChange={(e) => setForm((prev) => ({ ...prev, supervisor: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Select Supervisor" />
-                    <input type="number" value={form.capacity} onChange={(e) => setForm((prev) => ({ ...prev, capacity: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Capacity" min={0} />
-                    <input type="number" value={form.occupied} onChange={(e) => setForm((prev) => ({ ...prev, occupied: e.target.value }))} className="border rounded-md px-3 py-2" placeholder="Occupied" min={0} />
-                    <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} className="border rounded-md px-3 py-2">
-                        <option value="ACTIVE">Active</option>
-                        <option value="INACTIVE">Inactive</option>
-                    </select>
-                    <div className="flex gap-2">
-                        <ActionButton type="submit">{form.id ? "Update" : "Create"}</ActionButton>
-                        {form.id && (
-                            <ActionButton type="button" variant="secondary" onClick={() => setForm(defaultForm)}>Cancel</ActionButton>
+
+                {/* Row 1: Basic info */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input value={form.address} onChange={f("address")} className="ui-input" placeholder="Address" required />
+                    <input value={form.ownerName} onChange={f("ownerName")} className="ui-input" placeholder="Owner Name" />
+                    <input value={form.ownerPhone} onChange={f("ownerPhone")} className="ui-input" placeholder="Owner Phone" />
+                </div>
+
+                {/* Row 2: Supervisor, Capacity, Rent */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input value={form.supervisor} onChange={f("supervisor")} className="ui-input" placeholder="Select Supervisor" />
+                    <input type="number" value={form.capacity} onChange={f("capacity")} className="ui-input" placeholder="Capacity" min={0} />
+                    <input type="number" value={form.rentPayable} onChange={f("rentPayable")} className="ui-input" placeholder="Rent Payable (PKR)" min={0} />
+                </div>
+
+                {/* Row 3: Dropdowns */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Utility Bills</label>
+                        <select value={form.utilityBills} onChange={f("utilityBills")} className="ui-select">
+                            <option value="">-- Select --</option>
+                            <option value="INCLUDED">Included</option>
+                            <option value="EXCLUDED">Excluded</option>
+                            <option value="SHARED">Shared</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Payment Method</label>
+                        <select value={form.paymentMethod} onChange={f("paymentMethod")} className="ui-select">
+                            <option value="">-- Select --</option>
+                            <option value="CASH">Cash</option>
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Status</label>
+                        <select value={form.status} onChange={f("status")} className="ui-select">
+                            <option value="ACTIVE">Active</option>
+                            <option value="INACTIVE">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Row 4: Location + Referred By */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input value={form.state} onChange={f("state")} className="ui-input" placeholder="State / Province" />
+                    <input value={form.city} onChange={f("city")} className="ui-input" placeholder="City" />
+                    <input value={form.referredBy} onChange={f("referredBy")} className="ui-input" placeholder="Referred By" />
+                </div>
+
+                {/* Row 5: Remarks + Contract */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Remarks</label>
+                        <textarea value={form.remarks} onChange={f("remarks")} rows={2} className="ui-textarea" placeholder="Any remarks..." />
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Rental Contract Attachment</label>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            onChange={handleFileChange}
+                            className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[var(--brand)] file:text-white hover:file:opacity-90 cursor-pointer border rounded-md px-2 py-1.5"
+                        />
+                        {form.contractAttachment && (
+                            <p className="mt-1 text-xs text-green-600">
+                                File attached ✓{" "}
+                                <a href={form.contractAttachment} target="_blank" rel="noopener noreferrer" className="underline">Preview</a>
+                            </p>
                         )}
                     </div>
                 </div>
+
+                <div className="flex gap-2">
+                    <ActionButton type="submit">{form.id ? "Update" : "Create"}</ActionButton>
+                    {form.id && (
+                        <ActionButton type="button" variant="secondary" onClick={() => { setForm(defaultForm); if (fileRef.current) fileRef.current.value = "" }}>
+                            Cancel
+                        </ActionButton>
+                    )}
+                </div>
             </form>
 
-            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+            {/* Listing Filters */}
+            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div>
-                    <label className="block text-sm text-gray-600 mb-1">Show 102550100 entries</label>
-                    <select name="Show 102550100 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2">
-                        {["10", "25", "50", "100"].map((value) => (
-                            <option key={value} value={value}>
-                                {value}
-                            </option>
-                        ))}
+                    <label className="block text-sm text-gray-600 mb-1">Show entries</label>
+                    <select value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm">
+                        {["10", "25", "50", "100"].map((v) => <option key={v} value={v}>{v}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm text-gray-600 mb-1">Search:</label>
-                    <input name="Search:" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Address, owner or supervisor" />
+                    <label className="block text-sm text-gray-600 mb-1">Search</label>
+                    <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="Address, owner or supervisor" />
+                </div>
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Filter by State</label>
+                    <input value={filterState} onChange={(e) => setFilterState(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="State / Province" />
+                </div>
+                <div>
+                    <label className="block text-sm text-gray-600 mb-1">Filter by City</label>
+                    <input value={filterCity} onChange={(e) => setFilterCity(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="City" />
                 </div>
                 <div>
                     <label className="block text-sm text-gray-600 mb-1">Select Date</label>
-                    <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="w-full border rounded-md px-3 py-2" />
-                </div>
-                <div className="flex items-end">
-                    <ActionButton onClick={loadResidences} className="w-full">Search</ActionButton>
+                    <input type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
                 </div>
             </div>
 
@@ -184,30 +285,53 @@ export default function ResidencesManager() {
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Address</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Owner Name</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Owner Phone</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Supervisor</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Occupancy</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Assignments</th>
-                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Action</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Address</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Owner</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Supervisor</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">State / City</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Rent Payable</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Utilities</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Payment</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Capacity</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Assignments</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Contract</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {loading ? (
-                            <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
+                            <tr><td colSpan={11} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
                         ) : visibleRows.length === 0 ? (
-                            <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">No residences found.</td></tr>
+                            <tr><td colSpan={11} className="px-6 py-8 text-center text-sm text-gray-500">No residences found.</td></tr>
                         ) : (
                             visibleRows.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-sm">{row.address}</td>
-                                    <td className="px-6 py-4 text-sm">{row.ownerName || "—"}</td>
-                                    <td className="px-6 py-4 text-sm">{row.ownerPhone || "—"}</td>
-                                    <td className="px-6 py-4 text-sm">{row.supervisor || "—"}</td>
-                                    <td className="px-6 py-4 text-sm">{(row.occupied ?? 0)}/{(row.capacity ?? 0)}</td>
-                                    <td className="px-6 py-4 text-sm">{row._count?.assignments ?? 0}</td>
-                                    <td className="px-6 py-4 text-sm">
+                                    <td className="px-4 py-3 text-sm">{row.address}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <div>{row.ownerName || "—"}</div>
+                                        {row.ownerPhone && <div className="text-xs text-gray-400">{row.ownerPhone}</div>}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">{row.supervisor || "—"}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                        {[row.city, row.state].filter(Boolean).join(", ") || "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {row.rentPayable != null ? `PKR ${row.rentPayable.toLocaleString()}` : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {row.utilityBills ? row.utilityBills.charAt(0) + row.utilityBills.slice(1).toLowerCase() : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {row.paymentMethod ? row.paymentMethod.replace("_", " ") : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">{row.capacity ?? "—"}</td>
+                                    <td className="px-4 py-3 text-sm">{row._count?.assignments ?? 0}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {row.contractAttachment ? (
+                                            <a href={row.contractAttachment} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">View</a>
+                                        ) : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">
                                         <ActionButton variant="secondary" onClick={() => editResidence(row)}>Edit</ActionButton>
                                     </td>
                                 </tr>

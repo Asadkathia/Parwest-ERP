@@ -166,7 +166,7 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         </p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Manager</p>
+                        <p className="text-sm text-gray-600">Supervisor</p>
                         <p className="font-medium">{guard.managerName || "—"}</p>
                     </div>
                     <div>

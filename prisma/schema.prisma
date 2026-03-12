@@ -156,6 +156,7 @@ model Guard {
   bankAccountType   String?
   bankIban          String?
   bankBranchCode    String?
+  bankAccountsJson  String?   // JSON array of GuardBankAccount objects
   joiningDate       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -306,16 +307,24 @@ model ResidenceAssignment {
 }
 
 model Residence {
-  id         String   @id @default(cuid())
-  address    String
-  ownerName  String?
-  ownerPhone String?
-  supervisor String?
-  capacity   Int?
-  occupied   Int?
-  status     String   @default("ACTIVE") // ACTIVE, INACTIVE
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  address            String
+  ownerName          String?
+  ownerPhone         String?
+  supervisor         String?
+  capacity           Int?
+  occupied           Int?
+  status             String   @default("ACTIVE") // ACTIVE, INACTIVE
+  rentPayable        Float?
+  utilityBills       String?  // INCLUDED, EXCLUDED, SHARED
+  paymentMethod      String?  // CASH, BANK_TRANSFER
+  referredBy         String?
+  state              String?
+  city               String?
+  remarks            String?
+  contractAttachment String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   assignments ResidenceAssignment[]
 

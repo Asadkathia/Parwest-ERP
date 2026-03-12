@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react"
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
+import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 
 type RegionalOffice = {
   id: string
@@ -438,7 +439,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 ))}
               </select>
             </div>
-            <Field label="Manager" name="managerName" placeholder="Manager Name" />
+            <SupervisorSelector />
             <Field label="Profile Introducer" name="profileIntroducer" placeholder="Profile Introducer" />
           </div>
         </CollapsibleSection>
@@ -450,22 +451,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           collapsed={collapsed.bankAccount}
           onToggle={() => toggleSectionCollapse("bankAccount")}
         >
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                ACCOUNT NO <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="bankAccountNumber"
-                required
-                className="ui-input"
-                placeholder="Account Number"
-              />
-            </div>
-            <Field label="IBAN" name="bankIban" placeholder="PK00XXXX0000000000000000" />
-            <Field label="BRANCH CODE" name="bankBranchCode" placeholder="Branch Code" />
-          </div>
+          <GuardAccountsEditor name="bankAccounts" />
         </CollapsibleSection>
       ) : null}
 
@@ -820,6 +806,103 @@ function Field({
         {label} {required && !label.includes("*") ? <span className="text-red-500">*</span> : null}
       </label>
       <input type={type} name={name} required={required} className="ui-input" placeholder={placeholder} />
+    </div>
+  )
+}
+
+function SupervisorSelector() {
+  const [query, setQuery] = useState("")
+  const [guards, setGuards] = useState<Array<{ id: string; name: string; parwestId: string }>>([])
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null)
+  const [open, setOpen] = useState(false)
+  const [fetching, setFetching] = useState(false)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? guards.filter(
+          (g) => g.name.toLowerCase().includes(q) || g.parwestId.toLowerCase().includes(q)
+        )
+      : guards.slice(0, 10)
+    return list
+  }, [query, guards])
+
+  const fetchGuards = async () => {
+    if (guards.length > 0) return
+    setFetching(true)
+    try {
+      const res = await fetch("/api/guards")
+      if (res.ok) {
+        const data = await res.json() as Array<{ id: string; name: string; parwestId?: string }>
+        setGuards(data.map((g) => ({ id: g.id, name: g.name, parwestId: g.parwestId || "" })))
+      }
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <label className="mb-2 block text-sm font-medium text-gray-700">Supervisor</label>
+      <input type="hidden" name="supervisorId" value={selected?.id || ""} />
+      <input type="hidden" name="managerName" value={selected?.name || ""} />
+      <div className="relative">
+        <input
+          type="text"
+          className="ui-input pr-8"
+          placeholder="Search supervisor by name or ID..."
+          value={selected ? selected.name : query}
+          onChange={(e) => {
+            setSelected(null)
+            setQuery(e.target.value)
+          }}
+          onFocus={() => {
+            setOpen(true)
+            fetchGuards()
+          }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          autoComplete="off"
+        />
+        {selected && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-600 text-base leading-none"
+            onClick={() => { setSelected(null); setQuery("") }}
+            tabIndex={-1}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {open && !selected && (
+        <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-60 overflow-y-auto">
+          {fetching && (
+            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Loading supervisors...</p>
+          )}
+          {!fetching && filtered.length === 0 && (
+            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">
+              {query ? "No matching guards found" : "No guards in system"}
+            </p>
+          )}
+          {filtered.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)] flex items-center justify-between gap-2"
+              onMouseDown={() => {
+                setSelected({ id: g.id, name: g.name })
+                setQuery("")
+                setOpen(false)
+              }}
+            >
+              <span className="font-medium text-[var(--text)]">{g.name}</span>
+              {g.parwestId && (
+                <span className="text-xs text-[var(--text-muted)] shrink-0">{g.parwestId}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

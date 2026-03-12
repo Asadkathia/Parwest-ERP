@@ -419,10 +419,6 @@ export default function SearchGuardsManager() {
             isOnNightDuty
           </label>
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input name="isArchived" type="checkbox" checked={filters.isArchived} onChange={(e) => setFilter("isArchived", e.target.checked)} />
-            isArchived
-          </label>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
             <input name="terminatedRecords" type="checkbox" checked={filters.terminatedRecords} onChange={(e) => setFilter("terminatedRecords", e.target.checked)} />
             Terminated Records
           </label>

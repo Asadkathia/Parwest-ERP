@@ -16,8 +16,12 @@ type Client = {
 type Branch = {
   id: string
   name: string
-  code: string
-  city: string
+  code: string | null
+  city: string | null
+  address: string | null
+  contactPerson: string | null
+  supervisorName: string | null
+  activeDeployments: number
 }
 
 type Guard = {
@@ -95,8 +99,11 @@ export default function DeployGuardForm() {
   const [selectedGuard, setSelectedGuard] = useState("")
   const [selectedRegionalOffice, setSelectedRegionalOffice] = useState("")
 
+
+  const [clientGuardTypes, setClientGuardTypes] = useState<string[]>([])
+
   const [designation, setDesignation] = useState("")
-  const [guardType, setGuardType] = useState("Security Guard")
+  const [guardType, setGuardType] = useState("")
   const [salary, setSalary] = useState("")
   const [overtime, setOvertime] = useState("")
   const [extraHours, setExtraHours] = useState("")
@@ -108,6 +115,7 @@ export default function DeployGuardForm() {
   const [nightShiftEnd, setNightShiftEnd] = useState("08:00")
   const [deploymentDate, setDeploymentDate] = useState(new Date().toISOString().split("T")[0])
   const [deploymentType, setDeploymentType] = useState("REGULAR")
+  const [deploymentNature, setDeploymentNature] = useState("PERMANENT")
   const [isExtraGuard, setIsExtraGuard] = useState(false)
   const [comment, setComment] = useState("")
   const [guardDeploymentStatus, setGuardDeploymentStatus] = useState("ACTIVE")
@@ -126,8 +134,28 @@ export default function DeployGuardForm() {
     loadGuards(selectedRegionalOffice)
   }, [selectedRegionalOffice])
 
+  const loadClientGuardTypes = async (clientId: string) => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/pricing-configs`)
+      if (res.ok) {
+        const data = await res.json() as Array<{ id: string; guardType: string; rate: number }>
+        const types = [...new Set(data.map((c) => c.guardType).filter(Boolean))]
+        setClientGuardTypes(types)
+        setGuardType(types.length > 0 ? types[0] : "")
+      }
+    } catch {
+      setClientGuardTypes([])
+    }
+  }
+
   useEffect(() => {
-    if (selectedClient) loadBranches(selectedClient)
+    if (!selectedClient) {
+      setClientGuardTypes([])
+      setGuardType("")
+      return
+    }
+    loadBranches(selectedClient)
+    loadClientGuardTypes(selectedClient)
   }, [selectedClient])
 
   const loadClients = async () => {
@@ -206,6 +234,7 @@ export default function DeployGuardForm() {
           nightShiftStart: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftStart : null,
           nightShiftEnd: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftEnd : null,
           deploymentType,
+          deploymentNature,
           isExtraGuard,
           comment: isExtraGuard ? comment : null,
           status: guardDeploymentStatus || "ACTIVE",
@@ -231,6 +260,7 @@ export default function DeployGuardForm() {
   }
 
   const selectedGuardData = guards.find((g) => g.id === selectedGuard)
+  const selectedBranchData = branches.find((b) => b.id === selectedBranch) ?? null
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -278,7 +308,7 @@ export default function DeployGuardForm() {
                 <option value="">Nothing selected</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
-                    {branch.name} - {branch.city}
+                    {branch.name}{branch.city ? ` - ${branch.city}` : ""}
                   </option>
                 ))}
               </select>
@@ -300,15 +330,33 @@ export default function DeployGuardForm() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard&apos;s Type</label>
-              <select name="guard_type" value={guardType} onChange={(e) => setGuardType(e.target.value)} required className="ui-select">
-                <option value="">Type</option>
-                <option value="Guard">Guard</option>
-                <option value="Ex-Service">Ex-Service</option>
-              </select>
-            </div>
           </div>
+
+          {selectedBranchData && (
+            <div className="mt-4 p-4 rounded-[var(--radius-md)] border border-blue-200 bg-blue-50">
+              <h3 className="text-sm font-semibold text-blue-800 mb-2">Branch Info</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="block text-xs text-blue-600">Supervisor</span>
+                  <span className="font-medium text-blue-900">{selectedBranchData.supervisorName ?? "—"}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-blue-600">Contact Person</span>
+                  <span className="font-medium text-blue-900">{selectedBranchData.contactPerson ?? "—"}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-blue-600">Total Deployments</span>
+                  <span className="font-medium text-blue-900">{selectedBranchData.activeDeployments}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-blue-600">Guard Types (Client)</span>
+                  <span className="font-medium text-blue-900">
+                    {clientGuardTypes.length > 0 ? clientGuardTypes.join(", ") : "No types configured"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="ui-card p-6">
@@ -348,10 +396,6 @@ export default function DeployGuardForm() {
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Supervisor Name</label>
                   <input name="Supervisor Name" value="—" readOnly className="ui-input bg-slate-50" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Manager Name</label>
-                  <input name="Manager Name" value="—" readOnly className="ui-input bg-slate-50" />
                 </div>
               </div>
             </div>
@@ -444,6 +488,13 @@ export default function DeployGuardForm() {
               <select name="deployment_type" value={deploymentType} onChange={(e) => setDeploymentType(e.target.value)} className="ui-select">
                 <option value="REGULAR">Regular</option>
                 <option value="OVERTIME">Overtime</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Nature</label>
+              <select name="deployment_nature" value={deploymentNature} onChange={(e) => setDeploymentNature(e.target.value)} className="ui-select">
+                <option value="PERMANENT">Permanent</option>
+                <option value="TEMPORARY">Temporary</option>
               </select>
             </div>
             <div className="flex items-end">

@@ -66,8 +66,15 @@ export async function POST(request: NextRequest) {
                 ownerPhone: body.ownerPhone || null,
                 supervisor: body.supervisor || null,
                 capacity: body.capacity ? Number(body.capacity) : null,
-                occupied: body.occupied ? Number(body.occupied) : null,
                 status: body.status || "ACTIVE",
+                rentPayable: body.rentPayable ? Number(body.rentPayable) : null,
+                utilityBills: body.utilityBills || null,
+                paymentMethod: body.paymentMethod || null,
+                referredBy: body.referredBy || null,
+                state: body.state || null,
+                city: body.city || null,
+                remarks: body.remarks || null,
+                contractAttachment: body.contractAttachment || null,
             },
         })
 

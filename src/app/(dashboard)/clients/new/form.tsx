@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, Plus, X } from "lucide-react"
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 
@@ -24,6 +24,23 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [isBranchless, setIsBranchless] = useState(initialBranchless)
     const [introducerAddress, setIntroducerAddress] = useState("")
     const [defaultBranchName, setDefaultBranchName] = useState("")
+    const [contactNumbers, setContactNumbers] = useState<string[]>([""])
+    const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([])
+
+    useEffect(() => {
+        fetch("/api/users?limit=500")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setStaffUsers(
+                        (data as { id: string; name?: string | null }[])
+                            .filter((u) => u.name)
+                            .map((u) => ({ id: u.id, name: u.name as string }))
+                    )
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     const applyOcrFields = (fields: Record<string, string>) => {
         const form = formRef.current
@@ -41,9 +58,12 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
         setError("")
 
         const formData = new FormData(e.currentTarget)
+        const filled = contactNumbers.filter((n) => n.trim())
         const data = {
             ...Object.fromEntries(formData.entries()),
             isBranchless,
+            contactNumber: filled[0] ?? "",
+            contactNumbers: filled,
         }
 
         try {
@@ -176,13 +196,40 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number *</label>
-                            <input
-                                type="text"
-                                name="contactNumber"
-                                required
-                                className="ui-input"
-                                placeholder="Contact number"
-                            />
+                            <div className="space-y-2">
+                                {contactNumbers.map((num, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={num}
+                                            required={idx === 0}
+                                            onChange={(e) => {
+                                                const updated = [...contactNumbers]
+                                                updated[idx] = e.target.value
+                                                setContactNumbers(updated)
+                                            }}
+                                            className="ui-input flex-1"
+                                            placeholder={idx === 0 ? "Primary contact number" : `Contact number ${idx + 1}`}
+                                        />
+                                        {contactNumbers.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setContactNumbers(contactNumbers.filter((_, i) => i !== idx))}
+                                                className="flex-shrink-0 text-[var(--text-muted)] hover:text-red-500"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setContactNumbers([...contactNumbers, ""])}
+                                    className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1"
+                                >
+                                    <Plus size={13} /> Add another number
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Client Location</label>
@@ -279,21 +326,6 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                     </div>
                 </div>
 
-                {/* Assign Weapon */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Assign Weapon</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">License Number</label>
-                            <input type="text" name="licenseNumber" className="ui-input" placeholder="License number" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Serial Number</label>
-                            <input type="text" name="serialNumber" className="ui-input" placeholder="Serial number" />
-                        </div>
-                    </div>
-                </div>
-
                 {/* Operational Territory */}
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Operational Territory</h2>
@@ -307,6 +339,31 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 <option value="KPK">KPK</option>
                                 <option value="Balochistan">Balochistan</option>
                                 <option value="All Pakistan">All Pakistan</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Supervisor & Manager Assignment — all client types */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Supervisor &amp; Manager Assignment</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
+                            <select name="assignedSupervisorId" className="ui-select">
+                                <option value="">— Select Supervisor —</option>
+                                {staffUsers.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
+                            <select name="assignedManagerId" className="ui-select">
+                                <option value="">— Select Manager —</option>
+                                {staffUsers.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -406,17 +463,28 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                             <input type="date" name="contractRateEnd" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">City</label>
-                            <input type="text" name="contractCity" className="ui-input" placeholder="City" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
+                            <select name="contractRegionalOffice" className="ui-select">
+                                <option value="">— Select Regional Office —</option>
+                                {regions.map((region) => (
+                                    <option key={region.id} value={region.id}>{region.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Type</label>
-                            <select name="contractGuardType" className="ui-select">
-                                <option value="">Select guard type</option>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
+                            <select name="contractGuardDesignation" className="ui-select">
+                                <option value="">Select designation</option>
                                 <option value="Guard">Guard</option>
                                 <option value="Supervisor">Supervisor</option>
                                 <option value="CPO">CPO</option>
+                                <option value="Armed Guard">Armed Guard</option>
+                                <option value="Unarmed Guard">Unarmed Guard</option>
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Guards</label>
+                            <input type="number" name="contractAdditionalGuards" className="ui-input" placeholder="0" min={0} />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>

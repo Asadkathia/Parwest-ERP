@@ -30,13 +30,31 @@ export async function GET(
         }
 
         const branches = await prisma.branch.findMany({
-            where: {
-                clientId: id,
-            },
+            where: { clientId: id },
             orderBy: { name: "asc" },
+            include: {
+                supervisorAssignments: {
+                    where: { status: "ACTIVE" },
+                    include: { supervisor: { select: { id: true, name: true } } },
+                    orderBy: { effectiveDate: "desc" },
+                    take: 1,
+                },
+                _count: { select: { deployments: true } },
+            },
         })
 
-        return NextResponse.json(branches)
+        const mapped = branches.map((b) => ({
+            id: b.id,
+            name: b.name,
+            code: b.code,
+            city: b.city,
+            address: b.address,
+            contactPerson: b.contactPerson,
+            supervisorName: b.supervisorAssignments[0]?.supervisor?.name ?? null,
+            activeDeployments: b._count.deployments,
+        }))
+
+        return NextResponse.json(mapped)
     } catch (error: unknown) {
         console.error("Error fetching branches:", error)
         return internalServerError("Failed to fetch branches")

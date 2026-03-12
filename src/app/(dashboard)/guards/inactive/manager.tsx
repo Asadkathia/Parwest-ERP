@@ -10,13 +10,20 @@ type InactiveGuard = {
     name: string
     updatedAt: string
     status: string
+    regionalOfficeId?: string | null
+    regionalOffice?: { id: string; name: string; region?: { name: string } } | null
 }
+
+type RegionalOffice = { id: string; name: string; region: { id: string; name: string } }
 
 export default function InactiveGuardsManager() {
     const [guards, setGuards] = useState<InactiveGuard[]>([])
     const [entries, setEntries] = useState("10")
     const [search, setSearch] = useState("")
-    const [selectDate, setSelectDate] = useState("")
+    const [dateFrom, setDateFrom] = useState("")
+    const [dateTo, setDateTo] = useState("")
+    const [regionalOfficeId, setRegionalOfficeId] = useState("")
+    const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
@@ -32,9 +39,7 @@ export default function InactiveGuardsManager() {
                 const data = await response.json().catch(() => ({}))
                 throw new Error(data.message || "Failed to fetch inactive guards")
             }
-
-            const data = await response.json()
-            setGuards(data)
+            setGuards(await response.json())
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error")
             setGuards([])
@@ -45,14 +50,16 @@ export default function InactiveGuardsManager() {
 
     useEffect(() => {
         loadInactiveGuards()
+        fetch("/api/regional-offices")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: RegionalOffice[]) => setRegionalOffices(data))
+            .catch(() => {})
     }, [])
 
     const reactivateGuard = async (guardId: string, reason: string) => {
         setError("")
-        if (!reason.trim()) {
-            setError("Reactivation reason is required.")
-            return
-        }
+        if (!reason.trim()) { setError("Reactivation reason is required."); return }
+
         const response = await fetch(`/api/guards/${guardId}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -71,16 +78,29 @@ export default function InactiveGuardsManager() {
     }
 
     const filtered = guards
-        .filter((guard) => {
+        .filter((g) => {
             if (!search.trim()) return true
             const q = search.toLowerCase()
-            return guard.name.toLowerCase().includes(q) || guard.parwestId.toLowerCase().includes(q)
+            return g.name.toLowerCase().includes(q) || g.parwestId.toLowerCase().includes(q)
         })
-        .filter((guard) => {
-            if (!selectDate) return true
-            return new Date(guard.updatedAt).toISOString().slice(0, 10) === selectDate
+        .filter((g) => {
+            if (!regionalOfficeId) return true
+            return g.regionalOfficeId === regionalOfficeId
+        })
+        .filter((g) => {
+            const d = new Date(g.updatedAt).toISOString().slice(0, 10)
+            if (dateFrom && d < dateFrom) return false
+            if (dateTo && d > dateTo) return false
+            return true
         })
         .slice(0, Number.parseInt(entries, 10) || 10)
+
+    const clearFilters = () => {
+        setSearch("")
+        setDateFrom("")
+        setDateTo("")
+        setRegionalOfficeId("")
+    }
 
     return (
         <div className="space-y-6">
@@ -93,33 +113,104 @@ export default function InactiveGuardsManager() {
             {notice ? <InlineAlert type="success" message={notice} /> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
-                <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
-                    <div>
-                        <label className="mb-1 block text-xs text-gray-600">Show 102550100200 entries</label>
-                        <select name="Show 102550100200 entries" value={entries} onChange={(e) => setEntries(e.target.value)} className="rounded-md border px-2 py-1 text-sm">
-                            {["10", "25", "50", "100", "200"].map((value) => (
-                                <option key={value} value={value}>
-                                    {value}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {/* Filter bar */}
+                <div className="border-b bg-gray-50 px-4 py-3 space-y-3">
+                    <div className="flex flex-wrap items-end gap-3">
+                        {/* Show entries */}
                         <div>
-                            <label className="mb-1 block text-xs text-gray-600">Search:</label>
-                            <input name="Search:" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <label className="mb-1 block text-xs text-gray-600">Show entries</label>
+                            <select
+                                value={entries}
+                                onChange={(e) => setEntries(e.target.value)}
+                                className="rounded-md border px-2 py-1.5 text-sm"
+                            >
+                                {["10", "25", "50", "100", "200"].map((v) => (
+                                    <option key={v} value={v}>{v}</option>
+                                ))}
+                            </select>
                         </div>
+
+                        {/* Search */}
                         <div>
-                            <label className="mb-1 block text-xs text-gray-600">Select Date</label>
-                            <input name="Select Date" type="date" value={selectDate} onChange={(e) => setSelectDate(e.target.value)} className="rounded-md border px-2 py-1 text-sm" />
+                            <label className="mb-1 block text-xs text-gray-600">Search</label>
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Name or Parwest ID..."
+                                className="rounded-md border px-2 py-1.5 text-sm w-48"
+                            />
                         </div>
+
+                        {/* Regional Office */}
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Regional Office</label>
+                            <select
+                                value={regionalOfficeId}
+                                onChange={(e) => setRegionalOfficeId(e.target.value)}
+                                className="rounded-md border px-2 py-1.5 text-sm w-52"
+                            >
+                                <option value="">-- All Offices --</option>
+                                {regionalOffices.map((o) => (
+                                    <option key={o.id} value={o.id}>
+                                        {o.name} ({o.region.name})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Date From */}
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Date From</label>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="rounded-md border px-2 py-1.5 text-sm"
+                            />
+                        </div>
+
+                        {/* Date To */}
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Date To</label>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                min={dateFrom || undefined}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="rounded-md border px-2 py-1.5 text-sm"
+                            />
+                        </div>
+
+                        {/* Clear */}
+                        {(search || dateFrom || dateTo || regionalOfficeId) ? (
+                            <div className="flex items-end">
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                                >
+                                    Clear Filters
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
+
+                    {/* Active filter summary */}
+                    {(dateFrom || dateTo) && (
+                        <p className="text-xs text-gray-500">
+                            Showing records updated
+                            {dateFrom ? ` from ${dateFrom}` : ""}
+                            {dateTo ? ` to ${dateTo}` : ""}
+                        </p>
+                    )}
                 </div>
+
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Parwest ID</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Name</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Regional Office</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Last Updated</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Status</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-gray-500">Action</th>
@@ -127,18 +218,25 @@ export default function InactiveGuardsManager() {
                     </thead>
                     <tbody className="divide-y">
                         {loading ? (
-                            <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
+                            <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
                         ) : filtered.length === 0 ? (
-                            <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">No inactive guards found.</td></tr>
+                            <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">No inactive guards found.</td></tr>
                         ) : (
                             filtered.map((guard) => (
                                 <tr key={guard.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm">{guard.parwestId}</td>
                                     <td className="px-6 py-4 text-sm">{guard.name}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                        {guard.regionalOffice
+                                            ? `${guard.regionalOffice.name}${guard.regionalOffice.region ? ` (${guard.regionalOffice.region.name})` : ""}`
+                                            : "—"}
+                                    </td>
                                     <td className="px-6 py-4 text-sm">{new Date(guard.updatedAt).toLocaleString("en-US")}</td>
                                     <td className="px-6 py-4 text-sm">{guard.status}</td>
                                     <td className="px-6 py-4 text-sm">
-                                        <ActionButton variant="secondary" onClick={() => setConfirmReactivateId(guard.id)}>Activate</ActionButton>
+                                        <ActionButton variant="secondary" onClick={() => setConfirmReactivateId(guard.id)}>
+                                            Activate
+                                        </ActionButton>
                                     </td>
                                 </tr>
                             ))
@@ -153,10 +251,7 @@ export default function InactiveGuardsManager() {
                     message="Are you sure you want to activate this inactive guard?"
                     reason={reactivateReason}
                     onReasonChange={setReactivateReason}
-                    onNo={() => {
-                        setConfirmReactivateId(null)
-                        setReactivateReason("")
-                    }}
+                    onNo={() => { setConfirmReactivateId(null); setReactivateReason("") }}
                     onYes={async () => {
                         await reactivateGuard(confirmReactivateId, reactivateReason)
                         setConfirmReactivateId(null)

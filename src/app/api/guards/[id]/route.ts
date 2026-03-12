@@ -74,6 +74,18 @@ export async function PUT(
             }
         }
 
+        // Parse bankAccounts JSON array if provided
+        type BankAccountEntry = { bankName?: string; accountNumber?: string; accountType?: string; iban?: string; branchCode?: string; walletType?: string; isActive?: boolean }
+        let parsedBankAccounts: BankAccountEntry[] = []
+        if (body.bankAccounts) {
+            try {
+                parsedBankAccounts = JSON.parse(String(body.bankAccounts))
+            } catch {
+                // ignore parse errors — fall back to flat fields
+            }
+        }
+        const activeAccount = parsedBankAccounts.find((a) => a.isActive) ?? parsedBankAccounts[0] ?? null
+
         // Update guard
         const guard = await prisma.guard.update({
             where: { id },
@@ -98,9 +110,12 @@ export async function PUT(
                 isExService: body.isExService === "true" || body.isExService === true,
                 exServiceRank: body.exServiceRank || null,
                 exServiceRegiment: body.exServiceRegiment || null,
-                bankName: body.bankName || null,
-                bankAccountNumber: body.bankAccountNumber || null,
-                bankAccountType: body.bankAccountType || null,
+                bankName: activeAccount?.bankName || body.bankName || null,
+                bankAccountNumber: activeAccount?.accountNumber || body.bankAccountNumber || null,
+                bankAccountType: activeAccount?.accountType || body.bankAccountType || null,
+                bankIban: activeAccount?.iban || body.bankIban || null,
+                bankBranchCode: activeAccount?.branchCode || body.bankBranchCode || null,
+                bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : undefined,
             },
         })
 

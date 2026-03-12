@@ -27,7 +27,6 @@ export default function AssignResidenceForm() {
     const [residenceId, setResidenceId] = useState("")
     const [guardId, setGuardId] = useState("")
     const [assignDate, setAssignDate] = useState("")
-    const [revokeDate, setRevokeDate] = useState("")
     const [comment, setComment] = useState("")
 
     const [loading, setLoading] = useState(false)
@@ -86,7 +85,6 @@ export default function AssignResidenceForm() {
             const legacyNotes = [
                 supervisor ? `Supervisor: ${supervisor}` : "",
                 comment ? `Comment: ${comment}` : "",
-                revokeDate ? `Revoke Date: ${revokeDate}` : "",
             ]
                 .filter(Boolean)
                 .join(" | ")
@@ -112,7 +110,6 @@ export default function AssignResidenceForm() {
             setResidenceId("")
             setGuardId("")
             setAssignDate("")
-            setRevokeDate("")
             setComment("")
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to assign residence")
@@ -159,12 +156,9 @@ export default function AssignResidenceForm() {
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Name</label><input className="w-full border rounded-md px-3 py-2" value={selectedGuard?.name || ""} placeholder="Name" readOnly /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Designations</label><input className="w-full border rounded-md px-3 py-2" value="Designation" readOnly /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">Guard&apos;s Type</label><input className="w-full border rounded-md px-3 py-2" value="Type" readOnly /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">Assign Date</label><input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Revoke Date</label><input type="date" value={revokeDate} onChange={(e) => setRevokeDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                     <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Comment</label><input value={comment} onChange={(e) => setComment(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Comment" /></div>
-                    <div><label className="block text-sm text-gray-600 mb-1">Parwest ID</label><input className="w-full border rounded-md px-3 py-2" value={selectedGuard?.parwestId || ""} placeholder="Parwest ID" readOnly /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">Residence Capacity</label><input className="w-full border rounded-md px-3 py-2" value={selectedResidence ? `${selectedResidence.occupied ?? 0}/${selectedResidence.capacity ?? 0}` : ""} placeholder="Occupied/Capacity" readOnly /></div>
                 </div>
 

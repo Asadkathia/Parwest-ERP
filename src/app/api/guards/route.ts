@@ -153,6 +153,18 @@ export async function POST(request: NextRequest) {
             return `PW-${String(maxNumber + 1).padStart(5, "0")}`
         }
 
+        // Parse bankAccounts JSON array if provided
+        type BankAccountEntry = { bankName?: string; accountNumber?: string; accountType?: string; iban?: string; branchCode?: string; walletType?: string; isActive?: boolean }
+        let parsedBankAccounts: BankAccountEntry[] = []
+        if (body.bankAccounts) {
+            try {
+                parsedBankAccounts = JSON.parse(String(body.bankAccounts))
+            } catch {
+                // ignore parse errors — fall back to flat fields
+            }
+        }
+        const activeAccount = parsedBankAccounts.find((a) => a.isActive) ?? parsedBankAccounts[0] ?? null
+
         const createGuardPayload = (parwestId: string) => ({
             parwestId,
             name: body.name,
@@ -172,11 +184,12 @@ export async function POST(request: NextRequest) {
             isExService: body.isExService === "true",
             exServiceRank: body.exServiceRank || null,
             exServiceRegiment: body.exServiceRegiment || null,
-            bankName: body.bankName || null,
-            bankAccountNumber: body.bankAccountNumber || null,
-            bankAccountType: body.bankAccountType || null,
-            bankIban: body.bankIban || null,
-            bankBranchCode: body.bankBranchCode || null,
+            bankName: activeAccount?.bankName || body.bankName || null,
+            bankAccountNumber: activeAccount?.accountNumber || body.bankAccountNumber || null,
+            bankAccountType: activeAccount?.accountType || body.bankAccountType || null,
+            bankIban: activeAccount?.iban || body.bankIban || null,
+            bankBranchCode: activeAccount?.branchCode || body.bankBranchCode || null,
+            bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : null,
             joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
             regionId: bodyRegionId,
             regionalOfficeId: body.regionalOfficeId || null,
