@@ -217,22 +217,36 @@ model DeploymentRate {
   @@index([branchId])
 }
 
-model GuardPrerequisite {
-  id          String    @id @default(cuid())
-  guardId     String
-  guard       Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  type        String // NADRA, HEALTH, POLICE, EYESIGHT, CHARACTER, MENTAL_HEALTH, GUARANTOR, COMPANY_CARD
-  status      String    @default("PENDING") // PENDING, VERIFIED, REJECTED
-  documentUrl String?
-  verifiedAt  DateTime?
-  verifiedBy  String?
-  expiryDate  DateTime?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model GuardDocumentType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
+model GuardPrerequisite {
+  id                 String    @id @default(cuid())
+  guardId            String
+  guard              Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  docTypeName        String    // matches GuardDocumentType.name
+  status             String    @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationStatus String?   // REQUEST_SUBMITTED, REQUEST_NOT_SUBMITTED, VERIFIED, NON_VERIFIED, LETTER_ISSUED, LETTER_NOT_ISSUED, FEEDBACK_RECEIVED, FEEDBACK_PENDING
+  attachmentData     String?   // base64 encoded file
+  attachmentName     String?   // original file name
+  documentUrl        String?
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  expiryDate         DateTime?
+  comments           String?
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([guardId, docTypeName])
   @@index([guardId])
-  @@index([type])
+  @@index([docTypeName])
 }
 
 model Deployment {

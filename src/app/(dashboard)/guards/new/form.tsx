@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useMemo, useRef, useState } from "react"
+import { type ReactNode, useMemo, useRef, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -53,15 +53,15 @@ const LEGACY_GUARD_TYPES = [
 const EDUCATION_LEVELS = ["Primary", "Middle", "Matric", "Intermediate", "Graduate", "B.A", "BSc", "M.A", "Msc"]
 const BLOOD_GROUPS = ["O+ve", "A+ve", "B+ve", "AB+ve", "O-ve", "A-ve", "B-ve", "AB-ve"]
 const MARITAL_STATUSES = ["single", "married", "divorced", "widowed", "separated", "engaged"]
-const PREREQUISITE_ITEMS = [
+const PREREQUISITE_ITEMS_FALLBACK = [
   "NADRA Verification",
   "Health Certificate Verification",
   "Police Verification",
   "Eyesight Certificate",
-  "character verification",
-  "mental health check",
-  "3rd gurantor verysis",
-  "Company card & CNIC",
+  "Character Verification",
+  "Mental Health Check",
+  "3rd Guarantor Verification",
+  "Company Card & CNIC",
 ]
 
 function useSectionChecklist() {
@@ -105,12 +105,27 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
     () => Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
   )
-  const [prerequisites, setPrerequisites] = useState<Record<string, boolean>>(
-    () =>
-      Object.fromEntries(
-        PREREQUISITE_ITEMS.map((item) => [item.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])
-      ) as Record<string, boolean>
-  )
+  const [dbPrereqItems, setDbPrereqItems] = useState<string[]>(PREREQUISITE_ITEMS_FALLBACK)
+  const [prerequisites, setPrerequisites] = useState<Record<string, boolean>>({})
+
+  const loadPrereqItems = useCallback(async () => {
+    try {
+      const res = await fetch("/api/guard-document-types?activeOnly=true")
+      if (!res.ok) return
+      const data: { name: string }[] = await res.json()
+      if (data.length > 0) {
+        const names = data.map((d) => d.name)
+        setDbPrereqItems(names)
+        setPrerequisites(Object.fromEntries(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+      } else {
+        setPrerequisites(Object.fromEntries(PREREQUISITE_ITEMS_FALLBACK.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+      }
+    } catch {
+      setPrerequisites(Object.fromEntries(PREREQUISITE_ITEMS_FALLBACK.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+    }
+  }, [])
+
+  useEffect(() => { loadPrereqItems() }, [loadPrereqItems])
 
   const [familyRows, setFamilyRows] = useState([0])
   const [nearestRows, setNearestRows] = useState([0])
@@ -144,8 +159,8 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   }
 
   const toggleAllPrerequisites = (value: boolean) => {
-    setPrerequisites((prev) =>
-      Object.fromEntries(Object.keys(prev).map((key) => [key, value])) as Record<string, boolean>
+    setPrerequisites(
+      Object.fromEntries(dbPrereqItems.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), value])) as Record<string, boolean>
     )
   }
 
@@ -265,7 +280,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           <span className="text-sm font-medium">Select All</span>
         </label>
         <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {PREREQUISITE_ITEMS.map((item) => {
+          {dbPrereqItems.map((item) => {
             const key = item.toLowerCase().replace(/[^a-z0-9]+/g, "_")
             return (
             <label key={item} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">

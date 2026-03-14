@@ -41,7 +41,7 @@ import {
 } from "lucide-react"
 
 interface GuardProfileTabsProps {
-    guard: GuardTabModel
+    guard: GuardTabModel & { id?: string }
     baseUrl: string
 }
 
@@ -77,7 +77,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "profile":
                 return <ProfileTab guard={guard} />
             case "attachments":
-                return <AttachmentsTab attachments={guard.attachments || []} />
+                return <AttachmentsTab guardId={guard.id || ""} />
             case "attendance":
                 return <AttendanceTab attendance={guard.attendance || []} attendanceSummary={guard.attendanceSummary || {}} />
             case "inventory":
@@ -89,7 +89,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "courses":
                 return <CoursesTab courses={guard.courses || []} />
             case "verification":
-                return <VerificationTab verifications={guard.verifications || []} />
+                return <VerificationTab guardId={guard.id || ""} />
             case "pledged-docs":
                 return <PledgedDocumentsTab documents={guard.pledgedDocuments || []} />
             case "bank-details":

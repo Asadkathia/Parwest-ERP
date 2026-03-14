@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Edit } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
+import GuardProfileHealth from "@/components/guards/GuardProfileHealth"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
@@ -147,6 +148,9 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                         <h1 className="text-3xl font-bold">{guard.name}</h1>
                         <p className="text-gray-600 mt-1">Parwest ID: {guard.parwestId}</p>
                         <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.managerName || "—"}</p>
+                        <div className="mt-4">
+                            <GuardProfileHealth guard={guardWithTabs} />
+                        </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
                         {guard.status}
