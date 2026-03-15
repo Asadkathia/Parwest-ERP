@@ -1,8 +1,13 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
-import { Sparkles, Upload, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Zap, FileText, Image, AlertCircle } from "lucide-react"
-import { parseCnicText, type ParsedField } from "@/lib/ocr/cnic-parser"
+import {
+    Sparkles, Upload, CheckCircle, XCircle, RefreshCw,
+    ChevronDown, ChevronUp, Zap, FileText, Image, AlertCircle, Tag,
+} from "lucide-react"
+import { classifyDocument, type ClassificationResult } from "@/lib/ocr/document-classifier"
+import { extractEntities } from "@/lib/ocr/entity-extractor"
+import { mapEntitiesToFields, type ParsedField } from "@/lib/ocr/field-mapper"
 
 interface Props {
     onApply: (fields: Record<string, string>) => void
@@ -17,28 +22,27 @@ interface FileJob {
     progress: number
     progressLabel: string
     fields: ParsedField[]
+    classification: ClassificationResult | null
     error: string
     preview: string | null
 }
 
-// ── tiny progress bar ─────────────────────────────────────────────────────────
-function ProgressBar({ value, color = "violet" }: { value: number; color?: string }) {
+// ── Progress bar ──────────────────────────────────────────────────────────────
+function ProgressBar({ value }: { value: number }) {
     return (
         <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
             <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                     width: `${value}%`,
-                    background: color === "green"
-                        ? "linear-gradient(90deg,#16a34a,#22c55e)"
-                        : "linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)",
+                    background: "linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)",
                 }}
             />
         </div>
     )
 }
 
-// ── confidence pill ───────────────────────────────────────────────────────────
+// ── Confidence pill ───────────────────────────────────────────────────────────
 function ConfidencePill({ value }: { value: number }) {
     const pct = Math.round(value * 100)
     const color = pct >= 85 ? "#16a34a" : pct >= 65 ? "#d97706" : "#dc2626"
@@ -52,7 +56,20 @@ function ConfidencePill({ value }: { value: number }) {
     )
 }
 
-// ── file type icon ────────────────────────────────────────────────────────────
+// ── Doc type badge ────────────────────────────────────────────────────────────
+function DocTypeBadge({ result }: { result: ClassificationResult }) {
+    const color = result.confidence >= 0.7 ? "bg-teal-100 text-teal-700 border-teal-200"
+        : result.confidence >= 0.4 ? "bg-amber-100 text-amber-700 border-amber-200"
+        : "bg-gray-100 text-gray-500 border-gray-200"
+    return (
+        <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${color}`}>
+            <Tag className="h-2.5 w-2.5" />
+            {result.label}
+        </span>
+    )
+}
+
+// ── File type icon ────────────────────────────────────────────────────────────
 function FileIcon({ file }: { file: File }) {
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
     return isPdf
@@ -60,7 +77,7 @@ function FileIcon({ file }: { file: File }) {
         : <Image className="h-4 w-4 text-blue-500 shrink-0" />
 }
 
-// ── status badge ──────────────────────────────────────────────────────────────
+// ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: FileStatus }) {
     if (status === "pending")    return <span className="text-[10px] text-gray-400 font-medium">Queued</span>
     if (status === "processing") return <Zap className="h-3.5 w-3.5 animate-pulse text-violet-500" />
@@ -70,7 +87,7 @@ function StatusBadge({ status }: { status: FileStatus }) {
 
 function uid() { return Math.random().toString(36).slice(2) }
 
-/** Merge fields from multiple scans — higher confidence wins per field */
+/** Merge fields from multiple scans — highest confidence per field wins */
 function mergeFields(allFields: ParsedField[][]): ParsedField[] {
     const best = new Map<string, ParsedField>()
     for (const fields of allFields) {
@@ -81,7 +98,7 @@ function mergeFields(allFields: ParsedField[][]): ParsedField[] {
             }
         }
     }
-    return Array.from(best.values())
+    return Array.from(best.values()).sort((a, b) => b.confidence - a.confidence)
 }
 
 export default function ParwestAIAutofill({ onApply }: Props) {
@@ -91,6 +108,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
     const [selected, setSelected] = useState<Record<string, boolean>>({})
     const [expanded, setExpanded] = useState(true)
     const [allDone, setAllDone] = useState(false)
+
     const isProcessing = jobs.some((j) => j.status === "processing" || j.status === "pending")
 
     const reset = () => {
@@ -101,7 +119,6 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         if (fileRef.current) fileRef.current.value = ""
     }
 
-    // ── update a single job ───────────────────────────────────────────────────
     const updateJob = useCallback((id: string, patch: Partial<FileJob>) => {
         setJobs((prev) => prev.map((j) => j.id === id ? { ...j, ...patch } : j))
     }, [])
@@ -110,53 +127,44 @@ export default function ParwestAIAutofill({ onApply }: Props) {
     const imageFileToDataUrl = (file: File): Promise<string> =>
         new Promise((res, rej) => {
             const reader = new FileReader()
-            reader.onload = () => res(reader.result as string)
+            reader.onload  = () => res(reader.result as string)
             reader.onerror = () => rej(new Error("Failed to read file"))
             reader.readAsDataURL(file)
         })
 
-    /**
-     * Convert first page of a PDF to a PNG data URL via pdfjs-dist + Canvas.
-     * Scale = 2.5× for higher resolution → better OCR accuracy.
-     */
     const pdfToImageDataUrl = async (
         file: File,
         onProgress: (label: string, pct: number) => void
     ): Promise<string> => {
         onProgress("Loading PDF renderer…", 10)
         const arrayBuffer = await file.arrayBuffer()
-
         const pdfjsLib = await import("pdfjs-dist")
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdn.jsdelivr.net/npm/pdfjs-dist@5/build/pdf.worker.min.mjs"
-
         onProgress("Parsing PDF…", 18)
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-        const page = await pdf.getPage(1)
+        const pdf      = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        const page     = await pdf.getPage(1)
         const viewport = page.getViewport({ scale: 2.5 })
-
-        const canvas = document.createElement("canvas")
-        canvas.width  = viewport.width
-        canvas.height = viewport.height
+        const canvas   = document.createElement("canvas")
+        canvas.width   = viewport.width
+        canvas.height  = viewport.height
         const ctx = canvas.getContext("2d")!
-
         onProgress("Rendering PDF page…", 25)
         await page.render({ canvasContext: ctx, canvas, viewport }).promise
         onProgress("PDF rendered — starting OCR…", 32)
-
         return canvas.toDataURL("image/png")
     }
 
-    // ── OCR a single file ─────────────────────────────────────────────────────
-    const processFile = useCallback(async (job: FileJob) => {
+    // ── Full pipeline for one file ────────────────────────────────────────────
+    const processFile = useCallback(async (job: FileJob): Promise<ParsedField[]> => {
         const { id, file } = job
         const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
 
         updateJob(id, { status: "processing", progress: 5, progressLabel: "Reading file…" })
 
         try {
+            // ── Step 1: get image data URL ────────────────────────────────────
             let imageDataUrl: string
-
             if (isPdf) {
                 imageDataUrl = await pdfToImageDataUrl(file, (label, pct) =>
                     updateJob(id, { progressLabel: label, progress: pct })
@@ -168,56 +176,82 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                 updateJob(id, { preview: imageDataUrl })
             }
 
+            // ── Step 2: Tesseract OCR ─────────────────────────────────────────
             const { createWorker } = await import("tesseract.js")
             const worker = await createWorker("eng", 1, {
                 logger: (m: { status: string; progress: number }) => {
-                    if (m.status === "loading tesseract core") {
+                    if (m.status === "loading tesseract core")
                         updateJob(id, { progress: 38, progressLabel: "Loading OCR engine…" })
-                    } else if (m.status === "loading language traineddata") {
+                    else if (m.status === "loading language traineddata")
                         updateJob(id, { progress: 50, progressLabel: "Loading language model…" })
-                    } else if (m.status === "initializing api") {
+                    else if (m.status === "initializing api")
                         updateJob(id, { progress: 65, progressLabel: "Initialising scanner…" })
-                    } else if (m.status === "recognizing text") {
+                    else if (m.status === "recognizing text")
                         updateJob(id, {
-                            progress: 68 + Math.round(m.progress * 27),
+                            progress: 68 + Math.round(m.progress * 15),
                             progressLabel: `Scanning text… ${Math.round(m.progress * 100)}%`,
                         })
-                    }
                 },
                 workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/worker.min.js",
                 langPath:   "https://tessdata.projectnaptha.com/4.0.0",
                 corePath:   "https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js",
             })
 
-            updateJob(id, { progress: 96, progressLabel: "Extracting fields…" })
+            updateJob(id, { progress: 83, progressLabel: "Extracting text…" })
             const { data } = await worker.recognize(imageDataUrl)
             await worker.terminate()
 
-            const parsed = parseCnicText(data.text)
-            updateJob(id, { status: "done", progress: 100, fields: parsed })
-            return parsed
+            const ocrText = data.text
+
+            // ── Step 3: Classify document type ───────────────────────────────
+            updateJob(id, { progress: 87, progressLabel: "Identifying document type…" })
+            const classification = classifyDocument(ocrText)
+            updateJob(id, { classification })
+
+            // ── Step 4: Extract entities (NER + regex) ───────────────────────
+            const entities = await extractEntities(
+                ocrText,
+                classification.docType,
+                (msg) => updateJob(id, { progressLabel: msg, progress: 91 })
+            )
+
+            // ── Step 5: Map entities → form fields ───────────────────────────
+            updateJob(id, { progress: 96, progressLabel: "Mapping form fields…" })
+            const fields = mapEntitiesToFields(classification.docType, entities)
+
+            if (fields.length === 0) {
+                updateJob(id, {
+                    status: "error",
+                    error: `No fields found in this ${classification.label}. Try a clearer scan.`,
+                })
+                return []
+            }
+
+            updateJob(id, { status: "done", progress: 100, fields })
+            return fields
 
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
             let friendly = `Processing failed: ${msg}`
-            if (msg.toLowerCase().includes("password"))       friendly = "PDF is password-protected."
-            else if (msg.toLowerCase().includes("network"))   friendly = "Network error — check internet connection."
-            else if (msg.toLowerCase().includes("image"))     friendly = "Could not process file — use JPG, PNG, or unlocked PDF."
+            if (msg.toLowerCase().includes("password"))
+                friendly = "PDF is password-protected."
+            else if (msg.toLowerCase().includes("network"))
+                friendly = "Network error — check internet connection."
+            else if (msg.toLowerCase().includes("image"))
+                friendly = "Could not process — use JPG, PNG, or unlocked PDF."
             updateJob(id, { status: "error", error: friendly })
             return []
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [updateJob])
 
-    // ── Start OCR pipeline for all files ─────────────────────────────────────
+    // ── Run all jobs sequentially (prevents memory overload) ─────────────────
     const runAll = useCallback(async (newJobs: FileJob[]) => {
         const allResults: ParsedField[][] = []
-
         for (const job of newJobs) {
             const fields = await processFile(job)
             if (fields.length > 0) allResults.push(fields)
         }
-
         const merged = mergeFields(allResults)
         setMergedFields(merged)
         setSelected(Object.fromEntries(merged.map((f) => [f.field, true])))
@@ -226,7 +260,6 @@ export default function ParwestAIAutofill({ onApply }: Props) {
 
     // ── Handle file selection ─────────────────────────────────────────────────
     const handleFiles = (files: File[]) => {
-        if (files.length === 0) return
         const accepted = files.filter((f) =>
             f.type.startsWith("image/") ||
             f.type === "application/pdf" ||
@@ -235,13 +268,9 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         if (accepted.length === 0) return
 
         const newJobs: FileJob[] = accepted.map((file) => ({
-            id: uid(),
-            file,
-            status: "pending",
-            progress: 0,
-            progressLabel: "Queued…",
-            fields: [],
-            error: "",
+            id: uid(), file,
+            status: "pending", progress: 0, progressLabel: "Queued…",
+            fields: [], classification: null, error: "",
             preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
         }))
 
@@ -250,11 +279,6 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         setSelected({})
         setAllDone(false)
         runAll(newJobs)
-    }
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault()
-        handleFiles(Array.from(e.dataTransfer.files))
     }
 
     const handleApply = () => {
@@ -268,9 +292,8 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         setSelected((prev) => ({ ...prev, [field]: !prev[field] }))
 
     const anySelected = Object.values(selected).some(Boolean)
-    const doneCount = jobs.filter((j) => j.status === "done").length
+    const doneCount  = jobs.filter((j) => j.status === "done").length
     const errorCount = jobs.filter((j) => j.status === "error").length
-    const totalFields = mergedFields.length
 
     return (
         <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 overflow-hidden shadow-sm">
@@ -291,7 +314,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                         </span>
                     </div>
                     <p className="text-xs text-violet-500 mt-0.5">
-                        Upload CNIC, documents &amp; forms — any format, multiple files
+                        Upload any document — CNIC, passport, certificates, letters
                     </p>
                 </div>
                 <div className="text-violet-400">
@@ -307,16 +330,16 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                         <div
                             className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-300 bg-white/70 py-8 text-center transition-colors hover:border-violet-500 hover:bg-violet-50"
                             onClick={() => fileRef.current?.click()}
-                            onDrop={handleDrop}
+                            onDrop={(e) => { e.preventDefault(); handleFiles(Array.from(e.dataTransfer.files)) }}
                             onDragOver={(e) => e.preventDefault()}
                         >
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100">
                                 <Upload className="h-5 w-5 text-violet-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-semibold text-violet-800">Drop documents here</p>
+                                <p className="text-sm font-semibold text-violet-800">Drop any document here</p>
                                 <p className="text-xs text-violet-400 mt-0.5">
-                                    JPG · PNG · PDF — multiple files supported
+                                    CNIC · Passport · Certificates · Letters · JPG · PNG · PDF
                                 </p>
                             </div>
                             <span className="mt-1 rounded-lg bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white shadow">
@@ -328,10 +351,9 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                     {/* ── File job list ── */}
                     {jobs.length > 0 && (
                         <div className="space-y-2">
-                            {/* Summary header */}
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-semibold text-violet-700">
-                                    {jobs.length} file{jobs.length !== 1 ? "s" : ""} selected
+                                    {jobs.length} file{jobs.length !== 1 ? "s" : ""}
                                     {doneCount > 0 && ` · ${doneCount} scanned`}
                                     {errorCount > 0 && ` · ${errorCount} failed`}
                                 </span>
@@ -346,69 +368,59 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                                 )}
                             </div>
 
-                            {/* Per-file rows */}
-                            <div className="space-y-2">
-                                {jobs.map((job) => (
-                                    <div
-                                        key={job.id}
-                                        className={`rounded-lg border px-3 py-2 space-y-1.5 ${
-                                            job.status === "done"    ? "border-green-200 bg-green-50/50" :
-                                            job.status === "error"   ? "border-red-200 bg-red-50/50" :
-                                            job.status === "processing" ? "border-violet-200 bg-white" :
-                                            "border-gray-200 bg-white/60"
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            {/* Preview thumbnail */}
-                                            {job.preview ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={job.preview}
-                                                    alt="preview"
-                                                    className="h-8 w-10 rounded object-cover border border-gray-200 shrink-0"
-                                                />
-                                            ) : (
-                                                <div className="h-8 w-10 flex items-center justify-center rounded border border-gray-200 bg-gray-50 shrink-0">
-                                                    <FileIcon file={job.file} />
-                                                </div>
-                                            )}
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <FileIcon file={job.file} />
-                                                    <span className="text-xs font-medium text-gray-700 truncate max-w-[160px]">
-                                                        {job.file.name}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400 shrink-0">
-                                                        ({(job.file.size / 1024).toFixed(0)} KB)
-                                                    </span>
-                                                </div>
-                                                {job.status === "processing" && (
-                                                    <span className="text-[10px] text-violet-500">{job.progressLabel}</span>
-                                                )}
-                                                {job.status === "done" && (
-                                                    <span className="text-[10px] text-green-600">
-                                                        {job.fields.length} field{job.fields.length !== 1 ? "s" : ""} found
-                                                    </span>
-                                                )}
-                                                {job.status === "error" && (
-                                                    <span className="text-[10px] text-red-500 flex items-center gap-0.5">
-                                                        <AlertCircle className="h-3 w-3" /> {job.error}
-                                                    </span>
+                            {jobs.map((job) => (
+                                <div
+                                    key={job.id}
+                                    className={`rounded-lg border px-3 py-2 space-y-1.5 ${
+                                        job.status === "done"    ? "border-green-200 bg-green-50/50" :
+                                        job.status === "error"   ? "border-red-200 bg-red-50/50" :
+                                        job.status === "processing" ? "border-violet-200 bg-white" :
+                                        "border-gray-200 bg-white/60"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {job.preview ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={job.preview} alt="preview"
+                                                className="h-8 w-10 rounded object-cover border border-gray-200 shrink-0" />
+                                        ) : (
+                                            <div className="h-8 w-10 flex items-center justify-center rounded border border-gray-200 bg-gray-50 shrink-0">
+                                                <FileIcon file={job.file} />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <FileIcon file={job.file} />
+                                                <span className="text-xs font-medium text-gray-700 truncate max-w-[140px]">
+                                                    {job.file.name}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 shrink-0">
+                                                    ({(job.file.size / 1024).toFixed(0)} KB)
+                                                </span>
+                                                {job.classification && job.status === "done" && (
+                                                    <DocTypeBadge result={job.classification} />
                                                 )}
                                             </div>
-
-                                            <StatusBadge status={job.status} />
+                                            {job.status === "processing" && (
+                                                <span className="text-[10px] text-violet-500">{job.progressLabel}</span>
+                                            )}
+                                            {job.status === "done" && (
+                                                <span className="text-[10px] text-green-600">
+                                                    {job.fields.length} field{job.fields.length !== 1 ? "s" : ""} extracted
+                                                </span>
+                                            )}
+                                            {job.status === "error" && (
+                                                <span className="text-[10px] text-red-500 flex items-center gap-0.5">
+                                                    <AlertCircle className="h-3 w-3" /> {job.error}
+                                                </span>
+                                            )}
                                         </div>
-
-                                        {job.status === "processing" && (
-                                            <ProgressBar value={job.progress} />
-                                        )}
+                                        <StatusBadge status={job.status} />
                                     </div>
-                                ))}
-                            </div>
+                                    {job.status === "processing" && <ProgressBar value={job.progress} />}
+                                </div>
+                            ))}
 
-                            {/* Add more files button while idle or processing */}
                             {!allDone && (
                                 <button
                                     type="button"
@@ -427,7 +439,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
                                 <CheckCircle className="h-4 w-4" />
-                                {totalFields} unique field{totalFields !== 1 ? "s" : ""} extracted
+                                {mergedFields.length} field{mergedFields.length !== 1 ? "s" : ""} extracted
                                 {jobs.length > 1 && (
                                     <span className="text-xs font-normal text-gray-400">
                                         — merged from {doneCount} document{doneCount !== 1 ? "s" : ""}
@@ -476,27 +488,20 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
                             <div className="flex items-center gap-2 text-amber-700 text-sm font-medium">
                                 <AlertCircle className="h-4 w-4 shrink-0" />
-                                No recognisable fields found in any document
+                                No recognisable fields found
                             </div>
                             <p className="text-xs text-amber-600">
-                                Try clearer images or ensure the document is a CNIC, form, or official record.
+                                Try a clearer scan or a different document with visible text.
                             </p>
-                            <button
-                                type="button"
-                                onClick={reset}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:underline"
-                            >
+                            <button type="button" onClick={reset}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:underline">
                                 <RefreshCw className="h-3 w-3" /> Try again
                             </button>
                         </div>
                     )}
 
                     <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*,.pdf"
-                        multiple
-                        className="hidden"
+                        ref={fileRef} type="file" accept="image/*,.pdf" multiple className="hidden"
                         onChange={(e) => handleFiles(Array.from(e.target.files || []))}
                     />
                 </div>
