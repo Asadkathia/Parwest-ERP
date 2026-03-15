@@ -25,9 +25,16 @@ export default function GuardAvatar({ guardId, guardName, initialUrl, size = "sm
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
+    // If DB has a URL, always use it and keep localStorage in sync
+    if (initialUrl) {
+      setPreview(initialUrl)
+      localStorage.setItem(storageKey, initialUrl)
+      return
+    }
+    // Fall back to localStorage for offline / cached display
     const stored = localStorage.getItem(storageKey)
     if (stored) setPreview(stored)
-  }, [storageKey])
+  }, [storageKey, initialUrl])
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
 
   const sizeClasses = size === "md" ? "h-12 w-12" : "h-10 w-10"

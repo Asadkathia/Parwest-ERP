@@ -18,29 +18,68 @@ const initialsFrom = (name: string) =>
     .map((part) => part[0]?.toUpperCase() || "")
     .join("")
 
+async function savePhotoToDb(guardId: string, photoUrl: string | null) {
+  await fetch(`/api/guards/${guardId}/photo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ photoUrl }),
+  })
+}
+
 export default function ProfileImageCard({ guardId, guardName, initialUrl }: Props) {
   const storageKey = `guard-profile-image:${guardId}`
   const [preview, setPreview] = useState<string | null>(() => {
-    if (typeof window === "undefined") return initialUrl || null
-    return localStorage.getItem(storageKey) || initialUrl || null
+    // DB value takes priority over stale localStorage
+    if (initialUrl) return initialUrl
+    if (typeof window === "undefined") return null
+    return localStorage.getItem(storageKey) || null
   })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
 
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
 
   const onFileChange = (file: File | null) => {
     if (!file) return
+    setSaveError("")
     const reader = new FileReader()
-    reader.onload = () => {
+    reader.onload = async () => {
       const value = typeof reader.result === "string" ? reader.result : null
+      if (!value) return
       setPreview(value)
-      if (value) localStorage.setItem(storageKey, value)
+      localStorage.setItem(storageKey, value)
+      setSaving(true)
+      try {
+        const res = await fetch(`/api/guards/${guardId}/photo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoUrl: value }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          setSaveError(err.message || "Failed to save photo")
+        }
+      } catch {
+        setSaveError("Network error — photo saved locally only")
+      } finally {
+        setSaving(false)
+      }
     }
     reader.readAsDataURL(file)
   }
 
-  const removeImage = () => {
+  const removeImage = async () => {
     setPreview(null)
+    setSaveError("")
     if (typeof window !== "undefined") localStorage.removeItem(storageKey)
+    setSaving(true)
+    try {
+      await savePhotoToDb(guardId, null)
+    } catch {
+      // silent — DB will sync on next save
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -64,13 +103,28 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
           </div>
         )}
         <div className="space-y-2">
-          <label className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm cursor-pointer inline-flex">
-            Upload / Change
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
+          <label className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm cursor-pointer inline-flex items-center gap-1.5">
+            {saving ? "Saving…" : "Upload / Change"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={saving}
+              onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+            />
           </label>
           <div>
-            <button type="button" onClick={removeImage} className="text-xs text-red-600 hover:underline">Remove</button>
+            <button
+              type="button"
+              onClick={removeImage}
+              disabled={saving}
+              className="text-xs text-red-600 hover:underline disabled:opacity-50"
+            >
+              Remove
+            </button>
           </div>
+          {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+          {saving && <p className="text-xs text-gray-400">Saving to database…</p>}
         </div>
       </div>
     </div>

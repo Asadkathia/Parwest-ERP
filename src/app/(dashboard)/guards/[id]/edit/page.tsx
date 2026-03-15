@@ -9,7 +9,7 @@ export default async function EditGuardPage({ params }: { params: Promise<{ id: 
 
     const { id } = await params
 
-    const [guard, regions, regionalOffices] = await Promise.all([
+    const [guard, regions, regionalOffices, supervisors, currentAssignment] = await Promise.all([
         prisma.guard.findUnique({
             where: { id },
         }),
@@ -19,6 +19,15 @@ export default async function EditGuardPage({ params }: { params: Promise<{ id: 
         prisma.regionalOffice.findMany({
             include: { region: true },
             orderBy: { name: "asc" },
+        }),
+        prisma.user.findMany({
+            where: { status: "ACTIVE" },
+            select: { id: true, name: true, email: true },
+            orderBy: { name: "asc" },
+        }),
+        prisma.guardSupervisorAssignment.findFirst({
+            where: { guardId: id, status: "ACTIVE" },
+            select: { supervisorId: true },
         }),
     ])
 
@@ -31,7 +40,13 @@ export default async function EditGuardPage({ params }: { params: Promise<{ id: 
                 <p className="text-gray-600 mt-1">Update guard information for {guard.name}</p>
             </div>
 
-            <GuardEditForm guard={guard} regions={regions} regionalOffices={regionalOffices} />
+            <GuardEditForm
+                guard={guard}
+                regions={regions}
+                regionalOffices={regionalOffices}
+                supervisors={supervisors}
+                currentSupervisorId={currentAssignment?.supervisorId ?? null}
+            />
         </div>
     )
 }

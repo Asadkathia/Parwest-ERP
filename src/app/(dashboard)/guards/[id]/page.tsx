@@ -18,6 +18,7 @@ type GuardDetailModel = GuardTabModel & {
     phone?: string | null
     email?: string | null
     status: string
+    photoUrl?: string | null
     regionalOffice?: { name?: string | null } | null
     managerName?: string | null
     joiningAge?: number | null
@@ -54,13 +55,22 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     let guard: GuardDetailModel | null = null
 
     try {
-        guard = await prisma.guard.findUnique({
-            where: { id },
-            include: {
-                region: true,
-                regionalOffice: true,
-            },
-        })
+        const [guardData, activeSupervisor] = await Promise.all([
+            prisma.guard.findUnique({
+                where: { id },
+                include: {
+                    region: true,
+                    regionalOffice: true,
+                },
+            }),
+            prisma.guardSupervisorAssignment.findFirst({
+                where: { guardId: id, status: "ACTIVE" },
+                include: { supervisor: { select: { name: true } } },
+            }),
+        ])
+        guard = guardData
+            ? { ...guardData, managerName: activeSupervisor?.supervisor?.name ?? null }
+            : null
     } catch (error) {
         if (!isPrismaMissingSchemaError(error)) {
             throw error
@@ -100,7 +110,13 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         joiningAge: guard.joiningAge ?? calculateAge(guard.dateOfBirth ?? null, guard.joiningDate ?? null) ?? null,
         enrolledBy: guard.enrolledBy || "—",
         profileIntroducer: guard.profileIntroducer || "—",
-        nearestRelatives: guard.nearestRelatives || [],
+        nearestRelatives: (() => {
+            try {
+                const raw = (guard as Record<string, unknown>).nearestRelativesJson
+                if (typeof raw === "string" && raw) return JSON.parse(raw)
+            } catch { /* ignore */ }
+            return (guard as Record<string, unknown>).nearestRelatives || []
+        })(),
     }
 
     const getStatusColor = (status: string) => {
@@ -157,7 +173,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                     </span>
                 </div>
             </div>
-            <ProfileImageCard guardId={guard.id} guardName={guard.name} />
+            <ProfileImageCard guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl ?? null} />
             </div>
 
             {/* Tabs */}

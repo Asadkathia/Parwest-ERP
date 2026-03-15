@@ -116,8 +116,37 @@ export async function PUT(
                 bankIban: activeAccount?.iban || body.bankIban || null,
                 bankBranchCode: activeAccount?.branchCode || body.bankBranchCode || null,
                 bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : undefined,
+                motherName: body.motherName || null,
+                nationality: body.nationality || null,
+                nextOfKin: body.nextOfKin || null,
+                profileIntroducer: body.profileIntroducer || null,
+                additionalContactNumbers: body.additionalContactNumbers || null,
+                nearestRelativesJson: body.nearestRelativesJson || null,
             },
         })
+
+        // Handle supervisor assignment change
+        if (body.supervisorId !== undefined) {
+            const newSupervisorId = body.supervisorId ? String(body.supervisorId) : null
+
+            // End all current active assignments for this guard
+            await prisma.guardSupervisorAssignment.updateMany({
+                where: { guardId: id, status: "ACTIVE" },
+                data: { status: "ENDED", endedAt: new Date() },
+            })
+
+            // Create new assignment if a supervisor was selected
+            if (newSupervisorId) {
+                await prisma.guardSupervisorAssignment.create({
+                    data: {
+                        guardId: id,
+                        supervisorId: newSupervisorId,
+                        status: "ACTIVE",
+                        assignedAt: new Date(),
+                    },
+                })
+            }
+        }
 
         return NextResponse.json(guard, { status: 200 })
     } catch (error: unknown) {
