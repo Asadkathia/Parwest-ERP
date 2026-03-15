@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-re
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
+import PhoneInput from "@/components/ui/PhoneInput"
 
 type RegionalOffice = {
   id: string
@@ -166,15 +167,33 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
 
   const applyOcrFields = (fields: Record<string, string>) => {
     const form = formRef.current
-    if (!form) return
 
     Object.entries(fields).forEach(([name, value]) => {
+      // Update React-controlled state first
+      if (name === "dateOfBirth") { setDateOfBirth(value); return }
+      if (name === "maritalStatus") { setMaritalStatus(value); return }
+
+      // For all other fields update the DOM input directly
+      if (!form) return
       const input = form.elements.namedItem(name) as
         | HTMLInputElement
         | HTMLTextAreaElement
         | HTMLSelectElement
         | null
-      if (input) input.value = value
+      if (!input) return
+
+      // Use React's synthetic event so React-uncontrolled inputs pick up the value
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : input instanceof HTMLSelectElement
+            ? HTMLSelectElement.prototype
+            : HTMLInputElement.prototype,
+        "value"
+      )?.set
+      nativeSetter?.call(input, value)
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+      input.dispatchEvent(new Event("change", { bubbles: true }))
     })
   }
 
@@ -377,24 +396,15 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 CONTACT # (FORMAT: +92-300-1234567) <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <input
-                  type="text"
-                  name="phone"
-                  required
-                  className="ui-input"
-                  placeholder="Primary Contact # (+92-300-1234567)"
-                />
+                <PhoneInput name="phone" required />
                 {contactRows.map((idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      name={`phone_secondary_${idx}`}
-                      className="ui-input"
-                      placeholder="Additional Contact #"
-                    />
+                    <div className="flex-1">
+                      <PhoneInput name={`phone_secondary_${idx}`} />
+                    </div>
                     <button
                       type="button"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] text-red-600 hover:bg-red-50"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] text-red-600 hover:bg-red-50"
                       onClick={() => setContactRows((prev) => prev.filter((id) => id !== idx))}
                       aria-label="Remove contact number"
                     >

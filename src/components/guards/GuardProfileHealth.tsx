@@ -8,15 +8,28 @@ function Ring({
     size = 60,
     stroke = 5,
     color,
+    animate = false,
+    delay = 0,
 }: {
     pct: number
     size?: number
     stroke?: number
     color: string
+    animate?: boolean
+    delay?: number
 }) {
+    const [displayed, setDisplayed] = useState(animate ? 0 : pct)
+
+    useEffect(() => {
+        if (!animate) { setDisplayed(pct); return }
+        setDisplayed(0)
+        const t = setTimeout(() => setDisplayed(pct), delay)
+        return () => clearTimeout(t)
+    }, [pct, animate, delay])
+
     const r = (size - stroke) / 2
     const circumference = 2 * Math.PI * r
-    const offset = circumference - (pct / 100) * circumference
+    const offset = circumference - (displayed / 100) * circumference
 
     return (
         <svg
@@ -25,14 +38,7 @@ function Ring({
             viewBox={`0 0 ${size} ${size}`}
             style={{ transform: "rotate(-90deg)" }}
         >
-            <circle
-                cx={size / 2}
-                cy={size / 2}
-                r={r}
-                fill="none"
-                stroke="#e5e7eb"
-                strokeWidth={stroke}
-            />
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
             <circle
                 cx={size / 2}
                 cy={size / 2}
@@ -43,7 +49,7 @@ function Ring({
                 strokeDasharray={`${circumference}`}
                 strokeDashoffset={`${offset}`}
                 strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset 0.6s ease" }}
+                style={{ transition: "stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1)" }}
             />
         </svg>
     )
@@ -59,7 +65,7 @@ function has(v: unknown): boolean {
     return true
 }
 
-function pct(filled: number, total: number) {
+function calcPct(filled: number, total: number) {
     return total === 0 ? 0 : Math.round((filled / total) * 100)
 }
 
@@ -94,13 +100,23 @@ interface GuardProfileHealthProps {
     }
 }
 
-type Section = { label: string; pct: number; color: string }
+type Section = { label: string; value: number; color: string }
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
     const [show, setShow] = useState(false)
+    const [visible, setVisible] = useState(false)
     const [docPct, setDocPct] = useState<number | null>(null)
     const [docLoading, setDocLoading] = useState(false)
+
+    // animate in/out
+    useEffect(() => {
+        if (show) {
+            requestAnimationFrame(() => setVisible(true))
+        } else {
+            setVisible(false)
+        }
+    }, [show])
 
     useEffect(() => {
         if (!guard.id) return
@@ -123,71 +139,34 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
 
     // ── section calculations ──────────────────────────────────────────────────
     const personalFields = [
-        guard.name,
-        guard.cnic,
-        guard.dateOfBirth,
-        guard.fatherName,
-        guard.motherName,
-        guard.religion,
-        guard.maritalStatus,
-        guard.education,
-        guard.nationality,
+        guard.name, guard.cnic, guard.dateOfBirth,
+        guard.fatherName, guard.motherName, guard.religion,
+        guard.maritalStatus, guard.education, guard.nationality,
     ]
     const contactFields = [
-        guard.phone,
-        guard.email,
-        guard.emergencyContact,
-        guard.addressPermanent,
-        guard.addressCurrent,
+        guard.phone, guard.email, guard.emergencyContact,
+        guard.addressPermanent, guard.addressCurrent,
     ]
     const employmentFields = [
-        guard.regionalOffice,
-        guard.managerName,
-        guard.joiningDate,
-        guard.enrolledBy,
+        guard.regionalOffice, guard.managerName,
+        guard.joiningDate, guard.enrolledBy,
     ]
     const rels = guard.nearestRelatives ?? []
-    const relPct = (() => {
-        if (rels.length === 0) return 0
-        const complete = rels.filter(
-            (r) => has(r.name) && has(r.cnic) && has(r.contact) && has(r.relation)
-        ).length
-        return pct(complete, rels.length)
-    })()
+    const relPct = rels.length === 0 ? 0 : calcPct(
+        rels.filter((r) => has(r.name) && has(r.cnic) && has(r.contact) && has(r.relation)).length,
+        rels.length
+    )
 
     const sections: Section[] = [
-        {
-            label: "Personal Info",
-            color: "#3b82f6",
-            pct: pct(personalFields.filter(has).length, personalFields.length),
-        },
-        {
-            label: "Contact Info",
-            color: "#8b5cf6",
-            pct: pct(contactFields.filter(has).length, contactFields.length),
-        },
-        {
-            label: "Employment",
-            color: "#f59e0b",
-            pct: pct(employmentFields.filter(has).length, employmentFields.length),
-        },
-        {
-            label: "Nearest Relatives",
-            color: "#10b981",
-            pct: relPct,
-        },
-        {
-            label: "Documents",
-            color: "#ef4444",
-            pct: docLoading ? 0 : (docPct ?? 0),
-        },
+        { label: "Personal Info",      color: "#3b82f6", value: calcPct(personalFields.filter(has).length, personalFields.length) },
+        { label: "Contact Info",       color: "#8b5cf6", value: calcPct(contactFields.filter(has).length, contactFields.length) },
+        { label: "Employment",         color: "#f59e0b", value: calcPct(employmentFields.filter(has).length, employmentFields.length) },
+        { label: "Nearest Relatives",  color: "#10b981", value: relPct },
+        { label: "Documents",          color: "#ef4444", value: docLoading ? 0 : (docPct ?? 0) },
     ]
 
-    const overall = Math.round(
-        sections.reduce((sum, s) => sum + s.pct, 0) / sections.length
-    )
-    const overallColor =
-        overall >= 80 ? "#10b981" : overall >= 50 ? "#f59e0b" : "#ef4444"
+    const overall = Math.round(sections.reduce((s, x) => s + x.value, 0) / sections.length)
+    const overallColor = overall >= 80 ? "#10b981" : overall >= 50 ? "#f59e0b" : "#ef4444"
 
     return (
         <div
@@ -195,7 +174,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
             onMouseEnter={() => setShow(true)}
             onMouseLeave={() => setShow(false)}
         >
-            {/* Main ring */}
+            {/* ── Trigger: main ring ── */}
             <div className="relative shrink-0">
                 <Ring pct={overall} size={52} stroke={5} color={overallColor} />
                 <span
@@ -210,60 +189,85 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                 <div className="text-[11px] text-gray-400">Completeness</div>
             </div>
 
-            {/* Hover popover */}
-            {show && (
+            {/* ── Popover: expands to the right ── */}
+            <div
+                className="absolute left-full top-1/2 ml-3 z-50 pointer-events-none"
+                style={{
+                    transform: `translateY(-50%) translateX(${visible ? "0px" : "-10px"})`,
+                    opacity: visible ? 1 : 0,
+                    transition: "opacity 0.25s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1)",
+                }}
+            >
+                {/* Left arrow tip */}
                 <div
-                    className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 z-50
-                               bg-white rounded-2xl shadow-2xl border border-gray-100 p-5
-                               min-w-[360px] pointer-events-none"
-                >
+                    className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-l border-b border-gray-100 rotate-45"
+                />
+
+                <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 min-w-[380px]">
                     <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">
                         Profile Health
                     </div>
 
                     {/* Section rings */}
-                    <div className="flex items-start justify-between gap-2">
-                        {sections.map((s) => (
-                            <div key={s.label} className="flex flex-col items-center gap-1.5">
+                    <div className="flex items-start justify-between gap-1">
+                        {sections.map((s, i) => (
+                            <div
+                                key={s.label}
+                                className="flex flex-col items-center gap-1.5"
+                                style={{
+                                    opacity: visible ? 1 : 0,
+                                    transform: `translateX(${visible ? "0px" : "-6px"})`,
+                                    transition: `opacity 0.3s ease ${0.08 + i * 0.06}s, transform 0.35s cubic-bezier(0.34,1.3,0.64,1) ${0.08 + i * 0.06}s`,
+                                }}
+                            >
                                 <div className="relative">
-                                    <Ring pct={s.pct} size={52} stroke={4} color={s.color} />
+                                    <Ring
+                                        pct={s.value}
+                                        size={54}
+                                        stroke={4}
+                                        color={s.color}
+                                        animate={show}
+                                        delay={100 + i * 70}
+                                    />
                                     <span
                                         className="absolute inset-0 flex items-center justify-center text-[10px] font-bold"
                                         style={{ color: s.color }}
                                     >
-                                        {s.pct}%
+                                        {s.value}%
                                     </span>
                                 </div>
-                                <span className="text-[10px] text-gray-500 text-center leading-tight max-w-[58px]">
+                                <span className="text-[10px] text-gray-500 text-center leading-tight max-w-[60px]">
                                     {s.label}
                                 </span>
                             </div>
                         ))}
                     </div>
 
-                    {/* Overall bar */}
-                    <div className="mt-4 pt-3 border-t border-gray-100">
+                    {/* Overall progress bar */}
+                    <div
+                        className="mt-4 pt-3 border-t border-gray-100"
+                        style={{
+                            opacity: visible ? 1 : 0,
+                            transition: "opacity 0.3s ease 0.45s",
+                        }}
+                    >
                         <div className="flex items-center justify-between text-xs mb-1.5">
                             <span className="text-gray-500 font-medium">Overall Completeness</span>
-                            <span className="font-bold" style={{ color: overallColor }}>
-                                {overall}%
-                            </span>
+                            <span className="font-bold" style={{ color: overallColor }}>{overall}%</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${overall}%`, background: overallColor }}
+                                className="h-full rounded-full"
+                                style={{
+                                    width: visible ? `${overall}%` : "0%",
+                                    background: overallColor,
+                                    transition: "width 0.7s cubic-bezier(0.4,0,0.2,1) 0.4s",
+                                }}
                             />
                         </div>
                     </div>
-
-                    {/* Arrow tip */}
-                    <div
-                        className="absolute -bottom-[7px] left-1/2 -translate-x-1/2 w-3.5 h-3.5
-                                   bg-white border-r border-b border-gray-100 rotate-45"
-                    />
                 </div>
-            )}
+            </div>
         </div>
     )
 }

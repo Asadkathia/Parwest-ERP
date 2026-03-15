@@ -107,7 +107,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "status-history":
                 return <StatusHistoryTab statusHistory={guard.statusHistory || []} />
             case "pba-docs":
-                return <PBADocumentsTab documents={guard.pbaDocuments || []} />
+                return <PBADocumentsTab guard={guard} />
             default:
                 return <GeneralInformationTab guard={guard} />
         }
