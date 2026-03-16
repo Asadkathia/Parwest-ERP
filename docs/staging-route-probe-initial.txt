@@ -1,0 +1,72 @@
+//                       | 302 | https://staging-store.parwestgroup.com/login
+//login                  | 404 | 
+//register               | 404 | 
+//password/reset         | 404 | 
+/products                | 302 | https://staging-store.parwestgroup.com/login
+/product                 | 404 | 
+/categories              | 302 | https://staging-store.parwestgroup.com/login
+/category                | 404 | 
+/brands                  | 302 | https://staging-store.parwestgroup.com/login
+/brand                   | 404 | 
+/units                   | 302 | https://staging-store.parwestgroup.com/login
+/unit                    | 404 | 
+/warehouses              | 404 | 
+/warehouse               | 404 | 
+/locations               | 404 | 
+/stocks                  | 404 | 
+/stock                   | 404 | 
+/inventory               | 404 | 
+/inventory-items         | 404 | 
+/inventory-adjustments   | 404 | 
+/adjustments             | 302 | https://staging-store.parwestgroup.com/login
+/stock-adjustments       | 404 | 
+/stock-transfer          | 404 | 
+/stock-transfers         | 404 | 
+/transfers               | 404 | 
+/purchase                | 404 | 
+/purchases               | 302 | https://staging-store.parwestgroup.com/login
+/purchase-orders         | 404 | 
+/po                      | 404 | 
+/grn                     | 404 | 
+/goods-receipt           | 404 | 
+/suppliers               | 404 | 
+/vendors                 | 302 | https://staging-store.parwestgroup.com/login
+/customers               | 404 | 
+/clients                 | 404 | 
+/sales                   | 404 | 
+/orders                  | 404 | 
+/invoices                | 404 | 
+/returns                 | 404 | 
+/sales-returns           | 404 | 
+/purchase-returns        | 404 | 
+/damages                 | 404 | 
+/writeoffs               | 404 | 
+/counting                | 404 | 
+/stock-count             | 404 | 
+/cycle-count             | 404 | 
+/reports                 | 404 | 
+/report                  | 404 | 
+/reports/stock           | 404 | 
+/reports/sales           | 404 | 
+/reports/purchase        | 404 | 
+/analytics               | 404 | 
+/dashboard               | 404 | 
+/home                    | 404 | 
+/admin                   | 404 | 
+/users                   | 302 | https://staging-store.parwestgroup.com/login
+/roles                   | 302 | https://staging-store.parwestgroup.com/login
+/permissions             | 404 | 
+/settings                | 404 | 
+/company                 | 404 | 
+/branches                | 404 | 
+/stores                  | 302 | https://staging-store.parwestgroup.com/login
+/outlets                 | 404 | 
+/cashier                 | 404 | 
+/pos                     | 404 | 
+/barcode                 | 404 | 
+/print-labels            | 404 | 
+/imports                 | 404 | 
+/exports                 | 404 | 
+/notifications           | 404 | 
+/audit-log               | 404 | 
+/activities              | 404 | 
