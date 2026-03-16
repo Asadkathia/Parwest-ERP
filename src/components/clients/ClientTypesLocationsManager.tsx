@@ -1,22 +1,16 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import ActionButton from "@/components/ui/action-button"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 
-type ClientTypeRow = { id: string; serial: number; name: string; addedBy: string }
+type ClientTypeRow = { id: string; serial: number; name: string; label: string; addedBy: string }
 type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string; status: "ACTIVE" | "INACTIVE" }
 type LocationRow = { id: string; locationName: string; createdBy: string; createdOn: string }
 
 type AddMode = "clientType" | "documentType" | "location"
-
-const initialClientTypes: ClientTypeRow[] = [
-  { id: "1", serial: 1, name: "Bank", addedBy: "SUPERUSER" },
-  { id: "2", serial: 2, name: "Manufacturer", addedBy: "SUPERUSER" },
-  { id: "3", serial: 3, name: "Other", addedBy: "SUPERUSER" },
-]
 
 const initialDocumentTypes: DocumentTypeRow[] = [
   { id: "1", name: "Verification Form", uniqueKey: "FE879B37B8", createdAt: "2018-01-29 10:00:36", status: "INACTIVE" },
@@ -32,9 +26,10 @@ const initialLocations: LocationRow[] = [
 ]
 
 export default function ClientTypesLocationsManager() {
-  const [clientTypes, setClientTypes] = useState<ClientTypeRow[]>(initialClientTypes)
+  const [clientTypes, setClientTypes] = useState<ClientTypeRow[]>([])
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeRow[]>(initialDocumentTypes)
   const [locations, setLocations] = useState<LocationRow[]>(initialLocations)
+  const [clientTypesLoading, setClientTypesLoading] = useState(false)
 
   const [query, setQuery] = useState("")
   const [entries, setEntries] = useState("10")
@@ -44,6 +39,31 @@ export default function ClientTypesLocationsManager() {
   const [addMode, setAddMode] = useState<AddMode | null>(null)
   const [nameInput, setNameInput] = useState("")
   const [uniqueKeyInput, setUniqueKeyInput] = useState("")
+
+  // ── Load client types from DB ──────────────────────────────────────────────
+  const loadClientTypes = async () => {
+    setClientTypesLoading(true)
+    try {
+      const res = await fetch("/api/client-types", { cache: "no-store" })
+      const data = await res.json().catch(() => [])
+      if (!res.ok) throw new Error(data?.message || "Failed to load client types.")
+      setClientTypes(
+        (Array.isArray(data) ? data : []).map((t: { id: string; name: string; label: string }, i: number) => ({
+          id: t.id,
+          serial: i + 1,
+          name: t.name,
+          label: t.label,
+          addedBy: "Admin",
+        }))
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load client types.")
+    } finally {
+      setClientTypesLoading(false)
+    }
+  }
+
+  useEffect(() => { void loadClientTypes() }, [])
 
   const limited = Number.parseInt(entries, 10) || 10
   const q = query.trim().toLowerCase()
@@ -85,7 +105,7 @@ export default function ClientTypesLocationsManager() {
     setUniqueKeyInput("")
   }
 
-  const submitAdd = () => {
+  const submitAdd = async () => {
     if (!nameInput.trim()) {
       setError("Name is required.")
       return
@@ -94,16 +114,21 @@ export default function ClientTypesLocationsManager() {
     setError("")
 
     if (addMode === "clientType") {
-      setClientTypes((prev) => [
-        {
-          id: crypto.randomUUID(),
-          serial: prev.length + 1,
-          name: nameInput.trim(),
-          addedBy: "SUPERUSER",
-        },
-        ...prev,
-      ])
-      setNotice("Client type added.")
+      try {
+        const res = await fetch("/api/client-types", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: nameInput.trim() }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.message || "Failed to create client type.")
+        setNotice("Client type added.")
+        await loadClientTypes()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create client type.")
+      }
+      closeModal()
+      return
     }
 
     if (addMode === "documentType") {
@@ -174,13 +199,32 @@ export default function ClientTypesLocationsManager() {
         <DataTable
           rows={filteredClientTypes}
           columns={[
-            { key: "serial", header: "Serial #", sortable: true },
-            { key: "name", header: "Name", sortable: true },
+            { key: "serial", header: "#", sortable: true },
+            { key: "label", header: "Label", sortable: true },
+            { key: "name", header: "System Key", sortable: true },
             { key: "addedBy", header: "Added By", sortable: true },
+            {
+              key: "action",
+              header: "Action",
+              render: (row) => (
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:underline"
+                  onClick={async () => {
+                    if (!confirm(`Delete "${row.label}"?`)) return
+                    const res = await fetch(`/api/client-types/${row.id}`, { method: "DELETE" })
+                    if (res.ok) { setNotice(`"${row.label}" deleted.`); await loadClientTypes() }
+                    else setError("Failed to delete.")
+                  }}
+                >
+                  Delete
+                </button>
+              ),
+            },
           ]}
           getRowKey={(row) => row.id}
           searchable={false}
-          emptyText="No client types found."
+          emptyText={clientTypesLoading ? "Loading…" : "No client types found."}
         />
       </MasterSection>
 

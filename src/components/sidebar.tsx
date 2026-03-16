@@ -19,7 +19,8 @@ import {
     Menu,
     X,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
 
 const navItems: NavNode[] = [
@@ -170,9 +171,33 @@ const navItems: NavNode[] = [
     },
 ]
 
+function getActiveSectionTitle(pathname: string): string | null {
+    for (const item of navItems) {
+        if (!item.children) continue
+        for (const child of item.children) {
+            if (child.href && (pathname === child.href || pathname.startsWith(child.href + "/"))) {
+                return item.title
+            }
+        }
+    }
+    return null
+}
+
 export function Sidebar() {
-    const [openSections, setOpenSections] = useState<string[]>(["Dashboard", "Guards", "Clients"])
+    const pathname = usePathname()
+    const [openSections, setOpenSections] = useState<string[]>(() => {
+        const active = getActiveSectionTitle(pathname)
+        return active ? [active] : []
+    })
     const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+    // When path changes, collapse all sections except the active one
+    useEffect(() => {
+        const active = getActiveSectionTitle(pathname)
+        if (active) {
+            setOpenSections([active])
+        }
+    }, [pathname])
 
     const toggleSection = (title: string) => {
         setOpenSections((prev) =>

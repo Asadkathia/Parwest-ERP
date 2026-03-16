@@ -92,12 +92,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(mock, { status: 201 })
         }
 
+        const isBranchless = body.isBranchless === "true"
+        const defaultBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""
+
         const client = await prisma.client.create({
             data: {
                 name: body.name,
                 email: body.email || null,
                 type: body.type,
-                isBranchless: body.isBranchless === "true",
+                isBranchless,
                 headOfficeAddress: body.headOfficeAddress || null,
                 city: body.city || null,
                 status: body.status || "ACTIVE",
@@ -105,8 +108,21 @@ export async function POST(request: NextRequest) {
                 ntn: body.ntn || null,
                 strn: body.strn || null,
                 contractUrl: body.contractUrl || null,
+                contractAttachments: Array.isArray(body.contractAttachments) && body.contractAttachments.length > 0 ? body.contractAttachments : undefined,
                 regionId: body.regionId || null,
+                // Auto-create the first branch if a name was provided (branch clients only)
+                ...(!isBranchless && defaultBranchName ? {
+                    branches: {
+                        create: {
+                            name: defaultBranchName,
+                            isHeadOffice: true,
+                            address: body.headOfficeAddress || null,
+                            city: body.city || null,
+                        },
+                    },
+                } : {}),
             },
+            include: { branches: true },
         })
 
         return NextResponse.json(client, { status: 201 })

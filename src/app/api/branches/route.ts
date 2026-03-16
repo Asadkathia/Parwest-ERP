@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
                     contactPhone: body?.contactPhone ? String(body.contactPhone) : null,
                     contactEmail: body?.contactEmail ? String(body.contactEmail) : null,
                     isHeadOffice: body?.isHeadOffice === true,
+                    contractUrl: body?.contractUrl ? String(body.contractUrl) : null,
+                    contractAttachments: Array.isArray(body?.contractAttachments) && body.contractAttachments.length > 0 ? body.contractAttachments : undefined,
                 },
                 include: {
                     client: true,

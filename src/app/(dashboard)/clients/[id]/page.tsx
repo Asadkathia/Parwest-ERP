@@ -4,7 +4,7 @@ import { redirect, notFound } from "next/navigation"
 import Image from "next/image"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
-import { ArrowLeft, Edit, FileText, Plus } from "lucide-react"
+import { ArrowLeft, Edit, FileText, Plus, Paperclip, Building2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import SectionTitle from "@/components/ui/section-title"
 import StatusChip from "@/components/ui/status-chip"
@@ -238,22 +238,22 @@ export default async function ClientDetailPage({
 
   const headAddress = client.headOfficeAddress || client.branches[0]?.address || "—"
   const primaryBranch = client.branches[0]
-  const attachments = [
-    {
-      id: "client-logo",
-      documentName: "Client Logo",
-      parwest: client.name,
-      uploadedAt: client.updatedAt,
-      available: Boolean(client.logoUrl),
-    },
-    {
-      id: "client-contract",
-      documentName: "Contract",
-      parwest: client.name,
-      uploadedAt: client.updatedAt,
-      available: Boolean(client.contractUrl),
-    },
-  ]
+
+  // Build attachment data for the Attachments tab
+  type AttachmentItem = { name: string; dataUrl: string }
+  const parseAttachments = (raw: unknown): AttachmentItem[] => {
+    if (!Array.isArray(raw)) return []
+    return (raw as { name?: string; dataUrl?: string }[]).filter((a) => a?.dataUrl).map((a) => ({ name: a.name || "Attachment", dataUrl: a.dataUrl! }))
+  }
+  const clientAdditional = parseAttachments(client.contractAttachments)
+  const totalClientDocs = (client.contractUrl ? 1 : 0) + clientAdditional.length + (client.logoUrl ? 1 : 0)
+  const branchAttachments = client.branches.map((b) => ({
+    branch: b,
+    additional: parseAttachments(b.contractAttachments),
+  }))
+  const totalBranchDocs = branchAttachments.reduce((sum, { branch, additional }) => sum + (branch.contractUrl ? 1 : 0) + additional.length, 0)
+  const totalDocs = totalClientDocs + totalBranchDocs
+  const uploadedDocs = totalDocs // all stored = uploaded
 
   return (
     <div className="space-y-6">
@@ -524,45 +524,97 @@ export default async function ClientDetailPage({
       ) : null}
 
       {activeTab === "attachments" ? (
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">ATTACHMENTS</h2>
-            <button type="button" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Upload Attachment
-            </button>
-          </CardHeader>
-          <CardBody>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>DOCUMENT NAME</Th>
-                  <Th>PARWEST</Th>
-                  <Th>UPLOADED</Th>
-                  <Th>ACTION</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {attachments.map((doc) => (
-                  <tr key={doc.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                    <Td>{doc.documentName}</Td>
-                    <Td>{doc.parwest}</Td>
-                    <Td>{formatDate(doc.uploadedAt)}</Td>
-                    <Td>
-                      {doc.available ? (
-                        <button type="button" className="text-[var(--brand)] hover:underline">
-                          View
-                        </button>
-                      ) : (
-                        <span className="text-[var(--text-muted)]">Not uploaded</span>
-                      )}
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableWrapper>
-          </CardBody>
-        </Card>
+        <div className="space-y-4">
+          {/* Summary strip */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-[var(--text)]">{totalDocs}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Total Files</p>
+            </div>
+            <div className="rounded-[var(--radius-md)] border border-green-200 bg-green-50 px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-green-700">{uploadedDocs}</p>
+              <p className="text-xs text-green-600 mt-0.5">Uploaded</p>
+            </div>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-[var(--text-muted)]">{client.isBranchless ? "Branchless" : `${client.branches.length} Branch${client.branches.length !== 1 ? "es" : ""}`}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Client Type</p>
+            </div>
+          </div>
+
+          {/* Client-level attachments */}
+          <Card>
+            <CardHeader className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-[var(--brand)]" />
+              <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wide">Client Attachments — {client.name}</h2>
+            </CardHeader>
+            <CardBody>
+              {totalClientDocs === 0 ? (
+                <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  No attachments uploaded for this client yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {client.logoUrl && (
+                    <AttachmentRow name="Client Logo" type="Logo" source={client.name} uploadedAt={client.updatedAt} dataUrl={client.logoUrl} />
+                  )}
+                  {client.contractUrl && (
+                    <AttachmentRow name="Client Contract" type="Contract" source={client.name} uploadedAt={client.updatedAt} dataUrl={client.contractUrl} />
+                  )}
+                  {clientAdditional.map((att, idx) => (
+                    <AttachmentRow key={idx} name={att.name} type="Attachment" source={client.name} uploadedAt={client.updatedAt} dataUrl={att.dataUrl} />
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Branch-level attachments (branch clients only) */}
+          {!client.isBranchless && (
+            <>
+              {branchAttachments.length === 0 ? (
+                <Card>
+                  <CardBody>
+                    <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">
+                      <Building2 className="h-4 w-4 flex-shrink-0" />
+                      No branches found for this client.
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : (
+                branchAttachments.map(({ branch: b, additional }) => {
+                  const branchTotal = (b.contractUrl ? 1 : 0) + additional.length
+                  return (
+                    <Card key={b.id}>
+                      <CardHeader className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-[var(--text-muted)]" />
+                        <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wide flex-1">{b.name}</h2>
+                        {b.isHeadOffice && (
+                          <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wide">Head Office</span>
+                        )}
+                        <span className="text-xs text-[var(--text-muted)]">{branchTotal} file{branchTotal !== 1 ? "s" : ""}</span>
+                      </CardHeader>
+                      <CardBody>
+                        {branchTotal === 0 ? (
+                          <p className="text-sm text-[var(--text-muted)] italic">No attachments uploaded for this branch.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {b.contractUrl && (
+                              <AttachmentRow name="Branch Contract" type="Contract" source={b.name} uploadedAt={b.updatedAt} dataUrl={b.contractUrl} />
+                            )}
+                            {additional.map((att, idx) => (
+                              <AttachmentRow key={idx} name={att.name} type="Attachment" source={b.name} uploadedAt={b.updatedAt} dataUrl={att.dataUrl} />
+                            ))}
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
+                  )
+                })
+              )}
+            </>
+          )}
+        </div>
       ) : null}
 
       {activeTab === "inventory" ? (
@@ -800,6 +852,46 @@ function LegacyFilterForm({
         <button type="button" className="ui-btn ui-btn-secondary">Export In Excel File</button>
       </div>
     </form>
+  )
+}
+
+function AttachmentRow({
+  name,
+  type,
+  source,
+  uploadedAt,
+  dataUrl,
+}: {
+  name: string
+  type: "Contract" | "Logo" | "Attachment"
+  source: string
+  uploadedAt: Date
+  dataUrl: string
+}) {
+  const badgeColor =
+    type === "Contract" ? "bg-blue-100 text-blue-700" :
+    type === "Logo" ? "bg-purple-100 text-purple-700" :
+    "bg-gray-100 text-gray-600"
+
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5">
+      <Paperclip className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]" />
+      <span className="flex-1 text-sm font-medium text-[var(--text)] truncate">{name}</span>
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 ${badgeColor}`}>{type}</span>
+      <span className="text-xs text-[var(--text-muted)] flex-shrink-0 hidden sm:block">{source}</span>
+      <span className="text-xs text-[var(--text-muted)] flex-shrink-0 hidden md:block">{formatDate(uploadedAt)}</span>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+        <a
+          href={dataUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--brand)] hover:underline"
+        >
+          View <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    </div>
   )
 }
 

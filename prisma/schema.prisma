@@ -369,6 +369,14 @@ model Training {
 // CLIENTS MODULE
 // ============================================
 
+model ClientType {
+  id        String   @id @default(cuid())
+  name      String   @unique // stored value e.g. "BANK"
+  label     String           // display label e.g. "Bank"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Client {
   id                String   @id @default(cuid())
   name              String
@@ -382,9 +390,10 @@ model Client {
   logoUrl           String?
   ntn               String? // National Tax Number
   strn              String? // Sales Tax Registration
-  contractUrl       String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  contractUrl         String?
+  contractAttachments Json?    // Array of { name: string; dataUrl: string }
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   regionId String?
   region   Region? @relation(fields: [regionId], references: [id])
@@ -411,11 +420,13 @@ model Branch {
   city          String?
   province      String?
   isHeadOffice  Boolean  @default(false)
-  contactPerson String?
-  contactPhone  String?
-  contactEmail  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  contactPerson       String?
+  contactPhone        String?
+  contactEmail        String?
+  contractUrl         String?
+  contractAttachments Json?    // Array of { name: string; dataUrl: string }
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   deployments           Deployment[]
   deploymentRates       DeploymentRate[]
