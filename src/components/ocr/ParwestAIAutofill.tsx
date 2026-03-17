@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from "react"
 import {
     Sparkles, Upload, CheckCircle, XCircle, RefreshCw,
-    ChevronDown, ChevronUp, Zap, FileText, Image, AlertCircle, Tag,
+    ChevronDown, ChevronUp, Zap, FileText, Image as ImageIcon, AlertCircle, Tag,
 } from "lucide-react"
 import { classifyDocument, type ClassificationResult } from "@/lib/ocr/document-classifier"
 import { extractEntities } from "@/lib/ocr/entity-extractor"
@@ -74,7 +74,7 @@ function FileIcon({ file }: { file: File }) {
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
     return isPdf
         ? <FileText className="h-4 w-4 text-red-500 shrink-0" />
-        : <Image className="h-4 w-4 text-blue-500 shrink-0" />
+        : <ImageIcon className="h-4 w-4 text-blue-500 shrink-0" />
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -242,7 +242,6 @@ export default function ParwestAIAutofill({ onApply }: Props) {
             updateJob(id, { status: "error", error: friendly })
             return []
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [updateJob])
 
     // ── Run all jobs sequentially (prevents memory overload) ─────────────────

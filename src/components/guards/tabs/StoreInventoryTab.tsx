@@ -2,6 +2,7 @@
 
 import { ShoppingCart } from "lucide-react"
 import type { GuardLooseRow } from "@/components/guards/tabs/types"
+import Link from "next/link"
 
 type StoreInventoryItem = {
     id: string
@@ -26,7 +27,12 @@ export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Store Inventory</h2>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h2 className="text-2xl font-bold">Store Inventory</h2>
+                <Link href="/store-inventory/inventory-assignments" className="ui-btn ui-btn-secondary">
+                    Open Store Inventory V2
+                </Link>
+            </div>
 
             {rows.length === 0 ? (
                 <div className="bg-white rounded-lg border p-12 text-center">

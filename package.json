@@ -33,7 +33,14 @@
     "db:verify:schema": "node scripts/verify-db-schema.mjs",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "inventory:v2:backfill": "node scripts/backfill-store-inventory-v2.mjs",
+    "inventory:v2:parity": "node scripts/check-inventory-v2-parity.mjs",
+    "inventory:v2:flags": "node scripts/verify-inventory-v2-flags.mjs",
+    "inventory:v2:stage-env": "node scripts/generate-inventory-v2-stage-env.mjs",
+    "inventory:v2:parity-diff": "node scripts/inventory-v2-parity-diff.mjs",
+    "inventory:v2:cleanup-test-data": "node scripts/cleanup-inventory-v2-test-data.mjs",
+    "inventory:v2:backfill:legacy": "node scripts/backfill-inventory-v2-from-legacy.mjs"
   },
   "keywords": [],
   "author": "",
@@ -60,11 +67,12 @@
     "react-leaflet": "^5.0.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "vercel": "^50.32.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^25.2.2",
+    "@types/node": "^22.15.30",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",

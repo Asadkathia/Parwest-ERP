@@ -68,7 +68,7 @@ function sampleCsv(moduleName: ImportModule) {
   if (moduleName === "clients") {
     return "name,type\nClient One,BANK\nClient Two,OTHER"
   }
-  return "name,category\nWalkie Talkie,Equipment\nUniform Set,Uniform"
+  return "sku,name,storeCode,quantityOnHand,brand,status\nWT-001,Walkie Talkie,RO-L,12,Motorola,ACTIVE\nUF-001,Uniform Set,RO-L,50,Parwest,ACTIVE"
 }
 
 export default function ImportsLifecycleManager({ initialModule = "users" }: { initialModule?: ImportModule }) {

@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-03-17T00:56:49.828Z",
+  "summary": {
+    "legacyUnits": 19,
+    "legacyIssued": 1,
+    "v2Tracked": 0,
+    "v2Issued": 0,
+    "unitDriftAbs": 19,
+    "unitDriftPct": 100,
+    "issuedDriftAbs": 1,
+    "issuedDriftPct": 100
+  },
+  "suspiciousContributors": {
+    "suspiciousBalanceRows": 0,
+    "suspiciousTrackedUnits": 0,
+    "suspiciousIssuedUnits": 0,
+    "adjustedTracked": 0,
+    "adjustedUnitDriftAbs": 19,
+    "adjustedUnitDriftPct": 100
+  },
+  "suspiciousProducts": [],
+  "suspiciousStores": [],
+  "suspiciousBalances": [],
+  "legacyIssuedRows": [
+    {
+      "id": "cmmttvwws002crf07q9hrdtny",
+      "uniqueNumber": "INV-LC-1773704538223",
+      "status": "ISSUED",
+      "isNonUnique": false,
+      "quantity": 1,
+      "regionalOfficeId": null,
+      "office_name": null
+    }
+  ],
+  "v2IssuedBalanceRows": [],
+  "v2ActiveAssignments": [],
+  "candidateCleanupSql": {
+    "note": "Review before execution. Intended for non-production cleanup of strict-test generated v2 rows.",
+    "sql": [
+      "BEGIN;",
+      "DELETE FROM \"StoreInventoryMovement\" m USING \"StoreInventoryProduct\" p WHERE m.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryAssignment\" a USING \"StoreInventoryProduct\" p WHERE a.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryDemandResponseLine\" drl USING \"StoreInventoryProduct\" p WHERE drl.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryDemandLine\" dl USING \"StoreInventoryProduct\" p WHERE dl.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryAdjustmentLine\" al USING \"StoreInventoryProduct\" p WHERE al.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryPurchaseLine\" pl USING \"StoreInventoryProduct\" p WHERE pl.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryBalance\" b USING \"StoreInventoryProduct\" p WHERE b.\"productId\" = p.id AND (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"StoreInventoryProduct\" p WHERE (p.sku ILIKE 'INV2-SKU-%' OR p.name ILIKE 'Inventory V2 Product %' OR p.sku ILIKE 'IMPORT-%' OR p.name ILIKE 'Imported Inventory Product%');",
+      "DELETE FROM \"Store\" s WHERE (s.code ILIKE 'INV2-%' OR s.name ILIKE 'Inventory V2 %');",
+      "COMMIT;"
+    ]
+  }
+}

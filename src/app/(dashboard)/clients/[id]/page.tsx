@@ -96,6 +96,7 @@ export default async function ClientDetailPage({
 }) {
   const session = await auth()
   if (!session) redirect("/login")
+  const inventoryAssignmentHref = "/store-inventory/inventory-assignments"
 
   const { id } = await params
   const {
@@ -621,7 +622,7 @@ export default async function ClientDetailPage({
         <Card>
           <CardHeader className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--text)]">INVENTORY</h2>
-            <Link href="/inventory/assign-item" className="ui-btn ui-btn-secondary">Open Inventory Assignment</Link>
+            <Link href={inventoryAssignmentHref} className="ui-btn ui-btn-secondary">Open Inventory Assignment</Link>
           </CardHeader>
           <CardBody>
             {client.inventoryAssignments.length === 0 ? (

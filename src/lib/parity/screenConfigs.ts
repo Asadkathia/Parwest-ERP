@@ -338,6 +338,13 @@ export const reportScreens: Record<string, ScreenConfig> = {
     actions: ["Search", "Reset", "Submit", "Generate Report", "Export In Excel File"],
     table: { columns: ["Client", "Branches", "Day Guards", "Night Guards", "Status"] },
   },
+  "inventory-store-summary": {
+    title: "Inventory Store Summary",
+    description: "Store inventory balances and valuation report from the v2 inventory dataset.",
+    sections: [{ title: "Filters", fields: [{ label: "Regional Office ID" }, { label: "Store ID" }, { label: "Product ID" }, { label: "Search" }, { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] }] }],
+    actions: ["Search", "Reset", "Submit", "Generate Report", "Export In Excel File"],
+    table: { columns: ["Store Code", "Store", "Regional Office", "Region", "SKU", "Product", "On Hand", "Held", "Issued", "Avg Unit Cost", "Inventory Value", "Updated At"] },
+  },
   "client-branch-deactive-report": {
     title: "Client Branch Deactive Report",
     sections: [{ title: "Filters", fields: [{ label: "Region", type: "select" }, { label: "Client", type: "select" }, { label: "Date From", type: "date" }, { label: "Date To", type: "date" }, { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] }, { label: "Search:" }, { label: "Select Date", type: "date" }] }],
@@ -487,15 +494,15 @@ export const payrollOperationLinks = [
 ]
 
 export const inventoryLinks = [
-  { label: "Dashboard", href: "/inventory" },
-  { label: "Search", href: "/inventory/search" },
-  { label: "Categories", href: "/inventory/categories" },
-  { label: "Vendors", href: "/inventory/vendors" },
-  { label: "Conditions", href: "/inventory/conditions" },
-  { label: "Demand", href: "/inventory/demand" },
-  { label: "Stock In", href: "/inventory/stock-in" },
-  { label: "Assign Item", href: "/inventory/assign-item" },
-  { label: "Condemned", href: "/inventory/condemned" },
+  { label: "Dashboard", href: "/store-inventory" },
+  { label: "Inventories", href: "/store-inventory/inventories" },
+  { label: "Products", href: "/store-inventory/products" },
+  { label: "Purchases", href: "/store-inventory/purchases" },
+  { label: "Adjustments", href: "/store-inventory/adjustments" },
+  { label: "Demand Send", href: "/store-inventory/demands-send" },
+  { label: "Demand Response", href: "/store-inventory/demands-response" },
+  { label: "Inventory Assignments", href: "/store-inventory/inventory-assignments" },
+  { label: "Audits", href: "/store-inventory/audits" },
 ]
 
 export const reportLinks = [
@@ -504,6 +511,7 @@ export const reportLinks = [
   { label: "Guard Deployment", href: "/reports/guard-deployment" },
   { label: "Day & Night", href: "/reports/day-night-duty" },
   { label: "Client Enrolled", href: "/reports/client-enrolled" },
+  { label: "Inventory Summary", href: "/reports/inventory-store-summary" },
   { label: "AI/Prompt", href: "/reports/ai" },
   { label: "Generated List", href: "/reports/generated" },
 ]

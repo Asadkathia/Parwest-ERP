@@ -2,6 +2,7 @@
 
 import { Package } from "lucide-react"
 import type { GuardLooseRow } from "@/components/guards/tabs/types"
+import Link from "next/link"
 
 type InventoryItem = {
     id: string
@@ -24,8 +25,13 @@ export default function InventoryTab({ inventory }: InventoryTabProps) {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Inventory</h2>
-                <div className="text-sm text-gray-600">
-                    Items: <span className="font-semibold">{items.length}</span>
+                <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-600">
+                        Items: <span className="font-semibold">{items.length}</span>
+                    </div>
+                    <Link href="/store-inventory/employee-assignments" className="ui-btn ui-btn-secondary">
+                        Inventory V2
+                    </Link>
                 </div>
             </div>
 

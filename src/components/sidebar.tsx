@@ -93,15 +93,55 @@ const navItems: NavNode[] = [
         title: "Inventory",
         icon: Package,
         children: [
-            { title: "Dashboard", href: "/inventory", icon: LayoutDashboard },
-            { title: "Search", href: "/inventory/search", icon: Search },
-            { title: "Categories", href: "/inventory/categories", icon: Package },
-            { title: "Vendors", href: "/inventory/vendors", icon: Building2 },
-            { title: "Conditions", href: "/inventory/conditions", icon: Settings },
-            { title: "Demand", href: "/inventory/demand", icon: ClipboardList },
-            { title: "Stock In", href: "/inventory/stock-in", icon: Upload },
-            { title: "Assign Item", href: "/inventory/assign-item", icon: MapPin },
-            { title: "Condemned Items", href: "/inventory/condemned", icon: History },
+            {
+                title: "Overview",
+                icon: LayoutDashboard,
+                children: [
+                    { title: "Dashboard", href: "/store-inventory", icon: LayoutDashboard },
+                    { title: "Inventories", href: "/store-inventory/inventories", icon: Search },
+                    { title: "Audits", href: "/store-inventory/audits", icon: History },
+                ],
+            },
+            {
+                title: "Procurement & Stock",
+                icon: Upload,
+                children: [
+                    { title: "Purchases", href: "/store-inventory/purchases", icon: FileText },
+                    { title: "Create Purchase", href: "/store-inventory/purchase-create", icon: Upload },
+                    { title: "Adjustments", href: "/store-inventory/adjustments", icon: History },
+                ],
+            },
+            {
+                title: "Requests & Assignment",
+                icon: ClipboardList,
+                children: [
+                    { title: "Demand Send", href: "/store-inventory/demands-send", icon: ClipboardList },
+                    { title: "Demand Response", href: "/store-inventory/demands-response", icon: ClipboardList },
+                    { title: "Inventory Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
+                    { title: "Employee Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
+                ],
+            },
+            {
+                title: "Catalog & Masters",
+                icon: Settings,
+                children: [
+                    { title: "Products", href: "/store-inventory/products", icon: Package },
+                    { title: "Create Product", href: "/store-inventory/product-create", icon: Upload },
+                    { title: "Vendors", href: "/store-inventory/vendors", icon: Building2 },
+                    { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
+                    { title: "Categories", href: "/store-inventory/categories", icon: Package },
+                    { title: "Brands", href: "/store-inventory/brands", icon: Package },
+                    { title: "Units", href: "/store-inventory/units", icon: Package },
+                    { title: "Variations", href: "/store-inventory/variations", icon: Settings },
+                    { title: "Conditions", href: "/store-inventory/conditions", icon: Settings },
+                    { title: "Statuses", href: "/store-inventory/statuses", icon: Settings },
+                    { title: "Weapons", href: "/store-inventory/weapons", icon: Package },
+                    { title: "Calibres", href: "/store-inventory/calibres", icon: Settings },
+                    { title: "Licenses", href: "/store-inventory/licenses", icon: FileText },
+                    { title: "Repairings", href: "/store-inventory/repairings", icon: History },
+                    { title: "Product Unique Items", href: "/store-inventory/product-unique-items", icon: Package },
+                ],
+            },
         ],
     },
     {
@@ -171,13 +211,23 @@ const navItems: NavNode[] = [
     },
 ]
 
+function hasPathInTree(node: NavNode, pathname: string): boolean {
+    if (node.href && (pathname === node.href || pathname.startsWith(node.href + "/"))) {
+        return true
+    }
+
+    if (!node.children?.length) {
+        return false
+    }
+
+    return node.children.some((child) => hasPathInTree(child, pathname))
+}
+
 function getActiveSectionTitle(pathname: string): string | null {
     for (const item of navItems) {
         if (!item.children) continue
-        for (const child of item.children) {
-            if (child.href && (pathname === child.href || pathname.startsWith(child.href + "/"))) {
-                return item.title
-            }
+        if (item.children.some((child) => hasPathInTree(child, pathname))) {
+            return item.title
         }
     }
     return null

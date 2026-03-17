@@ -9,6 +9,52 @@ datasource db {
   provider = "postgresql"
 }
 
+enum StoreInventoryDemandStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum StoreInventoryDemandResponseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+enum StoreInventoryAssignmentStatus {
+  ASSIGNED
+  RETURNED
+  LOST
+  DAMAGED
+}
+
+enum StoreInventoryMovementType {
+  PURCHASE
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  ASSIGNMENT_OUT
+  ASSIGNMENT_RETURN
+  DEMAND_OUT
+  DEMAND_IN
+}
+
+enum StoreInventoryAdjustmentType {
+  INCREASE
+  DECREASE
+  SET
+}
+
+enum StoreInventoryPurchaseStatus {
+  DRAFT
+  RECEIVED
+  CANCELLED
+}
+
 // ============================================
 // AUTHENTICATION & AUTHORIZATION
 // ============================================
@@ -32,17 +78,27 @@ model User {
   regionalOfficeId String?
   regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
 
-  permissions           UserPermission[]
-  statusHistory         UserStatusHistory[]
-  auditLogs             AuditLog[]
-  ticketsCreated        Ticket[]                      @relation("TicketSender")
-  ticketsAssigned       Ticket[]                      @relation("TicketAssignee")
-  managerAssignments    ManagerSupervisorAssignment[] @relation("ManagerAssignments")
-  supervisorAssignments ManagerSupervisorAssignment[] @relation("SupervisorAssignments")
-  clientAssignments     ClientSupervisorAssignment[]
-  guardAssignments      GuardSupervisorAssignment[]
-  requisitionsRequested Requisition[]                 @relation("RequisitionRequester")
-  requisitionsApproved  Requisition[]                 @relation("RequisitionApprover")
+  permissions                       UserPermission[]
+  statusHistory                     UserStatusHistory[]
+  auditLogs                         AuditLog[]
+  ticketsCreated                    Ticket[]                       @relation("TicketSender")
+  ticketsAssigned                   Ticket[]                       @relation("TicketAssignee")
+  managerAssignments                ManagerSupervisorAssignment[]  @relation("ManagerAssignments")
+  supervisorAssignments             ManagerSupervisorAssignment[]  @relation("SupervisorAssignments")
+  clientAssignments                 ClientSupervisorAssignment[]
+  guardAssignments                  GuardSupervisorAssignment[]
+  requisitionsRequested             Requisition[]                  @relation("RequisitionRequester")
+  requisitionsApproved              Requisition[]                  @relation("RequisitionApprover")
+  storeInventoryPurchasesCreated    StoreInventoryPurchase[]       @relation("StoreInventoryPurchaseCreatedBy")
+  storeInventoryPurchasesApproved   StoreInventoryPurchase[]       @relation("StoreInventoryPurchaseApprovedBy")
+  storeInventoryAdjustmentsCreated  StoreInventoryAdjustment[]     @relation("StoreInventoryAdjustmentCreatedBy")
+  storeInventoryDemandsRequested    StoreInventoryDemand[]         @relation("StoreInventoryDemandRequestedBy")
+  storeInventoryDemandsApproved     StoreInventoryDemand[]         @relation("StoreInventoryDemandApprovedBy")
+  storeInventoryDemandResponses     StoreInventoryDemandResponse[] @relation("StoreInventoryDemandResponseResponder")
+  storeInventoryAssignmentsReceived StoreInventoryAssignment[]     @relation("StoreInventoryAssignmentAssignee")
+  storeInventoryAssignmentsIssued   StoreInventoryAssignment[]     @relation("StoreInventoryAssignmentIssuer")
+  storeInventoryAssignmentsReturned StoreInventoryAssignment[]     @relation("StoreInventoryAssignmentReturner")
+  storeInventoryMovementsPerformed  StoreInventoryMovement[]       @relation("StoreInventoryMovementPerformedBy")
 
   @@index([email])
   @@index([roleId])
@@ -122,6 +178,7 @@ model RegionalOffice {
   deployments                  Deployment[]
   inventory                    InventoryItem[]
   inventoryDemands             InventoryDemand[]
+  storesV2                     Store[]
   managerSupervisorAssignments ManagerSupervisorAssignment[]
 
   @@index([regionId])
@@ -132,41 +189,41 @@ model RegionalOffice {
 // ============================================
 
 model Guard {
-  id                String    @id @default(cuid())
-  parwestId         String    @unique
-  name              String
-  cnic              String    @unique
-  phone             String?
-  email             String?
-  dateOfBirth       DateTime?
-  age               Int?
-  fatherName        String?
-  religion          String?
-  maritalStatus     String?
-  education         String?
-  addressPermanent  String?
-  addressCurrent    String?
-  emergencyContact  String?
-  status            String    @default("PENDING") // PENDING, ACTIVE, INACTIVE, TERMINATED, BLACKLISTED
-  isExService       Boolean   @default(false)
-  exServiceRank     String?
-  exServiceRegiment String?
-  bankName          String?
-  bankAccountNumber String?
-  bankAccountType   String?
-  bankIban          String?
-  bankBranchCode    String?
-  bankAccountsJson  String?   // JSON array of GuardBankAccount objects
-  joiningDate       DateTime?
-  motherName        String?
-  nationality       String?
-  nextOfKin         String?
-  profileIntroducer String?
+  id                       String    @id @default(cuid())
+  parwestId                String    @unique
+  name                     String
+  cnic                     String    @unique
+  phone                    String?
+  email                    String?
+  dateOfBirth              DateTime?
+  age                      Int?
+  fatherName               String?
+  religion                 String?
+  maritalStatus            String?
+  education                String?
+  addressPermanent         String?
+  addressCurrent           String?
+  emergencyContact         String?
+  status                   String    @default("PENDING") // PENDING, ACTIVE, INACTIVE, TERMINATED, BLACKLISTED
+  isExService              Boolean   @default(false)
+  exServiceRank            String?
+  exServiceRegiment        String?
+  bankName                 String?
+  bankAccountNumber        String?
+  bankAccountType          String?
+  bankIban                 String?
+  bankBranchCode           String?
+  bankAccountsJson         String? // JSON array of GuardBankAccount objects
+  joiningDate              DateTime?
+  motherName               String?
+  nationality              String?
+  nextOfKin                String?
+  profileIntroducer        String?
   additionalContactNumbers String?
-  nearestRelativesJson     String?   // JSON array of NearestRelative objects
-  photoUrl                 String?   // base64 data URL or external image URL
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  nearestRelativesJson     String? // JSON array of NearestRelative objects
+  photoUrl                 String? // base64 data URL or external image URL
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   // Relations
   regionalOfficeId String?
@@ -237,11 +294,11 @@ model GuardPrerequisite {
   id                 String    @id @default(cuid())
   guardId            String
   guard              Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  docTypeName        String    // matches GuardDocumentType.name
+  docTypeName        String // matches GuardDocumentType.name
   status             String    @default("PENDING") // PENDING, VERIFIED, REJECTED
-  verificationStatus String?   // REQUEST_SUBMITTED, REQUEST_NOT_SUBMITTED, VERIFIED, NON_VERIFIED, LETTER_ISSUED, LETTER_NOT_ISSUED, FEEDBACK_RECEIVED, FEEDBACK_PENDING
-  attachmentData     String?   // base64 encoded file
-  attachmentName     String?   // original file name
+  verificationStatus String? // REQUEST_SUBMITTED, REQUEST_NOT_SUBMITTED, VERIFIED, NON_VERIFIED, LETTER_ISSUED, LETTER_NOT_ISSUED, FEEDBACK_RECEIVED, FEEDBACK_PENDING
+  attachmentData     String? // base64 encoded file
+  attachmentName     String? // original file name
   documentUrl        String?
   verifiedAt         DateTime?
   verifiedBy         String?
@@ -337,8 +394,8 @@ model Residence {
   occupied           Int?
   status             String   @default("ACTIVE") // ACTIVE, INACTIVE
   rentPayable        Float?
-  utilityBills       String?  // INCLUDED, EXCLUDED, SHARED
-  paymentMethod      String?  // CASH, BANK_TRANSFER
+  utilityBills       String? // INCLUDED, EXCLUDED, SHARED
+  paymentMethod      String? // CASH, BANK_TRANSFER
   referredBy         String?
   state              String?
   city               String?
@@ -372,26 +429,26 @@ model Training {
 model ClientType {
   id        String   @id @default(cuid())
   name      String   @unique // stored value e.g. "BANK"
-  label     String           // display label e.g. "Bank"
+  label     String // display label e.g. "Bank"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Client {
-  id                String   @id @default(cuid())
-  name              String
-  email             String?
-  type              String // BANK, MANUFACTURER, etc.
-  enrollmentDate    DateTime @default(now())
-  isBranchless      Boolean  @default(false)
-  headOfficeAddress String?
-  city              String?
-  status            String   @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
-  logoUrl           String?
-  ntn               String? // National Tax Number
-  strn              String? // Sales Tax Registration
+  id                  String   @id @default(cuid())
+  name                String
+  email               String?
+  type                String // BANK, MANUFACTURER, etc.
+  enrollmentDate      DateTime @default(now())
+  isBranchless        Boolean  @default(false)
+  headOfficeAddress   String?
+  city                String?
+  status              String   @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
+  logoUrl             String?
+  ntn                 String? // National Tax Number
+  strn                String? // Sales Tax Registration
   contractUrl         String?
-  contractAttachments Json?    // Array of { name: string; dataUrl: string }
+  contractAttachments Json? // Array of { name: string; dataUrl: string }
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -411,20 +468,20 @@ model Client {
 }
 
 model Branch {
-  id            String   @id @default(cuid())
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name          String
-  code          String?
-  address       String?
-  city          String?
-  province      String?
-  isHeadOffice  Boolean  @default(false)
+  id                  String   @id @default(cuid())
+  clientId            String
+  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name                String
+  code                String?
+  address             String?
+  city                String?
+  province            String?
+  isHeadOffice        Boolean  @default(false)
   contactPerson       String?
   contactPhone        String?
   contactEmail        String?
   contractUrl         String?
-  contractAttachments Json?    // Array of { name: string; dataUrl: string }
+  contractAttachments Json? // Array of { name: string; dataUrl: string }
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -633,6 +690,419 @@ model InventoryDemand {
   @@index([categoryId])
   @@index([regionalOfficeId])
   @@index([status])
+}
+
+// ============================================
+// STORE INVENTORY MODULE (V2)
+// ============================================
+
+model Store {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  type          String?
+  address       String?
+  contactNumber String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  regionalOfficeId String?
+  regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
+
+  balances        StoreInventoryBalance[]
+  purchases       StoreInventoryPurchase[]
+  adjustments     StoreInventoryAdjustment[]
+  demandsFrom     StoreInventoryDemand[]         @relation("StoreInventoryDemandFromStore")
+  demandsTo       StoreInventoryDemand[]         @relation("StoreInventoryDemandToStore")
+  demandResponses StoreInventoryDemandResponse[]
+  assignments     StoreInventoryAssignment[]
+  stockMovements  StoreInventoryMovement[]
+
+  @@index([regionalOfficeId])
+  @@index([isActive])
+}
+
+model StoreInventoryBrand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryUnit {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  shortCode String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryStatus {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryConditionV2 {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryWeaponType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryCalibre {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryLicenseType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryVariation {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryRepairing {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+}
+
+model StoreInventoryProduct {
+  id             String   @id @default(cuid())
+  sku            String   @unique
+  name           String
+  description    String?
+  serialRequired Boolean  @default(false)
+  minStockLevel  Int?
+  maxStockLevel  Int?
+  reorderLevel   Int?
+  barcode        String?
+  hsCode         String?
+  warrantyMonths Int?
+  licenseNumber  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  brandId       String?
+  brand         StoreInventoryBrand?       @relation(fields: [brandId], references: [id])
+  unitId        String?
+  unit          StoreInventoryUnit?        @relation(fields: [unitId], references: [id])
+  statusId      String?
+  status        StoreInventoryStatus?      @relation(fields: [statusId], references: [id])
+  conditionId   String?
+  condition     StoreInventoryConditionV2? @relation(fields: [conditionId], references: [id])
+  weaponTypeId  String?
+  weaponType    StoreInventoryWeaponType?  @relation(fields: [weaponTypeId], references: [id])
+  calibreId     String?
+  calibre       StoreInventoryCalibre?     @relation(fields: [calibreId], references: [id])
+  licenseTypeId String?
+  licenseType   StoreInventoryLicenseType? @relation(fields: [licenseTypeId], references: [id])
+  variationId   String?
+  variation     StoreInventoryVariation?   @relation(fields: [variationId], references: [id])
+  repairingId   String?
+  repairing     StoreInventoryRepairing?   @relation(fields: [repairingId], references: [id])
+
+  balances            StoreInventoryBalance[]
+  purchaseLines       StoreInventoryPurchaseLine[]
+  adjustmentLines     StoreInventoryAdjustmentLine[]
+  demandLines         StoreInventoryDemandLine[]
+  demandResponseLines StoreInventoryDemandResponseLine[]
+  assignments         StoreInventoryAssignment[]
+  stockMovements      StoreInventoryMovement[]
+
+  @@index([name])
+  @@index([brandId])
+  @@index([unitId])
+  @@index([statusId])
+  @@index([conditionId])
+}
+
+model StoreInventoryBalance {
+  id             String   @id @default(cuid())
+  quantityOnHand Int      @default(0)
+  quantityHeld   Int      @default(0)
+  quantityIssued Int      @default(0)
+  avgUnitCost    Float?
+  updatedAt      DateTime @updatedAt
+
+  storeId   String
+  store     Store                 @relation(fields: [storeId], references: [id])
+  productId String
+  product   StoreInventoryProduct @relation(fields: [productId], references: [id])
+
+  @@unique([storeId, productId])
+  @@index([productId])
+}
+
+model StoreInventoryPurchase {
+  id           String                       @id @default(cuid())
+  referenceNo  String?                      @unique
+  invoiceNo    String?
+  supplierName String?
+  status       StoreInventoryPurchaseStatus @default(DRAFT)
+  purchasedAt  DateTime                     @default(now())
+  receivedAt   DateTime?
+  notes        String?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  storeId      String
+  store        Store   @relation(fields: [storeId], references: [id])
+  createdById  String
+  createdBy    User    @relation("StoreInventoryPurchaseCreatedBy", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   User?   @relation("StoreInventoryPurchaseApprovedBy", fields: [approvedById], references: [id])
+
+  lines StoreInventoryPurchaseLine[]
+
+  @@index([storeId])
+  @@index([status])
+  @@index([createdById])
+  @@index([approvedById])
+}
+
+model StoreInventoryPurchaseLine {
+  id        String   @id @default(cuid())
+  quantity  Int
+  unitCost  Float?
+  totalCost Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseId String
+  purchase   StoreInventoryPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String
+  product    StoreInventoryProduct  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+model StoreInventoryAdjustment {
+  id             String                       @id @default(cuid())
+  adjustmentType StoreInventoryAdjustmentType
+  reason         String?
+  notes          String?
+  adjustedAt     DateTime                     @default(now())
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  storeId     String
+  store       Store  @relation(fields: [storeId], references: [id])
+  createdById String
+  createdBy   User   @relation("StoreInventoryAdjustmentCreatedBy", fields: [createdById], references: [id])
+
+  lines StoreInventoryAdjustmentLine[]
+
+  @@index([storeId])
+  @@index([createdById])
+  @@index([adjustmentType])
+}
+
+model StoreInventoryAdjustmentLine {
+  id             String   @id @default(cuid())
+  quantityBefore Int
+  quantityDelta  Int
+  quantityAfter  Int
+  unitCost       Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  adjustmentId String
+  adjustment   StoreInventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  productId    String
+  product      StoreInventoryProduct    @relation(fields: [productId], references: [id])
+
+  @@index([adjustmentId])
+  @@index([productId])
+}
+
+model StoreInventoryDemand {
+  id          String                     @id @default(cuid())
+  requestNo   String?                    @unique
+  status      StoreInventoryDemandStatus @default(DRAFT)
+  requiredBy  DateTime?
+  requestedAt DateTime                   @default(now())
+  approvedAt  DateTime?
+  fulfilledAt DateTime?
+  reason      String?
+  notes       String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  fromStoreId   String?
+  fromStore     Store?  @relation("StoreInventoryDemandFromStore", fields: [fromStoreId], references: [id])
+  toStoreId     String?
+  toStore       Store?  @relation("StoreInventoryDemandToStore", fields: [toStoreId], references: [id])
+  requestedById String
+  requestedBy   User    @relation("StoreInventoryDemandRequestedBy", fields: [requestedById], references: [id])
+  approvedById  String?
+  approvedBy    User?   @relation("StoreInventoryDemandApprovedBy", fields: [approvedById], references: [id])
+
+  lines     StoreInventoryDemandLine[]
+  responses StoreInventoryDemandResponse[]
+
+  @@index([status])
+  @@index([fromStoreId])
+  @@index([toStoreId])
+  @@index([requestedById])
+  @@index([approvedById])
+}
+
+model StoreInventoryDemandLine {
+  id           String   @id @default(cuid())
+  requestedQty Int
+  approvedQty  Int?
+  fulfilledQty Int      @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  demandId  String
+  demand    StoreInventoryDemand  @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  productId String
+  product   StoreInventoryProduct @relation(fields: [productId], references: [id])
+
+  responseLines StoreInventoryDemandResponseLine[]
+
+  @@index([demandId])
+  @@index([productId])
+}
+
+model StoreInventoryDemandResponse {
+  id          String                             @id @default(cuid())
+  status      StoreInventoryDemandResponseStatus @default(PENDING)
+  respondedAt DateTime                           @default(now())
+  notes       String?
+  createdAt   DateTime                           @default(now())
+  updatedAt   DateTime                           @updatedAt
+
+  demandId         String
+  demand           StoreInventoryDemand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  responderStoreId String
+  responderStore   Store                @relation(fields: [responderStoreId], references: [id])
+  responderId      String
+  responder        User                 @relation("StoreInventoryDemandResponseResponder", fields: [responderId], references: [id])
+
+  lines StoreInventoryDemandResponseLine[]
+
+  @@index([demandId])
+  @@index([responderStoreId])
+  @@index([responderId])
+  @@index([status])
+}
+
+model StoreInventoryDemandResponseLine {
+  id        String   @id @default(cuid())
+  quantity  Int
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  responseId   String
+  response     StoreInventoryDemandResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  demandLineId String
+  demandLine   StoreInventoryDemandLine     @relation(fields: [demandLineId], references: [id])
+  productId    String
+  product      StoreInventoryProduct        @relation(fields: [productId], references: [id])
+
+  @@index([responseId])
+  @@index([demandLineId])
+  @@index([productId])
+}
+
+model StoreInventoryAssignment {
+  id               String                         @id @default(cuid())
+  quantity         Int                            @default(1)
+  status           StoreInventoryAssignmentStatus @default(ASSIGNED)
+  assignedAt       DateTime                       @default(now())
+  expectedReturnAt DateTime?
+  returnedAt       DateTime?
+  notes            String?
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+
+  storeId          String
+  store            Store                 @relation(fields: [storeId], references: [id])
+  productId        String
+  product          StoreInventoryProduct @relation(fields: [productId], references: [id])
+  assignedToUserId String
+  assignedToUser   User                  @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assignedByUserId String
+  assignedByUser   User                  @relation("StoreInventoryAssignmentIssuer", fields: [assignedByUserId], references: [id])
+  returnedByUserId String?
+  returnedByUser   User?                 @relation("StoreInventoryAssignmentReturner", fields: [returnedByUserId], references: [id])
+
+  @@index([storeId])
+  @@index([productId])
+  @@index([assignedToUserId])
+  @@index([assignedByUserId])
+  @@index([returnedByUserId])
+  @@index([status])
+}
+
+model StoreInventoryMovement {
+  id            String                     @id @default(cuid())
+  movementType  StoreInventoryMovementType
+  quantity      Int
+  occurredAt    DateTime                   @default(now())
+  referenceType String?
+  referenceId   String?
+  notes         String?
+  createdAt     DateTime                   @default(now())
+
+  storeId       String
+  store         Store                 @relation(fields: [storeId], references: [id])
+  productId     String
+  product       StoreInventoryProduct @relation(fields: [productId], references: [id])
+  performedById String?
+  performedBy   User?                 @relation("StoreInventoryMovementPerformedBy", fields: [performedById], references: [id])
+
+  @@index([storeId, productId])
+  @@index([movementType])
+  @@index([occurredAt])
+  @@index([performedById])
 }
 
 // ============================================

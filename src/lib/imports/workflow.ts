@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/db"
+import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
+
 export const IMPORT_MODULES = ["users", "guards", "clients", "inventory"] as const
 export type ImportModule = (typeof IMPORT_MODULES)[number]
 
@@ -42,7 +45,7 @@ const REQUIRED_FIELDS: Record<ImportModule, string[]> = {
   users: ["name", "email", "role", "regionalOfficeSeries", "contactNumber"],
   guards: ["name", "cnic"],
   clients: ["name", "type"],
-  inventory: ["name", "category"],
+  inventory: ["name"],
 }
 
 const globalStore = globalThis as unknown as {
@@ -143,13 +146,35 @@ export function validateImport(moduleName: string, payload: ImportPayload): Impo
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]
     const rowErrors: ImportValidationError[] = []
-    for (const field of requiredFields) {
-      if (!toStringValue(row[field])) {
+    if (importModule === "inventory") {
+      const hasLegacyShape = Boolean(toStringValue(row.name) && toStringValue(row.category))
+      const hasV2Shape = Boolean(toStringValue(row.sku) && toStringValue(row.name) && toStringValue(row.storeCode))
+
+      if (!hasLegacyShape && !hasV2Shape) {
         rowErrors.push({
           row: index + 2,
-          field,
-          message: `Missing required field: ${field}`,
+          field: "inventory",
+          message: "Inventory row must include either legacy shape (name, category) or v2 shape (sku, name, storeCode).",
         })
+      }
+
+      const qtyText = toStringValue(row.quantity || row.quantityOnHand)
+      if (qtyText && !/^-?\d+(\.\d+)?$/.test(qtyText)) {
+        rowErrors.push({
+          row: index + 2,
+          field: "quantity",
+          message: "Quantity must be numeric when provided.",
+        })
+      }
+    } else {
+      for (const field of requiredFields) {
+        if (!toStringValue(row[field])) {
+          rowErrors.push({
+            row: index + 2,
+            field,
+            message: `Missing required field: ${field}`,
+          })
+        }
       }
     }
 
@@ -193,6 +218,187 @@ export function createImportJob(module: ImportModule, validation: ImportValidati
   }
   jobsStore().set(jobId, job)
   return job
+}
+
+function finalizeImportJob(
+  module: ImportModule,
+  validation: ImportValidationResult,
+  processedRows: number,
+  successRows: number,
+  failedRows: number,
+  errors: ImportValidationError[]
+) {
+  const now = new Date().toISOString()
+  const jobId = `imp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const job: ImportJobRecord = {
+    jobId,
+    module,
+    status: failedRows > 0 ? "FAILED" : "COMPLETED",
+    createdAt: now,
+    updatedAt: now,
+    totalRows: validation.totalRows,
+    processedRows,
+    successRows,
+    failedRows,
+    validation,
+    errors,
+  }
+  jobsStore().set(jobId, job)
+  return job
+}
+
+function toNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function toSlug(input: string) {
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24)
+}
+
+async function processInventoryRows(validation: ImportValidationResult, rows: Array<Record<string, unknown>>) {
+  const flags = getInventoryV2Flags()
+  const errors: ImportValidationError[] = [...validation.errors]
+
+  if (!flags.writeEnabled) {
+    errors.push({
+      row: 1,
+      field: "inventory.v2.writeEnabled",
+      message: "Inventory v2 write flag is disabled. Enable INVENTORY_V2_WRITE_ENABLED=true before processing imports.",
+    })
+    return finalizeImportJob("inventory", validation, 0, 0, validation.totalRows, errors)
+  }
+
+  let successRows = 0
+  let failedRows = 0
+  let processedRows = 0
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index]
+    const rowNo = index + 2
+    processedRows += 1
+
+    try {
+      const name = toStringValue(row.name)
+      if (!name) throw new Error("Missing name")
+
+      const sku = toStringValue(row.sku) || `LEG-${toSlug(name)}-${index + 1}`
+      const storeCode = toStringValue(row.storeCode) || "RO-UNASSIGNED"
+      const storeName = toStringValue(row.storeName) || `${storeCode} Imported Store`
+      const quantityOnHand = Math.max(0, Math.round(toNumber(row.quantityOnHand ?? row.quantity, 0)))
+      const avgUnitCostRaw = toNumber(row.avgUnitCost ?? row.unitCost, 0)
+      const avgUnitCost = avgUnitCostRaw > 0 ? avgUnitCostRaw : null
+      const brandName = toStringValue(row.brand)
+      const unitName = toStringValue(row.unit)
+      const statusName = toStringValue(row.status) || "ACTIVE"
+
+      await prisma.$transaction(async (tx) => {
+        const store = await tx.store.upsert({
+          where: { code: storeCode },
+          create: {
+            code: storeCode,
+            name: storeName,
+            type: "IMPORTED",
+            isActive: true,
+          },
+          update: {
+            name: storeName,
+            isActive: true,
+          },
+        })
+
+        const brand = brandName
+          ? await tx.storeInventoryBrand.upsert({
+              where: { name: brandName },
+              create: { name: brandName },
+              update: {},
+            })
+          : null
+
+        const unit = unitName
+          ? await tx.storeInventoryUnit.upsert({
+              where: { name: unitName },
+              create: {
+                name: unitName,
+                shortCode: toSlug(unitName).slice(0, 8) || "UNIT",
+              },
+              update: {},
+            })
+          : null
+
+        const status = await tx.storeInventoryStatus.upsert({
+          where: { name: statusName },
+          create: { name: statusName },
+          update: {},
+        })
+
+        const product = await tx.storeInventoryProduct.upsert({
+          where: { sku },
+          create: {
+            sku,
+            name,
+            brandId: brand?.id ?? null,
+            unitId: unit?.id ?? null,
+            statusId: status.id,
+            serialRequired: false,
+          },
+          update: {
+            name,
+            brandId: brand?.id ?? null,
+            unitId: unit?.id ?? null,
+            statusId: status.id,
+          },
+        })
+
+        await tx.storeInventoryBalance.upsert({
+          where: {
+            storeId_productId: {
+              storeId: store.id,
+              productId: product.id,
+            },
+          },
+          create: {
+            storeId: store.id,
+            productId: product.id,
+            quantityOnHand,
+            avgUnitCost,
+          },
+          update: {
+            quantityOnHand,
+            avgUnitCost,
+          },
+        })
+      })
+
+      successRows += 1
+    } catch (error) {
+      failedRows += 1
+      errors.push({
+        row: rowNo,
+        field: "inventory",
+        message: error instanceof Error ? error.message : "Failed to process inventory row.",
+      })
+    }
+  }
+
+  return finalizeImportJob("inventory", validation, processedRows, successRows, failedRows, errors)
+}
+
+export async function processImport(
+  module: ImportModule,
+  payload: { rows: Array<Record<string, unknown>>; headers: string[] },
+  validation: ImportValidationResult
+) {
+  if (module !== "inventory") {
+    return createImportJob(module, validation)
+  }
+
+  return processInventoryRows(validation, payload.rows)
 }
 
 export function getImportJob(jobId: string) {

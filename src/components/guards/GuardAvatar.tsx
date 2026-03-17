@@ -27,13 +27,15 @@ export default function GuardAvatar({ guardId, guardName, initialUrl, size = "sm
   useEffect(() => {
     // If DB has a URL, always use it and keep localStorage in sync
     if (initialUrl) {
-      setPreview(initialUrl)
+      const rafId = requestAnimationFrame(() => setPreview(initialUrl))
       localStorage.setItem(storageKey, initialUrl)
-      return
+      return () => cancelAnimationFrame(rafId)
     }
     // Fall back to localStorage for offline / cached display
     const stored = localStorage.getItem(storageKey)
-    if (stored) setPreview(stored)
+    if (!stored) return
+    const rafId = requestAnimationFrame(() => setPreview(stored))
+    return () => cancelAnimationFrame(rafId)
   }, [storageKey, initialUrl])
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
 

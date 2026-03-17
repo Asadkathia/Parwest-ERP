@@ -1,6 +1,6 @@
 import { badRequest, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { auth } from "@/lib/auth"
-import { createImportJob, readImportPayload, validateImport } from "@/lib/imports/workflow"
+import { processImport, readImportPayload, validateImport } from "@/lib/imports/workflow"
 
 export async function POST(
   request: Request,
@@ -21,7 +21,7 @@ export async function POST(
       return badRequest(`Unsupported module '${module}'. Supported modules: users, guards, clients, inventory.`)
     }
 
-    const job = createImportJob(validation.module, validation)
+    const job = await processImport(validation.module, payload, validation)
     return ok(job, 202)
   } catch (error) {
     console.error("Error processing import:", error)

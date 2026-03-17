@@ -21,10 +21,16 @@ function Ring({
     const [displayed, setDisplayed] = useState(animate ? 0 : pct)
 
     useEffect(() => {
-        if (!animate) { setDisplayed(pct); return }
-        setDisplayed(0)
+        if (!animate) {
+            const rafId = requestAnimationFrame(() => setDisplayed(pct))
+            return () => cancelAnimationFrame(rafId)
+        }
+        const resetRafId = requestAnimationFrame(() => setDisplayed(0))
         const t = setTimeout(() => setDisplayed(pct), delay)
-        return () => clearTimeout(t)
+        return () => {
+            cancelAnimationFrame(resetRafId)
+            clearTimeout(t)
+        }
     }, [pct, animate, delay])
 
     const r = (size - stroke) / 2
@@ -111,19 +117,27 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
 
     // animate in/out
     useEffect(() => {
+        let rafId: number | null = null
         if (show) {
-            requestAnimationFrame(() => setVisible(true))
+            rafId = requestAnimationFrame(() => setVisible(true))
         } else {
-            setVisible(false)
+            rafId = requestAnimationFrame(() => setVisible(false))
+        }
+        return () => {
+            if (rafId !== null) cancelAnimationFrame(rafId)
         }
     }, [show])
 
     useEffect(() => {
         if (!guard.id) return
-        setDocLoading(true)
+        let cancelled = false
+        const markLoading = Promise.resolve().then(() => {
+            if (!cancelled) setDocLoading(true)
+        })
         fetch(`/api/guards/${guard.id}/prerequisites`)
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
+                if (cancelled) return
                 if (!Array.isArray(data)) return
                 const active = data.filter((d: { isActive: boolean }) => d.isActive)
                 if (active.length === 0) { setDocPct(0); return }
@@ -133,8 +147,16 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                 ).length
                 setDocPct(Math.round((uploaded / active.length) * 100))
             })
-            .catch(() => setDocPct(0))
-            .finally(() => setDocLoading(false))
+            .catch(() => {
+                if (!cancelled) setDocPct(0)
+            })
+            .finally(() => {
+                if (!cancelled) setDocLoading(false)
+            })
+        return () => {
+            cancelled = true
+            void markLoading
+        }
     }, [guard.id])
 
     // ── section calculations ──────────────────────────────────────────────────

@@ -96,6 +96,15 @@ export const REPORT_BINDINGS: Record<string, ReportBinding> = {
             { key: "clientId", label: "Client ID" },
         ],
     },
+    "inventory-store-summary": {
+        endpoint: "/api/reports/inventory/store-summary",
+        fields: [
+            { key: "regionalOfficeId", label: "Regional Office ID" },
+            { key: "storeId", label: "Store ID" },
+            { key: "productId", label: "Product ID" },
+            { key: "search", label: "Search" },
+        ],
+    },
 }
 
 export function isOperationalReportScreen(screen: string) {

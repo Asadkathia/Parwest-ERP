@@ -1,291 +1,504 @@
-# Staging Inventory Management Webapp Documentation
+# Staging Inventory Management System: Authenticated Screen and Workflow Documentation
 
 - Environment: `https://staging-store.parwestgroup.com`
 - Audit date: 2026-03-16
-- Auditor: Codex (automated HTTP exploration)
+- Authentication status: Success
+- Verified login used in this pass: `admin@parwestgroup.com` / `admin123@`
+- Total authenticated screens verified: 31
+- Total URLs crawled during pass: 63
 
-## 1. Scope and Access Status
+## Verification Method
 
-This document is intended to cover every screen, feature, and module of the staging inventory management webapp.
+- Performed authenticated session login via real staging form and CSRF flow.
+- Crawled internal links from the authenticated dashboard using read-only GET requests.
+- Extracted per-page metadata: title, headings, table columns, buttons, form actions, and fields.
+- Excluded template placeholder links and static asset paths from the final screen catalog.
 
-During the audit, authentication with the provided credentials failed:
+## Module and Screen Index
 
-- Email used: `admin@parwestgroup.com`
-- Password used: `admin123@.`
-- System response: `These credentials do not match our records.`
+### Dashboard
 
-Because authenticated access was not available, screen-level documentation is split into:
+- `/` - Dashboard | Parwest Store Managment
 
-- Verified (directly observed): public/login flow and HTTP route behavior
-- Inferred (high confidence): authenticated modules and screen patterns based on protected route detection
+### Administration
 
-## 2. Methodology
+- `/roles` - Roles | Parwest Store Managment
+- `/roles/create` - Add Role | Parwest Store Managment
+- `/users` - users | Parwest Store Managment
 
-1. Loaded public pages directly (`/`, `/login`, known endpoints).
-2. Attempted form-based login using Laravel CSRF token + session cookies.
-3. Verified login rejection message on redirected login page.
-4. Probed module routes and sub-routes.
-5. Classified endpoints:
-- `302 -> /login`: route likely exists and is protected by auth
-- `404`: route likely not defined
+### Store Structure
 
-## 3. Verified Screens and Behavior
+- `/employee-inventory-assignments` - Employee Assignments | Parwest Store Management
+- `/stores` - Stores | Parwest Store Managment
 
-## 3.1 Login Screen
+### Inventory Operations
 
-- URL: `/login` (also served when visiting `/` unauthenticated)
-- Title: `Laravel`
-- Primary purpose: user authentication into inventory/store system
+- `/adjustments/create/regular` - Add Adjustment | Parwest Store Managment
+- `/adjustments/regular` - Adjustments | Parwest Store Managment
+- `/audits` - Audits | Parwest Store Managment
+- `/inventories/regular` - Inventories | Parwest Store Managment
+- `/inventory-assignements` - Assignement | Parwest Store Managment
+- `/inventory-assignements/create` - Add Assignement | Parwest Store Managment
 
-### Fields and Controls
+### Purchasing and Vendors
 
-- `email` (type `email`, required)
-- `password` (type `password`, required)
-- `remember` checkbox
-- `Login` submit button
-- `Forgot Your Password?` link (`/password/reset`)
+- `/demands_response` - Demands Responsed | Parwest Store Managment
+- `/demands_send` - Demands | Parwest Store Managment
+- `/demands_send/create` - Add Demands | Parwest Store Managment
+- `/purchases/create/regular` - Add Purchase | Parwest Store Managment
+- `/purchases/regular` - Purchase | Parwest Store Managment
+- `/vendors` - Vendors | Parwest Store Managment
 
-### Validation and Error Handling
+### Product Master Data
 
-- Invalid credential attempt displays:
-- `These credentials do not match our records.`
-- Email input gets invalid styling class (`is-invalid`).
+- `/brands` - Brands | Parwest Store Managment
+- `/calibres` - Calibres | Parwest Store Managment
+- `/categories` - Categories | Parwest Store Managment
+- `/conditions` - Conditions | Parwest Store Managment
+- `/licenses` - licenses | Parwest Store Managment
+- `/product-unique-items` - Weapon Unique Items | Parwest Store Managment
+- `/products` - Products | Parwest Store Managment
+- `/products/create` - Add Product | Parwest Store Managment
+- `/repairings` - Repairinges | Parwest Store Managment
+- `/statuses` - Statuses | Parwest Store Managment
+- `/units` - Units | Parwest Store Managment
+- `/variations` - Variations | Parwest Store Managment
+- `/weapon-types` - Weapon Types | Parwest Store Managment
 
-### UX Notes
+## Verified Workflows
 
-- Centered card layout with gradient background.
-- Classic Laravel auth pattern.
-- Form posts to `/login` with `_token` CSRF field.
+### 1. Authentication and Dashboard
 
-## 3.2 Password Reset Entry
-
-- Link present on login UI: `/password/reset`
-- Current direct response in this environment: `404 Not Found`
-- Interpretation: feature may be disabled/misrouted in staging or protected by different routing setup.
-
-## 4. Confirmed Module Surface (Route-Level)
-
-The following modules returned `302 -> /login` and are therefore likely implemented as authenticated modules.
-
-## 4.1 Inventory Master Data
-
-### Products Module
-
-- Base route: `/products`
-- Confirmed protected sub-routes:
-- `/products/create`
-- `/products/index`
-- `/products/list`
-- `/products/new`
-- `/products/add`
-- `/products/manage`
-- `/products/{id}`
-- `/products/{id}/edit`
-- `/products/import`
-- `/products/export`
-- `/products/report`
-
-### Categories Module
-
-- Base route: `/categories`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-### Brands Module
-
-- Base route: `/brands`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-### Units Module
-
-- Base route: `/units`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-## 4.2 Inventory Transactions
-
-### Adjustments Module
-
-- Base route: `/adjustments`
-- Confirmed protected sub-routes:
-- `/adjustments/create`
-- `/adjustments/index`
-- `/adjustments/list`
-- `/adjustments/new`
-- `/adjustments/add`
-- `/adjustments/manage`
-- `/adjustments/{id}`
-- `/adjustments/import`
-- `/adjustments/export`
-- `/adjustments/report`
-
-Note:
-- `/adjustments/1/edit` returned `404` during probe; edit path may be disabled, named differently, or guarded by stricter constraints.
-
-### Purchases Module
-
-- Base route: `/purchases`
-- Confirmed protected sub-routes:
-- `/purchases/create`
-- `/purchases/index`
-- `/purchases/list`
-- `/purchases/new`
-- `/purchases/add`
-- `/purchases/manage`
-- `/purchases/{id}`
-- `/purchases/import`
-- `/purchases/export`
-- `/purchases/report`
-
-Note:
-- `/purchases/1/edit` returned `404`; edit URL may differ or editing may be restricted.
-
-### Vendors Module
-
-- Base route: `/vendors`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-## 4.3 Administration and Security
-
-### Users Module
-
-- Base route: `/users`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-### Roles Module
-
-- Base route: `/roles`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-## 4.4 Multi-Store / Location Layer
-
-### Stores Module
-
-- Base route: `/stores`
-- Confirmed protected sub-routes include create/list/show/edit/import/export/report variants.
-
-## 5. Feature Catalog (Inferred from Route Structure)
-
-Given repeated route patterns across modules, the system likely supports the following standard capabilities:
-
-- Listing records (`/index`, `/list`, `/manage`)
-- Creating records (`/create`, `/new`, `/add`)
-- Viewing details (`/{id}`)
-- Editing records (`/{id}/edit`) where supported
-- Bulk data ingestion (`/import`)
-- Data extraction (`/export`)
-- Module reporting (`/report`)
-
-## 6. Routes Probed but Not Found (404)
-
-These were checked and returned `404`, suggesting absent or differently named modules:
-
-- `/inventory`, `/stocks`, `/warehouses`, `/transfers`, `/orders`, `/sales`, `/reports`, `/dashboard`, `/admin`, `/settings`, `/customers`, `/returns`, `/pos`, `/barcode`, `/audit-log` (and many related variants).
-
-This indicates the app may be narrower than a full ERP and focused on store-centric inventory + purchasing + user-role management.
-
-## 7. Module-by-Module Screen Matrix
-
-Legend:
-- Verified Route: route returns `302 -> /login` (exists, auth-gated)
-- Inferred Screen: UI screen likely exists behind route
-
-### Products
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens:
-- Product list/grid
-- Product create form
-- Product detail view
-- Product edit form
-- Product import wizard/upload
-- Product export action/view
-- Product report view
-
-### Categories
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: category list/create/detail/edit/import/export/report
-
-### Brands
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: brand list/create/detail/edit/import/export/report
-
-### Units
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: unit list/create/detail/edit/import/export/report
-
-### Adjustments
-
-- Verified routes: index/list/manage/create/new/add/show/import/export/report
-- Route exception: `/{id}/edit` not confirmed
-- Inferred screens: adjustment list/create/detail/import/export/report
-
-### Purchases
-
-- Verified routes: index/list/manage/create/new/add/show/import/export/report
-- Route exception: `/{id}/edit` not confirmed
-- Inferred screens: purchase list/create/detail/import/export/report
-
-### Vendors
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: vendor list/create/detail/edit/import/export/report
-
-### Users
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: user list/create/detail/edit/import/export/report
-
-### Roles
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: role list/create/detail/edit/import/export/report
-
-### Stores
-
-- Verified routes: index/list/manage/create/new/add/show/edit/import/export/report
-- Inferred screens: store list/create/detail/edit/import/export/report
-
-## 8. Known Risks / Documentation Gaps
-
-Because auth access is blocked, this document cannot yet verify:
-
-- Actual UI layouts and field-level forms for authenticated modules
-- Workflow-level behavior (create/update/delete lifecycles)
-- Validation rules, business constraints, and error messages per module
-- Permission matrix behavior by role
-- Report contents and export formats
-- Actual menu hierarchy and dashboard widgets
-
-## 9. Recommended Next Audit Pass (After Valid Credentials)
-
-When working credentials are available, perform full authenticated walkthrough and extend this same file with:
-
-- Every menu item and submenu
-- Every page screenshot reference
-- Every form field catalog (required/optional/default)
-- Every action button + side effects
-- Every filter/search/sort/pagination behavior
-- Role-wise access table (admin/manager/clerk, etc.)
-- End-to-end module workflows (e.g., vendor -> purchase -> stock effect -> adjustment)
-
-## 10. Raw Route Discovery Snapshot
-
-Confirmed protected roots:
-
-- `/products`
-- `/categories`
-- `/brands`
-- `/units`
-- `/adjustments`
-- `/purchases`
-- `/vendors`
-- `/users`
-- `/roles`
-- `/stores`
-
-Authentication test result:
-
-- Login attempt redirects back to `/login` with credential mismatch validation.
-
+- `GET /login` -> credentials submit -> redirect to authenticated dashboard (`/`).
+- Dashboard renders KPI counters and direct navigation to operational modules.
+
+### 2. Product Lifecycle (Master to Transaction Use)
+
+- Master setup screens verified: `/categories`, `/brands`, `/units`, `/statuses`, `/conditions`, `/variations`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`.
+- Product management screens verified: `/products` (listing) and `/products/create` (product creation form).
+- Inventory and purchase modules exist as consuming workflows for product records: `/inventories/regular`, `/purchases/regular`, `/adjustments/regular`.
+
+### 3. Purchasing Workflow
+
+- Vendor master verified: `/vendors`.
+- Purchase listing verified: `/purchases/regular`.
+- Purchase creation verified: `/purchases/create/regular`.
+- Demand communication screens verified: `/demands_send`, `/demands_send/create`, `/demands_response`.
+
+### 4. Inventory Control Workflow
+
+- Inventory view verified: `/inventories/regular`.
+- Manual assignment management verified: `/inventory-assignements`, `/inventory-assignements/create`, `/employee-inventory-assignments`.
+- Adjustment listing and creation verified: `/adjustments/regular`, `/adjustments/create/regular`.
+- Audit trail entry point verified: `/audits`.
+
+### 5. Access and Organization Workflow
+
+- User administration verified: `/users`.
+- Role administration verified: `/roles`, `/roles/create`.
+- Store hierarchy verified: `/stores`.
+
+## Page-by-Page Verified Details
+
+### Dashboard
+
+#### /
+
+- Page title: Dashboard | Parwest Store Managment
+- Table columns detected: `Sr#`, `From Store`, `To Store`, `Requested By`, `Date`, `Total Required Qty`, `Status`, `Actions`
+- Forms detected: 3
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- In-page navigation targets: `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+### Administration
+
+#### /roles
+
+- Page title: Roles | Parwest Store Managment
+- Table columns detected: `Sr#`, `Role Name`, `Action`
+- Forms detected: 3
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- In-page navigation targets: `/roles`, `/`, `/users`, `/employee-inventory-assignments`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /roles/create
+
+- Page title: Add Role | Parwest Store Managment
+- Headings detected: `Role Permissions`
+- Action controls detected: `Save`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/roles`, fields=`name*`, `selectAllPermissions`, `selectGroup1`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `selectGroup2`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `selectGroup3`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `permissions[]`, `selectGroup4`, `permissions[]`, `permissions[]`
+- In-page navigation targets: `/roles/create`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /users
+
+- Page title: users | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Email`, `Role`, `Stores/Wearhouse`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `role_id`, `email*`, `password*`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `role_id`, `email*`, `password`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`, `store_ids[]`
+- In-page navigation targets: `/users`, `/`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+### Store Structure
+
+#### /employee-inventory-assignments
+
+- Page title: Employee Assignments | Parwest Store Management
+- Table columns detected: `Sr#`, `Employee ID`, `Employee Name`, `Product`, `Assigned By`, `Assigned At`, `Assigning Condition`, `Revoked By`, `Revoked At`, `Revoking Condition`, `Remarks`, `Action`, `Product Name`, `Assign Date`
+- Action controls detected: `Clear Filters`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`condition_id*`, `revoked_at*`
+- Form: method=`GET`, action=`(self)`, fields=`guard_parwest_id*`, `assigned_at*`, `guardName`, `guardStatus`, `guardSupervisor`
+- In-page navigation targets: `/employee-inventory-assignments`, `/`, `/users`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /stores
+
+- Page title: Stores | Parwest Store Managment
+- Table columns detected: `warehouse Name`, `Region Name`, `Prefix`, `Store`, `Landline`, `Mobile`, `Address`, `Edit`, `Delete`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`is_warehouse`, `region_name*`, `prefix*`, `head_office*`, `landline*`, `mobile*`, `address*`, `latitude*`, `longitude*`
+- Form: method=`GET`, action=`(self)`, fields=`is_warehouse`, `region_name*`, `prefix*`, `head_office*`, `landline*`, `mobile*`, `address*`, `latitude*`, `longitude*`
+- In-page navigation targets: `/stores`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+### Inventory Operations
+
+#### /adjustments/create/regular
+
+- Page title: Add Adjustment | Parwest Store Managment
+- Table columns detected: `Product Name`, `Product Code`, `Calibre`, `Weapon Type`, `New Stock`, `Reusable Stock`, `Product Quantity`, `Condtion`, `Action`, `Total Qty`, `0`
+- Action controls detected: `Add Adjustment Loading...`, `Delete`, `file.submit`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/adjustments/store`, fields=`store_id`, `product_code_name`, `note*`, `submit-button`
+- In-page navigation targets: `/adjustments/create/regular`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /adjustments/regular
+
+- Page title: Adjustments | Parwest Store Managment
+- Table columns detected: `Sr#`, `Head Office`, `Total Qty`, `Items`, `User`, `Dated`, `Note`, `Action`, `Size`, `Color`, `Code`
+- Action controls detected: `CLOSE`
+- Forms detected: 3
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- In-page navigation targets: `/adjustments/regular`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /audits
+
+- Page title: Audits | Parwest Store Managment
+- Table columns detected: `Sr#`, `User`, `Model`, `Model ID`, `Event`, `URL`, `IP`, `User Agent`, `Date`, `Action`
+- Action controls detected: `Clear`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`user_id`, `auditable_type`, `event`, `date_from`, `date_to`
+- In-page navigation targets: `/audits`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /inventories/regular
+
+- Page title: Inventories | Parwest Store Managment
+- Table columns detected: `Sr#`, `Store`, `Product`, `Product Variant`, `Category`, `Total Qty`, `Available Qty`, `Assigned Qty`, `Reusable Qty`, `damaged Qty`, `condemned Qty`, `stolen Qty`
+- Action controls detected: `Clear Filters`
+- Forms detected: 3
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- In-page navigation targets: `/inventories/regular`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /inventory-assignements
+
+- Page title: Assignement | Parwest Store Managment
+- Table columns detected: `Sr#`, `Guard PPS ID`, `Guard Name`, `Branch Name`, `Product`, `Assigned By`, `Assigned At`, `Assigning Condition`, `Revoked By`, `Revoked At`, `Revoking Condition`, `Remarks`, `Action`
+- Action controls detected: `Clear Filters`, `Revoke`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`condition_id*`, `revoked_at*`
+- In-page navigation targets: `/inventory-assignements`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /inventory-assignements/create
+
+- Page title: Add Assignement | Parwest Store Managment
+- Table columns detected: `Product Name`, `Product Code`, `Product Quantity`, `Product Condition`, `Total Qty`, `0`, `Name`, `Assign Date`
+- Action controls detected: `Assign Products`, `Close`, `Delete`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/inventory-assignements`, fields=`store_id`, `guard_parwest_id`, `assigned_at`, `guardName`, `guardStatus`, `guardSupervisor`, `guardBranch`, `guardBranchCode`, `product_code_name`, `remarks`
+- In-page navigation targets: `/inventory-assignements/create`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+### Purchasing and Vendors
+
+#### /demands_response
+
+- Page title: Demands Responsed | Parwest Store Managment
+- Table columns detected: `Sr#`, `From Store`, `To Warehouse`, `Status`, `Dated`, `Requested By`, `Responsed By`, `Canceled By`, `Canceled Reason`, `Canceled at`, `Rejected By`, `Rejected Reason`, `Rejected at`, `Total Quantity`, `Request Remarks`, `Response Remarks`, `Action`
+- Action controls detected: `Submit`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/demand/response-demand/status/update/reject`, fields=`reject_reason*`
+- In-page navigation targets: `/demands_response`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /demands_send
+
+- Page title: Demands | Parwest Store Managment
+- Table columns detected: `Sr#`, `From Store`, `To Warehouse`, `Status`, `Dated`, `Requested By`, `Responsed By`, `Canceled By`, `Canceled Reason`, `Canceled at`, `Rejected By`, `Rejected Reason`, `Rejected at`, `Total Quantity`, `Total Fulfill Qty`, `Request Remarks`, `Response Remarks`, `Action`, `Product`, `Code`
+- Action controls detected: `Submit`, `Confirm Receive`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/demand/send-demand/cancel`, fields=`cancel_reason*`
+- In-page navigation targets: `/demands_send`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /demands_send/create
+
+- Page title: Add Demands | Parwest Store Managment
+- Table columns detected: `Product Name`, `Product Code`, `Available New Stock`, `Available Reusable Stock`, `Required Quantity`, `Delete`, `Total Qty`, `0`
+- Action controls detected: `Add Demands Loading...`, `Delete`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/demands_send`, fields=`from_store`, `to_store`, `product_code_name`, `request_remarks`
+- In-page navigation targets: `/demands_send/create`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /purchases/create/regular
+
+- Page title: Add Purchase | Parwest Store Managment
+- Table columns detected: `Product Name`, `Product Code`, `Calibre`, `Weapon Type`, `New Stock`, `Reusable Stock`, `Product Quantity`, `Product Price`, `Action`, `Total price`, `0`, `Total Qty`
+- Action controls detected: `Add Purchase Loading...`, `Delete`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/purchases/store`, fields=`store_id`, `vendor_id`, `attachments[]`, `date`, `product_code_name`, `note`, `approval_reference`, `invoice_number`, `invoice_date`, `delivery_challan_no`
+- In-page navigation targets: `/purchases/create/regular`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /purchases/regular
+
+- Page title: Purchase | Parwest Store Managment
+- Table columns detected: `Sr#`, `Store/Warehouse`, `Vendor`, `User`, `Purchase Date`, `Total Invoice`, `Status`, `Confirmed/Rejected By`, `Confirmed/Rejected At`, `Reject Reason`, `Note`, `Action`
+- Action controls detected: `Reject`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`(self)`, fields=`reason*`
+- In-page navigation targets: `/purchases/regular`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /vendors
+
+- Page title: Vendors | Parwest Store Managment
+- Table columns detected: `Sr#`, `Company Name`, `Company Phone`, `Contact Person Name`, `Contact Person Phone`, `Address`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`company_name*`, `company_phone*`, `contact_person_name*`, `contact_person_phone*`, `address*`
+- Form: method=`GET`, action=`(self)`, fields=`company_name*`, `company_phone*`, `contact_person_name*`, `contact_person_phone*`, `address*`
+- In-page navigation targets: `/vendors`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+### Product Master Data
+
+#### /brands
+
+- Page title: Brands | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/brands`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /calibres
+
+- Page title: Calibres | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/calibres`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /categories
+
+- Page title: Categories | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Parent Category`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `assign_create[]`, `parent_id`
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `assign_update[]`, `parent_id`
+- In-page navigation targets: `/categories`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /conditions
+
+- Page title: Conditions | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/conditions`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/variations`, `/repairings`, `/audits`
+
+#### /licenses
+
+- Page title: licenses | Parwest Store Managment
+- Table columns detected: `Sr#`, `Weapon Type`, `Calibre`, `License Number`, `Weapon Number`, `Issue Date`, `Expiry Date`, `Validity`, `Created By`, `Updated By`, `Created At`, `Updated At`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`validity`, `license_number*`, `client_id`, `weapon_number*`, `weapon_type_id`, `calibre_id`, `issue_date`, `expiry_date`, `attachment[]`
+- Form: method=`GET`, action=`(self)`, fields=`validity`, `license_number*`, `client_id`, `weapon_type_id`, `calibre_id`, `attachment[]`
+- In-page navigation targets: `/licenses`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /product-unique-items
+
+- Page title: Weapon Unique Items | Parwest Store Managment
+- Table columns detected: `Sr#`, `Product`, `Weapon Number`, `Unique Number`, `License`, `Created At`, `Action`
+- Action controls detected: `Cancel`, `Update`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`weapon_number*`, `license_id*`
+- In-page navigation targets: `/product-unique-items`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /products
+
+- Page title: Products | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Category`, `Weapon Type`, `Calibre`, `Brand`, `Unit`, `Product Code`, `Action`, `Size`, `Color`, `Code`
+- Action controls detected: `Add Variant`, `CLOSE`, `Save`
+- Forms detected: 4
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`size`, `color`
+- In-page navigation targets: `/products`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /products/create
+
+- Page title: Add Product | Parwest Store Managment
+- Action controls detected: `Add Product`, `Add`, `Close`, `➕ Add New`
+- Forms detected: 6
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`POST`, action=`/products`, fields=`name*`, `code*`, `category_id*`, `weapon_type_id`, `calibre_id`, `brand_id*`, `unit_id*`, `sizes[]`, `colors[]`
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `assign_create[]`, `parent_id`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/products/create`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`
+
+#### /repairings
+
+- Page title: Repairinges | Parwest Store Managment
+- Table columns detected: `Sr#`, `Store Name`, `Product Name`, `Product Variant`, `Product Code`, `PPS Number`, `Item Status`, `Repairing Status`, `Action`
+- Action controls detected: `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/repairings`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/audits`
+
+#### /statuses
+
+- Page title: Statuses | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Category`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `category_id`
+- Form: method=`GET`, action=`(self)`, fields=`name*`, `category_id`
+- In-page navigation targets: `/statuses`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /units
+
+- Page title: Units | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/units`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+#### /variations
+
+- Page title: Variations | Parwest Store Managment
+- Table columns detected: `Sr#`, `Category Name`, `Name`, `Type`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`category_id*`, `type*`, `name*`
+- Form: method=`GET`, action=`(self)`, fields=`category_id*`, `type*`, `name*`
+- In-page navigation targets: `/variations`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/weapon-types`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/repairings`, `/audits`
+
+#### /weapon-types
+
+- Page title: Weapon Types | Parwest Store Managment
+- Table columns detected: `Sr#`, `Name`, `Action`
+- Action controls detected: `Create New`, `Add`, `Close`, `Update`, `CLOSE`
+- Forms detected: 5
+- Form: method=`GET`, action=`(self)`, fields=`top-search`
+- Form: method=`GET`, action=`(self)`, fields=`Search ...`
+- Form: method=`POST`, action=`/logout`, fields=none
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- Form: method=`GET`, action=`(self)`, fields=`name*`
+- In-page navigation targets: `/weapon-types`, `/`, `/users`, `/employee-inventory-assignments`, `/roles`, `/inventories/regular`, `/inventory-assignements`, `/inventory-assignements/create`, `/stores`, `/demands_send`, `/demands_response`, `/vendors`, `/purchases/regular`, `/purchases/create/regular`, `/calibres`, `/licenses`, `/product-unique-items`, `/brands`, `/units`, `/categories`, `/statuses`, `/conditions`, `/variations`, `/repairings`, `/audits`
+
+## Verified Issues and Broken Links
+
+- No authenticated 4xx/5xx routes were detected in filtered application links.
+
+## Evidence Files
+
+- Raw crawl JSON: `docs/staging-store-authenticated-crawl.json`
+- Initial route probe snapshot: `docs/staging-route-probe-initial.txt`
+- Deep route probe snapshot: `docs/staging-route-probe-deep.txt`

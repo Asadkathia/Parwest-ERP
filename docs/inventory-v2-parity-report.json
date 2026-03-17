@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-03-17T01:24:37.674Z",
+  "thresholds": {
+    "failOnDrift": true,
+    "maxDriftPct": 35
+  },
+  "legacy": {
+    "itemRows": 19,
+    "unitTotal": 19,
+    "availableUnits": 18,
+    "issuedUnits": 1,
+    "condemnedUnits": 0
+  },
+  "v2": {
+    "productCount": 2,
+    "balanceRows": 2,
+    "onHandUnits": 22,
+    "heldUnits": 0,
+    "issuedUnits": 1,
+    "trackedUnits": 23,
+    "inventoryValue": 600
+  },
+  "parity": {
+    "unitDriftAbs": 4,
+    "unitDriftPct": 21.05,
+    "issuedDriftAbs": 0,
+    "issuedDriftPct": 0
+  },
+  "byOffice": {
+    "legacy": [
+      {
+        "office_id": "UNASSIGNED",
+        "office_name": "Unassigned",
+        "legacy_units": 19
+      }
+    ],
+    "v2": [
+      {
+        "office_id": "cmm5lmroz0005sqo2mdyvd0k3",
+        "office_name": "Lahore Head Office",
+        "on_hand_units": 4,
+        "issued_units": 0,
+        "held_units": 0
+      },
+      {
+        "office_id": "UNASSIGNED",
+        "office_name": "Unassigned",
+        "on_hand_units": 18,
+        "issued_units": 1,
+        "held_units": 0
+      }
+    ]
+  }
+}

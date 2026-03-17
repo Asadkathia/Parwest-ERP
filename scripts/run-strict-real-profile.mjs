@@ -11,11 +11,22 @@ const START_TIMEOUT_MS = Number(process.env.STRICT_START_TIMEOUT_MS || 120000);
 const POLL_INTERVAL_MS = Number(process.env.STRICT_START_POLL_MS || 1500);
 
 function withStrictEnv(extra = {}) {
-  return {
-    ...process.env,
-    ...extra,
+  const defaults = {
     USE_MOCKS: 'false',
     NEXT_PUBLIC_USE_MOCKS: 'false',
+    INVENTORY_V2_ENABLED: 'true',
+    INVENTORY_V2_WRITE_ENABLED: 'true',
+    INVENTORY_V2_READ_FROM_V2: 'false',
+    INVENTORY_V2_LEGACY_READONLY: 'false',
+    NEXT_PUBLIC_INVENTORY_V2_ENABLED: 'true',
+    NEXT_PUBLIC_INVENTORY_V2_WRITE_ENABLED: 'true',
+    NEXT_PUBLIC_INVENTORY_V2_READ_FROM_V2: 'false',
+    NEXT_PUBLIC_INVENTORY_V2_LEGACY_READONLY: 'false',
+  };
+  return {
+    ...defaults,
+    ...process.env,
+    ...extra,
   };
 }
 

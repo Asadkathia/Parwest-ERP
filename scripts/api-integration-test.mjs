@@ -101,6 +101,8 @@ async function run() {
     const failOnScopeSkip = envBool('FAIL_ON_SCOPE_SKIP', requireRealScopeAssertions);
     const requireRealInventoryAssertions = envBool('REQUIRE_REAL_INVENTORY_ASSERTIONS', false);
     const failOnInventorySkip = envBool('FAIL_ON_INVENTORY_SKIP', requireRealInventoryAssertions);
+    const inventoryV2LegacyReadonly = envBool('INVENTORY_V2_LEGACY_READONLY', false);
+    const skipLegacyInventoryMutations = envBool('SKIP_LEGACY_INVENTORY_MUTATIONS', inventoryV2LegacyReadonly);
 
     console.log('Integration env:', {
         USE_MOCKS: process.env.USE_MOCKS || null,
@@ -109,6 +111,8 @@ async function run() {
         FAIL_ON_SCOPE_SKIP: failOnScopeSkip,
         REQUIRE_REAL_INVENTORY_ASSERTIONS: requireRealInventoryAssertions,
         FAIL_ON_INVENTORY_SKIP: failOnInventorySkip,
+        INVENTORY_V2_LEGACY_READONLY: inventoryV2LegacyReadonly,
+        SKIP_LEGACY_INVENTORY_MUTATIONS: skipLegacyInventoryMutations,
     });
 
     const adminSession = await loginAs({
@@ -1125,13 +1129,23 @@ async function run() {
     check('GET /api/inventory/items', invItems.status === 200, `${invItems.status}`);
     record('/api/inventory/items GET', invItems.status === 200 ? 'PASS' : 'FAIL', 200, invItems.status, `items=${Array.isArray(invItems.data) ? invItems.data.length : 'N/A'}`);
 
-    const inventoryTs = Date.now();
-    const categoryName = `INV_CAT_${inventoryTs}`;
-    const categoryCreate = await api('POST', '/api/inventory/categories', { name: categoryName });
-    const categoryCreatePass = categoryCreate.status === 201;
-    check('POST /api/inventory/categories', categoryCreatePass, `${categoryCreate.status}`);
-    record('/api/inventory/categories POST', categoryCreatePass ? 'PASS' : 'FAIL', 201, categoryCreate.status, categoryCreate.data?.id || categoryCreate.data?.message);
-    const categoryIdForCrud = categoryCreate.data?.id || null;
+    if (skipLegacyInventoryMutations) {
+        console.log('Skipping legacy inventory mutation assertions (readonly mode enabled).');
+        record(
+            '/api/inventory mutation lifecycle',
+            'PASS',
+            'not executed in readonly mode',
+            'skipped',
+            'Skipped because SKIP_LEGACY_INVENTORY_MUTATIONS=true or INVENTORY_V2_LEGACY_READONLY=true.'
+        );
+    } else {
+        const inventoryTs = Date.now();
+        const categoryName = `INV_CAT_${inventoryTs}`;
+        const categoryCreate = await api('POST', '/api/inventory/categories', { name: categoryName });
+        const categoryCreatePass = categoryCreate.status === 201;
+        check('POST /api/inventory/categories', categoryCreatePass, `${categoryCreate.status}`);
+        record('/api/inventory/categories POST', categoryCreatePass ? 'PASS' : 'FAIL', 201, categoryCreate.status, categoryCreate.data?.id || categoryCreate.data?.message);
+        const categoryIdForCrud = categoryCreate.data?.id || null;
 
     const categoryDuplicate = await api('POST', '/api/inventory/categories', { name: categoryName });
     const categoryDuplicateExpected = isMockRuntime ? 201 : 409;
@@ -1429,6 +1443,247 @@ async function run() {
         }
     } else {
         record('/api/inventory/demands lifecycle setup', 'FAIL', 'inventory category id', 'missing category', 'Cannot execute demand transition assertions without category.');
+    }
+    }
+
+    // =========== STORE INVENTORY V2 ===========
+    console.log('\n=== STORE INVENTORY V2 ===');
+    const unwrapData = (response) => {
+        const payload = response?.data;
+        if (payload && typeof payload === 'object' && payload.success === true && 'data' in payload) {
+            return payload.data;
+        }
+        return payload;
+    };
+    const v2StoresList = await api('GET', '/api/store-inventory/v2/masters/stores');
+    const v2StoresListBody = unwrapData(v2StoresList);
+    const v2StoresReadable = v2StoresList.status === 200;
+    check('GET /api/store-inventory/v2/masters/stores', v2StoresReadable, `${v2StoresList.status}`);
+    record('/api/store-inventory/v2/masters/stores GET', v2StoresReadable ? 'PASS' : 'FAIL', 200, v2StoresList.status, `items=${Array.isArray(v2StoresListBody) ? v2StoresListBody.length : 'N/A'}`);
+
+    if (!v2StoresReadable) {
+        const shouldFailV2Skip = failOnInventorySkip;
+        record(
+            '/api/store-inventory/v2 lifecycle setup',
+            shouldFailV2Skip ? 'FAIL' : 'PASS',
+            shouldFailV2Skip ? 'readable v2 namespace with migrated schema' : 'readable v2 namespace with migrated schema',
+            `status=${v2StoresList.status}`,
+            shouldFailV2Skip
+                ? 'V2 inventory assertions required but v2 namespace is not ready (schema may be missing or runtime misconfigured).'
+                : 'Skipped v2 lifecycle assertions because v2 namespace is not ready.'
+        );
+    } else {
+        const v2Inventories = await api('GET', '/api/store-inventory/v2/inventories');
+        const v2InventoriesBody = unwrapData(v2Inventories);
+        check('GET /api/store-inventory/v2/inventories', v2Inventories.status === 200, `${v2Inventories.status}`);
+        record('/api/store-inventory/v2/inventories GET', v2Inventories.status === 200 ? 'PASS' : 'FAIL', 200, v2Inventories.status, `items=${Array.isArray(v2InventoriesBody) ? v2InventoriesBody.length : 'N/A'}`);
+
+        const v2StatusName = `INV_V2_STATUS_${Date.now()}`;
+        const v2StatusCreate = await api('POST', '/api/store-inventory/v2/masters/statuses', { name: v2StatusName });
+        const v2WritesBlocked =
+            v2StatusCreate.status === 403 &&
+            String(v2StatusCreate.data?.message || '').toLowerCase().includes('writeenabled');
+
+        if (v2WritesBlocked) {
+            const shouldFailV2WriteSkip = failOnInventorySkip;
+            record(
+                '/api/store-inventory/v2 lifecycle writes',
+                shouldFailV2WriteSkip ? 'FAIL' : 'PASS',
+                shouldFailV2WriteSkip ? 'inventory.v2.writeEnabled=true for lifecycle assertions' : 'inventory.v2.writeEnabled=true for lifecycle assertions',
+                '403 write blocked',
+                shouldFailV2WriteSkip
+                    ? 'V2 write lifecycle assertions required but inventory.v2.writeEnabled is disabled.'
+                    : 'Skipped v2 write lifecycle assertions because inventory.v2.writeEnabled is disabled.'
+            );
+        } else {
+            const v2StatusBody = unwrapData(v2StatusCreate);
+            const v2StatusCreatePass = v2StatusCreate.status === 201;
+            check('POST /api/store-inventory/v2/masters/statuses', v2StatusCreatePass, `${v2StatusCreate.status}`);
+            record('/api/store-inventory/v2/masters/statuses POST', v2StatusCreatePass ? 'PASS' : 'FAIL', 201, v2StatusCreate.status, v2StatusBody?.id || v2StatusCreate.data?.message);
+            const v2StatusId = v2StatusBody?.id || null;
+
+            const v2BrandCreate = await api('POST', '/api/store-inventory/v2/masters/brands', { name: `INV_V2_BRAND_${Date.now()}` });
+            const v2BrandBody = unwrapData(v2BrandCreate);
+            check('POST /api/store-inventory/v2/masters/brands', v2BrandCreate.status === 201, `${v2BrandCreate.status}`);
+            record('/api/store-inventory/v2/masters/brands POST', v2BrandCreate.status === 201 ? 'PASS' : 'FAIL', 201, v2BrandCreate.status, v2BrandBody?.id || v2BrandCreate.data?.message);
+            const v2BrandId = v2BrandBody?.id || null;
+
+            const v2UnitCreate = await api('POST', '/api/store-inventory/v2/masters/units', {
+                name: `INV_V2_UNIT_${Date.now()}`,
+                shortCode: `U${String(Date.now()).slice(-5)}`,
+            });
+            const v2UnitBody = unwrapData(v2UnitCreate);
+            check('POST /api/store-inventory/v2/masters/units', v2UnitCreate.status === 201, `${v2UnitCreate.status}`);
+            record('/api/store-inventory/v2/masters/units POST', v2UnitCreate.status === 201 ? 'PASS' : 'FAIL', 201, v2UnitCreate.status, v2UnitBody?.id || v2UnitCreate.data?.message);
+            const v2UnitId = v2UnitBody?.id || null;
+
+            const v2StoreCode = `INV2-${String(Date.now()).slice(-6)}`;
+            const v2StoreCreate = await api('POST', '/api/store-inventory/v2/masters/stores', {
+                code: v2StoreCode,
+                name: `Inventory V2 Store ${Date.now()}`,
+                regionalOfficeId: officeId || undefined,
+                isActive: true,
+            });
+            const v2StoreBody = unwrapData(v2StoreCreate);
+            check('POST /api/store-inventory/v2/masters/stores', v2StoreCreate.status === 201, `${v2StoreCreate.status}`);
+            record('/api/store-inventory/v2/masters/stores POST', v2StoreCreate.status === 201 ? 'PASS' : 'FAIL', 201, v2StoreCreate.status, v2StoreBody?.id || v2StoreCreate.data?.message);
+            const v2StoreId = v2StoreBody?.id || null;
+
+            const v2ToStoreCreate = await api('POST', '/api/store-inventory/v2/masters/stores', {
+                code: `${v2StoreCode}-T`,
+                name: `Inventory V2 To Store ${Date.now()}`,
+                regionalOfficeId: officeId || undefined,
+                isActive: true,
+            });
+            const v2ToStoreBody = unwrapData(v2ToStoreCreate);
+            check('POST /api/store-inventory/v2/masters/stores (toStore)', v2ToStoreCreate.status === 201, `${v2ToStoreCreate.status}`);
+            record('/api/store-inventory/v2/masters/stores POST toStore', v2ToStoreCreate.status === 201 ? 'PASS' : 'FAIL', 201, v2ToStoreCreate.status, v2ToStoreBody?.id || v2ToStoreCreate.data?.message);
+            const v2ToStoreId = v2ToStoreBody?.id || null;
+
+            const v2Sku = `INV2-SKU-${Date.now()}`;
+            const v2ProductCreate = await api('POST', '/api/store-inventory/v2/products', {
+                sku: v2Sku,
+                name: `Inventory V2 Product ${Date.now()}`,
+                brandId: v2BrandId || undefined,
+                unitId: v2UnitId || undefined,
+                statusId: v2StatusId || undefined,
+            });
+            const v2ProductBody = unwrapData(v2ProductCreate);
+            const v2ProductCreatePass = v2ProductCreate.status === 201;
+            check('POST /api/store-inventory/v2/products', v2ProductCreatePass, `${v2ProductCreate.status}`);
+            record('/api/store-inventory/v2/products POST', v2ProductCreatePass ? 'PASS' : 'FAIL', 201, v2ProductCreate.status, v2ProductBody?.id || v2ProductCreate.data?.message);
+            const v2ProductId = v2ProductBody?.id || null;
+
+            if (v2StoreId && v2ProductId) {
+                const v2PurchaseCreate = await api('POST', '/api/store-inventory/v2/purchases', {
+                    storeId: v2StoreId,
+                    status: 'RECEIVED',
+                    lines: [{ productId: v2ProductId, quantity: 8, unitCost: 150 }],
+                });
+                const v2PurchaseBody = unwrapData(v2PurchaseCreate);
+                const v2PurchasePass = v2PurchaseCreate.status === 201;
+                check('POST /api/store-inventory/v2/purchases', v2PurchasePass, `${v2PurchaseCreate.status}`);
+                record('/api/store-inventory/v2/purchases POST', v2PurchasePass ? 'PASS' : 'FAIL', 201, v2PurchaseCreate.status, v2PurchaseBody?.id || v2PurchaseCreate.data?.message);
+
+                const v2BalanceAfterPurchase = await api('GET', `/api/store-inventory/v2/inventories?storeId=${encodeURIComponent(v2StoreId)}&productId=${encodeURIComponent(v2ProductId)}`);
+                const v2BalanceAfterPurchaseBody = unwrapData(v2BalanceAfterPurchase);
+                const v2PurchaseRows = Array.isArray(v2BalanceAfterPurchaseBody) ? v2BalanceAfterPurchaseBody : [];
+                const v2OnHandAfterPurchase = Number(v2PurchaseRows[0]?.quantityOnHand || 0);
+                const v2PurchaseBalancePass = v2BalanceAfterPurchase.status === 200 && v2OnHandAfterPurchase >= 8;
+                check('v2 purchase increments stock', v2PurchaseBalancePass, `onHand=${v2OnHandAfterPurchase}`);
+                record('/api/store-inventory/v2 purchase balance', v2PurchaseBalancePass ? 'PASS' : 'FAIL', '200 + onHand>=8', `${v2BalanceAfterPurchase.status} + onHand=${v2OnHandAfterPurchase}`, `rows=${v2PurchaseRows.length}`);
+
+                const v2AdjustmentCreate = await api('POST', '/api/store-inventory/v2/adjustments', {
+                    storeId: v2StoreId,
+                    adjustmentType: 'DECREASE',
+                    lines: [{ productId: v2ProductId, quantity: 2, unitCost: 150 }],
+                });
+                const v2AdjustmentBody = unwrapData(v2AdjustmentCreate);
+                const v2AdjustmentPass = v2AdjustmentCreate.status === 201;
+                check('POST /api/store-inventory/v2/adjustments', v2AdjustmentPass, `${v2AdjustmentCreate.status}`);
+                record('/api/store-inventory/v2/adjustments POST', v2AdjustmentPass ? 'PASS' : 'FAIL', 201, v2AdjustmentCreate.status, v2AdjustmentBody?.id || v2AdjustmentCreate.data?.message);
+
+                const v2BalanceAfterAdjustment = await api('GET', `/api/store-inventory/v2/inventories?storeId=${encodeURIComponent(v2StoreId)}&productId=${encodeURIComponent(v2ProductId)}`);
+                const v2BalanceAfterAdjustmentBody = unwrapData(v2BalanceAfterAdjustment);
+                const v2AdjustedRows = Array.isArray(v2BalanceAfterAdjustmentBody) ? v2BalanceAfterAdjustmentBody : [];
+                const v2OnHandAfterAdjustment = Number(v2AdjustedRows[0]?.quantityOnHand || 0);
+                const v2AdjustmentBalancePass = v2BalanceAfterAdjustment.status === 200 && v2OnHandAfterAdjustment >= 6;
+                check('v2 adjustment mutates stock', v2AdjustmentBalancePass, `onHand=${v2OnHandAfterAdjustment}`);
+                record('/api/store-inventory/v2 adjustment balance', v2AdjustmentBalancePass ? 'PASS' : 'FAIL', '200 + onHand>=6', `${v2BalanceAfterAdjustment.status} + onHand=${v2OnHandAfterAdjustment}`, `rows=${v2AdjustedRows.length}`);
+
+                let v2AssignmentId = null;
+                if (adminUserId) {
+                    const v2AssignmentCreate = await api('POST', '/api/store-inventory/v2/assignments', {
+                        storeId: v2StoreId,
+                        productId: v2ProductId,
+                        assignedToUserId: adminUserId,
+                        quantity: 1,
+                    });
+                    const v2AssignmentBody = unwrapData(v2AssignmentCreate);
+                    const v2AssignmentCreatePass = v2AssignmentCreate.status === 201;
+                    check('POST /api/store-inventory/v2/assignments', v2AssignmentCreatePass, `${v2AssignmentCreate.status}`);
+                    record('/api/store-inventory/v2/assignments POST', v2AssignmentCreatePass ? 'PASS' : 'FAIL', 201, v2AssignmentCreate.status, v2AssignmentBody?.id || v2AssignmentCreate.data?.message);
+                    v2AssignmentId = v2AssignmentBody?.id || null;
+                } else {
+                    record('/api/store-inventory/v2 assignments setup', 'FAIL', 'admin user id', 'missing session user id', 'Cannot run assignment lifecycle assertions without admin user id.');
+                }
+
+                if (v2AssignmentId) {
+                    const v2Return = await api('POST', `/api/store-inventory/v2/assignments/${v2AssignmentId}/return`, { status: 'RETURNED' });
+                    const v2ReturnBody = unwrapData(v2Return);
+                    const v2ReturnPass = v2Return.status === 200 && v2ReturnBody?.status === 'RETURNED';
+                    check('POST /api/store-inventory/v2/assignments/[id]/return', v2ReturnPass, `${v2Return.status}`);
+                    record('/api/store-inventory/v2/assignments/[id]/return POST', v2ReturnPass ? 'PASS' : 'FAIL', '200 + status RETURNED', `${v2Return.status} + status=${v2ReturnBody?.status}`, v2Return.data?.message || '');
+                }
+
+                if (v2ToStoreId) {
+                    const v2DemandCreate = await api('POST', '/api/store-inventory/v2/demands', {
+                        fromStoreId: v2ToStoreId,
+                        toStoreId: v2StoreId,
+                        status: 'SENT',
+                        lines: [{ productId: v2ProductId, requestedQty: 2 }],
+                    });
+                    const v2DemandBody = unwrapData(v2DemandCreate);
+                    const v2DemandCreatePass = v2DemandCreate.status === 201;
+                    check('POST /api/store-inventory/v2/demands', v2DemandCreatePass, `${v2DemandCreate.status}`);
+                    record('/api/store-inventory/v2/demands POST', v2DemandCreatePass ? 'PASS' : 'FAIL', 201, v2DemandCreate.status, v2DemandBody?.id || v2DemandCreate.data?.message);
+
+                    const v2DemandId = v2DemandBody?.id || null;
+                    const v2DemandLineId = Array.isArray(v2DemandBody?.lines) ? v2DemandBody.lines[0]?.id : null;
+                    if (v2DemandId) {
+                        const v2DemandApprove = await api('PATCH', `/api/store-inventory/v2/demands/${v2DemandId}`, { status: 'APPROVED' });
+                        const v2DemandApproveBody = unwrapData(v2DemandApprove);
+                        const v2DemandApprovePass = v2DemandApprove.status === 200 && v2DemandApproveBody?.status === 'APPROVED';
+                        check('PATCH /api/store-inventory/v2/demands/[id] approve', v2DemandApprovePass, `${v2DemandApprove.status}`);
+                        record('/api/store-inventory/v2/demands/[id] PATCH approve', v2DemandApprovePass ? 'PASS' : 'FAIL', '200 + status APPROVED', `${v2DemandApprove.status} + status=${v2DemandApproveBody?.status}`, v2DemandApprove.data?.message || '');
+                    }
+
+                    if (v2DemandId && v2DemandLineId) {
+                        const v2DemandResponse = await api('POST', `/api/store-inventory/v2/demands/${v2DemandId}/responses`, {
+                            responderStoreId: v2StoreId,
+                            status: 'FULFILLED',
+                            lines: [{ demandLineId: v2DemandLineId, productId: v2ProductId, quantity: 2 }],
+                        });
+                        const v2DemandResponseBody = unwrapData(v2DemandResponse);
+                        const v2DemandResponsePass = v2DemandResponse.status === 201;
+                        check('POST /api/store-inventory/v2/demands/[id]/responses', v2DemandResponsePass, `${v2DemandResponse.status}`);
+                        record('/api/store-inventory/v2/demands/[id]/responses POST', v2DemandResponsePass ? 'PASS' : 'FAIL', 201, v2DemandResponse.status, v2DemandResponseBody?.createdResponse?.id || v2DemandResponse.data?.message);
+
+                        const v2DemandGet = await api('GET', `/api/store-inventory/v2/demands/${v2DemandId}`);
+                        const v2DemandGetBody = unwrapData(v2DemandGet);
+                        const v2DemandStatus = String(v2DemandGetBody?.status || '');
+                        const v2DemandTerminalPass = v2DemandGet.status === 200 && ['PARTIALLY_FULFILLED', 'FULFILLED'].includes(v2DemandStatus);
+                        check('GET /api/store-inventory/v2/demands/[id] reflects response progress', v2DemandTerminalPass, `${v2DemandGet.status} + ${v2DemandStatus}`);
+                        record('/api/store-inventory/v2/demands/[id] GET progress', v2DemandTerminalPass ? 'PASS' : 'FAIL', '200 + PARTIALLY_FULFILLED/FULFILLED', `${v2DemandGet.status} + ${v2DemandStatus}`, '');
+                    }
+                }
+
+                const v2Report = await api('GET', '/api/reports/inventory/store-summary');
+                const v2ReportRows = Array.isArray(v2Report.data?.data?.rows) ? v2Report.data.data.rows : [];
+                const v2ReportPass = v2Report.status === 200 && v2Report.data?.success === true;
+                check('GET /api/reports/inventory/store-summary', v2ReportPass, `${v2Report.status}`);
+                record('/api/reports/inventory/store-summary GET', v2ReportPass ? 'PASS' : 'FAIL', '200 + success=true', `${v2Report.status} + success=${v2Report.data?.success}`, `rows=${v2ReportRows.length}`);
+
+                const v2ReportCsvRes = await fetch(`${BASE_URL}/api/reports/inventory/store-summary?format=csv`, {
+                    headers: { 'Cookie': serializeCookies() },
+                });
+                absorbCookies(v2ReportCsvRes.headers.get('set-cookie'));
+                const v2ReportCsvText = await v2ReportCsvRes.text();
+                const v2ReportCsvPass = v2ReportCsvRes.status === 200 && v2ReportCsvText.includes('Store Code,Store,Regional Office');
+                check('GET /api/reports/inventory/store-summary?format=csv', v2ReportCsvPass, `${v2ReportCsvRes.status}`);
+                record('/api/reports/inventory/store-summary GET csv', v2ReportCsvPass ? 'PASS' : 'FAIL', '200 + csv header', v2ReportCsvRes.status, `header_present=${v2ReportCsvText.includes('Store Code,Store,Regional Office')}`);
+
+                const invImportValidateV2 = await api('POST', '/api/imports/inventory/validate', {
+                    rows: [{ sku: `IMPORT-${Date.now()}`, name: 'Imported Inventory Product', storeCode: 'RO-IMPORT-1', quantityOnHand: 5 }],
+                });
+                const invImportValidateV2Data = invImportValidateV2.data?.data;
+                const invImportValidateV2Pass = invImportValidateV2.status === 200 && invImportValidateV2Data?.valid === true;
+                check('POST /api/imports/inventory/validate (v2 shape)', invImportValidateV2Pass, `${invImportValidateV2.status}`);
+                record('/api/imports/inventory/validate POST v2-shape', invImportValidateV2Pass ? 'PASS' : 'FAIL', '200 + valid=true', `${invImportValidateV2.status} + valid=${invImportValidateV2Data?.valid}`, `rows=${invImportValidateV2Data?.totalRows ?? 'N/A'}`);
+            } else {
+                record('/api/store-inventory/v2 lifecycle setup', 'FAIL', 'store + product ids', 'missing refs', 'Cannot run purchase/adjustment/demand lifecycle without seeded store/product.');
+            }
+        }
     }
 
     // =========== PAYROLL HOLIDAYS ===========
