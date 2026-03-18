@@ -94,15 +94,6 @@ const navItems: NavNode[] = [
         icon: Package,
         children: [
             {
-                title: "User Management",
-                icon: Users,
-                children: [
-                    { title: "Users", href: "/store-inventory/users", icon: Users },
-                    { title: "Employees", href: "/store-inventory/employee-assignments", icon: Users },
-                    { title: "Roles", href: "/store-inventory/roles", icon: Settings },
-                ],
-            },
-            {
                 title: "Warehouses & Stores",
                 icon: Building2,
                 children: [

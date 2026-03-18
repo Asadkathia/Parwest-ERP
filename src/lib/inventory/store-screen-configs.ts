@@ -27,8 +27,6 @@ export const storeInventoryLinks = [
   { label: 'Repairings', href: '/store-inventory/repairings' },
   { label: 'Product Unique Items', href: '/store-inventory/product-unique-items' },
   { label: 'Audits', href: '/store-inventory/audits' },
-  { label: 'Roles', href: '/store-inventory/roles' },
-  { label: 'Users', href: '/store-inventory/users' },
 ]
 
 export const storeInventoryScreens: Record<string, ScreenConfig> = {
@@ -135,6 +133,4 @@ export const storeInventoryScreens: Record<string, ScreenConfig> = {
     table: { columns: ['Sr#', 'User', 'Model', 'Model ID', 'Event', 'IP', 'Date', 'Action'] },
     actions: ['Search', 'Clear'],
   },
-  roles: { title: 'Roles', table: { columns: ['Sr#', 'Role Name', 'Action'] }, actions: ['Create Role'] },
-  users: { title: 'Users', table: { columns: ['Sr#', 'Name', 'Email', 'Role', 'Stores/Warehouse', 'Action'] }, actions: ['Create User'] },
 }
