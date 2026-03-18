@@ -1,26 +1,26 @@
 {
-  "generatedAt": "2026-03-18T11:11:33.185Z",
-  "expectedStage": "E",
+  "generatedAt": "2026-03-18T18:01:05.499Z",
+  "expectedStage": "C",
   "expected": {
     "enabled": true,
     "writeEnabled": true,
     "readFromV2": true,
-    "legacyReadonly": true,
-    "cutoverComplete": true
+    "legacyReadonly": false,
+    "cutoverComplete": false
   },
   "serverFlags": {
     "enabled": true,
     "writeEnabled": true,
     "readFromV2": true,
-    "legacyReadonly": true,
-    "cutoverComplete": true
+    "legacyReadonly": false,
+    "cutoverComplete": false
   },
   "publicFlags": {
     "enabled": true,
     "writeEnabled": true,
     "readFromV2": true,
-    "legacyReadonly": true,
-    "cutoverComplete": true
+    "legacyReadonly": false,
+    "cutoverComplete": false
   },
   "pass": true,
   "serverMismatches": [],

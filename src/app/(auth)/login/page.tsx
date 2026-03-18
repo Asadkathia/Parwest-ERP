@@ -1,8 +1,8 @@
 "use client"
 
-import { useFormState, useFormStatus } from "react-dom"
+import { useFormStatus } from "react-dom"
 import { authenticate } from "./actions"
-import { useEffect } from "react"
+import { useActionState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 function SubmitButton() {
@@ -21,7 +21,7 @@ function SubmitButton() {
 
 export default function LoginPage() {
     const router = useRouter()
-    const [errorMessage, dispatch] = useFormState(authenticate, undefined)
+    const [errorMessage, dispatch] = useActionState(authenticate, undefined)
 
     useEffect(() => {
         if (errorMessage === "success") {

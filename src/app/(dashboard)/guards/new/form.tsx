@@ -350,7 +350,6 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
               </label>
               <select name="regionalOfficeId" required className="ui-input">
                 <option value="">Select regional office</option>
-                <option value="legacy-head-office-lahore">head office lahore</option>
                 {regionalOffices.map((office) => (
                   <option key={`regionalOffice-${office.id}`} value={office.id}>
                     {office.name} ({office.region.name})

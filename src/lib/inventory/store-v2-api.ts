@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { forbidden, unauthorized, type ApiEnvelope } from "@/lib/api/response"
 import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
+import { getPrismaCode } from "@/lib/prisma-errors"
 
 type SessionUser = {
   id?: string
@@ -43,15 +44,33 @@ export async function emitInventoryV2Audit(args: {
 }) {
   const ipAddress = args.request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
 
-  await prisma.auditLog.create({
-    data: {
-      userId: args.userId ?? null,
-      event: args.event,
-      module: "INVENTORY_V2",
-      description: args.description,
-      ipAddress,
-    },
-  })
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: args.userId ?? null,
+        event: args.event,
+        module: "INVENTORY_V2",
+        description: args.description,
+        ipAddress,
+      },
+    })
+  } catch (error) {
+    // If actor user no longer exists (e.g. DB was truncated), do not block the business write.
+    // Retry audit write without user linkage.
+    if (getPrismaCode(error) === "P2003") {
+      await prisma.auditLog.create({
+        data: {
+          userId: null,
+          event: args.event,
+          module: "INVENTORY_V2",
+          description: `${args.description} (user reference missing)`,
+          ipAddress,
+        },
+      })
+      return
+    }
+    throw error
+  }
 }
 
 export function parsePositiveInt(value: unknown): number | null {

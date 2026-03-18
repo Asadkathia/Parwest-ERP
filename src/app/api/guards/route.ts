@@ -89,12 +89,17 @@ export async function POST(request: NextRequest) {
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
-        if (!bodyRegionId && bodyRegionalOfficeId) {
+        if (bodyRegionalOfficeId) {
             const office = await prisma.regionalOffice.findUnique({
                 where: { id: bodyRegionalOfficeId },
-                select: { regionId: true },
+                select: { id: true, regionId: true },
             })
-            bodyRegionId = office?.regionId || null
+            if (!office) {
+                return badRequest("Selected regional office does not exist.")
+            }
+            if (!bodyRegionId) {
+                bodyRegionId = office.regionId || null
+            }
         }
 
         if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId, regionalOfficeId: bodyRegionalOfficeId })) {
@@ -123,7 +128,7 @@ export async function POST(request: NextRequest) {
                 email: body.email || null,
                 status: body.status || "PENDING",
                 regionId: bodyRegionId,
-                regionalOfficeId: body.regionalOfficeId || null,
+                regionalOfficeId: bodyRegionalOfficeId,
             }
             return NextResponse.json(mock, { status: 201 })
         }
@@ -192,7 +197,7 @@ export async function POST(request: NextRequest) {
             bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : null,
             joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
             regionId: bodyRegionId,
-            regionalOfficeId: body.regionalOfficeId || null,
+            regionalOfficeId: bodyRegionalOfficeId,
         })
 
         let lastCreateError: unknown = null
