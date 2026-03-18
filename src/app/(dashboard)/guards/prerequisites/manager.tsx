@@ -2,7 +2,8 @@
 
 import { type ReactNode, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, ShieldAlert, Check, X as XIcon, Clock, AlertTriangle } from "lucide-react"
+import Link from "next/link"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -26,6 +27,8 @@ type GuardDocumentType = {
   name: string
   isActive: boolean
   sortOrder: number
+  docCategory: string
+  isSystemGenerated: boolean
 }
 
 type Props = {
@@ -78,10 +81,145 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
   const [docTypesError, setDocTypesError] = useState("")
   const [showAddDocType, setShowAddDocType] = useState(false)
   const [newDocTypeName, setNewDocTypeName] = useState("")
+  const [newDocTypeCategory, setNewDocTypeCategory] = useState<"VERIFICATION" | "ATTACHMENT">("ATTACHMENT")
   const [savingDocType, setSavingDocType] = useState(false)
   const [editingDocType, setEditingDocType] = useState<GuardDocumentType | null>(null)
   const [editDocTypeName, setEditDocTypeName] = useState("")
+  const [editDocTypeCategory, setEditDocTypeCategory] = useState<"VERIFICATION" | "ATTACHMENT">("ATTACHMENT")
   const [confirmDeleteDocType, setConfirmDeleteDocType] = useState<GuardDocumentType | null>(null)
+
+  // Ex-Service types
+  type ExServiceType = { id: string; name: string; isActive: boolean; sortOrder: number }
+  const [exServiceTypes, setExServiceTypes] = useState<ExServiceType[]>([])
+  const [exServiceTypesLoading, setExServiceTypesLoading] = useState(true)
+  const [exServiceTypesError, setExServiceTypesError] = useState("")
+  const [showAddExServiceType, setShowAddExServiceType] = useState(false)
+  const [newExServiceTypeName, setNewExServiceTypeName] = useState("")
+  const [savingExServiceType, setSavingExServiceType] = useState(false)
+  const [editingExServiceType, setEditingExServiceType] = useState<ExServiceType | null>(null)
+  const [editExServiceTypeName, setEditExServiceTypeName] = useState("")
+  const [confirmDeleteExServiceType, setConfirmDeleteExServiceType] = useState<ExServiceType | null>(null)
+
+  // Pledged document types
+  type PledgeableDocType = { id: string; name: string; description: string | null }
+  const [pledgeTypes, setPledgeTypes] = useState<PledgeableDocType[]>([])
+  const [pledgeTypesLoading, setPledgeTypesLoading] = useState(true)
+  const [pledgeTypesError, setPledgeTypesError] = useState("")
+  const [showAddPledgeType, setShowAddPledgeType] = useState(false)
+  const [newPledgeTypeName, setNewPledgeTypeName] = useState("")
+  const [newPledgeTypeDesc, setNewPledgeTypeDesc] = useState("")
+  const [savingPledgeType, setSavingPledgeType] = useState(false)
+  const [editingPledgeType, setEditingPledgeType] = useState<PledgeableDocType | null>(null)
+  const [editPledgeTypeName, setEditPledgeTypeName] = useState("")
+  const [editPledgeTypeDesc, setEditPledgeTypeDesc] = useState("")
+  const [confirmDeletePledgeType, setConfirmDeletePledgeType] = useState<PledgeableDocType | null>(null)
+
+  // Age config
+  type AgeConfig = { id: string; minAge: number; maxAge: number }
+  const [ageConfig, setAgeConfig] = useState<AgeConfig | null>(null)
+  const [ageConfigLoading, setAgeConfigLoading] = useState(true)
+  const [ageConfigSaving, setAgeConfigSaving] = useState(false)
+  const [ageConfigError, setAgeConfigError] = useState("")
+  const [ageConfigSuccess, setAgeConfigSuccess] = useState("")
+  const [editMinAge, setEditMinAge] = useState("")
+  const [editMaxAge, setEditMaxAge] = useState("")
+
+  // Age approvals
+  type AgeApproval = {
+    id: string
+    guardAge: number
+    reason: string
+    status: string
+    requestedBy: string | null
+    reviewedBy: string | null
+    reviewedAt: string | null
+    notes: string | null
+    createdAt: string
+    guard: { id: string; parwestId: string; name: string; cnic: string; status: string; regionalOffice: { name: string } | null }
+  }
+  const [approvals, setApprovals] = useState<AgeApproval[]>([])
+  const [approvalsLoading, setApprovalsLoading] = useState(true)
+  const [approvalsError, setApprovalsError] = useState("")
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [reviewNotes, setReviewNotes] = useState("")
+  const [reviewModalApproval, setReviewModalApproval] = useState<AgeApproval | null>(null)
+  const [approvalsFilter, setApprovalsFilter] = useState("PENDING")
+
+  const loadAgeConfig = useCallback(async () => {
+    setAgeConfigLoading(true)
+    try {
+      const res = await fetch("/api/guard-age-config")
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setAgeConfig(data)
+      setEditMinAge(String(data.minAge))
+      setEditMaxAge(String(data.maxAge))
+    } catch {
+      setAgeConfigError("Failed to load age config")
+    } finally {
+      setAgeConfigLoading(false)
+    }
+  }, [])
+
+  const saveAgeConfig = async () => {
+    const minAge = parseInt(editMinAge)
+    const maxAge = parseInt(editMaxAge)
+    if (!Number.isFinite(minAge) || !Number.isFinite(maxAge)) { setAgeConfigError("Enter valid numbers"); return }
+    if (minAge >= maxAge) { setAgeConfigError("Min age must be less than max age"); return }
+    setAgeConfigSaving(true)
+    setAgeConfigError("")
+    setAgeConfigSuccess("")
+    try {
+      const res = await fetch("/api/guard-age-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minAge, maxAge }),
+      })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed") }
+      const data = await res.json()
+      setAgeConfig(data)
+      setAgeConfigSuccess("Age limits saved successfully.")
+      setTimeout(() => setAgeConfigSuccess(""), 3000)
+    } catch (err: unknown) {
+      setAgeConfigError(err instanceof Error ? err.message : "Failed to save")
+    } finally {
+      setAgeConfigSaving(false)
+    }
+  }
+
+  const loadApprovals = useCallback(async () => {
+    setApprovalsLoading(true)
+    setApprovalsError("")
+    try {
+      const res = await fetch(`/api/guard-age-approvals?status=${approvalsFilter}`)
+      if (!res.ok) throw new Error()
+      setApprovals(await res.json())
+    } catch {
+      setApprovalsError("Failed to load approval requests")
+    } finally {
+      setApprovalsLoading(false)
+    }
+  }, [approvalsFilter])
+
+  const handleReview = async (action: "APPROVE" | "REJECT") => {
+    if (!reviewModalApproval) return
+    setReviewingId(reviewModalApproval.id)
+    try {
+      const res = await fetch(`/api/guard-age-approvals/${reviewModalApproval.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, notes: reviewNotes || null }),
+      })
+      if (!res.ok) throw new Error()
+      setReviewModalApproval(null)
+      setReviewNotes("")
+      await loadApprovals()
+    } catch {
+      setApprovalsError("Failed to process review")
+    } finally {
+      setReviewingId(null)
+    }
+  }
 
   const loadDocTypes = useCallback(async () => {
     setDocTypesLoading(true)
@@ -99,6 +237,176 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
   }, [])
 
   useEffect(() => { loadDocTypes() }, [loadDocTypes])
+  useEffect(() => { loadAgeConfig() }, [loadAgeConfig])
+  useEffect(() => { loadApprovals() }, [loadApprovals])
+
+  const loadPledgeTypes = useCallback(async () => {
+    setPledgeTypesLoading(true)
+    setPledgeTypesError("")
+    try {
+      const res = await fetch("/api/guard-pledgeable-documents")
+      if (!res.ok) throw new Error("Failed to load pledged document types")
+      setPledgeTypes(await res.json())
+    } catch {
+      setPledgeTypesError("Failed to load pledged document types")
+    } finally {
+      setPledgeTypesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadPledgeTypes() }, [loadPledgeTypes])
+
+  const loadExServiceTypes = useCallback(async () => {
+    setExServiceTypesLoading(true)
+    setExServiceTypesError("")
+    try {
+      const res = await fetch("/api/guard-ex-service-types?activeOnly=false")
+      if (!res.ok) throw new Error()
+      setExServiceTypes(await res.json())
+    } catch {
+      setExServiceTypesError("Failed to load ex-service types")
+    } finally {
+      setExServiceTypesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadExServiceTypes() }, [loadExServiceTypes])
+
+  const handleAddExServiceType = async () => {
+    const name = newExServiceTypeName.trim().toUpperCase()
+    if (!name) return
+    setSavingExServiceType(true)
+    setExServiceTypesError("")
+    try {
+      const res = await fetch("/api/guard-ex-service-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.error || "Failed"); return }
+      setNewExServiceTypeName("")
+      setShowAddExServiceType(false)
+      await loadExServiceTypes()
+    } catch {
+      setExServiceTypesError("Failed to add ex-service type")
+    } finally {
+      setSavingExServiceType(false)
+    }
+  }
+
+  const handleEditExServiceType = async () => {
+    if (!editingExServiceType) return
+    const name = editExServiceTypeName.trim().toUpperCase()
+    if (!name) return
+    setSavingExServiceType(true)
+    try {
+      const res = await fetch(`/api/guard-ex-service-types/${editingExServiceType.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.error || "Failed"); return }
+      setEditingExServiceType(null)
+      setEditExServiceTypeName("")
+      await loadExServiceTypes()
+    } catch {
+      setExServiceTypesError("Failed to update ex-service type")
+    } finally {
+      setSavingExServiceType(false)
+    }
+  }
+
+  const handleToggleExServiceType = async (et: ExServiceType) => {
+    try {
+      await fetch(`/api/guard-ex-service-types/${et.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !et.isActive }),
+      })
+      await loadExServiceTypes()
+    } catch {
+      setExServiceTypesError("Failed to update ex-service type")
+    }
+  }
+
+  const handleDeleteExServiceType = async (et: ExServiceType) => {
+    try {
+      await fetch(`/api/guard-ex-service-types/${et.id}`, { method: "DELETE" })
+      setConfirmDeleteExServiceType(null)
+      await loadExServiceTypes()
+    } catch {
+      setExServiceTypesError("Failed to delete ex-service type")
+    }
+  }
+
+  const handleAddPledgeType = async () => {
+    const name = newPledgeTypeName.trim()
+    if (!name) return
+    setSavingPledgeType(true)
+    setPledgeTypesError("")
+    try {
+      const res = await fetch("/api/guard-pledgeable-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: newPledgeTypeDesc.trim() || null }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setPledgeTypesError(d.error || "Failed to add pledged document type")
+        return
+      }
+      setNewPledgeTypeName("")
+      setNewPledgeTypeDesc("")
+      setShowAddPledgeType(false)
+      await loadPledgeTypes()
+    } catch {
+      setPledgeTypesError("Failed to add pledged document type")
+    } finally {
+      setSavingPledgeType(false)
+    }
+  }
+
+  const handleEditPledgeType = async () => {
+    if (!editingPledgeType) return
+    const name = editPledgeTypeName.trim()
+    if (!name) return
+    setSavingPledgeType(true)
+    setPledgeTypesError("")
+    try {
+      const res = await fetch(`/api/guard-pledgeable-documents/${editingPledgeType.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: editPledgeTypeDesc.trim() || null }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setPledgeTypesError(d.error || "Failed to update pledged document type")
+        return
+      }
+      setEditingPledgeType(null)
+      setEditPledgeTypeName("")
+      setEditPledgeTypeDesc("")
+      await loadPledgeTypes()
+    } catch {
+      setPledgeTypesError("Failed to update pledged document type")
+    } finally {
+      setSavingPledgeType(false)
+    }
+  }
+
+  const handleDeletePledgeType = async (pt: { id: string; name: string; description: string | null }) => {
+    try {
+      const res = await fetch(`/api/guard-pledgeable-documents/${pt.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        setPledgeTypesError("Failed to delete pledged document type")
+        return
+      }
+      setConfirmDeletePledgeType(null)
+      await loadPledgeTypes()
+    } catch {
+      setPledgeTypesError("Failed to delete pledged document type")
+    }
+  }
 
   const handleAddDocType = async () => {
     const name = newDocTypeName.trim()
@@ -108,7 +416,7 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
       const res = await fetch("/api/guard-document-types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, docCategory: newDocTypeCategory }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -151,7 +459,7 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
       const res = await fetch(`/api/guard-document-types/${editingDocType.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, docCategory: editDocTypeCategory }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -160,6 +468,7 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
       }
       setEditingDocType(null)
       setEditDocTypeName("")
+      setEditDocTypeCategory("ATTACHMENT")
       await loadDocTypes()
     } catch {
       setDocTypesError("Failed to update document type")
@@ -246,7 +555,7 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
         <CardBody className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <SectionTitle title="Prerequisite Document Types" subtitle="Configure the required documents for guard enrollment. These appear in the Add Guard form and guard attachments/verification tabs." />
+              <SectionTitle title="Prerequisite Document Types" subtitle="Configure required documents for guard enrollment. Attachment category → appears in Attachments tab. Verification category → appears in Verifications tab." />
             </div>
             <ActionButton onClick={() => setShowAddDocType((p) => !p)} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -257,8 +566,8 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
           {docTypesError ? <InlineAlert type="error" message={docTypesError} /> : null}
 
           {showAddDocType && (
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex gap-3 items-end">
-              <div className="flex-1">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Document Type Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
@@ -269,58 +578,289 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
                   className="ui-input"
                 />
               </div>
+              <div>
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Category <span className="text-red-500">*</span></label>
+                <select
+                  value={newDocTypeCategory}
+                  onChange={(e) => setNewDocTypeCategory(e.target.value as "VERIFICATION" | "ATTACHMENT")}
+                  className="ui-input"
+                >
+                  <option value="VERIFICATION">Verification Document</option>
+                  <option value="ATTACHMENT">Attachment Document</option>
+                </select>
+              </div>
               <ActionButton onClick={handleAddDocType} disabled={savingDocType || !newDocTypeName.trim()}>
                 {savingDocType ? "Saving..." : "Save"}
               </ActionButton>
-              <ActionButton variant="secondary" onClick={() => { setShowAddDocType(false); setNewDocTypeName("") }}>Cancel</ActionButton>
+              <ActionButton variant="secondary" onClick={() => { setShowAddDocType(false); setNewDocTypeName(""); setNewDocTypeCategory("ATTACHMENT") }}>Cancel</ActionButton>
             </div>
           )}
 
           {docTypesLoading ? (
             <p className="text-center text-sm text-[var(--text-muted)] py-4">Loading...</p>
+          ) : (() => {
+            const systemDocs = docTypes.filter((dt) => dt.isSystemGenerated)
+            const adminDocs = docTypes.filter((dt) => !dt.isSystemGenerated)
+            return (
+              <div className="space-y-4">
+                {/* System-Generated (read-only) */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    System-Generated Documents
+                    <span className="ml-2 font-normal normal-case text-gray-400">— auto-created for every guard, not editable</span>
+                  </p>
+                  <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+                    <table className="min-w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          {["#", "NAME", "CATEGORY"].map((h) => (
+                            <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {systemDocs.length === 0 ? (
+                          <tr><td colSpan={3} className="px-4 py-6 text-center text-xs text-[var(--text-muted)]">No system documents found</td></tr>
+                        ) : systemDocs.map((dt, idx) => (
+                          <tr key={dt.id} className="border-t border-[var(--border)]">
+                            <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                            <td className="px-4 py-2 font-medium text-[var(--text)]">{dt.name}</td>
+                            <td className="px-4 py-2">
+                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800">
+                                Attachment
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Admin-Configured (editable) */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    Admin-Configured Document Types
+                  </p>
+                  <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+                    <table className="min-w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          {["#", "NAME", "CATEGORY", "STATUS", "ACTIONS"].map((h) => (
+                            <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminDocs.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--text-muted)]">No admin-configured document types yet</td></tr>
+                        ) : adminDocs.map((dt, idx) => (
+                          <tr key={dt.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                            <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                            <td className="px-4 py-2 font-medium">{dt.name}</td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                dt.docCategory === "VERIFICATION"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-purple-100 text-purple-800"
+                              }`}>
+                                {dt.docCategory === "VERIFICATION" ? "Verification" : "Attachment"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${dt.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                                {dt.isActive ? "ACTIVE" : "INACTIVE"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => { setEditingDocType(dt); setEditDocTypeName(dt.name); setEditDocTypeCategory((dt.docCategory as "VERIFICATION" | "ATTACHMENT") || "VERIFICATION") }}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Pencil className="h-3 w-3" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleToggleActive(dt)}
+                                  className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${dt.isActive ? "text-orange-700 hover:bg-orange-50" : "text-green-700 hover:bg-green-50"}`}
+                                >
+                                  {dt.isActive ? "Deactivate" : "Activate"}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteDocType(dt)}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </CardBody>
+      </Card>
+
+      {/* ── Age Limit Configuration ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <SectionTitle
+            title="Guard Age Limit Configuration"
+            subtitle="Set the minimum and maximum permitted age for guard enrollment. Guards outside these limits will require admin approval."
+          />
+          {ageConfigError && <InlineAlert type="error" message={ageConfigError} />}
+          {ageConfigSuccess && <InlineAlert type="success" message={ageConfigSuccess} />}
+          {ageConfigLoading ? (
+            <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+          ) : (
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">
+                  Minimum Age <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={editMinAge}
+                  onChange={(e) => setEditMinAge(e.target.value)}
+                  className="ui-input w-28"
+                  placeholder="18"
+                />
+                <p className="mt-1 text-xs text-gray-400">Underage threshold</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">
+                  Maximum Age <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={editMaxAge}
+                  onChange={(e) => setEditMaxAge(e.target.value)}
+                  className="ui-input w-28"
+                  placeholder="45"
+                />
+                <p className="mt-1 text-xs text-gray-400">Overage threshold</p>
+              </div>
+              <ActionButton onClick={saveAgeConfig} disabled={ageConfigSaving}>
+                {ageConfigSaving ? "Saving..." : "Save Limits"}
+              </ActionButton>
+            </div>
+          )}
+          <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            <strong>How it works:</strong> When a guard&apos;s age is below the minimum or above the maximum, the system will still
+            enroll the guard but flag it as <em>Pending Age Approval</em>. An approval request will appear in the section below for admin review.
+          </p>
+        </CardBody>
+      </Card>
+
+      {/* ── Age Approval Requests ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <SectionTitle
+              title="Age Approval Requests"
+              subtitle="Guards whose age is outside configured limits require your approval to be enrolled."
+            />
+            <div className="flex items-center gap-2">
+              {(["PENDING","APPROVED","REJECTED"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setApprovalsFilter(s)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    approvalsFilter === s
+                      ? s === "PENDING" ? "bg-orange-500 text-white"
+                        : s === "APPROVED" ? "bg-green-600 text-white"
+                        : "bg-red-600 text-white"
+                      : "bg-[var(--surface-muted)] text-[var(--text-muted)] hover:bg-[var(--border)]"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+              <button onClick={loadApprovals} className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">Refresh</button>
+            </div>
+          </div>
+
+          {approvalsError && <InlineAlert type="error" message={approvalsError} />}
+
+          {approvalsLoading ? (
+            <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+          ) : approvals.length === 0 ? (
+            <div className="rounded-[var(--radius-md)] border border-dashed px-6 py-10 text-center text-sm text-[var(--text-muted)]">
+              {approvalsFilter === "PENDING" ? "No pending age approval requests." : `No ${approvalsFilter.toLowerCase()} requests.`}
+            </div>
           ) : (
             <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-              <table className="min-w-full border-collapse text-sm">
+              <table className="min-w-full text-sm">
                 <thead>
                   <tr>
-                    {["#", "NAME", "STATUS", "ACTIONS"].map((h) => (
+                    {["#", "Guard", "Parwest ID", "Age", "Reason", "Requested By", "Status", "Actions"].map((h) => (
                       <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {docTypes.length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--text-muted)]">No document types configured</td></tr>
-                  ) : docTypes.map((dt, idx) => (
-                    <tr key={dt.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
-                      <td className="px-4 py-2 font-medium">{dt.name}</td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${dt.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-                          {dt.isActive ? "ACTIVE" : "INACTIVE"}
+                  {approvals.map((ap, idx) => (
+                    <tr key={ap.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-3 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/guards/${ap.guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
+                          {ap.guard.name}
+                        </Link>
+                        <p className="text-xs text-[var(--text-muted)]">{ap.guard.cnic}</p>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{ap.guard.parwestId}</td>
+                      <td className="px-4 py-3 font-semibold">{ap.guardAge} yrs</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          ap.reason === "UNDERAGE" ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"
+                        }`}>
+                          <AlertTriangle className="h-3 w-3" />
+                          {ap.reason === "UNDERAGE" ? "Underage" : "Overage"}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="flex gap-2">
+                      <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{ap.requestedBy || "—"}</td>
+                      <td className="px-4 py-3">
+                        {ap.status === "PENDING" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                            <Clock className="h-3 w-3" /> Pending
+                          </span>
+                        )}
+                        {ap.status === "APPROVED" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            <Check className="h-3 w-3" /> Approved
+                          </span>
+                        )}
+                        {ap.status === "REJECTED" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                            <XIcon className="h-3 w-3" /> Rejected
+                          </span>
+                        )}
+                        {ap.reviewedBy && (
+                          <p className="text-xs text-[var(--text-muted)] mt-0.5">by {ap.reviewedBy}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {ap.status === "PENDING" ? (
                           <button
-                            onClick={() => { setEditingDocType(dt); setEditDocTypeName(dt.name) }}
+                            onClick={() => { setReviewModalApproval(ap); setReviewNotes("") }}
                             className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
                           >
-                            <Pencil className="h-3 w-3" /> Edit
+                            <ShieldAlert className="h-3 w-3" /> Review
                           </button>
-                          <button
-                            onClick={() => handleToggleActive(dt)}
-                            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${dt.isActive ? "text-orange-700 hover:bg-orange-50" : "text-green-700 hover:bg-green-50"}`}
-                          >
-                            {dt.isActive ? "Deactivate" : "Activate"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteDocType(dt)}
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
-                        </div>
+                        ) : (
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {ap.reviewedAt ? new Date(ap.reviewedAt).toLocaleDateString() : "—"}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -330,6 +870,68 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
           )}
         </CardBody>
       </Card>
+
+      {/* Review Modal */}
+      {reviewModalApproval && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-base font-semibold flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-orange-500" />
+                Age Approval Review
+              </h3>
+              <button onClick={() => setReviewModalApproval(null)} className="text-gray-400 hover:text-gray-600">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-md bg-gray-50 border px-4 py-3 space-y-1">
+                <p className="text-sm font-semibold">{reviewModalApproval.guard.name}</p>
+                <p className="text-xs text-gray-500">Parwest ID: {reviewModalApproval.guard.parwestId} · CNIC: {reviewModalApproval.guard.cnic}</p>
+                <p className="text-xs text-gray-500">Age: <strong>{reviewModalApproval.guardAge} years</strong></p>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                  reviewModalApproval.reason === "UNDERAGE" ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"
+                }`}>
+                  <AlertTriangle className="h-3 w-3" />
+                  {reviewModalApproval.reason === "UNDERAGE" ? "Underage" : "Overage"}
+                </span>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Notes / Reason (optional)</label>
+                <textarea
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  rows={3}
+                  className="ui-input resize-none"
+                  placeholder="Add a note for this decision..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <button
+                onClick={() => setReviewModalApproval(null)}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleReview("REJECT")}
+                disabled={!!reviewingId}
+                className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                <XIcon className="h-4 w-4" /> Reject
+              </button>
+              <button
+                onClick={() => handleReview("APPROVE")}
+                disabled={!!reviewingId}
+                className="flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" /> Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Guard Statuses ── */}
       <Card>
@@ -389,6 +991,239 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
             headers={["FACTOR NAME", "AMOUNT", "ACTION"]}
             rows={allowancesAndDeductions.map((row) => [row.factorName, row.amount, "✎"])}
           />
+        </CardBody>
+      </Card>
+
+      {/* ── Ex-Service Types ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <SectionTitle title="Ex-Servicemen Types" subtitle="Configure the list of ex-service branches shown during guard enrollment. Guards not matching any type are treated as Civilian." />
+            </div>
+            <ActionButton onClick={() => { setShowAddExServiceType((p) => !p); setNewExServiceTypeName("") }} className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Type
+            </ActionButton>
+          </div>
+
+          {exServiceTypesError ? <InlineAlert type="error" message={exServiceTypesError} /> : null}
+
+          {showAddExServiceType && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Type Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newExServiceTypeName}
+                  onChange={(e) => setNewExServiceTypeName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddExServiceType() }}
+                  placeholder="e.g., NAVY, AIR FORCE"
+                  className="ui-input"
+                />
+              </div>
+              <ActionButton onClick={handleAddExServiceType} disabled={savingExServiceType || !newExServiceTypeName.trim()}>
+                {savingExServiceType ? "Saving..." : "Save"}
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => { setShowAddExServiceType(false); setNewExServiceTypeName("") }}>Cancel</ActionButton>
+            </div>
+          )}
+
+          {exServiceTypesLoading ? (
+            <p className="text-center text-sm text-[var(--text-muted)] py-4">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    {["#", "TYPE NAME", "STATUS", "ACTIONS"].map((h) => (
+                      <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {exServiceTypes.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--text-muted)]">No types yet — defaults will be created on first use</td></tr>
+                  ) : exServiceTypes.map((et, idx) => (
+                    <tr key={et.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-[var(--text)]">{et.name}</td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${et.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                          {et.isActive ? "ACTIVE" : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setEditingExServiceType(et); setEditExServiceTypeName(et.name) }}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleToggleExServiceType(et)}
+                            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${et.isActive ? "text-orange-700 hover:bg-orange-50" : "text-green-700 hover:bg-green-50"}`}
+                          >
+                            {et.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteExServiceType(et)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Edit ex-service type modal */}
+      {editingExServiceType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-base font-semibold">Edit Ex-Service Type</h3>
+              <button onClick={() => setEditingExServiceType(null)} className="text-gray-400 hover:text-gray-600"><XIcon className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Type Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={editExServiceTypeName}
+                  onChange={(e) => setEditExServiceTypeName(e.target.value)}
+                  className="ui-input"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <ActionButton variant="secondary" onClick={() => setEditingExServiceType(null)}>Cancel</ActionButton>
+              <ActionButton onClick={handleEditExServiceType} disabled={savingExServiceType || !editExServiceTypeName.trim()}>
+                {savingExServiceType ? "Saving..." : "Save"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete ex-service type confirm */}
+      {confirmDeleteExServiceType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-base font-semibold text-red-700">Delete Ex-Service Type</h3>
+              <button onClick={() => setConfirmDeleteExServiceType(null)} className="text-gray-400 hover:text-gray-600"><XIcon className="h-5 w-5" /></button>
+            </div>
+            <div className="px-6 py-5 text-sm text-[var(--text-muted)]">
+              Are you sure you want to delete <strong>{confirmDeleteExServiceType.name}</strong>? This cannot be undone.
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <ActionButton variant="secondary" onClick={() => setConfirmDeleteExServiceType(null)}>Cancel</ActionButton>
+              <button
+                onClick={() => handleDeleteExServiceType(confirmDeleteExServiceType)}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pledged Document Types ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <SectionTitle title="Pledged Document Types" subtitle="Configure the types of documents that guards can pledge (hand over to the company for safekeeping)." />
+            </div>
+            <ActionButton onClick={() => { setShowAddPledgeType((p) => !p); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }} className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Type
+            </ActionButton>
+          </div>
+
+          {pledgeTypesError ? <InlineAlert type="error" message={pledgeTypesError} /> : null}
+
+          {showAddPledgeType && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Document Type Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newPledgeTypeName}
+                  onChange={(e) => setNewPledgeTypeName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddPledgeType() }}
+                  placeholder="e.g., CNIC Original"
+                  className="ui-input"
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Description <span className="text-xs font-normal">(optional)</span></label>
+                <input
+                  type="text"
+                  value={newPledgeTypeDesc}
+                  onChange={(e) => setNewPledgeTypeDesc(e.target.value)}
+                  placeholder="Brief description"
+                  className="ui-input"
+                />
+              </div>
+              <ActionButton onClick={handleAddPledgeType} disabled={savingPledgeType || !newPledgeTypeName.trim()}>
+                {savingPledgeType ? "Saving..." : "Save"}
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => { setShowAddPledgeType(false); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }}>Cancel</ActionButton>
+            </div>
+          )}
+
+          {pledgeTypesLoading ? (
+            <p className="text-center text-sm text-[var(--text-muted)] py-4">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    {["#", "NAME", "DESCRIPTION", "ACTIONS"].map((h) => (
+                      <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pledgeTypes.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--text-muted)]">No pledged document types configured yet</td></tr>
+                  ) : pledgeTypes.map((pt, idx) => (
+                    <tr key={pt.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-[var(--text)]">{pt.name}</td>
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{pt.description || "—"}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setEditingPledgeType(pt); setEditPledgeTypeName(pt.name); setEditPledgeTypeDesc(pt.description || "") }}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeletePledgeType(pt)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardBody>
       </Card>
 
@@ -511,9 +1346,23 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
                   onKeyDown={(e) => { if (e.key === "Enter") handleEditDocType() }}
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Category</label>
+                <select
+                  value={editDocTypeCategory}
+                  onChange={(e) => setEditDocTypeCategory(e.target.value as "VERIFICATION" | "ATTACHMENT")}
+                  className="ui-input"
+                >
+                  <option value="VERIFICATION">Verification Document</option>
+                  <option value="ATTACHMENT">Attachment Document</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Verification docs appear in the Verification tab and affect guard status. Attachment docs appear in the Attachments tab only.
+                </p>
+              </div>
             </div>
           }
-          onNo={() => { setEditingDocType(null); setEditDocTypeName("") }}
+          onNo={() => { setEditingDocType(null); setEditDocTypeName(""); setEditDocTypeCategory("VERIFICATION") }}
           onYes={handleEditDocType}
           yesText={savingDocType ? "Saving..." : "Save"}
           noText="Cancel"
@@ -527,6 +1376,51 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
           message={`Are you sure you want to delete "${confirmDeleteDocType.name}"? This will remove it from all guard prerequisite records.`}
           onNo={() => setConfirmDeleteDocType(null)}
           onYes={() => handleDeleteDocType(confirmDeleteDocType)}
+          yesText="Delete"
+          noText="Cancel"
+        />
+      ) : null}
+
+      {/* Edit Pledged Document Type Modal */}
+      {editingPledgeType ? (
+        <ConfirmDialog
+          title="Edit Pledged Document Type"
+          customContent={
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Name <span className="text-red-500">*</span></label>
+                <input
+                  value={editPledgeTypeName}
+                  onChange={(e) => setEditPledgeTypeName(e.target.value)}
+                  className="ui-input"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleEditPledgeType() }}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Description <span className="text-xs font-normal">(optional)</span></label>
+                <input
+                  value={editPledgeTypeDesc}
+                  onChange={(e) => setEditPledgeTypeDesc(e.target.value)}
+                  className="ui-input"
+                  placeholder="Brief description"
+                />
+              </div>
+            </div>
+          }
+          onNo={() => { setEditingPledgeType(null); setEditPledgeTypeName(""); setEditPledgeTypeDesc("") }}
+          onYes={handleEditPledgeType}
+          yesText={savingPledgeType ? "Saving..." : "Save"}
+          noText="Cancel"
+        />
+      ) : null}
+
+      {/* Delete Pledged Document Type Confirm Modal */}
+      {confirmDeletePledgeType ? (
+        <ConfirmDialog
+          title="Delete Pledged Document Type"
+          message={`Are you sure you want to delete "${confirmDeletePledgeType.name}"?`}
+          onNo={() => setConfirmDeletePledgeType(null)}
+          onYes={() => handleDeletePledgeType(confirmDeletePledgeType)}
           yesText="Delete"
           noText="Cancel"
         />

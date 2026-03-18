@@ -1,36 +1,43 @@
 "use client"
 
-import { User, Phone, MapPin, Building } from "lucide-react"
-import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
+import { User, Phone, MapPin, Building, Briefcase, BookOpen, UserCheck, Activity } from "lucide-react"
+import type { GuardTabModel, NearestRelative, FamilyMember } from "@/components/guards/tabs/types"
 
 interface GeneralInformationProps {
     guard: GuardTabModel
 }
 
+function InfoField({ label, value }: { label: string; value?: string | number | null }) {
+    return (
+        <div>
+            <p className="text-sm text-gray-500">{label}</p>
+            <p className="font-medium text-gray-900">{value || "—"}</p>
+        </div>
+    )
+}
+
 export default function GeneralInformationTab({ guard }: GeneralInformationProps) {
     const formatDate = (date?: Date | string | null) => {
         if (!date) return "—"
-        return new Date(date).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        })
+        return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
     }
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "ACTIVE":
-                return "bg-green-100 text-green-800"
-            case "INACTIVE":
-                return "bg-gray-100 text-gray-800"
-            case "PENDING":
-                return "bg-yellow-100 text-yellow-800"
-            default:
-                return "bg-gray-100 text-gray-800"
+            case "ACTIVE": return "bg-green-100 text-green-800"
+            case "INACTIVE": return "bg-gray-100 text-gray-800"
+            case "PENDING": return "bg-yellow-100 text-yellow-800"
+            default: return "bg-gray-100 text-gray-800"
         }
     }
 
     const nearestRelativeList = Array.isArray(guard.nearestRelatives) ? guard.nearestRelatives : []
+    const familyMemberList = Array.isArray(guard.familyMembers) ? guard.familyMembers : []
+
+    // Previous employment label
+    const exType = guard.exServiceType || (guard.isExService ? "OTHER" : "CIVILIAN")
+    const isPreviouslyServed = ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].includes(exType)
+    const exLabel = exType === "OTHER" ? (guard.exServiceOtherLabel || "Other") : exType
 
     return (
         <div className="space-y-6">
@@ -49,58 +56,24 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     Personal Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <p className="text-sm text-gray-600">Parwest ID</p>
-                        <p className="font-medium">{guard.parwestId}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Full Name</p>
-                        <p className="font-medium">{guard.name}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">CNIC</p>
-                        <p className="font-medium">{guard.cnic}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Father&apos;s Name</p>
-                        <p className="font-medium">{guard.fatherName || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Mother&apos;s Name</p>
-                        <p className="font-medium">{guard.motherName || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Date of Birth</p>
-                        <p className="font-medium">{formatDate(guard.dateOfBirth)}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Age</p>
-                        <p className="font-medium">{guard.age} years</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Religion</p>
-                        <p className="font-medium">{guard.religion || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Marital Status</p>
-                        <p className="font-medium">{guard.maritalStatus || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Education</p>
-                        <p className="font-medium">{guard.education || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Nationality</p>
-                        <p className="font-medium">{guard.nationality || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Next of Kin</p>
-                        <p className="font-medium">{guard.nextOfKin || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Profile Introducer</p>
-                        <p className="font-medium">{guard.profileIntroducer || "—"}</p>
-                    </div>
+                    <InfoField label="Parwest ID" value={guard.parwestId} />
+                    <InfoField label="Full Name" value={guard.name} />
+                    <InfoField label="CNIC" value={guard.cnic} />
+                    <InfoField label="CNIC Issue Date" value={formatDate(guard.cnicIssueDate)} />
+                    <InfoField label="CNIC Expiry Date" value={formatDate(guard.cnicExpiryDate)} />
+                    <InfoField label="Father's Name" value={guard.fatherName} />
+                    <InfoField label="Mother's Name" value={guard.motherName} />
+                    <InfoField label="Date of Birth" value={formatDate(guard.dateOfBirth)} />
+                    <InfoField label="Age" value={guard.age != null ? `${guard.age} years` : null} />
+                    <InfoField label="Religion" value={guard.religion} />
+                    <InfoField label="Sect" value={guard.sect} />
+                    <InfoField label="Cast" value={guard.cast} />
+                    <InfoField label="Marital Status" value={guard.maritalStatus} />
+                    <InfoField label="Blood Group" value={guard.bloodGroup} />
+                    <InfoField label="Nationality" value={guard.nationality} />
+                    <InfoField label="Next of Kin" value={guard.nextOfKin} />
+                    <InfoField label="Police Station" value={guard.policeStation} />
+                    <InfoField label="Profile Introducer" value={guard.profileIntroducer} />
                 </div>
             </div>
 
@@ -111,23 +84,11 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     Contact Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <p className="text-sm text-gray-600">Phone</p>
-                        <p className="font-medium">{guard.phone || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Email</p>
-                        <p className="font-medium">{guard.email || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Emergency Contact</p>
-                        <p className="font-medium">{guard.emergencyContact || "—"}</p>
-                    </div>
+                    <InfoField label="Phone" value={guard.phone} />
+                    <InfoField label="Email" value={guard.email} />
+                    <InfoField label="Emergency Contact" value={guard.emergencyContact} />
                     <div className="md:col-span-2 lg:col-span-3">
-                        <p className="text-sm text-gray-600">Additional Contact Numbers</p>
-                        <p className="font-medium">
-                            {guard.additionalContactNumbers || guard.phoneSecondary || "—"}
-                        </p>
+                        <InfoField label="Additional Contact Numbers" value={guard.additionalContactNumbers || guard.phoneSecondary} />
                     </div>
                 </div>
             </div>
@@ -139,55 +100,131 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     Address Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-sm text-gray-600">Permanent Address</p>
-                        <p className="font-medium">{guard.addressPermanent || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Current Address</p>
-                        <p className="font-medium">{guard.addressCurrent || "—"}</p>
-                    </div>
+                    <InfoField label="Current Address" value={guard.addressCurrent} />
+                    <InfoField label="Current Address Contact" value={guard.currentAddressContact} />
+                    <InfoField label="Permanent Address" value={guard.addressPermanent} />
+                    <InfoField label="Permanent Address Contact" value={guard.permanentAddressContact} />
                 </div>
             </div>
 
-            {/* Employment Information */}
+            {/* Parwest Employment */}
             <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Building className="h-5 w-5" />
-                    Employment Information
+                    Parwest Employment
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <p className="text-sm text-gray-600">Regional Office</p>
-                        <p className="font-medium">
-                            {typeof guard.regionalOffice === "string"
-                                ? guard.regionalOffice
-                                : guard.regionalOffice?.name || "—"}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Supervisor</p>
-                        <p className="font-medium">{guard.managerName || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Enrolled By User</p>
-                        <p className="font-medium">{guard.enrolledBy || "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Joining Date</p>
-                        <p className="font-medium">{formatDate(guard.joiningDate)}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Joining Age</p>
-                        <p className="font-medium">{guard.joiningAge != null ? `${guard.joiningAge} years` : "—"}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Ex-Service</p>
-                        <p className="font-medium">{guard.isExService ? "Yes" : "No"}</p>
-                    </div>
+                    <InfoField label="Regional Office" value={typeof guard.regionalOffice === "string" ? guard.regionalOffice : guard.regionalOffice?.name} />
+                    <InfoField label="Designation" value={guard.designation} />
+                    <InfoField label="Salary" value={guard.salary != null ? `PKR ${guard.salary.toLocaleString()}` : null} />
+                    <InfoField label="Supervisor" value={guard.managerName} />
+                    <InfoField label="Enrolled By" value={guard.enrolledBy} />
+                    <InfoField label="Joining Date" value={formatDate(guard.joiningDate)} />
+                    <InfoField label="Joining Age" value={guard.joiningAge != null ? `${guard.joiningAge} years` : null} />
                 </div>
             </div>
 
+            {/* Previous Employment */}
+            <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    Previous Employment
+                </h3>
+                {!isPreviouslyServed ? (
+                    <div className="flex items-center gap-2 rounded-md bg-gray-50 border px-4 py-3">
+                        <span className="text-sm font-medium text-gray-700">Type:</span>
+                        <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">Civilian</span>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700">Service Type:</span>
+                            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">{exLabel}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <InfoField label="Registration No" value={guard.exServiceRegistrationNo} />
+                            <InfoField label="Rank" value={guard.exServiceRank} />
+                            <InfoField label="Unit / Regiment" value={guard.exServiceUnit || guard.exServiceRegiment} />
+                            <InfoField label="Service Period" value={guard.exServicePeriod} />
+                            <InfoField label="Years of Service" value={guard.exServiceYears != null ? `${guard.exServiceYears} years` : null} />
+                            <InfoField label="Months" value={guard.exServiceMonths != null ? `${guard.exServiceMonths} months` : null} />
+                            <InfoField label="Date of Enrollment" value={formatDate(guard.dateOfEnrollment)} />
+                            <InfoField label="Date of Discharge" value={formatDate(guard.dateOfDischarge)} />
+                            <InfoField label="Remarks" value={guard.exServiceRemarks} />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Education */}
+            <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Education
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <InfoField label="Education Level" value={guard.education} />
+                    <InfoField label="Passing Year" value={guard.passingYear} />
+                    <InfoField label="Institute" value={guard.educationInstitute} />
+                </div>
+            </div>
+
+            {/* Physical Details */}
+            <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Physical Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <InfoField label="Height" value={guard.height} />
+                    <InfoField label="Weight" value={guard.weight} />
+                    <InfoField label="Eye Color" value={guard.eyeColor} />
+                    <InfoField label="Hair Color" value={guard.hairColor} />
+                    <InfoField label="Disability" value={guard.disability} />
+                    <InfoField label="Mark of Identification" value={guard.identificationMark} />
+                </div>
+            </div>
+
+            {/* Introducer */}
+            {(guard.introducerName || guard.introducerCnic) ? (
+                <div className="bg-white rounded-lg border p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <UserCheck className="h-5 w-5" />
+                        Introducer
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <InfoField label="Full Name" value={guard.introducerName} />
+                        <InfoField label="CNIC" value={guard.introducerCnic} />
+                        <InfoField label="Contact" value={guard.introducerContact} />
+                        <div className="md:col-span-2">
+                            <InfoField label="Address" value={guard.introducerAddress} />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Family Members */}
+            {familyMemberList.length > 0 ? (
+                <div className="bg-white rounded-lg border p-6">
+                    <h3 className="text-lg font-semibold mb-4">Family Members</h3>
+                    <div className="space-y-3">
+                        {familyMemberList.map((member: FamilyMember, i: number) => (
+                            <div key={i} className="rounded-md border p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <InfoField label="Name" value={member.name} />
+                                <InfoField label="Relation" value={member.relation} />
+                                <InfoField label="Age" value={member.age} />
+                                <InfoField label="Profession" value={member.profession} />
+                                {member.address ? <div className="md:col-span-2 lg:col-span-4"><InfoField label="Address" value={member.address} /></div> : null}
+                                {member.childCnic ? <InfoField label="Child CNIC / B-Form" value={member.childCnic} /> : null}
+                                {member.childAge ? <InfoField label="Child Age" value={member.childAge} /> : null}
+                                {member.childDob ? <InfoField label="Child DOB" value={member.childDob} /> : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Nearest Relatives */}
             <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4">Nearest Relative Details</h3>
                 {nearestRelativeList.length === 0 ? (
@@ -197,33 +234,14 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         {nearestRelativeList.map((relative: NearestRelative, index: number) => (
                             <div key={`${relative.name || "relative"}-${index}`} className="rounded-md border p-4">
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-                                    <div>
-                                        <p className="text-xs text-gray-500">Name</p>
-                                        <p className="font-medium">{relative.name || "—"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Father Name</p>
-                                        <p className="font-medium">{relative.fatherName || "—"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Relation</p>
-                                        <p className="font-medium">{relative.relation || "—"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Profession</p>
-                                        <p className="font-medium">{relative.profession || "—"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">CNIC</p>
-                                        <p className="font-medium">{relative.cnic || "—"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Contact</p>
-                                        <p className="font-medium">{relative.contact || "—"}</p>
-                                    </div>
+                                    <InfoField label="Name" value={relative.name} />
+                                    <InfoField label="Father Name" value={relative.fatherName} />
+                                    <InfoField label="Relation" value={relative.relation} />
+                                    <InfoField label="Profession" value={relative.profession} />
+                                    <InfoField label="CNIC" value={relative.cnic} />
+                                    <InfoField label="Contact" value={relative.contact} />
                                     <div className="md:col-span-2">
-                                        <p className="text-xs text-gray-500">Address</p>
-                                        <p className="font-medium">{relative.address || "—"}</p>
+                                        <InfoField label="Address" value={relative.address} />
                                     </div>
                                 </div>
                             </div>

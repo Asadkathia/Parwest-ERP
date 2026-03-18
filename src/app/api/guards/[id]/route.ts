@@ -74,6 +74,19 @@ export async function PUT(
             }
         }
 
+        // Parse previousEmployments JSON array if provided
+        type PreviousEmploymentEntry = { type?: string; isExService?: boolean; rank?: string; registrationNo?: string; unit?: string }
+        let parsedPreviousEmployments: PreviousEmploymentEntry[] = []
+        if (body.previousEmploymentsJson) {
+            try {
+                parsedPreviousEmployments = JSON.parse(String(body.previousEmploymentsJson))
+            } catch { /* ignore */ }
+        }
+        // Derive isExService + exServiceType from previousEmployments
+        const derivedIsExService = parsedPreviousEmployments.some((e) => e.isExService === true)
+        const primaryExService = parsedPreviousEmployments.find((e) => e.isExService === true)
+        const derivedExServiceType = primaryExService?.type ?? (derivedIsExService ? null : "CIVILIAN")
+
         // Parse bankAccounts JSON array if provided
         type BankAccountEntry = { bankName?: string; accountNumber?: string; accountType?: string; iban?: string; branchCode?: string; walletType?: string; isActive?: boolean }
         let parsedBankAccounts: BankAccountEntry[] = []
@@ -107,9 +120,13 @@ export async function PUT(
                 regionalOfficeId: body.regionalOfficeId || null,
                 joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
                 status: body.status || "PENDING",
-                isExService: body.isExService === "true" || body.isExService === true,
-                exServiceRank: body.exServiceRank || null,
+                isExService: parsedPreviousEmployments.length > 0 ? derivedIsExService : (body.isExService === "true" || body.isExService === true),
+                exServiceType: parsedPreviousEmployments.length > 0 ? derivedExServiceType : (body.exServiceType || null),
+                exServiceRank: primaryExService?.rank || body.exServiceRank || null,
+                exServiceRegistrationNo: primaryExService?.registrationNo || body.exServiceRegistrationNo || null,
+                exServiceUnit: primaryExService?.unit || body.exServiceUnit || null,
                 exServiceRegiment: body.exServiceRegiment || null,
+                previousEmploymentsJson: parsedPreviousEmployments.length > 0 ? JSON.stringify(parsedPreviousEmployments) : (body.previousEmploymentsJson || null),
                 bankName: activeAccount?.bankName || body.bankName || null,
                 bankAccountNumber: activeAccount?.accountNumber || body.bankAccountNumber || null,
                 bankAccountType: activeAccount?.accountType || body.bankAccountType || null,

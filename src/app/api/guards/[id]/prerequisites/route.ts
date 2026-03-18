@@ -33,6 +33,8 @@ export async function GET(
         docTypeId: dt.id,
         docTypeName: dt.name,
         isActive: dt.isActive,
+        docCategory: (dt as Record<string, unknown>).docCategory ?? "VERIFICATION",
+        isSystemGenerated: (dt as Record<string, unknown>).isSystemGenerated ?? false,
         prereqId: prereq?.id ?? null,
         status: prereq?.status ?? "PENDING",
         verificationStatus: prereq?.verificationStatus ?? null,
@@ -74,6 +76,31 @@ export async function POST(
     const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true } })
     if (!guard) return notFound("Guard not found")
 
+    const uploaderName = (session as Record<string, unknown> & { user?: { name?: string; email?: string } }).user?.name
+      ?? (session as Record<string, unknown> & { user?: { name?: string; email?: string } }).user?.email
+      ?? null
+
+    // If a previous record with a file exists, archive it to history before replacing
+    const existing = await prisma.guardPrerequisite.findUnique({
+      where: { guardId_docTypeName: { guardId, docTypeName } },
+      select: { id: true, attachmentData: true, attachmentName: true, documentUrl: true, verifiedBy: true, updatedAt: true },
+    })
+
+    if (existing && (existing.attachmentData || existing.documentUrl)) {
+      await (prisma.guardPrerequisiteHistory as unknown as {
+        create: (args: { data: Record<string, unknown> }) => Promise<unknown>
+      }).create({
+        data: {
+          prereqId: existing.id,
+          attachmentData: existing.attachmentData,
+          attachmentName: existing.attachmentName,
+          documentUrl: existing.documentUrl,
+          uploadedBy: existing.verifiedBy,
+          uploadedAt: existing.updatedAt,
+        },
+      })
+    }
+
     // Upsert: create or update the prerequisite record for this doc type
     const prereq = await prisma.guardPrerequisite.upsert({
       where: { guardId_docTypeName: { guardId, docTypeName } },
@@ -85,17 +112,18 @@ export async function POST(
         attachmentName: body.attachmentName ?? null,
         documentUrl: body.documentUrl ?? null,
         notes: body.notes ?? null,
+        verifiedBy: uploaderName, // used as uploadedBy for attachments
       },
       update: {
         attachmentData: body.attachmentData ?? undefined,
         attachmentName: body.attachmentName ?? undefined,
         documentUrl: body.documentUrl ?? undefined,
         notes: body.notes ?? undefined,
+        verifiedBy: uploaderName,
         // Reset verification when doc is re-uploaded
         status: "PENDING",
         verificationStatus: null,
         verifiedAt: null,
-        verifiedBy: null,
       },
     })
 

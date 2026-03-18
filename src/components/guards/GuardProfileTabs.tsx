@@ -91,7 +91,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "verification":
                 return <VerificationTab guardId={guard.id || ""} />
             case "pledged-docs":
-                return <PledgedDocumentsTab documents={guard.pledgedDocuments || []} />
+                return <PledgedDocumentsTab guardId={guard.id || ""} />
             case "bank-details":
                 return <BankDetailsTab bankDetails={guard.bankDetails || {}} />
             case "residence-history":

@@ -27,6 +27,7 @@ export default async function GuardsPage() {
     regionId: string | null
     regionalOfficeId: string | null
     supervisorName: string | null
+    regionalOfficeName: string | null
     photoUrl?: string | null
   }> = []
   let dbWarning = ""
@@ -39,6 +40,14 @@ export default async function GuardsPage() {
       prisma.guard.findMany({
         take: 20,
         orderBy: { createdAt: "desc" },
+        include: {
+          regionalOffice: { select: { name: true } },
+          supervisorAssignments: {
+            where: { status: "ACTIVE" },
+            take: 1,
+            include: { supervisor: { select: { name: true } } },
+          },
+        },
       }),
       prisma.guard.count(),
       prisma.guard.count({ where: { status: "ACTIVE" } }),
@@ -54,8 +63,9 @@ export default async function GuardsPage() {
       status: guard.status,
       regionId: guard.regionId || null,
       regionalOfficeId: guard.regionalOfficeId || null,
-      supervisorName: null,
-      photoUrl: null,
+      supervisorName: guard.supervisorAssignments?.[0]?.supervisor?.name ?? null,
+      regionalOfficeName: guard.regionalOffice?.name ?? null,
+      photoUrl: guard.photoUrl ?? null,
     }))
     stats.total = total
     stats.active = active
@@ -161,7 +171,7 @@ export default async function GuardsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.cnic}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.phone || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.supervisorName || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.regionId || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.regionalOfficeName || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip
                       label={guard.status}

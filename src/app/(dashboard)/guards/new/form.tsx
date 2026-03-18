@@ -134,10 +134,24 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const nearestCounterRef = useRef(1)
   const [contactRows, setContactRows] = useState([1])
   const contactCounterRef = useRef(2)
+  const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [joiningDate, setJoiningDate] = useState("")
   const [maritalStatus, setMaritalStatus] = useState("")
-  const [exServiceType, setExServiceType] = useState("ARMY")
+
+  // Dynamic ex-service types
+  const [exServiceTypeOptions, setExServiceTypeOptions] = useState<string[]>([])
+  type PreviousEmp = { type: string; isExService: boolean; registrationNo: string; rank: string; unit: string; dateOfEnrollment: string; dateOfDischarge: string; years: string; months: string; remarks: string }
+  const emptyEmp = (): PreviousEmp => ({ type: "", isExService: false, registrationNo: "", rank: "", unit: "", dateOfEnrollment: "", dateOfDischarge: "", years: "", months: "", remarks: "" })
+  const [prevEmployments, setPrevEmployments] = useState<PreviousEmp[]>([])
+  const empCounterRef = useRef(0)
+
+  useEffect(() => {
+    fetch("/api/guard-ex-service-types?activeOnly=true")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ name: string }>) => setExServiceTypeOptions(data.map((d) => d.name)))
+      .catch(() => setExServiceTypeOptions([]))
+  }, [])
   const ageValue = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth])
   const joiningAgeValue = useMemo(() => calculateAge(dateOfBirth, joiningDate), [dateOfBirth, joiningDate])
 
@@ -252,6 +266,10 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
     try {
       data.phone = contactNumbers[0]
       data.additionalContactNumbers = contactNumbers.slice(1).join(", ")
+      // Inject previousEmploymentsJson
+      if (prevEmployments.length > 0) {
+        data.previousEmploymentsJson = JSON.stringify(prevEmployments)
+      }
 
       const response = await fetch("/api/guards", {
         method: "POST",
@@ -348,7 +366,13 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Regional Office <span className="text-red-500">*</span>
               </label>
-              <select name="regionalOfficeId" required className="ui-input">
+              <select
+                name="regionalOfficeId"
+                required
+                className="ui-input"
+                value={selectedRegionalOfficeId}
+                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+              >
                 <option value="">Select regional office</option>
                 {regionalOffices.map((office) => (
                   <option key={`regionalOffice-${office.id}`} value={office.id}>
@@ -463,7 +487,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 ))}
               </select>
             </div>
-            <SupervisorSelector />
+            <SupervisorSelector regionalOfficeId={selectedRegionalOfficeId} />
             <Field label="Profile Introducer" name="profileIntroducer" placeholder="Profile Introducer" />
           </div>
         </CollapsibleSection>
@@ -485,42 +509,107 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           collapsed={collapsed.previousEmployment}
           onToggle={() => toggleSectionCollapse("previousEmployment")}
         >
-          <div className="mb-4 flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium text-[var(--text)]">ex</span>
-            {["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].map((option) => (
-              <label key={option} className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="exServiceType"
-                  value={option}
-                  checked={exServiceType === option}
-                  onChange={() => setExServiceType(option)}
-                  className="h-4 w-4 accent-[var(--brand)]"
-                />
-                <span>{option}</span>
-              </label>
-            ))}
-            {exServiceType === "OTHER" ? (
-              <input
-                type="text"
-                name="exServiceOtherLabel"
-                defaultValue="Civilian"
-                className="h-8 w-28 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white px-2 text-sm text-[var(--text)] outline-none focus:border-[var(--brand)] focus:ring-1 focus:ring-[var(--brand)]"
-                placeholder="Specify..."
-              />
-            ) : null}
-          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--text-muted)]">
+                If the guard is <strong>Civilian</strong>, leave this section empty.
+                Click &quot;Add Employment&quot; only for ex-servicemen.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = empCounterRef.current++
+                  setPrevEmployments((prev) => [...prev, { ...emptyEmp() }])
+                  void id
+                }}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-muted)]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Employment
+              </button>
+            </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="REGISTRATION NO" name="exServiceRegistrationNo" placeholder="Registration No" />
-            <Field label="RANK" name="exServiceRank" placeholder="Rank" />
-            <Field label="UNIT" name="exServiceUnit" placeholder="Unit" />
-            <Field label="SERVICE PERIOD" name="exServicePeriod" placeholder="Select Date of Enrollment & Date of Discharge" />
-            <Field label="YEARS" name="exServiceYears" type="number" placeholder="years" />
-            <Field label="MONTHS" name="exServiceMonths" type="number" placeholder="months" />
-            <Field label="DATE OF ENROLLMENT" name="dateOfEnrollment" type="date" />
-            <Field label="DATE OF DISCHARGE" name="dateOfDischarge" type="date" />
-            <Field label="REMARKS" name="exServiceRemarks" placeholder="Remarks" />
+            {prevEmployments.length === 0 && (
+              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-6 py-5 text-center text-sm text-[var(--text-muted)]">
+                No previous employment — guard will be treated as <strong>Civilian</strong>
+              </div>
+            )}
+
+            {prevEmployments.map((emp, idx) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[var(--text)]">Employment {idx + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => setPrevEmployments((prev) => prev.filter((_, i) => i !== idx))}
+                    className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </button>
+                </div>
+
+                {/* Type selection — only admin-configured ex-service types, no CIVILIAN */}
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Service Type <span className="text-red-500">*</span></label>
+                  <div className="flex flex-wrap gap-4">
+                    {exServiceTypeOptions.map((t) => (
+                      <label key={t} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          checked={emp.type === t}
+                          onChange={() => setPrevEmployments((prev) => prev.map((e, i) => i === idx ? { ...e, type: t, isExService: true } : e))}
+                          className="h-4 w-4 accent-[var(--brand)]"
+                        />
+                        {t}
+                      </label>
+                    ))}
+                    {exServiceTypeOptions.length === 0 && (
+                      <span className="text-xs text-[var(--text-muted)]">Loading types…</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Fields — only show when a type is selected */}
+                {emp.type && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REGISTRATION NO</label>
+                      <input type="text" className="ui-input" placeholder="Registration No" value={emp.registrationNo} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, registrationNo: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">RANK</label>
+                      <input type="text" className="ui-input" placeholder="Rank" value={emp.rank} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, rank: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">UNIT</label>
+                      <input type="text" className="ui-input" placeholder="Unit" value={emp.unit} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, unit: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF ENROLLMENT</label>
+                      <input type="date" className="ui-input" value={emp.dateOfEnrollment} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfEnrollment: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF DISCHARGE</label>
+                      <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
+                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
+                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
+                      </div>
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REMARKS</label>
+                      <input type="text" className="ui-input" placeholder="Remarks" value={emp.remarks} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, remarks: e.target.value } : p))} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </CollapsibleSection>
       ) : null}
@@ -834,95 +923,83 @@ function Field({
   )
 }
 
-function SupervisorSelector() {
+function SupervisorSelector({ regionalOfficeId }: { regionalOfficeId: string }) {
   const [query, setQuery] = useState("")
-  const [guards, setGuards] = useState<Array<{ id: string; name: string; parwestId: string }>>([])
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [selected, setSelected] = useState<{ id: string; name: string } | null>(null)
   const [open, setOpen] = useState(false)
   const [fetching, setFetching] = useState(false)
 
+  // Reset and refetch when regional office changes
+  useEffect(() => {
+    setSelected(null)
+    setQuery("")
+    setUsers([])
+    if (!regionalOfficeId) return
+    setFetching(true)
+    fetch(`/api/users?status=ACTIVE&regionalOfficeId=${regionalOfficeId}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ id: string; name: string; email: string }>) => setUsers(data))
+      .catch(() => setUsers([]))
+      .finally(() => setFetching(false))
+  }, [regionalOfficeId])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q
-      ? guards.filter(
-          (g) => g.name.toLowerCase().includes(q) || g.parwestId.toLowerCase().includes(q)
-        )
-      : guards.slice(0, 10)
-    return list
-  }, [query, guards])
-
-  const fetchGuards = async () => {
-    if (guards.length > 0) return
-    setFetching(true)
-    try {
-      const res = await fetch("/api/guards")
-      if (res.ok) {
-        const data = await res.json() as Array<{ id: string; name: string; parwestId?: string }>
-        setGuards(data.map((g) => ({ id: g.id, name: g.name, parwestId: g.parwestId || "" })))
-      }
-    } finally {
-      setFetching(false)
-    }
-  }
+    return q
+      ? users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      : users.slice(0, 15)
+  }, [query, users])
 
   return (
     <div className="relative">
       <label className="mb-2 block text-sm font-medium text-gray-700">Supervisor</label>
       <input type="hidden" name="supervisorId" value={selected?.id || ""} />
       <input type="hidden" name="managerName" value={selected?.name || ""} />
-      <div className="relative">
-        <input
-          type="text"
-          className="ui-input pr-8"
-          placeholder="Search supervisor by name or ID..."
-          value={selected ? selected.name : query}
-          onChange={(e) => {
-            setSelected(null)
-            setQuery(e.target.value)
-          }}
-          onFocus={() => {
-            setOpen(true)
-            fetchGuards()
-          }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          autoComplete="off"
-        />
-        {selected && (
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-600 text-base leading-none"
-            onClick={() => { setSelected(null); setQuery("") }}
-            tabIndex={-1}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-      {open && !selected && (
-        <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-60 overflow-y-auto">
-          {fetching && (
-            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Loading supervisors...</p>
+      {!regionalOfficeId ? (
+        <div className="ui-input bg-gray-50 text-gray-400 text-sm cursor-not-allowed">
+          Select a regional office first
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            type="text"
+            className="ui-input pr-8"
+            placeholder={fetching ? "Loading supervisors..." : "Search supervisor by name..."}
+            value={selected ? selected.name : query}
+            onChange={(e) => { setSelected(null); setQuery(e.target.value) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            autoComplete="off"
+            disabled={fetching}
+          />
+          {selected && (
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-600"
+              onClick={() => { setSelected(null); setQuery("") }}
+              tabIndex={-1}
+            >✕</button>
           )}
+        </div>
+      )}
+      {open && !selected && regionalOfficeId && (
+        <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-60 overflow-y-auto">
+          {fetching && <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Loading...</p>}
           {!fetching && filtered.length === 0 && (
             <p className="px-3 py-2 text-sm text-[var(--text-muted)]">
-              {query ? "No matching guards found" : "No guards in system"}
+              {query ? "No matching supervisors" : "No supervisors in this office"}
             </p>
           )}
-          {filtered.map((g) => (
+          {filtered.map((u) => (
             <button
-              key={g.id}
+              key={u.id}
               type="button"
               className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)] flex items-center justify-between gap-2"
-              onMouseDown={() => {
-                setSelected({ id: g.id, name: g.name })
-                setQuery("")
-                setOpen(false)
-              }}
+              onMouseDown={() => { setSelected({ id: u.id, name: u.name }); setQuery(""); setOpen(false) }}
             >
-              <span className="font-medium text-[var(--text)]">{g.name}</span>
-              {g.parwestId && (
-                <span className="text-xs text-[var(--text-muted)] shrink-0">{g.parwestId}</span>
-              )}
+              <span className="font-medium text-[var(--text)]">{u.name}</span>
+              <span className="text-xs text-[var(--text-muted)] shrink-0">{u.email}</span>
             </button>
           ))}
         </div>

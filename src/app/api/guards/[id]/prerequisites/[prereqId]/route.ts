@@ -60,6 +60,37 @@ export async function PATCH(
       data,
     })
 
+    // Auto-update guard status based on VERIFICATION doc completion
+    try {
+      const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true } })
+      if (guard && (guard.status === "PENDING" || guard.status === "ACTIVE")) {
+        // Get all active VERIFICATION type doc types
+        const verificationDocTypes = await prisma.guardDocumentType.findMany({
+          where: { isActive: true, docCategory: "VERIFICATION" },
+          select: { name: true },
+        })
+        if (verificationDocTypes.length > 0) {
+          const verificationNames = verificationDocTypes.map((dt) => dt.name)
+          // Get guard's prerequisite records for these doc types
+          const guardVerifPrereqs = await prisma.guardPrerequisite.findMany({
+            where: { guardId, docTypeName: { in: verificationNames } },
+            select: { status: true, attachmentData: true, documentUrl: true },
+          })
+          const allVerified =
+            guardVerifPrereqs.length === verificationNames.length &&
+            guardVerifPrereqs.every((p) => p.status === "VERIFIED")
+
+          if (allVerified && guard.status === "PENDING") {
+            await prisma.guard.update({ where: { id: guardId }, data: { status: "ACTIVE" } })
+          } else if (!allVerified && guard.status === "ACTIVE") {
+            await prisma.guard.update({ where: { id: guardId }, data: { status: "PENDING" } })
+          }
+        }
+      }
+    } catch {
+      // Non-critical: don't fail the request if status update fails
+    }
+
     return NextResponse.json(updated)
   } catch (error) {
     console.error("PATCH /api/guards/[id]/prerequisites/[prereqId]:", error)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FileText, Eye, Download, Lock, ShieldCheck } from "lucide-react"
+import { FileText, Eye, Download, ShieldCheck } from "lucide-react"
 import type { GuardTabModel } from "@/components/guards/tabs/types"
 
 interface PBADocumentsTabProps {
@@ -567,38 +567,51 @@ const PBA_DOCS = [
         id: "SA05",
         title: "Particulars & Documents",
         subtitle: "Guards / Supervisors — PBA Records",
-        accent: "#0d9488",          // teal-600
-        accentLight: "#f0fdfa",     // teal-50
-        accentBorder: "#99f6e4",    // teal-200
-        iconBg: "#ccfbf1",          // teal-100
-        activeOnly: false,
+        accent: "#0d9488",
+        accentLight: "#f0fdfa",
+        accentBorder: "#99f6e4",
+        iconBg: "#ccfbf1",
+        visibility: "all" as const,
     },
     {
         id: "SA10",
         title: "Ex-Servicemen Particulars",
         subtitle: "Armed / Para Military Forces — PBA Records",
-        accent: "#059669",          // emerald-600
-        accentLight: "#f0fdf4",     // emerald-50
-        accentBorder: "#a7f3d0",    // emerald-200
-        iconBg: "#d1fae5",          // emerald-100
-        activeOnly: true,
+        accent: "#059669",
+        accentLight: "#f0fdf4",
+        accentBorder: "#a7f3d0",
+        iconBg: "#d1fae5",
+        visibility: "exservice" as const,   // only for ex-servicemen
     },
     {
         id: "SA11",
         title: "Verification Status",
         subtitle: "Guard Particulars — PBA Records",
-        accent: "#7c3aed",          // violet-700
-        accentLight: "#f5f3ff",     // violet-50
-        accentBorder: "#ddd6fe",    // violet-200
-        iconBg: "#ede9fe",          // violet-100
-        activeOnly: false,
+        accent: "#7c3aed",
+        accentLight: "#f5f3ff",
+        accentBorder: "#ddd6fe",
+        iconBg: "#ede9fe",
+        visibility: "civilian" as const,    // only for civilians
     },
 ]
+
+// Determine if a guard is ex-service from any source
+function isExServiceGuard(guard: GuardTabModel & { id?: string }): boolean {
+    // Check new previousEmployments JSON
+    const prevEmps = (guard as Record<string, unknown>).previousEmployments
+    if (Array.isArray(prevEmps) && prevEmps.length > 0) {
+        return prevEmps.some((e: Record<string, unknown>) => e.isExService === true)
+    }
+    // Fall back to legacy fields
+    if (guard.isExService) return true
+    if (guard.exServiceType && guard.exServiceType !== "CIVILIAN") return true
+    return false
+}
 
 // ── main component ────────────────────────────────────────────────────────────
 export default function PBADocumentsTab({ guard }: PBADocumentsTabProps) {
     const [loading, setLoading] = useState<string | null>(null)
-    const isActive = guard.status === "ACTIVE"
+    const exService = isExServiceGuard(guard)
 
     const openDoc = (docId: string, triggerPrint: boolean) => {
         let html = ""
@@ -630,21 +643,26 @@ export default function PBADocumentsTab({ guard }: PBADocumentsTabProps) {
                 </div>
             </div>
 
-            {/* SA-10 locked banner */}
-            {!isActive && (
-                <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-                    <Lock className="h-4 w-4 shrink-0" />
-                    <span>
-                        <strong>SA-10</strong> is restricted to <strong>ACTIVE</strong> guards only.
-                        Current status: <span className="rounded-full bg-orange-100 px-2 py-0.5 font-semibold">{guard.status || "PENDING"}</span>
-                    </span>
-                </div>
-            )}
+            {/* Guard type info banner */}
+            <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
+                exService
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-violet-200 bg-violet-50 text-violet-700"
+            }`}>
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                <span>
+                    Guard type: <strong>{exService ? "Ex-Serviceman" : "Civilian"}</strong>.
+                    {exService ? " SA-05 + SA-10 are applicable." : " SA-05 + SA-11 are applicable."}
+                </span>
+            </div>
 
             {/* Document cards */}
             <div className="grid gap-4 sm:grid-cols-3">
                 {PBA_DOCS.map((doc) => {
-                    const locked = doc.activeOnly && !isActive
+                    // Visibility: all = always show; exservice = only ex-service; civilian = only civilian
+                    if (doc.visibility === "exservice" && !exService) return null
+                    if (doc.visibility === "civilian" && exService) return null
+
                     const isViewLoading = loading === `${doc.id}-view`
                     const isDlLoading   = loading === `${doc.id}-dl`
 
@@ -653,16 +671,12 @@ export default function PBADocumentsTab({ guard }: PBADocumentsTabProps) {
                             key={doc.id}
                             className="relative flex flex-col rounded-xl border bg-white overflow-hidden transition-shadow"
                             style={{
-                                borderColor: locked ? "#e5e7eb" : doc.accentBorder,
-                                boxShadow: locked ? "none" : `0 1px 8px 0 ${doc.accentBorder}88`,
-                                opacity: locked ? 0.65 : 1,
+                                borderColor: doc.accentBorder,
+                                boxShadow: `0 1px 8px 0 ${doc.accentBorder}88`,
                             }}
                         >
                             {/* Colour accent strip */}
-                            <div
-                                className="h-1.5 w-full"
-                                style={{ background: locked ? "#d1d5db" : doc.accent }}
-                            />
+                            <div className="h-1.5 w-full" style={{ background: doc.accent }} />
 
                             {/* Card body */}
                             <div className="flex flex-col gap-3 p-5">
@@ -670,19 +684,16 @@ export default function PBADocumentsTab({ guard }: PBADocumentsTabProps) {
                                 <div className="flex items-start justify-between">
                                     <div
                                         className="flex h-11 w-11 items-center justify-center rounded-xl"
-                                        style={{ background: locked ? "#f3f4f6" : doc.iconBg }}
+                                        style={{ background: doc.iconBg }}
                                     >
-                                        <FileText
-                                            className="h-5 w-5"
-                                            style={{ color: locked ? "#9ca3af" : doc.accent }}
-                                        />
+                                        <FileText className="h-5 w-5" style={{ color: doc.accent }} />
                                     </div>
                                     <span
                                         className="rounded-md px-2 py-0.5 text-xs font-bold tracking-wide"
                                         style={{
-                                            background: locked ? "#f3f4f6" : doc.accentLight,
-                                            color: locked ? "#9ca3af" : doc.accent,
-                                            border: `1px solid ${locked ? "#e5e7eb" : doc.accentBorder}`,
+                                            background: doc.accentLight,
+                                            color: doc.accent,
+                                            border: `1px solid ${doc.accentBorder}`,
                                         }}
                                     >
                                         PBA-{doc.id}
@@ -691,46 +702,31 @@ export default function PBADocumentsTab({ guard }: PBADocumentsTabProps) {
 
                                 {/* Title */}
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-800 leading-snug">
-                                        {doc.title}
-                                    </p>
-                                    <p className="mt-0.5 text-[11px] text-gray-400 leading-snug">
-                                        {doc.subtitle}
-                                    </p>
+                                    <p className="text-sm font-semibold text-gray-800 leading-snug">{doc.title}</p>
+                                    <p className="mt-0.5 text-[11px] text-gray-400 leading-snug">{doc.subtitle}</p>
                                 </div>
 
-                                {/* Lock notice OR action buttons */}
-                                {locked ? (
-                                    <div className="flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-400 border border-gray-200">
-                                        <Lock className="h-3.5 w-3.5 shrink-0" />
-                                        Available for ACTIVE guards only
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-2 pt-1">
-                                        <button
-                                            onClick={() => openDoc(doc.id, false)}
-                                            disabled={isViewLoading || isDlLoading}
-                                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50"
-                                            style={{
-                                                borderColor: doc.accentBorder,
-                                                color: doc.accent,
-                                                background: doc.accentLight,
-                                            }}
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                            {isViewLoading ? "Opening…" : "View"}
-                                        </button>
-                                        <button
-                                            onClick={() => openDoc(doc.id, true)}
-                                            disabled={isViewLoading || isDlLoading}
-                                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white transition-opacity disabled:opacity-50"
-                                            style={{ background: doc.accent }}
-                                        >
-                                            <Download className="h-3.5 w-3.5" />
-                                            {isDlLoading ? "Opening…" : "Download"}
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Action buttons */}
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        onClick={() => openDoc(doc.id, false)}
+                                        disabled={isViewLoading || isDlLoading}
+                                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                                        style={{ borderColor: doc.accentBorder, color: doc.accent, background: doc.accentLight }}
+                                    >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        {isViewLoading ? "Opening…" : "View"}
+                                    </button>
+                                    <button
+                                        onClick={() => openDoc(doc.id, true)}
+                                        disabled={isViewLoading || isDlLoading}
+                                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white transition-opacity disabled:opacity-50"
+                                        style={{ background: doc.accent }}
+                                    >
+                                        <Download className="h-3.5 w-3.5" />
+                                        {isDlLoading ? "Opening…" : "Download"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )

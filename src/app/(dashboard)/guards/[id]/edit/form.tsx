@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -8,6 +8,19 @@ import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import type { NearestRelative } from "@/components/guards/tabs/types"
+
+type PreviousEmployment = {
+    type: string           // ex-service type name or "CIVILIAN"
+    isExService: boolean
+    registrationNo?: string
+    rank?: string
+    unit?: string
+    dateOfEnrollment?: string
+    dateOfDischarge?: string
+    years?: string
+    months?: string
+    remarks?: string
+}
 
 type Guard = {
     id: string
@@ -31,6 +44,7 @@ type Guard = {
     emergencyContact: string | null
     additionalContactNumbers: string | null
     nearestRelativesJson: string | null
+    previousEmploymentsJson?: string | null
     regionId: string | null
     regionalOfficeId: string | null
     joiningDate: Date | null
@@ -57,18 +71,157 @@ type RegionalOffice = {
     region: Region
 }
 
-type Supervisor = {
-    id: string
-    name: string
-    email: string
-}
-
 type Props = {
     guard: Guard
     regions: Region[]
     regionalOffices: RegionalOffice[]
-    supervisors: Supervisor[]
     currentSupervisorId: string | null
+}
+
+const emptyEmployment = (): PreviousEmployment => ({
+    type: "CIVILIAN",
+    isExService: false,
+    registrationNo: "",
+    rank: "",
+    unit: "",
+    dateOfEnrollment: "",
+    dateOfDischarge: "",
+    years: "",
+    months: "",
+    remarks: "",
+})
+
+function PreviousEmploymentEditor({ defaultJson }: { defaultJson: string | null | undefined }) {
+    const [employments, setEmployments] = useState<PreviousEmployment[]>(() => {
+        if (!defaultJson) return []
+        try {
+            const parsed = JSON.parse(defaultJson)
+            return Array.isArray(parsed) ? parsed : []
+        } catch { return [] }
+    })
+    const [exServiceTypes, setExServiceTypes] = useState<string[]>([])
+
+    useEffect(() => {
+        fetch("/api/guard-ex-service-types?activeOnly=true")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: Array<{ name: string }>) => setExServiceTypes(data.map((d) => d.name)))
+            .catch(() => setExServiceTypes([]))
+    }, [])
+
+    const addEntry = () => setEmployments((prev) => [...prev, emptyEmployment()])
+    const removeEntry = (i: number) => setEmployments((prev) => prev.filter((_, idx) => idx !== i))
+    const updateEntry = (i: number, patch: Partial<PreviousEmployment>) =>
+        setEmployments((prev) => prev.map((e, idx) => (idx === i ? { ...e, ...patch } : e)))
+
+    const handleTypeChange = (i: number, value: string) => {
+        const isExService = value !== "CIVILIAN"
+        updateEntry(i, { type: value, isExService })
+    }
+
+    return (
+        <section className="space-y-3">
+            <input type="hidden" name="previousEmploymentsJson" value={JSON.stringify(employments)} />
+            <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-800">Previous Employment Details</h3>
+                <button
+                    type="button"
+                    onClick={addEntry}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50"
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Employment
+                </button>
+            </div>
+
+            {employments.length === 0 && (
+                <p className="text-sm text-gray-500 italic">No previous employment added. If civilian, leave empty. Click &quot;Add Employment&quot; to add ex-service details.</p>
+            )}
+
+            <div className="space-y-4">
+                {employments.map((emp, idx) => (
+                    <div key={idx} className="rounded-md border p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-gray-700">Employment {idx + 1}</p>
+                            <button
+                                type="button"
+                                onClick={() => removeEntry(idx)}
+                                className="text-sm text-red-600 hover:underline flex items-center gap-1"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" /> Remove
+                            </button>
+                        </div>
+
+                        {/* Type selection */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-2">Service Type</label>
+                            <div className="flex flex-wrap gap-3">
+                                {exServiceTypes.map((t) => (
+                                    <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            checked={emp.type === t}
+                                            onChange={() => handleTypeChange(idx, t)}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm">{t}</span>
+                                    </label>
+                                ))}
+                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        checked={emp.type === "CIVILIAN"}
+                                        onChange={() => handleTypeChange(idx, "CIVILIAN")}
+                                        className="w-4 h-4 text-blue-600"
+                                    />
+                                    <span className="text-sm">CIVILIAN</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Ex-service fields (only when not civilian) */}
+                        {emp.isExService && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Registration No</label>
+                                    <input type="text" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Registration No" value={emp.registrationNo || ""} onChange={(e) => updateEntry(idx, { registrationNo: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Rank</label>
+                                    <input type="text" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Rank" value={emp.rank || ""} onChange={(e) => updateEntry(idx, { rank: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+                                    <input type="text" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Unit" value={emp.unit || ""} onChange={(e) => updateEntry(idx, { unit: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Date of Enrollment</label>
+                                    <input type="date" className="w-full px-3 py-1.5 border rounded-md text-sm" value={emp.dateOfEnrollment || ""} onChange={(e) => updateEntry(idx, { dateOfEnrollment: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Date of Discharge</label>
+                                    <input type="date" className="w-full px-3 py-1.5 border rounded-md text-sm" value={emp.dateOfDischarge || ""} onChange={(e) => updateEntry(idx, { dateOfDischarge: e.target.value })} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Years</label>
+                                        <input type="number" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Years" value={emp.years || ""} onChange={(e) => updateEntry(idx, { years: e.target.value })} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Months</label>
+                                        <input type="number" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Months" value={emp.months || ""} onChange={(e) => updateEntry(idx, { months: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Remarks</label>
+                                    <input type="text" className="w-full px-3 py-1.5 border rounded-md text-sm" placeholder="Remarks" value={emp.remarks || ""} onChange={(e) => updateEntry(idx, { remarks: e.target.value })} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </section>
+    )
 }
 
 const emptyRelative = (): NearestRelative => ({
@@ -219,11 +372,26 @@ function NearestRelativesEditor({
     )
 }
 
-export default function GuardEditForm({ guard, regions, regionalOffices, supervisors, currentSupervisorId }: Props) {
+export default function GuardEditForm({ guard, regions, regionalOffices, currentSupervisorId }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+
+    // Dynamic supervisor list based on selected regional office
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(guard.regionalOfficeId || "")
+    const [supervisors, setSupervisors] = useState<Array<{ id: string; name: string; email: string }>>([])
+    const [supervisorsLoading, setSupervisorsLoading] = useState(false)
+
+    useEffect(() => {
+        if (!selectedRegionalOfficeId) { setSupervisors([]); return }
+        setSupervisorsLoading(true)
+        fetch(`/api/users?status=ACTIVE&regionalOfficeId=${selectedRegionalOfficeId}`)
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: Array<{ id: string; name: string; email: string }>) => setSupervisors(data))
+            .catch(() => setSupervisors([]))
+            .finally(() => setSupervisorsLoading(false))
+    }, [selectedRegionalOfficeId])
 
     const formatDateForInput = (date: Date | null) => {
         if (!date) return ""
@@ -593,7 +761,8 @@ export default function GuardEditForm({ guard, regions, regionalOffices, supervi
                             </label>
                             <select
                                 name="regionalOfficeId"
-                                defaultValue={guard.regionalOfficeId || ""}
+                                value={selectedRegionalOfficeId}
+                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
                                 className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="">Select office</option>
@@ -661,9 +830,12 @@ export default function GuardEditForm({ guard, regions, regionalOffices, supervi
                             <select
                                 name="supervisorId"
                                 defaultValue={currentSupervisorId || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                disabled={!selectedRegionalOfficeId || supervisorsLoading}
+                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
                             >
-                                <option value="">— No Supervisor —</option>
+                                <option value="">
+                                    {supervisorsLoading ? "Loading supervisors..." : !selectedRegionalOfficeId ? "— Select office first —" : "— No Supervisor —"}
+                                </option>
                                 {supervisors.map((s) => (
                                     <option key={s.id} value={s.id}>
                                         {s.name} ({s.email})
@@ -674,49 +846,10 @@ export default function GuardEditForm({ guard, regions, regionalOffices, supervi
                     </div>
                 </div>
 
-                {/* Ex-Service Information */}
+                {/* Previous Employment / Ex-Service Information */}
                 <div>
-                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Ex-Service Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name="isExService"
-                                    value="true"
-                                    defaultChecked={guard.isExService}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="text-sm font-medium text-gray-700">Ex-Service Personnel</span>
-                            </label>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Rank
-                            </label>
-                            <input
-                                type="text"
-                                name="exServiceRank"
-                                defaultValue={guard.exServiceRank || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="e.g., Sepoy, Naik, Havildar"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Regiment
-                            </label>
-                            <input
-                                type="text"
-                                name="exServiceRegiment"
-                                defaultValue={guard.exServiceRegiment || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="e.g., Punjab Regiment"
-                            />
-                        </div>
-                    </div>
+                    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Previous Employment Details</h2>
+                    <PreviousEmploymentEditor defaultJson={guard.previousEmploymentsJson ?? null} />
                 </div>
 
                 {/* Banking Information */}

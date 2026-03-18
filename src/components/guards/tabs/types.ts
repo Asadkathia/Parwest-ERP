@@ -32,8 +32,20 @@ export type NearestRelative = {
   relation?: string
   profession?: string
   cnic?: string
+  cnicIssueDate?: string
   contact?: string
   address?: string
+}
+
+export type FamilyMember = {
+  name?: string
+  relation?: string
+  age?: string
+  profession?: string
+  address?: string
+  childCnic?: string
+  childAge?: string
+  childDob?: string
 }
 
 export type GuardTabModel = {
@@ -67,6 +79,53 @@ export type GuardTabModel = {
   joiningAge?: number | null
   isExService?: boolean
   nearestRelatives?: NearestRelative[]
+  // General extras
+  sect?: string | null
+  cast?: string | null
+  bloodGroup?: string | null
+  policeStation?: string | null
+  cnicIssueDate?: string | Date | null
+  cnicExpiryDate?: string | Date | null
+  salary?: number | null
+  designation?: string | null
+  // Previous employment
+  exServiceType?: string | null
+  exServiceRank?: string | null
+  exServiceRegiment?: string | null
+  exServiceRegistrationNo?: string | null
+  exServiceUnit?: string | null
+  exServicePeriod?: string | null
+  exServiceYears?: number | null
+  exServiceMonths?: number | null
+  exServiceOtherLabel?: string | null
+  dateOfEnrollment?: string | Date | null
+  dateOfDischarge?: string | Date | null
+  exServiceRemarks?: string | null
+  // Address contacts
+  currentAddressContact?: string | null
+  permanentAddressContact?: string | null
+  // Education extras
+  passingYear?: string | null
+  educationInstitute?: string | null
+  // Introducer
+  introducerName?: string | null
+  introducerCnic?: string | null
+  introducerAddress?: string | null
+  introducerContact?: string | null
+  // Physical
+  height?: string | null
+  weight?: string | null
+  eyeColor?: string | null
+  hairColor?: string | null
+  disability?: string | null
+  identificationMark?: string | null
+  // Previous employments (new multi-entry)
+  previousEmployments?: Array<{ type?: string; isExService?: boolean; rank?: string; registrationNo?: string; unit?: string }>
+  // Family
+  familyMembers?: FamilyMember[]
+  // Age approval
+  ageApprovalRequired?: boolean
+  ageApprovalStatus?: string | null
   attachments?: GuardLooseRow[]
   attendance?: AttendanceRecord[]
   attendanceSummary?: AttendanceSummary

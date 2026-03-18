@@ -222,6 +222,59 @@ model Guard {
   additionalContactNumbers String?
   nearestRelativesJson     String? // JSON array of NearestRelative objects
   photoUrl                 String? // base64 data URL or external image URL
+
+  // General info extras
+  sect                     String?
+  cast                     String?
+  bloodGroup               String?
+  policeStation            String?
+  cnicIssueDate            DateTime?
+  cnicExpiryDate           DateTime?
+  salary                   Float?
+  designation              String?
+  joiningAge               Int?
+  enrolledBy               String?
+
+  // Previous employment details
+  exServiceType            String?   // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
+  exServiceRegistrationNo  String?
+  exServiceUnit            String?
+  exServicePeriod          String?
+  exServiceYears           Int?
+  exServiceMonths          Int?
+  exServiceOtherLabel      String?
+  dateOfEnrollment         DateTime?
+  dateOfDischarge          DateTime?
+  exServiceRemarks         String?
+
+  // Address contacts
+  currentAddressContact    String?
+  permanentAddressContact  String?
+
+  // Education extras
+  passingYear              String?
+  educationInstitute       String?
+
+  // Introducer
+  introducerName           String?
+  introducerCnic           String?
+  introducerAddress        String?
+  introducerContact        String?
+
+  // Physical details
+  height                   String?
+  weight                   String?
+  eyeColor                 String?
+  hairColor                String?
+  disability               String?
+  identificationMark       String?
+
+  // Family members
+  familyMembersJson        String? // JSON array of family member objects
+
+  // Previous employment (multiple entries)
+  previousEmploymentsJson  String? // JSON array of PreviousEmployment objects
+
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
@@ -231,7 +284,8 @@ model Guard {
   regionId         String?
   region           Region?         @relation(fields: [regionId], references: [id])
 
-  prerequisites         GuardPrerequisite[]
+  prerequisites              GuardPrerequisite[]
+  pledgedDocumentRecords     GuardPledgedDocumentRecord[]
   deployments           Deployment[]
   payrolls              Payroll[]
   loans                 Loan[]
@@ -240,9 +294,39 @@ model Guard {
   residenceAssignment   ResidenceAssignment?
   trainings             Training[]
   supervisorAssignments GuardSupervisorAssignment[]
+  ageApproval           GuardAgeApproval?
+
+  // Age approval flags
+  ageApprovalRequired Boolean  @default(false)
+  ageApprovalStatus   String?  // PENDING | APPROVED | REJECTED
 
   @@index([parwestId])
   @@index([cnic])
+  @@index([status])
+}
+
+// Singleton config for guard age limits
+model GuardAgeConfig {
+  id     String @id @default(cuid())
+  minAge Int    @default(18)
+  maxAge Int    @default(45)
+}
+
+// Approval request when a guard is over/underage
+model GuardAgeApproval {
+  id          String    @id @default(cuid())
+  guardId     String    @unique
+  guard       Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  guardAge    Int
+  reason      String    // OVERAGE | UNDERAGE
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  requestedBy String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([status])
 }
 
@@ -282,12 +366,14 @@ model DeploymentRate {
 }
 
 model GuardDocumentType {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String   @unique
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  docCategory      String   @default("VERIFICATION") // VERIFICATION | ATTACHMENT
+  isSystemGenerated Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model GuardPrerequisite {
@@ -308,9 +394,24 @@ model GuardPrerequisite {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  history            GuardPrerequisiteHistory[]
+
   @@unique([guardId, docTypeName])
   @@index([guardId])
   @@index([docTypeName])
+}
+
+model GuardPrerequisiteHistory {
+  id             String            @id @default(cuid())
+  prereqId       String
+  prereq         GuardPrerequisite @relation(fields: [prereqId], references: [id], onDelete: Cascade)
+  attachmentData String?           // base64 of archived file
+  attachmentName String?
+  documentUrl    String?
+  uploadedBy     String?
+  uploadedAt     DateTime          @default(now())
+
+  @@index([prereqId])
 }
 
 model Deployment {
@@ -1279,4 +1380,32 @@ model GuardPledgeableDocument {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model GuardPledgedDocumentRecord {
+  id               String    @id @default(cuid())
+  guardId          String
+  guard            Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  documentTypeName String
+  receivedBy       String?
+  receivedAt       DateTime  @default(now())
+  returnedBy       String?
+  returnedAt       DateTime?
+  status           String    @default("HELD") // HELD | RETURNED
+  attachmentData   String?
+  attachmentName   String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([guardId])
+}
+
+model GuardExServiceType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

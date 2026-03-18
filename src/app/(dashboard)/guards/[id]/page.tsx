@@ -2,10 +2,11 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
-import { ArrowLeft, Edit } from "lucide-react"
+import { ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import GuardProfileHealth from "@/components/guards/GuardProfileHealth"
+import MentalHealthBadge from "@/components/guards/MentalHealthBadge"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
@@ -103,6 +104,14 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         notFound()
     }
 
+    const parseJson = (raw: unknown): unknown[] => {
+        try {
+            if (typeof raw === "string" && raw) return JSON.parse(raw)
+        } catch { /* ignore */ }
+        return Array.isArray(raw) ? raw : []
+    }
+
+    const g = guard as Record<string, unknown>
     const guardWithTabs = {
         ...guard,
         regionalOffice: guard.regionalOffice?.name || null,
@@ -110,13 +119,17 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         joiningAge: guard.joiningAge ?? calculateAge(guard.dateOfBirth ?? null, guard.joiningDate ?? null) ?? null,
         enrolledBy: guard.enrolledBy || "—",
         profileIntroducer: guard.profileIntroducer || "—",
-        nearestRelatives: (() => {
-            try {
-                const raw = (guard as Record<string, unknown>).nearestRelativesJson
-                if (typeof raw === "string" && raw) return JSON.parse(raw)
-            } catch { /* ignore */ }
-            return (guard as Record<string, unknown>).nearestRelatives || []
-        })(),
+        nearestRelatives: parseJson(g.nearestRelativesJson),
+        familyMembers: parseJson(g.familyMembersJson),
+        previousEmployments: parseJson(g.previousEmploymentsJson),
+        bankDetails: {
+            bankName: g.bankName as string | null,
+            accountNumber: g.bankAccountNumber as string | null,
+            accountType: g.bankAccountType as string | null,
+            iban: g.bankIban as string | null,
+            branchCode: g.bankBranchCode as string | null,
+            bankAccountsJson: g.bankAccountsJson as string | null,
+        },
     }
 
     const getStatusColor = (status: string) => {
@@ -164,13 +177,39 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                         <h1 className="text-3xl font-bold">{guard.name}</h1>
                         <p className="text-gray-600 mt-1">Parwest ID: {guard.parwestId}</p>
                         <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.managerName || "—"}</p>
+                        {/* Age approval flag */}
+                        {(guard as Record<string, unknown>).ageApprovalRequired && (
+                            <div className="mt-2">
+                                {(guard as Record<string, unknown>).ageApprovalStatus === "PENDING" && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 border border-orange-200">
+                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                        Age Approval Pending
+                                    </span>
+                                )}
+                                {(guard as Record<string, unknown>).ageApprovalStatus === "APPROVED" && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800 border border-green-200">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        Age Exception Approved
+                                    </span>
+                                )}
+                                {(guard as Record<string, unknown>).ageApprovalStatus === "REJECTED" && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 border border-red-200">
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        Age Exception Rejected
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <div className="mt-4">
                             <GuardProfileHealth guard={guardWithTabs} />
                         </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
-                        {guard.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
+                            {guard.status}
+                        </span>
+                        <MentalHealthBadge guardId={guard.id} />
+                    </div>
                 </div>
             </div>
             <ProfileImageCard guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl ?? null} />

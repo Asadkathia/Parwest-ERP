@@ -30,6 +30,11 @@ export async function PATCH(
     }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive)
     if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder)
+    if (body.docCategory !== undefined) {
+      if (!["VERIFICATION", "ATTACHMENT"].includes(body.docCategory))
+        return badRequest("Invalid docCategory. Must be VERIFICATION or ATTACHMENT")
+      data.docCategory = body.docCategory
+    }
 
     const updated = await prisma.guardDocumentType.update({ where: { id }, data })
     return NextResponse.json(updated)

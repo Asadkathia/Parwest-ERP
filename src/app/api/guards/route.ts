@@ -170,44 +170,194 @@ export async function POST(request: NextRequest) {
         }
         const activeAccount = parsedBankAccounts.find((a) => a.isActive) ?? parsedBankAccounts[0] ?? null
 
+        // Build nearest relatives JSON from nearest_X_* fields
+        const nearestRelatives: Record<string, string>[] = []
+        const nearestIndexes = new Set<string>()
+        for (const key of Object.keys(body)) {
+            const m = key.match(/^nearest_(\d+)_/)
+            if (m) nearestIndexes.add(m[1])
+        }
+        for (const idx of Array.from(nearestIndexes).sort()) {
+            const rel: Record<string, string> = {}
+            for (const field of ["name","fatherName","relation","profession","cnic","cnicIssueDate","contact","address"]) {
+                const v = String(body[`nearest_${idx}_${field}`] || "").trim()
+                if (v) rel[field] = v
+            }
+            if (Object.keys(rel).length > 0) nearestRelatives.push(rel)
+        }
+
+        // Build family members JSON from family_X_* fields
+        const familyMembers: Record<string, string>[] = []
+        const familyIndexes = new Set<string>()
+        for (const key of Object.keys(body)) {
+            const m = key.match(/^family_(\d+)_/)
+            if (m) familyIndexes.add(m[1])
+        }
+        for (const idx of Array.from(familyIndexes).sort()) {
+            const member: Record<string, string> = {}
+            for (const field of ["name","relation","age","profession","address","childCnic","childAge","childDob"]) {
+                const v = String(body[`family_${idx}_${field}`] || "").trim()
+                if (v) member[field] = v
+            }
+            if (Object.keys(member).length > 0) familyMembers.push(member)
+        }
+
+        const str = (v: unknown) => (v ? String(v).trim() || null : null)
+        const num = (v: unknown) => { const n = parseInt(String(v || "")); return Number.isFinite(n) ? n : null }
+        const flt = (v: unknown) => { const n = parseFloat(String(v || "")); return Number.isFinite(n) ? n : null }
+        const dt  = (v: unknown) => { if (!v || !String(v).trim()) return null; const d = new Date(String(v)); return Number.isNaN(d.getTime()) ? null : d }
+
+        // Parse previousEmploymentsJson if provided (new multi-entry format)
+        type PrevEmpEntry = { type?: string; isExService?: boolean; rank?: string; registrationNo?: string; unit?: string; years?: string; months?: string; dateOfEnrollment?: string; dateOfDischarge?: string; remarks?: string }
+        let parsedPrevEmployments: PrevEmpEntry[] = []
+        if (body.previousEmploymentsJson) {
+            try { parsedPrevEmployments = JSON.parse(String(body.previousEmploymentsJson)) } catch { /* ignore */ }
+        }
+
+        // Derive exServiceType + isExService
+        const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true)
+        const exServiceType = derivedExService
+            ? (derivedExService.type ?? "CIVILIAN")
+            : (str(body.exServiceType) ?? "CIVILIAN")
+        const isExService = parsedPrevEmployments.length > 0
+            ? parsedPrevEmployments.some((e) => e.isExService === true)
+            : ["ARMY","POLICE","RANGERS","MUJAHID","OTHER"].includes(exServiceType)
+
         const createGuardPayload = (parwestId: string) => ({
             parwestId,
             name: body.name,
             cnic,
-            phone: body.phone || null,
-            email: body.email || null,
-            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
-            age: body.age ? parseInt(body.age) : null,
-            fatherName: body.fatherName || null,
-            religion: body.religion || null,
-            maritalStatus: body.maritalStatus || null,
-            education: body.education || null,
-            addressPermanent: body.addressPermanent || null,
-            addressCurrent: body.addressCurrent || null,
-            emergencyContact: body.emergencyContact || null,
-            status: body.status || "PENDING",
-            isExService: body.isExService === "true",
-            exServiceRank: body.exServiceRank || null,
-            exServiceRegiment: body.exServiceRegiment || null,
-            bankName: activeAccount?.bankName || body.bankName || null,
-            bankAccountNumber: activeAccount?.accountNumber || body.bankAccountNumber || null,
-            bankAccountType: activeAccount?.accountType || body.bankAccountType || null,
-            bankIban: activeAccount?.iban || body.bankIban || null,
-            bankBranchCode: activeAccount?.branchCode || body.bankBranchCode || null,
+            phone: str(body.phone),
+            email: str(body.email),
+            dateOfBirth: dt(body.dateOfBirth),
+            age: num(body.age),
+            fatherName: str(body.fatherName),
+            motherName: str(body.motherName),
+            nationality: str(body.nationality),
+            nextOfKin: str(body.nextOfKin),
+            religion: str(body.religion),
+            maritalStatus: str(body.maritalStatus),
+            education: str(body.education),
+            addressPermanent: str(body.addressPermanent),
+            addressCurrent: str(body.addressCurrent),
+            emergencyContact: str(body.emergencyContact),
+            additionalContactNumbers: str(body.additionalContactNumbers),
+            profileIntroducer: str(body.profileIntroducer),
+            nearestRelativesJson: nearestRelatives.length > 0 ? JSON.stringify(nearestRelatives) : null,
+            status: str(body.status) || "PENDING",
+            // General extras
+            sect: str(body.sect),
+            cast: str(body.cast),
+            bloodGroup: str(body.bloodGroup),
+            policeStation: str(body.policeStation),
+            cnicIssueDate: dt(body.cnicIssueDate),
+            cnicExpiryDate: dt(body.cnicExpiryDate),
+            salary: flt(body.salary),
+            designation: str(body.designation),
+            joiningDate: dt(body.joiningDate),
+            joiningAge: num(body.joiningAge),
+            enrolledBy: str(body.enrolledBy),
+            // Previous employment
+            isExService,
+            exServiceType,
+            exServiceRank: str(body.exServiceRank),
+            exServiceRegiment: str(body.exServiceRegiment),
+            exServiceRegistrationNo: str(body.exServiceRegistrationNo),
+            exServiceUnit: str(body.exServiceUnit),
+            exServicePeriod: str(body.exServicePeriod),
+            exServiceYears: num(body.exServiceYears),
+            exServiceMonths: num(body.exServiceMonths),
+            exServiceOtherLabel: str(body.exServiceOtherLabel),
+            dateOfEnrollment: dt(body.dateOfEnrollment),
+            dateOfDischarge: dt(body.dateOfDischarge),
+            exServiceRemarks: str(body.exServiceRemarks),
+            // Address contacts
+            currentAddressContact: str(body.currentAddressContact),
+            permanentAddressContact: str(body.permanentAddressContact),
+            // Education extras
+            passingYear: str(body.passingYear),
+            educationInstitute: str(body.educationInstitute),
+            // Introducer
+            introducerName: str(body.introducerName),
+            introducerCnic: str(body.introducerCnic),
+            introducerAddress: str(body.introducerAddress),
+            introducerContact: str(body.introducerContact),
+            // Physical
+            height: str(body.height),
+            weight: str(body.weight),
+            eyeColor: str(body.eyeColor),
+            hairColor: str(body.hairColor),
+            disability: str(body.disability),
+            identificationMark: str(body.identificationMark),
+            // Family
+            familyMembersJson: familyMembers.length > 0 ? JSON.stringify(familyMembers) : null,
+            // Previous employments (multi-entry)
+            previousEmploymentsJson: parsedPrevEmployments.length > 0 ? JSON.stringify(parsedPrevEmployments) : null,
+            // Bank
+            bankName: activeAccount?.bankName || str(body.bankName),
+            bankAccountNumber: activeAccount?.accountNumber || str(body.bankAccountNumber),
+            bankAccountType: activeAccount?.accountType || str(body.bankAccountType),
+            bankIban: activeAccount?.iban || str(body.bankIban),
+            bankBranchCode: activeAccount?.branchCode || str(body.bankBranchCode),
             bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : null,
-            joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
             regionId: bodyRegionId,
             regionalOfficeId: bodyRegionalOfficeId,
         })
+
+        // Check age against configured limits
+        const guardAge = num(body.age)
+        let ageApprovalRequired = false
+        let ageApprovalReason: "OVERAGE" | "UNDERAGE" | null = null
+
+        if (guardAge !== null) {
+            try {
+                const ageConfig = await prisma.guardAgeConfig.findFirst()
+                if (ageConfig) {
+                    if (guardAge < ageConfig.minAge) {
+                        ageApprovalRequired = true
+                        ageApprovalReason = "UNDERAGE"
+                    } else if (guardAge > ageConfig.maxAge) {
+                        ageApprovalRequired = true
+                        ageApprovalReason = "OVERAGE"
+                    }
+                }
+            } catch {
+                // Non-critical — proceed without age check if config unavailable
+            }
+        }
 
         let lastCreateError: unknown = null
         for (let attempt = 0; attempt < 3; attempt++) {
             const parwestId = await generateNextParwestId()
             try {
-                const guard = await prisma.guard.create({
-                    data: createGuardPayload(parwestId),
-                })
-                return NextResponse.json(guard, { status: 201 })
+                const payload = {
+                    ...createGuardPayload(parwestId),
+                    ageApprovalRequired,
+                    ageApprovalStatus: ageApprovalRequired ? "PENDING" : null,
+                }
+                const guard = await prisma.guard.create({ data: payload })
+
+                // Create approval request if age is outside limits
+                if (ageApprovalRequired && ageApprovalReason && guardAge !== null) {
+                    try {
+                        await prisma.guardAgeApproval.create({
+                            data: {
+                                guardId: guard.id,
+                                guardAge,
+                                reason: ageApprovalReason,
+                                status: "PENDING",
+                                requestedBy: session.user?.name ?? session.user?.email ?? "System",
+                            },
+                        })
+                    } catch {
+                        // Non-critical — guard is already created
+                    }
+                }
+
+                return NextResponse.json(
+                    { ...guard, ageApprovalRequired, ageApprovalReason },
+                    { status: 201 }
+                )
             } catch (error: unknown) {
                 lastCreateError = error
                 const errorLike = error as { message?: unknown; code?: unknown; meta?: { target?: unknown } }
