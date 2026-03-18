@@ -8,6 +8,9 @@ import DemandsManager from '@/components/store-inventory-v2/DemandsManager'
 import AssignmentsManager from '@/components/store-inventory-v2/AssignmentsManager'
 import InventoriesManager from '@/components/store-inventory-v2/InventoriesManager'
 import AuditManager from '@/components/store-inventory-v2/AuditManager'
+import RolesManager from '@/components/store-inventory-v2/RolesManager'
+import UsersManager from '@/components/store-inventory-v2/UsersManager'
+import ProductUniqueItemsManager from '@/components/store-inventory-v2/ProductUniqueItemsManager'
 import { storeInventoryLinks, storeInventoryScreens } from '@/lib/inventory/store-screen-configs'
 
 export default async function StoreInventoryScreenPage({ params }: { params: Promise<{ screen: string }> }) {
@@ -47,6 +50,9 @@ export default async function StoreInventoryScreenPage({ params }: { params: Pro
   if (screen === 'employee-assignments') return <AssignmentsManager employeeMode />
   if (screen === 'inventories') return <InventoriesManager />
   if (screen === 'audits') return <AuditManager />
+  if (screen === 'roles') return <RolesManager />
+  if (screen === 'users') return <UsersManager />
+  if (screen === 'product-unique-items') return <ProductUniqueItemsManager />
 
   const config = storeInventoryScreens[screen]
   if (!config) notFound()

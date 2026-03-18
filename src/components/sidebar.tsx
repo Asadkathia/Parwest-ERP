@@ -19,7 +19,7 @@ import {
     Menu,
     X,
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { usePathname } from "next/navigation"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
 
@@ -94,52 +94,62 @@ const navItems: NavNode[] = [
         icon: Package,
         children: [
             {
-                title: "Overview",
-                icon: LayoutDashboard,
+                title: "User Management",
+                icon: Users,
                 children: [
-                    { title: "Dashboard", href: "/store-inventory", icon: LayoutDashboard },
-                    { title: "Inventories", href: "/store-inventory/inventories", icon: Search },
-                    { title: "Audits", href: "/store-inventory/audits", icon: History },
+                    { title: "Users", href: "/store-inventory/users", icon: Users },
+                    { title: "Employees", href: "/store-inventory/employee-assignments", icon: Users },
+                    { title: "Roles", href: "/store-inventory/roles", icon: Settings },
                 ],
             },
             {
-                title: "Procurement & Stock",
-                icon: Upload,
+                title: "Warehouses & Stores",
+                icon: Building2,
                 children: [
+                    { title: "Inventory", href: "/store-inventory/inventories", icon: Search },
+                    { title: "Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
+                    { title: "All Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
+                    { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
+                    { title: "Demands", href: "/store-inventory/demands-send", icon: ClipboardList },
+                    { title: "Demands Response", href: "/store-inventory/demands-response", icon: ClipboardList },
+                ],
+            },
+            {
+                title: "Vendors & Orders",
+                icon: FileText,
+                children: [
+                    { title: "Vendors", href: "/store-inventory/vendors", icon: Building2 },
                     { title: "Purchases", href: "/store-inventory/purchases", icon: FileText },
                     { title: "Create Purchase", href: "/store-inventory/purchase-create", icon: Upload },
-                    { title: "Adjustments", href: "/store-inventory/adjustments", icon: History },
                 ],
             },
             {
-                title: "Requests & Assignment",
-                icon: ClipboardList,
-                children: [
-                    { title: "Demand Send", href: "/store-inventory/demands-send", icon: ClipboardList },
-                    { title: "Demand Response", href: "/store-inventory/demands-response", icon: ClipboardList },
-                    { title: "Inventory Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
-                    { title: "Employee Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
-                ],
-            },
-            {
-                title: "Catalog & Masters",
+                title: "Product Definition",
                 icon: Settings,
                 children: [
+                    { title: "Weapons", href: "/store-inventory/weapons", icon: Package },
                     { title: "Products", href: "/store-inventory/products", icon: Package },
                     { title: "Create Product", href: "/store-inventory/product-create", icon: Upload },
-                    { title: "Vendors", href: "/store-inventory/vendors", icon: Building2 },
-                    { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
-                    { title: "Categories", href: "/store-inventory/categories", icon: Package },
                     { title: "Brands", href: "/store-inventory/brands", icon: Package },
                     { title: "Units", href: "/store-inventory/units", icon: Package },
-                    { title: "Variations", href: "/store-inventory/variations", icon: Settings },
-                    { title: "Conditions", href: "/store-inventory/conditions", icon: Settings },
+                    { title: "Categories", href: "/store-inventory/categories", icon: Package },
                     { title: "Statuses", href: "/store-inventory/statuses", icon: Settings },
-                    { title: "Weapons", href: "/store-inventory/weapons", icon: Package },
+                    { title: "Conditions", href: "/store-inventory/conditions", icon: Settings },
+                    { title: "Variations", href: "/store-inventory/variations", icon: Settings },
+                    { title: "Repairings", href: "/store-inventory/repairings", icon: History },
                     { title: "Calibres", href: "/store-inventory/calibres", icon: Settings },
                     { title: "Licenses", href: "/store-inventory/licenses", icon: FileText },
-                    { title: "Repairings", href: "/store-inventory/repairings", icon: History },
                     { title: "Product Unique Items", href: "/store-inventory/product-unique-items", icon: Package },
+                ],
+            },
+            {
+                title: "Stock Operations",
+                icon: History,
+                children: [
+                    { title: "Adjustments", href: "/store-inventory/adjustments", icon: History },
+                    { title: "Create Adjustment", href: "/store-inventory/adjustment-create", icon: Upload },
+                    { title: "Audits", href: "/store-inventory/audits", icon: History },
+                    { title: "Dashboard", href: "/store-inventory", icon: LayoutDashboard },
                 ],
             },
         ],
@@ -241,13 +251,11 @@ export function Sidebar() {
     })
     const [isMobileOpen, setIsMobileOpen] = useState(false)
 
-    // When path changes, collapse all sections except the active one
-    useEffect(() => {
+    const activeSections = useMemo(() => {
         const active = getActiveSectionTitle(pathname)
-        if (active) {
-            setOpenSections([active])
-        }
-    }, [pathname])
+        if (!active) return openSections
+        return openSections.includes(active) ? openSections : [active]
+    }, [openSections, pathname])
 
     const toggleSection = (title: string) => {
         setOpenSections((prev) =>
@@ -268,7 +276,7 @@ export function Sidebar() {
             <nav className="flex-1 overflow-y-auto p-4">
                 <SidebarNav
                     items={navItems}
-                    openSections={openSections}
+                    openSections={activeSections}
                     onToggleSection={toggleSection}
                     onNavigate={() => setIsMobileOpen(false)}
                 />

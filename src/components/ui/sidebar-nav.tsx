@@ -60,10 +60,11 @@ export default function SidebarNav({ items, openSections, onToggleSection, onNav
               <ul
                 className={cn(
                   "ml-2 mt-1 space-y-1 border-l border-[var(--sidebar-border)] pl-3",
-                  "max-h-0 overflow-hidden opacity-0 transition-all duration-200",
+                  "max-h-0 overflow-hidden opacity-0 translate-y-[-2px] transition-all duration-400 ease-in-out",
                   openSections.includes(item.title) && "max-h-[1200px] opacity-100",
-                  "lg:group-hover/sidebar-section:max-h-[1200px] lg:group-hover/sidebar-section:opacity-100",
-                  "lg:group-focus-within/sidebar-section:max-h-[1200px] lg:group-focus-within/sidebar-section:opacity-100"
+                  openSections.includes(item.title) && "translate-y-0",
+                  "lg:group-hover/sidebar-section:max-h-[1200px] lg:group-hover/sidebar-section:opacity-100 lg:group-hover/sidebar-section:translate-y-0",
+                  "lg:group-focus-within/sidebar-section:max-h-[1200px] lg:group-focus-within/sidebar-section:opacity-100 lg:group-focus-within/sidebar-section:translate-y-0"
                 )}
               >
                   {item.children.map((child) => (
@@ -82,7 +83,7 @@ export default function SidebarNav({ items, openSections, onToggleSection, onNav
                             </div>
                             <span className="text-xs transition-transform group-hover/inventory-category:rotate-180">⌄</span>
                           </div>
-                          <ul className="ml-2 mt-1 space-y-1 border-l border-[var(--sidebar-border)] pl-3 max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover/inventory-category:max-h-[720px] group-hover/inventory-category:opacity-100 group-focus-within/inventory-category:max-h-[720px] group-focus-within/inventory-category:opacity-100">
+                          <ul className="ml-2 mt-1 space-y-1 border-l border-[var(--sidebar-border)] pl-3 max-h-0 overflow-hidden opacity-0 translate-y-[-2px] transition-all duration-400 ease-in-out group-hover/inventory-category:max-h-[720px] group-hover/inventory-category:opacity-100 group-hover/inventory-category:translate-y-0 group-focus-within/inventory-category:max-h-[720px] group-focus-within/inventory-category:opacity-100 group-focus-within/inventory-category:translate-y-0">
                             {child.children.map((grandChild) => (
                               <li key={grandChild.title}>
                                 <Link
