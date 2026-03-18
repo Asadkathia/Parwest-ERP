@@ -14,7 +14,10 @@ type PurchaseLine = { id: string; quantity: number; unitCost?: number | null; pr
 type Purchase = {
   id: string
   referenceNo?: string | null
+  invoiceNo?: string | null
+  attachmentUrl?: string | null
   supplierName?: string | null
+  vendor?: Option | null
   status: string
   purchasedAt: string
   store: { id: string; name: string }
@@ -24,16 +27,19 @@ type Purchase = {
 
 const INITIAL_FORM = {
   storeId: "",
-  productId: "",
-  quantity: "1",
-  unitCost: "",
   referenceNo: "",
+  invoiceNo: "",
+  attachmentUrl: "",
   supplierName: "",
+  vendorId: "",
+  purchasedAt: new Date().toISOString().split("T")[0],
+  lines: [{ productId: "", quantity: "1", unitCost: "", notes: "" }],
 }
 
 export default function PurchasesManager({ createMode = false }: { createMode?: boolean }) {
   const [rows, setRows] = useState<Purchase[]>([])
   const [stores, setStores] = useState<Option[]>([])
+  const [vendors, setVendors] = useState<Option[]>([])
   const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string }>>([])
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
@@ -45,14 +51,16 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
     setLoading(true)
     setNotice(null)
     try {
-      const [purchaseRows, storeRows, productRows] = await Promise.all([
+      const [purchaseRows, storeRows, productRows, vendorRows] = await Promise.all([
         apiGet<Purchase[]>("/api/store-inventory/v2/purchases"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
         apiGet<Array<{ id: string; name: string; sku: string }>>("/api/store-inventory/v2/products"),
+        apiGet<Option[]>("/api/store-inventory/v2/masters/vendors"),
       ])
       setRows(purchaseRows)
       setStores(storeRows)
       setProducts(productRows)
+      setVendors(vendorRows)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load purchases."
       setNotice({ type: "error", message })
@@ -67,11 +75,15 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
   }, [load])
 
   const submit = async () => {
-    const quantity = Number(form.quantity)
-    const unitCost = form.unitCost.trim() ? Number(form.unitCost) : null
+    const lines = form.lines.map((l) => ({
+      productId: l.productId,
+      quantity: Number(l.quantity),
+      unitCost: l.unitCost.trim() ? Number(l.unitCost) : null,
+      notes: l.notes.trim() || null,
+    }))
 
-    if (!form.storeId || !form.productId || !Number.isFinite(quantity) || quantity <= 0) {
-      setNotice({ type: "error", message: "Store, product and positive quantity are required." })
+    if (!form.storeId || lines.some((l) => !l.productId || !Number.isFinite(l.quantity) || l.quantity <= 0)) {
+      setNotice({ type: "error", message: "Store and valid products/quantities are required." })
       return
     }
 
@@ -82,12 +94,16 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
       await apiSend<Purchase>("/api/store-inventory/v2/purchases", "POST", {
         storeId: form.storeId,
         referenceNo: form.referenceNo.trim() || null,
+        invoiceNo: form.invoiceNo.trim() || null,
+        attachmentUrl: form.attachmentUrl.trim() || null,
         supplierName: form.supplierName.trim() || null,
+        vendorId: form.vendorId || null,
+        purchasedAt: form.purchasedAt,
         status: "RECEIVED",
-        lines: [{ productId: form.productId, quantity, unitCost }],
+        lines,
       })
 
-      setNotice({ type: "success", message: "Purchase created and stock incremented." })
+      setNotice({ type: "success", message: "Purchase created successfully." })
       setForm(INITIAL_FORM)
       await load()
     } catch (error) {
@@ -96,6 +112,27 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
     } finally {
       setSaving(false)
     }
+  }
+
+  const addLine = () => {
+    setForm((prev) => ({
+      ...prev,
+      lines: [...prev.lines, { productId: "", quantity: "1", unitCost: "", notes: "" }],
+    }))
+  }
+
+  const removeLine = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateLine = (index: number, field: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)),
+    }))
   }
 
   const visible = useMemo(() => {
@@ -115,38 +152,74 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
       />
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
-      <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <FilterBar className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <FieldSelect label="Store *" value={form.storeId} onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))} options={stores} />
+          <FieldSelect label="Vendor" value={form.vendorId} onChange={(value) => setForm((prev) => ({ ...prev, vendorId: value }))} options={vendors} />
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Product *</label>
-            <select className="ui-select" value={form.productId} onChange={(e) => setForm((prev) => ({ ...prev, productId: e.target.value }))}>
-              <option value="">Select product</option>
-              {products.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.sku} - {row.name}
-                </option>
-              ))}
-            </select>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Purchase Date</label>
+            <input className="ui-input" type="date" value={form.purchasedAt} onChange={(e) => setForm((prev) => ({ ...prev, purchasedAt: e.target.value }))} />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Quantity *</label>
-            <input className="ui-input" type="number" min={1} value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Unit Cost</label>
-            <input className="ui-input" type="number" min={0} value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} />
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Supplier Name</label>
+            <input className="ui-input" value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} placeholder="Optional" />
           </div>
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Reference No</label>
             <input className="ui-input" value={form.referenceNo} onChange={(e) => setForm((prev) => ({ ...prev, referenceNo: e.target.value }))} />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Supplier Name</label>
-            <input className="ui-input" value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} />
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Invoice No</label>
+            <input className="ui-input" value={form.invoiceNo} onChange={(e) => setForm((prev) => ({ ...prev, invoiceNo: e.target.value }))} />
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Attachment URL</label>
+            <input className="ui-input" value={form.attachmentUrl} onChange={(e) => setForm((prev) => ({ ...prev, attachmentUrl: e.target.value }))} placeholder="Link to document" />
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="space-y-4">
+          <div className="font-medium text-[var(--text-muted)]">Items</div>
+          {form.lines.map((line, index) => (
+            <div key={index} className="grid grid-cols-1 gap-4 items-end border-b border-[var(--border)] pb-4 md:grid-cols-12">
+              <div className="md:col-span-4">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Product *</label>
+                <select className="ui-select" value={line.productId} onChange={(e) => updateLine(index, "productId", e.target.value)}>
+                  <option value="">Select product</option>
+                  {products.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.sku} - {row.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Quantity *</label>
+                <input className="ui-input" type="number" min={1} value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Unit Cost</label>
+                <input className="ui-input" type="number" min={0} value={line.unitCost} onChange={(e) => updateLine(index, "unitCost", e.target.value)} />
+              </div>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Notes</label>
+                <input className="ui-input" value={line.notes} onChange={(e) => updateLine(index, "notes", e.target.value)} />
+              </div>
+              <div className="md:col-span-1">
+                <button
+                  className="text-red-600 hover:text-red-700 p-2 disabled:opacity-30"
+                  onClick={() => removeLine(index)}
+                  disabled={form.lines.length === 1}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+          <ActionButton variant="secondary" onClick={addLine}>+ Add Item</ActionButton>
+        </div>
+
+        <div className="flex gap-2 pt-4">
           <ActionButton onClick={() => void submit()} disabled={saving}>{saving ? "Saving..." : "Create Purchase"}</ActionButton>
           <ActionButton variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</ActionButton>
         </div>
@@ -167,10 +240,11 @@ export default function PurchasesManager({ createMode = false }: { createMode?: 
             searchable={false}
             emptyText={loading ? "Loading purchases..." : "No purchases found."}
             columns={[
-              { key: "referenceNo", header: "Reference", render: (row) => row.referenceNo || row.id.slice(0, 8) },
-              { key: "store", header: "Store", render: (row) => row.store.name, sortable: true },
-              { key: "supplierName", header: "Supplier", render: (row) => row.supplierName || "—" },
-              { key: "lineCount", header: "Lines", render: (row) => row.lines.length },
+               { key: "referenceNo", header: "Reference", render: (row) => row.referenceNo || row.id.slice(0, 8) },
+               { key: "invoiceNo", header: "Invoice", render: (row) => row.invoiceNo || "—" },
+               { key: "store", header: "Store", render: (row) => row.store.name, sortable: true },
+               { key: "vendor", header: "Vendor", render: (row) => row.vendor?.name || row.supplierName || "—" },
+               { key: "lineCount", header: "Lines", render: (row) => row.lines.length },
               { key: "totalQty", header: "Total Qty", render: (row) => row.lines.reduce((sum, line) => sum + line.quantity, 0) },
               { key: "status", header: "Status", sortable: true },
               { key: "createdBy", header: "Created By", render: (row) => row.createdBy?.name || "—" },

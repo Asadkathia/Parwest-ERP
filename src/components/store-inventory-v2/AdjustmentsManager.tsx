@@ -24,10 +24,9 @@ type Adjustment = {
 
 const INITIAL_FORM = {
   storeId: "",
-  productId: "",
-  quantity: "1",
   adjustmentType: "INCREASE",
   reason: "",
+  lines: [{ productId: "", quantity: "1" }],
 }
 
 export default function AdjustmentsManager({ createMode = false }: { createMode?: boolean }) {
@@ -66,9 +65,13 @@ export default function AdjustmentsManager({ createMode = false }: { createMode?
   }, [load])
 
   const submit = async () => {
-    const quantity = Number(form.quantity)
-    if (!form.storeId || !form.productId || !Number.isFinite(quantity) || quantity <= 0) {
-      setNotice({ type: "error", message: "Store, product and positive quantity are required." })
+    const lines = form.lines.map((l) => ({
+      productId: l.productId,
+      quantity: Number(l.quantity),
+    }))
+
+    if (!form.storeId || lines.some((l) => !l.productId || !Number.isFinite(l.quantity) || l.quantity <= 0)) {
+      setNotice({ type: "error", message: "Store and valid products/quantities are required." })
       return
     }
 
@@ -80,7 +83,7 @@ export default function AdjustmentsManager({ createMode = false }: { createMode?
         storeId: form.storeId,
         adjustmentType: form.adjustmentType,
         reason: form.reason.trim() || null,
-        lines: [{ productId: form.productId, quantity }],
+        lines,
       })
       setNotice({ type: "success", message: "Adjustment applied successfully." })
       setForm(INITIAL_FORM)
@@ -91,6 +94,27 @@ export default function AdjustmentsManager({ createMode = false }: { createMode?
     } finally {
       setSaving(false)
     }
+  }
+
+  const addLine = () => {
+    setForm((prev) => ({
+      ...prev,
+      lines: [...prev.lines, { productId: "", quantity: "1" }],
+    }))
+  }
+
+  const removeLine = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateLine = (index: number, field: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)),
+    }))
   }
 
   const visible = useMemo(() => {
@@ -107,46 +131,63 @@ export default function AdjustmentsManager({ createMode = false }: { createMode?
       />
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
-      <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <Select label="Store *" value={form.storeId} onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))} options={stores} />
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Product *</label>
-            <select className="ui-select" value={form.productId} onChange={(e) => setForm((prev) => ({ ...prev, productId: e.target.value }))}>
-              <option value="">Select product</option>
-              {products.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.sku} - {row.name}
-                </option>
-              ))}
-            </select>
+        <FilterBar className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Select label="Store *" value={form.storeId} onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))} options={stores} />
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Adjustment Type *</label>
+              <select
+                className="ui-select"
+                value={form.adjustmentType}
+                onChange={(e) => setForm((prev) => ({ ...prev, adjustmentType: e.target.value as any }))}
+              >
+                <option value="INCREASE">INCREASE</option>
+                <option value="DECREASE">DECREASE</option>
+                <option value="SET">SET</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Reason</label>
+              <input className="ui-input" value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Adjustment Type *</label>
-            <select
-              className="ui-select"
-              value={form.adjustmentType}
-              onChange={(e) => setForm((prev) => ({ ...prev, adjustmentType: e.target.value }))}
-            >
-              <option value="INCREASE">INCREASE</option>
-              <option value="DECREASE">DECREASE</option>
-              <option value="SET">SET</option>
-            </select>
+
+          <div className="space-y-4 font-medium text-[var(--text-muted)]">Items</div>
+          {form.lines.map((line, index) => (
+            <div key={index} className="grid grid-cols-1 gap-4 items-end border-b border-[var(--border)] pb-4 md:grid-cols-12">
+              <div className="md:col-span-6">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Product *</label>
+                <select className="ui-select" value={line.productId} onChange={(e) => updateLine(index, "productId", e.target.value)}>
+                  <option value="">Select product</option>
+                  {products.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.sku} - {row.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-4">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Quantity *</label>
+                <input className="ui-input" type="number" min={1} value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  className="text-red-600 hover:text-red-700 p-2 disabled:opacity-30"
+                  onClick={() => removeLine(index)}
+                  disabled={form.lines.length === 1}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+          <ActionButton variant="secondary" onClick={addLine}>+ Add Item</ActionButton>
+
+          <div className="flex gap-2 pt-4">
+            <ActionButton onClick={() => void submit()} disabled={saving}>{saving ? "Saving..." : "Apply Adjustment"}</ActionButton>
+            <ActionButton variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</ActionButton>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Quantity *</label>
-            <input className="ui-input" type="number" min={1} value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Reason</label>
-            <input className="ui-input" value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <ActionButton onClick={() => void submit()} disabled={saving}>{saving ? "Saving..." : "Create Adjustment"}</ActionButton>
-          <ActionButton variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</ActionButton>
-        </div>
-      </FilterBar>
+        </FilterBar>
 
       {!createMode ? (
         <>

@@ -1,7 +1,7 @@
 # Inventory Replacement Progress Tracker
 
 Program: ERP Inventory V2 Replacement (Add-First, Remove-Legacy-Last)  
-Last updated: 2026-03-18  
+Last updated: 2026-03-19  
 Current phase: M5 — Validation + Controlled Cutover (in progress)  
 Overall completion: 93%  
 Status model: `todo | in_progress | blocked | done`
@@ -650,6 +650,36 @@ Acceptance for M6:
   - Assumption adopted: no ORM/platform swap during replacement.
 
 ## Progress Log
+
+- 2026-03-19
+  - Change: applied source-of-truth parity implementation from resolved staging docs for missing V2 master/product/purchase flows.
+  - Evidence:
+    - Master parity wiring:
+      - `src/lib/inventory/store-v2-masters.ts`
+      - `src/components/store-inventory-v2/MasterManager.tsx`
+      - `src/app/(dashboard)/store-inventory/[screen]/page.tsx`
+    - Product/purchase API parity wiring:
+      - `src/app/api/store-inventory/v2/products/route.ts`
+      - `src/app/api/store-inventory/v2/products/[id]/route.ts`
+      - `src/app/api/store-inventory/v2/purchases/route.ts`
+    - Schema parity updates:
+      - `prisma/schema.prisma` (category/status/store/vendor/product/purchase parity fields and relations)
+    - Verification:
+      - `npx prisma validate` (pass, 2026-03-19)
+      - `npx prisma generate` (pass, 2026-03-19)
+      - `npx tsc --noEmit --incremental false` (pass, 2026-03-19)
+  - Risk/Next: `prisma migrate dev --create-only` is currently blocked by pre-existing Neon DB drift vs local migration history (non-inventory guard/client tables). Resolve migration baseline safely first; do not run reset on shared DB.
+
+- 2026-03-19
+  - Change: upgraded assignments workflow to support multi-line checkout and optional per-line condition (legacy parity direction for guard/client-style assignment tables).
+  - Evidence:
+    - `src/app/api/store-inventory/v2/assignments/route.ts` (supports `lines[]` payload with transactional balance/movement updates; backward-compatible single-line input)
+    - `src/components/store-inventory-v2/AssignmentsManager.tsx` (multi-line item table + condition selector)
+    - `prisma/schema.prisma` (`StoreInventoryAssignment.conditionId` relation to `StoreInventoryConditionV2`)
+    - `npx prisma validate` (pass, 2026-03-19)
+    - `npx prisma generate` (pass, 2026-03-19)
+    - `npx tsc --noEmit --incremental false` (pass, 2026-03-19)
+  - Risk/Next: apply additive DB migration for assignment condition relation after migration-baseline drift is resolved.
 
 - 2026-03-18
   - Change: closed remaining SoT UI parity gaps for inventory v2 by implementing real modules for `/store-inventory/roles`, `/store-inventory/users`, and `/store-inventory/product-unique-items`; replaced config-only fallback behavior with API-backed screens.

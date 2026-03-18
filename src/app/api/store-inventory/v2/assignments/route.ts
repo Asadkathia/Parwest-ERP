@@ -8,9 +8,49 @@ import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession
 const assignmentInclude = {
   store: true,
   product: true,
+  condition: true,
   assignedToUser: { select: { id: true, name: true, email: true } },
   assignedByUser: { select: { id: true, name: true, email: true } },
   returnedByUser: { select: { id: true, name: true, email: true } },
+}
+
+type AssignmentLineInput = {
+  productId: string
+  quantity: number
+  conditionId: string | null
+  notes: string | null
+}
+
+function normalizeLines(body: Record<string, unknown>): AssignmentLineInput[] | null {
+  if (Array.isArray(body.lines) && body.lines.length > 0) {
+    const lines: AssignmentLineInput[] = []
+    for (const raw of body.lines) {
+      if (!raw || typeof raw !== "object") return null
+      const row = raw as Record<string, unknown>
+      const productId = String(row.productId ?? "").trim()
+      const quantity = parsePositiveInt(row.quantity)
+      if (!productId || quantity == null) return null
+      lines.push({
+        productId,
+        quantity,
+        conditionId: asText(row.conditionId),
+        notes: asText(row.notes),
+      })
+    }
+    return lines
+  }
+
+  const productId = String(body.productId ?? "").trim()
+  const quantity = parsePositiveInt(body.quantity)
+  if (!productId || quantity == null) return null
+  return [
+    {
+      productId,
+      quantity,
+      conditionId: asText(body.conditionId),
+      notes: asText(body.notes),
+    },
+  ]
 }
 
 export async function GET(request: NextRequest) {
@@ -51,76 +91,84 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>
     const storeId = String(body.storeId ?? "").trim()
-    const productId = String(body.productId ?? "").trim()
     const assignedToUserId = String(body.assignedToUserId ?? "").trim()
-    const quantity = parsePositiveInt(body.quantity)
+    const lines = normalizeLines(body)
 
-    if (!storeId || !productId || !assignedToUserId || quantity == null) {
-      return badRequest("storeId, productId, assignedToUserId, and positive quantity are required.")
+    if (!storeId || !assignedToUserId || !lines) {
+      return badRequest("storeId, assignedToUserId, and non-empty assignment lines are required.")
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      const balance = await tx.storeInventoryBalance.findUnique({
-        where: {
-          storeId_productId: {
-            storeId,
-            productId,
-          },
-        },
-      })
+      const createdAssignments: Array<Record<string, unknown>> = []
 
-      const onHand = balance?.quantityOnHand ?? 0
-      if (onHand < quantity) {
-        throw new Error("INSUFFICIENT_STOCK")
+      for (const line of lines) {
+        const balance = await tx.storeInventoryBalance.findUnique({
+          where: {
+            storeId_productId: {
+              storeId,
+              productId: line.productId,
+            },
+          },
+        })
+
+        const onHand = balance?.quantityOnHand ?? 0
+        if (onHand < line.quantity) {
+          throw new Error(`INSUFFICIENT_STOCK:${line.productId}`)
+        }
+
+        await tx.storeInventoryBalance.upsert({
+          where: {
+            storeId_productId: {
+              storeId,
+              productId: line.productId,
+            },
+          },
+          create: {
+            storeId,
+            productId: line.productId,
+            quantityOnHand: 0,
+            quantityIssued: line.quantity,
+          },
+          update: {
+            quantityOnHand: { decrement: line.quantity },
+            quantityIssued: { increment: line.quantity },
+          },
+        })
+
+        const assignmentData: Prisma.StoreInventoryAssignmentUncheckedCreateInput = {
+            storeId,
+            productId: line.productId,
+            conditionId: line.conditionId,
+            assignedToUserId,
+            assignedByUserId: session.userId,
+            quantity: line.quantity,
+            status: StoreInventoryAssignmentStatus.ASSIGNED,
+            expectedReturnAt: body.expectedReturnAt ? new Date(String(body.expectedReturnAt)) : null,
+            notes: line.notes ?? asText(body.notes),
+        }
+
+        const createdAssignment = await tx.storeInventoryAssignment.create({
+          data: assignmentData,
+          include: assignmentInclude,
+        })
+
+        await tx.storeInventoryMovement.create({
+          data: {
+            movementType: StoreInventoryMovementType.ASSIGNMENT_OUT,
+            quantity: line.quantity,
+            storeId,
+            productId: line.productId,
+            performedById: session.userId,
+            referenceType: "ASSIGNMENT",
+            referenceId: createdAssignment.id,
+            notes: `Assignment checkout to user ${assignedToUserId}`,
+          },
+        })
+
+        createdAssignments.push(createdAssignment as unknown as Record<string, unknown>)
       }
 
-      await tx.storeInventoryBalance.upsert({
-        where: {
-          storeId_productId: {
-            storeId,
-            productId,
-          },
-        },
-        create: {
-          storeId,
-          productId,
-          quantityOnHand: 0,
-          quantityIssued: quantity,
-        },
-        update: {
-          quantityOnHand: { decrement: quantity },
-          quantityIssued: { increment: quantity },
-        },
-      })
-
-      const createdAssignment = await tx.storeInventoryAssignment.create({
-        data: {
-          storeId,
-          productId,
-          assignedToUserId,
-          assignedByUserId: session.userId,
-          quantity,
-          status: StoreInventoryAssignmentStatus.ASSIGNED,
-          expectedReturnAt: body.expectedReturnAt ? new Date(String(body.expectedReturnAt)) : null,
-          notes: asText(body.notes),
-        },
-        include: assignmentInclude,
-      })
-
-      await tx.storeInventoryMovement.create({
-        data: {
-          movementType: StoreInventoryMovementType.ASSIGNMENT_OUT,
-          quantity,
-          storeId,
-          productId,
-          performedById: session.userId,
-          referenceType: "ASSIGNMENT",
-          referenceId: createdAssignment.id,
-          notes: `Assignment checkout to user ${assignedToUserId}`,
-        },
-      })
-
-      return createdAssignment
+      return createdAssignments
     }, {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     })
@@ -128,16 +176,16 @@ export async function POST(request: NextRequest) {
     await emitInventoryV2Audit({
       userId: session.userId,
       event: "ASSIGNMENT_CREATED",
-      description: `Created assignment ${created.id} for user ${created.assignedToUserId}`,
+      description: `Created ${created.length} assignment line(s) for user ${assignedToUserId}`,
       request,
     })
 
     return ok(created, 201)
   } catch (error) {
     const code = getPrismaCode(error)
-    if (code === "P2003") return badRequest("Invalid store/product/user reference.")
-    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
-      return badRequest("Insufficient stock available for assignment.")
+    if (code === "P2003") return badRequest("Invalid store/product/condition/user reference.")
+    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
+      return badRequest("Insufficient stock available for one or more assignment lines.")
     }
 
     console.error("store-inventory v2 assignments POST failed", error)

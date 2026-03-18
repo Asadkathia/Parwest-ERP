@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db"
+const prismaAny = prisma as unknown as Record<string, unknown>
+const hasStoreInventoryCategoryModel = Boolean(prismaAny.storeInventoryCategory)
 
 export type StoreV2MasterResource =
   | "stores"
@@ -46,6 +48,10 @@ const storesConfig: MasterResourceConfig = {
     code: String(body.code ?? "").trim(),
     name: String(body.name ?? "").trim(),
     type: body.type ? String(body.type).trim() : null,
+    prefix: body.prefix ? String(body.prefix).trim() : null,
+    isHeadOffice: body.isHeadOffice === true,
+    latitude: body.latitude != null ? Number(body.latitude) : null,
+    longitude: body.longitude != null ? Number(body.longitude) : null,
     address: body.address ? String(body.address).trim() : null,
     contactNumber: body.contactNumber ? String(body.contactNumber).trim() : null,
     isActive: body.isActive == null ? true : Boolean(body.isActive),
@@ -56,6 +62,10 @@ const storesConfig: MasterResourceConfig = {
     if (body.code != null) next.code = String(body.code).trim()
     if (body.name != null) next.name = String(body.name).trim()
     if (body.type != null) next.type = body.type ? String(body.type).trim() : null
+    if (body.prefix != null) next.prefix = body.prefix ? String(body.prefix).trim() : null
+    if (body.isHeadOffice != null) next.isHeadOffice = Boolean(body.isHeadOffice)
+    if (body.latitude != null) next.latitude = Number(body.latitude)
+    if (body.longitude != null) next.longitude = Number(body.longitude)
     if (body.address != null) next.address = body.address ? String(body.address).trim() : null
     if (body.contactNumber != null) {
       next.contactNumber = body.contactNumber ? String(body.contactNumber).trim() : null
@@ -76,19 +86,56 @@ const masters: Record<StoreV2MasterResource, MasterResourceConfig> = {
     buildCreateData: (body) => ({
       name: String(body.name ?? "").trim(),
       contact: body.contact ? String(body.contact).trim() : null,
+      companyPhone: body.companyPhone ? String(body.companyPhone).trim() : null,
+      contactPerson: body.contactPerson ? String(body.contactPerson).trim() : null,
+      contactPersonPhone: body.contactPersonPhone ? String(body.contactPersonPhone).trim() : null,
+      address: body.address ? String(body.address).trim() : null,
     }),
     buildUpdateData: (body) => {
       const next: Record<string, unknown> = {}
       if (body.name != null) next.name = String(body.name).trim()
       if (body.contact != null) next.contact = body.contact ? String(body.contact).trim() : null
+      if (body.companyPhone != null) {
+        next.companyPhone = body.companyPhone ? String(body.companyPhone).trim() : null
+      }
+      if (body.contactPerson != null) {
+        next.contactPerson = body.contactPerson ? String(body.contactPerson).trim() : null
+      }
+      if (body.contactPersonPhone != null) {
+        next.contactPersonPhone = body.contactPersonPhone
+          ? String(body.contactPersonPhone).trim()
+          : null
+      }
+      if (body.address != null) next.address = body.address ? String(body.address).trim() : null
       return next
     },
   },
   categories: {
-    delegate: prisma.inventoryCategory as unknown as MasterResourceConfig["delegate"],
+    delegate: (hasStoreInventoryCategoryModel
+      ? prismaAny.storeInventoryCategory
+      : prismaAny.inventoryCategory) as MasterResourceConfig["delegate"],
     orderBy: { name: "asc" },
-    buildCreateData: baseNameCreate,
-    buildUpdateData: baseNameUpdate,
+    include: hasStoreInventoryCategoryModel ? { parent: true } : undefined,
+    buildCreateData: (body) =>
+      hasStoreInventoryCategoryModel
+        ? {
+            name: String(body.name ?? "").trim(),
+            parentId: body.parentId ? String(body.parentId).trim() : null,
+            canAssignGuard: body.canAssignGuard === true,
+            canAssignEmployee: body.canAssignEmployee === true,
+            canAssignClient: body.canAssignClient === true,
+          }
+        : baseNameCreate(body),
+    buildUpdateData: (body) => {
+      if (!hasStoreInventoryCategoryModel) return baseNameUpdate(body)
+      const next: Record<string, unknown> = {}
+      if (body.name != null) next.name = String(body.name).trim()
+      if (body.parentId != null) next.parentId = body.parentId ? String(body.parentId).trim() : null
+      if (body.canAssignGuard != null) next.canAssignGuard = body.canAssignGuard === true
+      if (body.canAssignEmployee != null) next.canAssignEmployee = body.canAssignEmployee === true
+      if (body.canAssignClient != null) next.canAssignClient = body.canAssignClient === true
+      return next
+    },
   },
   brands: {
     delegate: prisma.storeInventoryBrand as unknown as MasterResourceConfig["delegate"],
@@ -113,8 +160,21 @@ const masters: Record<StoreV2MasterResource, MasterResourceConfig> = {
   statuses: {
     delegate: prisma.storeInventoryStatus as unknown as MasterResourceConfig["delegate"],
     orderBy: { name: "asc" },
-    buildCreateData: baseNameCreate,
-    buildUpdateData: baseNameUpdate,
+    include: hasStoreInventoryCategoryModel ? { category: true } : undefined,
+    buildCreateData: (body) =>
+      hasStoreInventoryCategoryModel
+        ? {
+            name: String(body.name ?? "").trim(),
+            categoryId: body.categoryId ? String(body.categoryId).trim() : null,
+          }
+        : baseNameCreate(body),
+    buildUpdateData: (body) => {
+      if (!hasStoreInventoryCategoryModel) return baseNameUpdate(body)
+      const next: Record<string, unknown> = {}
+      if (body.name != null) next.name = String(body.name).trim()
+      if (body.categoryId != null) next.categoryId = body.categoryId ? String(body.categoryId).trim() : null
+      return next
+    },
   },
   conditions: {
     delegate: prisma.storeInventoryConditionV2 as unknown as MasterResourceConfig["delegate"],

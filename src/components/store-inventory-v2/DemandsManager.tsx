@@ -26,9 +26,8 @@ type Demand = {
 const INITIAL_FORM = {
   fromStoreId: "",
   toStoreId: "",
-  productId: "",
-  requestedQty: "1",
   reason: "",
+  lines: [{ productId: "", requestedQty: "1" }],
 }
 
 export default function DemandsManager({ responseMode = false }: { responseMode?: boolean }) {
@@ -67,9 +66,13 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
   }, [load])
 
   const submitDemand = async () => {
-    const qty = Number(form.requestedQty)
-    if (!form.productId || !Number.isFinite(qty) || qty <= 0) {
-      setNotice({ type: "error", message: "Product and positive requested qty are required." })
+    const lines = form.lines.map((l) => ({
+      productId: l.productId,
+      requestedQty: Number(l.requestedQty),
+    }))
+
+    if (lines.some((l) => !l.productId || !Number.isFinite(l.requestedQty) || l.requestedQty <= 0)) {
+      setNotice({ type: "error", message: "Valid products and positive quantities are required." })
       return
     }
 
@@ -82,7 +85,7 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
         toStoreId: form.toStoreId || null,
         reason: form.reason.trim() || null,
         status: "SENT",
-        lines: [{ productId: form.productId, requestedQty: qty }],
+        lines,
       })
 
       setNotice({ type: "success", message: "Demand created successfully." })
@@ -94,6 +97,27 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
     } finally {
       setSaving(false)
     }
+  }
+
+  const addLine = () => {
+    setForm((prev) => ({
+      ...prev,
+      lines: [...prev.lines, { productId: "", requestedQty: "1" }],
+    }))
+  }
+
+  const removeLine = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateLine = (index: number, field: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)),
+    }))
   }
 
   const updateDemandStatus = async (demandId: string, status: string) => {
@@ -157,30 +181,47 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
       {!responseMode ? (
-        <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <FilterBar className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Select label="From Store" value={form.fromStoreId} onChange={(value) => setForm((prev) => ({ ...prev, fromStoreId: value }))} options={stores} allowEmpty />
             <Select label="To Store" value={form.toStoreId} onChange={(value) => setForm((prev) => ({ ...prev, toStoreId: value }))} options={stores} allowEmpty />
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Product *</label>
-              <select className="ui-select" value={form.productId} onChange={(e) => setForm((prev) => ({ ...prev, productId: e.target.value }))}>
-                <option value="">Select product</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.sku} - {product.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Requested Qty *</label>
-              <input className="ui-input" type="number" min={1} value={form.requestedQty} onChange={(e) => setForm((prev) => ({ ...prev, requestedQty: e.target.value }))} />
-            </div>
             <div>
               <label className="mb-1 block text-sm text-[var(--text-muted)]">Reason</label>
               <input className="ui-input" value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} />
             </div>
           </div>
+
+          <div className="space-y-4 font-medium text-[var(--text-muted)]">Items</div>
+          {form.lines.map((line, index) => (
+            <div key={index} className="grid grid-cols-1 gap-4 items-end border-b border-[var(--border)] pb-4 md:grid-cols-12">
+              <div className="md:col-span-6">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Product *</label>
+                <select className="ui-select" value={line.productId} onChange={(e) => updateLine(index, "productId", e.target.value)}>
+                  <option value="">Select product</option>
+                  {products.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.sku} - {row.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-4">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Requested Qty *</label>
+                <input className="ui-input" type="number" min={1} value={line.requestedQty} onChange={(e) => updateLine(index, "requestedQty", e.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  className="text-red-600 hover:text-red-700 p-2 disabled:opacity-30"
+                  onClick={() => removeLine(index)}
+                  disabled={form.lines.length === 1}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+          <ActionButton variant="secondary" onClick={addLine}>+ Add Item</ActionButton>
+
           <div className="flex gap-2">
             <ActionButton onClick={() => void submitDemand()} disabled={saving}>{saving ? "Saving..." : "Create Demand"}</ActionButton>
             <ActionButton variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</ActionButton>

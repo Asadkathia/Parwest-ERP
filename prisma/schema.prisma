@@ -702,10 +702,15 @@ model InventoryVendor {
   id        String   @id @default(cuid())
   name      String   @unique
   contact   String?
+  companyPhone String?
+  contactPerson String?
+  contactPersonPhone String?
+  address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items InventoryItem[]
+  items     InventoryItem[]
+  purchases StoreInventoryPurchase[]
 }
 
 model InventoryItem {
@@ -802,6 +807,10 @@ model Store {
   code          String   @unique
   name          String
   type          String?
+  prefix        String?
+  isHeadOffice  Boolean  @default(false)
+  latitude      Float?
+  longitude     Float?
   address       String?
   contactNumber String?
   isActive      Boolean  @default(true)
@@ -848,8 +857,28 @@ model StoreInventoryStatus {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  categoryId String?
+  category   StoreInventoryCategory? @relation(fields: [categoryId], references: [id])
 
   products StoreInventoryProduct[]
+}
+
+model StoreInventoryCategory {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  canAssignGuard   Boolean  @default(false)
+  canAssignEmployee Boolean @default(false)
+  canAssignClient  Boolean  @default(false)
+  parentId         String?
+  parent           StoreInventoryCategory?  @relation("StoreInventoryCategoryParent", fields: [parentId], references: [id])
+  children         StoreInventoryCategory[] @relation("StoreInventoryCategoryParent")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  products StoreInventoryProduct[]
+  statuses StoreInventoryStatus[]
+
+  @@index([parentId])
 }
 
 model StoreInventoryConditionV2 {
@@ -860,6 +889,7 @@ model StoreInventoryConditionV2 {
   updatedAt   DateTime @updatedAt
 
   products StoreInventoryProduct[]
+  assignments StoreInventoryAssignment[]
 }
 
 model StoreInventoryWeaponType {
@@ -912,6 +942,7 @@ model StoreInventoryProduct {
   sku            String   @unique
   name           String
   description    String?
+  imageUrl       String?
   serialRequired Boolean  @default(false)
   minStockLevel  Int?
   maxStockLevel  Int?
@@ -941,6 +972,8 @@ model StoreInventoryProduct {
   variation     StoreInventoryVariation?   @relation(fields: [variationId], references: [id])
   repairingId   String?
   repairing     StoreInventoryRepairing?   @relation(fields: [repairingId], references: [id])
+  categoryId    String?
+  category      StoreInventoryCategory?    @relation(fields: [categoryId], references: [id])
 
   balances            StoreInventoryBalance[]
   purchaseLines       StoreInventoryPurchaseLine[]
@@ -955,6 +988,7 @@ model StoreInventoryProduct {
   @@index([unitId])
   @@index([statusId])
   @@index([conditionId])
+  @@index([categoryId])
 }
 
 model StoreInventoryBalance {
@@ -978,7 +1012,10 @@ model StoreInventoryPurchase {
   id           String                       @id @default(cuid())
   referenceNo  String?                      @unique
   invoiceNo    String?
+  attachmentUrl String?
   supplierName String?
+  vendorId     String?
+  vendor       InventoryVendor?             @relation(fields: [vendorId], references: [id])
   status       StoreInventoryPurchaseStatus @default(DRAFT)
   purchasedAt  DateTime                     @default(now())
   receivedAt   DateTime?
@@ -1168,6 +1205,8 @@ model StoreInventoryAssignment {
   store            Store                 @relation(fields: [storeId], references: [id])
   productId        String
   product          StoreInventoryProduct @relation(fields: [productId], references: [id])
+  conditionId      String?
+  condition        StoreInventoryConditionV2? @relation(fields: [conditionId], references: [id])
   assignedToUserId String
   assignedToUser   User                  @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
   assignedByUserId String
@@ -1177,6 +1216,7 @@ model StoreInventoryAssignment {
 
   @@index([storeId])
   @@index([productId])
+  @@index([conditionId])
   @@index([assignedToUserId])
   @@index([assignedByUserId])
   @@index([returnedByUserId])

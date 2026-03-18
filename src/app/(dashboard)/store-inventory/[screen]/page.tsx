@@ -24,11 +24,11 @@ export default async function StoreInventoryScreenPage({ params }: { params: Pro
       />
     )
   }
-  if (screen === 'vendors') return <MasterManager resource="vendors" title="Vendors" subtitle="Manage vendor records." supportsContact />
-  if (screen === 'categories') return <MasterManager resource="categories" title="Categories" subtitle="Manage product categories." />
+  if (screen === 'vendors') return <MasterManager resource="vendors" title="Vendors" subtitle="Manage vendor records." supportsContact supportsVendorFields />
+  if (screen === 'categories') return <MasterManager resource="categories" title="Categories" subtitle="Manage product categories." supportsCategoryFields />
   if (screen === 'brands') return <MasterManager resource="brands" title="Brands" subtitle="Manage product brands." />
   if (screen === 'units') return <MasterManager resource="units" title="Units" subtitle="Manage product units." supportsUnitShortCode />
-  if (screen === 'statuses') return <MasterManager resource="statuses" title="Statuses" subtitle="Manage product statuses." />
+  if (screen === 'statuses') return <MasterManager resource="statuses" title="Statuses" subtitle="Manage product statuses." supportsStatusCategory />
   if (screen === 'conditions') return <MasterManager resource="conditions" title="Conditions" subtitle="Manage product conditions." supportsDescription />
   if (screen === 'weapons') return <MasterManager resource="weapon-types" title="Weapons" subtitle="Manage weapon definitions." />
   if (screen === 'weapon-types') return <MasterManager resource="weapon-types" title="Weapon Types" subtitle="Manage weapon type taxonomy." />

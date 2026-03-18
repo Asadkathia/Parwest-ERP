@@ -7,6 +7,7 @@ import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requ
 
 const purchaseInclude = {
   store: true,
+  vendor: true,
   createdBy: { select: { id: true, name: true, email: true } },
   approvedBy: { select: { id: true, name: true, email: true } },
   lines: {
@@ -14,6 +15,31 @@ const purchaseInclude = {
       product: true,
     },
   },
+}
+const legacyPurchaseInclude = {
+  store: true,
+  createdBy: { select: { id: true, name: true, email: true } },
+  approvedBy: { select: { id: true, name: true, email: true } },
+  lines: {
+    include: {
+      product: true,
+    },
+  },
+}
+const legacyPurchaseSelectBase = {
+  id: true,
+  referenceNo: true,
+  invoiceNo: true,
+  supplierName: true,
+  status: true,
+  purchasedAt: true,
+  receivedAt: true,
+  notes: true,
+  createdAt: true,
+  updatedAt: true,
+  storeId: true,
+  createdById: true,
+  approvedById: true,
 }
 
 type PurchaseLineInput = {
@@ -64,15 +90,38 @@ export async function GET(request: NextRequest) {
   const take = Math.min(Number(searchParams.get("take") ?? "100") || 100, 500)
 
   try {
-    const rows = await prisma.storeInventoryPurchase.findMany({
-      where: {
-        storeId,
-        status: status ? (status as StoreInventoryPurchaseStatus) : undefined,
-      },
-      include: purchaseInclude,
-      orderBy: { createdAt: "desc" },
-      take,
-    })
+    const where: any = {
+      storeId,
+      status: status ? (status as StoreInventoryPurchaseStatus) : undefined,
+    }
+    let rows
+    try {
+      rows = await prisma.storeInventoryPurchase.findMany({
+        where,
+        include: purchaseInclude,
+        orderBy: { createdAt: "desc" },
+        take,
+      })
+    } catch (error) {
+      const code = getPrismaCode(error)
+      const message = error instanceof Error ? error.message : ""
+      if (message.includes("Unknown field `vendor`") || code === "P2022" || code === "P2021") {
+        rows = await prisma.storeInventoryPurchase.findMany({
+          where,
+          select: {
+            ...legacyPurchaseSelectBase,
+            store: true,
+            createdBy: { select: { id: true, name: true, email: true } },
+            approvedBy: { select: { id: true, name: true, email: true } },
+            lines: { include: { product: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take,
+        } as any)
+      } else {
+        throw error
+      }
+    }
 
     return ok(rows)
   } catch (error) {
@@ -99,30 +148,52 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      const createdPurchase = await tx.storeInventoryPurchase.create({
-        data: {
-          referenceNo: asText(body.referenceNo),
-          invoiceNo: asText(body.invoiceNo),
-          supplierName: asText(body.supplierName),
-          status,
-          purchasedAt: body.purchasedAt ? new Date(String(body.purchasedAt)) : undefined,
-          receivedAt: status === StoreInventoryPurchaseStatus.RECEIVED ? new Date() : null,
-          notes: asText(body.notes),
-          storeId,
-          createdById: session.userId,
-          approvedById: asText(body.approvedById),
-          lines: {
-            create: lines.map((line) => ({
-              productId: line.productId,
-              quantity: line.quantity,
-              unitCost: line.unitCost,
-              totalCost: line.unitCost != null ? line.unitCost * line.quantity : null,
-              notes: line.notes,
-            })),
-          },
+      const baseData: any = {
+        referenceNo: asText(body.referenceNo),
+        invoiceNo: asText(body.invoiceNo),
+        attachmentUrl: asText(body.attachmentUrl),
+        supplierName: asText(body.supplierName),
+        vendorId: asText(body.vendorId),
+        status,
+        purchasedAt: body.purchasedAt ? new Date(String(body.purchasedAt)) : undefined,
+        receivedAt: status === StoreInventoryPurchaseStatus.RECEIVED ? new Date() : null,
+        notes: asText(body.notes),
+        storeId,
+        createdById: session.userId,
+        approvedById: asText(body.approvedById),
+        lines: {
+          create: lines.map((line) => ({
+            productId: line.productId,
+            quantity: line.quantity,
+            unitCost: line.unitCost,
+            totalCost: line.unitCost != null ? line.unitCost * line.quantity : null,
+            notes: line.notes,
+          })),
         },
-        include: purchaseInclude,
-      })
+      }
+      let createdPurchase: any
+      try {
+        createdPurchase = await tx.storeInventoryPurchase.create({
+          data: baseData,
+          include: purchaseInclude as any,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : ""
+        if (
+          !message.includes("Unknown argument `vendorId`") &&
+          !message.includes("Unknown argument `attachmentUrl`") &&
+          !message.includes("Unknown field `vendor`")
+        ) {
+          throw error
+        }
+        const fallbackData: any = { ...baseData }
+        delete fallbackData.vendorId
+        delete fallbackData.attachmentUrl
+        createdPurchase = await tx.storeInventoryPurchase.create({
+          data: fallbackData,
+          include: legacyPurchaseInclude as any,
+        })
+      }
 
       if (status !== StoreInventoryPurchaseStatus.CANCELLED) {
         for (const line of createdPurchase.lines) {

@@ -20,6 +20,7 @@ type Assignment = {
   returnedAt?: string | null
   store: Option
   product: Product
+  condition?: Option | null
   assignedToUser: User
   assignedByUser: User
   returnedByUser?: User | null
@@ -27,16 +28,16 @@ type Assignment = {
 
 const INITIAL_FORM = {
   storeId: "",
-  productId: "",
   assignedToUserId: "",
-  quantity: "1",
-  notes: "",
+  expectedReturnAt: "",
+  lines: [{ productId: "", conditionId: "", quantity: "1", notes: "" }],
 }
 
 export default function AssignmentsManager({ employeeMode = false }: { employeeMode?: boolean }) {
   const [rows, setRows] = useState<Assignment[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [conditions, setConditions] = useState<Option[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [form, setForm] = useState(INITIAL_FORM)
   const [search, setSearch] = useState("")
@@ -48,16 +49,18 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
     setLoading(true)
     setNotice(null)
     try {
-      const [assignmentRows, storeRows, productRows, userRows] = await Promise.all([
+      const [assignmentRows, storeRows, productRows, conditionRows, userRows] = await Promise.all([
         apiGet<Assignment[]>("/api/store-inventory/v2/assignments"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
         apiGet<Product[]>("/api/store-inventory/v2/products"),
+        apiGet<Option[]>("/api/store-inventory/v2/masters/conditions"),
         apiGet<User[]>("/api/users?status=ACTIVE"),
       ])
 
       setRows(assignmentRows)
       setStores(storeRows)
       setProducts(productRows)
+      setConditions(conditionRows)
       setUsers(userRows)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load assignments."
@@ -73,9 +76,14 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
   }, [load])
 
   const createAssignment = async () => {
-    const quantity = Number(form.quantity)
-    if (!form.storeId || !form.productId || !form.assignedToUserId || !Number.isFinite(quantity) || quantity <= 0) {
-      setNotice({ type: "error", message: "Store, product, assignee and positive quantity are required." })
+    const lines = form.lines.map((line) => ({
+      productId: line.productId,
+      conditionId: line.conditionId || null,
+      quantity: Number(line.quantity),
+      notes: line.notes.trim() || null,
+    }))
+    if (!form.storeId || !form.assignedToUserId || lines.some((line) => !line.productId || !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+      setNotice({ type: "error", message: "Store, assignee, and valid line items are required." })
       return
     }
 
@@ -83,12 +91,11 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
     setNotice(null)
 
     try {
-      await apiSend<Assignment>("/api/store-inventory/v2/assignments", "POST", {
+      await apiSend<Assignment[]>("/api/store-inventory/v2/assignments", "POST", {
         storeId: form.storeId,
-        productId: form.productId,
         assignedToUserId: form.assignedToUserId,
-        quantity,
-        notes: form.notes.trim() || null,
+        expectedReturnAt: form.expectedReturnAt || null,
+        lines,
       })
       setNotice({ type: "success", message: "Inventory assigned successfully." })
       setForm(INITIAL_FORM)
@@ -99,6 +106,27 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
     } finally {
       setSaving(false)
     }
+  }
+
+  const addLine = () => {
+    setForm((prev) => ({
+      ...prev,
+      lines: [...prev.lines, { productId: "", conditionId: "", quantity: "1", notes: "" }],
+    }))
+  }
+
+  const removeLine = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateLine = (index: number, field: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      lines: prev.lines.map((line, i) => (i === index ? { ...line, [field]: value } : line)),
+    }))
   }
 
   const returnAssignment = async (id: string) => {
@@ -134,17 +162,6 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Select label="Store *" value={form.storeId} onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))} options={stores} />
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Product *</label>
-            <select className="ui-select" value={form.productId} onChange={(e) => setForm((prev) => ({ ...prev, productId: e.target.value }))}>
-              <option value="">Select product</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.sku} - {product.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Assignee *</label>
             <select className="ui-select" value={form.assignedToUserId} onChange={(e) => setForm((prev) => ({ ...prev, assignedToUserId: e.target.value }))}>
               <option value="">Select user</option>
@@ -156,13 +173,57 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Quantity *</label>
-            <input className="ui-input" min={1} type="number" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} />
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Expected Return Date</label>
+            <input
+              className="ui-input"
+              type="date"
+              value={form.expectedReturnAt}
+              onChange={(e) => setForm((prev) => ({ ...prev, expectedReturnAt: e.target.value }))}
+            />
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Notes</label>
-            <input className="ui-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
-          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="font-medium text-[var(--text-muted)]">Items</div>
+          {form.lines.map((line, index) => (
+            <div key={index} className="grid grid-cols-1 gap-4 items-end border-b border-[var(--border)] pb-4 md:grid-cols-12">
+              <div className="md:col-span-4">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Product *</label>
+                <select className="ui-select" value={line.productId} onChange={(e) => updateLine(index, "productId", e.target.value)}>
+                  <option value="">Select product</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.sku} - {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Condition</label>
+                <select className="ui-select" value={line.conditionId} onChange={(e) => updateLine(index, "conditionId", e.target.value)}>
+                  <option value="">Optional</option>
+                  {conditions.map((condition) => (
+                    <option key={condition.id} value={condition.id}>
+                      {condition.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Quantity *</label>
+                <input className="ui-input" min={1} type="number" value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
+              </div>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Notes</label>
+                <input className="ui-input" value={line.notes} onChange={(e) => updateLine(index, "notes", e.target.value)} />
+              </div>
+              <div className="md:col-span-1">
+                <button className="text-red-600 hover:text-red-700 p-2 disabled:opacity-30" onClick={() => removeLine(index)} disabled={form.lines.length === 1}>
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+          <ActionButton variant="secondary" onClick={addLine}>+ Add Item</ActionButton>
         </div>
         <div className="flex gap-2">
           <ActionButton onClick={() => void createAssignment()} disabled={saving}>{saving ? "Saving..." : "Assign Inventory"}</ActionButton>
@@ -185,6 +246,7 @@ export default function AssignmentsManager({ employeeMode = false }: { employeeM
         columns={[
           { key: "store", header: "Store", render: (row) => row.store.name },
           { key: "product", header: "Product", render: (row) => `${row.product.sku} - ${row.product.name}` },
+          { key: "condition", header: "Condition", render: (row) => row.condition?.name || "—" },
           { key: "quantity", header: "Qty", sortable: true },
           { key: "assignedToUser", header: "Assigned To", render: (row) => row.assignedToUser.name, sortable: true },
           { key: "assignedByUser", header: "Assigned By", render: (row) => row.assignedByUser.name },
