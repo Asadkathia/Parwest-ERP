@@ -9,11 +9,40 @@ const productInclude = {
   unit: true,
   status: true,
   condition: true,
+  category: true,
   weaponType: true,
   calibre: true,
   licenseType: true,
   variation: true,
   repairing: true,
+}
+
+const legacyProductInclude = {
+  brand: true,
+  unit: true,
+  status: true,
+  condition: true,
+  weaponType: true,
+  calibre: true,
+  licenseType: true,
+  variation: true,
+  repairing: true,
+}
+const legacyProductSelectBase = {
+  id: true,
+  sku: true,
+  name: true,
+  description: true,
+  serialRequired: true,
+  minStockLevel: true,
+  maxStockLevel: true,
+  reorderLevel: true,
+  barcode: true,
+  hsCode: true,
+  warrantyMonths: true,
+  licenseNumber: true,
+  createdAt: true,
+  updatedAt: true,
 }
 
 export async function GET(request: NextRequest) {
@@ -25,23 +54,52 @@ export async function GET(request: NextRequest) {
   const includeBalances = searchParams.get("includeBalances") === "true"
 
   try {
-    const rows = await prisma.storeInventoryProduct.findMany({
-      where: search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { sku: { contains: search, mode: "insensitive" } },
-              { barcode: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
-      include: {
-        ...productInclude,
-        balances: includeBalances,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 500,
-    })
+    const where: any = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { sku: { contains: search, mode: "insensitive" } },
+            { barcode: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : undefined
+    let rows
+    try {
+      rows = await prisma.storeInventoryProduct.findMany({
+        where,
+        include: {
+          ...productInclude,
+          balances: includeBalances,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      })
+    } catch (error) {
+      const code = getPrismaCode(error)
+      const message = error instanceof Error ? error.message : ""
+      if (message.includes("Unknown field `category`") || code === "P2022" || code === "P2021") {
+        rows = await prisma.storeInventoryProduct.findMany({
+          where,
+          select: {
+            ...legacyProductSelectBase,
+            brand: true,
+            unit: true,
+            status: true,
+            condition: true,
+            weaponType: true,
+            calibre: true,
+            licenseType: true,
+            variation: true,
+            repairing: true,
+            balances: includeBalances,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 500,
+        } as any)
+      } else {
+        throw error
+      }
+    }
 
     return ok(rows)
   } catch (error) {
@@ -63,31 +121,53 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim()
     if (!sku || !name) return badRequest("sku and name are required.")
 
-    const created = await prisma.storeInventoryProduct.create({
-      data: {
-        sku,
-        name,
-        description: asText(body.description),
-        serialRequired: asBool(body.serialRequired),
-        minStockLevel: parseNonNegativeInt(body.minStockLevel),
-        maxStockLevel: parseNonNegativeInt(body.maxStockLevel),
-        reorderLevel: parseNonNegativeInt(body.reorderLevel),
-        barcode: asText(body.barcode),
-        hsCode: asText(body.hsCode),
-        warrantyMonths: parseNonNegativeInt(body.warrantyMonths),
-        licenseNumber: asText(body.licenseNumber),
-        brandId: asText(body.brandId),
-        unitId: asText(body.unitId),
-        statusId: asText(body.statusId),
-        conditionId: asText(body.conditionId),
-        weaponTypeId: asText(body.weaponTypeId),
-        calibreId: asText(body.calibreId),
-        licenseTypeId: asText(body.licenseTypeId),
-        variationId: asText(body.variationId),
-        repairingId: asText(body.repairingId),
-      },
-      include: productInclude,
-    })
+    const baseData: any = {
+      sku,
+      name,
+      description: asText(body.description),
+      imageUrl: asText(body.imageUrl),
+      serialRequired: asBool(body.serialRequired),
+      minStockLevel: parseNonNegativeInt(body.minStockLevel),
+      maxStockLevel: parseNonNegativeInt(body.maxStockLevel),
+      reorderLevel: parseNonNegativeInt(body.reorderLevel),
+      barcode: asText(body.barcode),
+      hsCode: asText(body.hsCode),
+      warrantyMonths: parseNonNegativeInt(body.warrantyMonths),
+      licenseNumber: asText(body.licenseNumber),
+      brandId: asText(body.brandId),
+      unitId: asText(body.unitId),
+      statusId: asText(body.statusId),
+      conditionId: asText(body.conditionId),
+      categoryId: asText(body.categoryId),
+      weaponTypeId: asText(body.weaponTypeId),
+      calibreId: asText(body.calibreId),
+      licenseTypeId: asText(body.licenseTypeId),
+      variationId: asText(body.variationId),
+      repairingId: asText(body.repairingId),
+    }
+    let created
+    try {
+      created = await prisma.storeInventoryProduct.create({
+        data: baseData,
+        include: productInclude as any,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ""
+      if (
+        !message.includes("Unknown argument `categoryId`") &&
+        !message.includes("Unknown argument `imageUrl`") &&
+        !message.includes("Unknown field `category`")
+      ) {
+        throw error
+      }
+      const fallbackData: any = { ...baseData }
+      delete fallbackData.categoryId
+      delete fallbackData.imageUrl
+      created = await prisma.storeInventoryProduct.create({
+        data: fallbackData,
+        include: legacyProductInclude as any,
+      })
+    }
 
     await emitInventoryV2Audit({
       userId: session.userId,

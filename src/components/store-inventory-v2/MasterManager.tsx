@@ -23,11 +23,15 @@ type MasterResource =
   | "repairings"
 
 type RegionalOffice = { id: string; name: string }
+type Option = { id: string; name: string }
 
 type Row = {
   id: string
   name: string
   contact?: string | null
+  companyPhone?: string | null
+  contactPerson?: string | null
+  contactPersonPhone?: string | null
   code?: string | null
   shortCode?: string | null
   description?: string | null
@@ -37,6 +41,17 @@ type Row = {
   isActive?: boolean
   regionalOfficeId?: string | null
   regionalOffice?: { id: string; name: string } | null
+  prefix?: string | null
+  isHeadOffice?: boolean
+  latitude?: number | null
+  longitude?: number | null
+  parentId?: string | null
+  parent?: { id: string; name: string } | null
+  canAssignGuard?: boolean
+  canAssignEmployee?: boolean
+  canAssignClient?: boolean
+  categoryId?: string | null
+  category?: { id: string; name: string } | null
 }
 
 type Props = {
@@ -47,6 +62,9 @@ type Props = {
   supportsStoreFields?: boolean
   supportsUnitShortCode?: boolean
   supportsContact?: boolean
+  supportsCategoryFields?: boolean
+  supportsVendorFields?: boolean
+  supportsStatusCategory?: boolean
 }
 
 const EMPTY_FORM = {
@@ -55,10 +73,22 @@ const EMPTY_FORM = {
   shortCode: "",
   description: "",
   contact: "",
+  companyPhone: "",
+  contactPerson: "",
+  contactPersonPhone: "",
   type: "",
   contactNumber: "",
   address: "",
   regionalOfficeId: "",
+  prefix: "",
+  isHeadOffice: false,
+  latitude: "",
+  longitude: "",
+  parentId: "",
+  canAssignGuard: false,
+  canAssignEmployee: false,
+  canAssignClient: false,
+  categoryId: "",
 }
 
 export default function MasterManager({
@@ -69,9 +99,13 @@ export default function MasterManager({
   supportsStoreFields = false,
   supportsUnitShortCode = false,
   supportsContact = false,
+  supportsCategoryFields = false,
+  supportsVendorFields = false,
+  supportsStatusCategory = false,
 }: Props) {
   const [rows, setRows] = useState<Row[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
+  const [categories, setCategories] = useState<Option[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
@@ -89,22 +123,25 @@ export default function MasterManager({
     setNotice(null)
 
     try {
-      const [masterRows, officeRows] = await Promise.all([
+      const [masterRows, officeRows, categoryRows] = await Promise.all([
         apiGet<Row[]>(`/api/store-inventory/v2/masters/${resource}`),
         supportsStoreFields ? apiGet<RegionalOffice[]>("/api/regional-offices") : Promise.resolve([]),
+        supportsStatusCategory ? apiGet<Option[]>("/api/store-inventory/v2/masters/categories") : Promise.resolve([]),
       ])
 
       setRows(masterRows)
       setRegionalOffices(officeRows)
+      setCategories(categoryRows)
     } catch (error) {
       const message = error instanceof Error ? error.message : `Failed to load ${title}.`
       setNotice({ type: "error", message })
       setRows([])
       setRegionalOffices([])
+      setCategories([])
     } finally {
       setLoading(false)
     }
-  }, [resource, supportsStoreFields, title])
+  }, [resource, supportsStatusCategory, supportsStoreFields, title])
 
   useEffect(() => {
     void loadRows()
@@ -133,10 +170,22 @@ export default function MasterManager({
       shortCode: row.shortCode || "",
       description: row.description || "",
       contact: row.contact || "",
+      companyPhone: row.companyPhone || "",
+      contactPerson: row.contactPerson || "",
+      contactPersonPhone: row.contactPersonPhone || "",
       type: row.type || "",
       contactNumber: row.contactNumber || "",
       address: row.address || "",
       regionalOfficeId: row.regionalOfficeId || "",
+      prefix: row.prefix || "",
+      isHeadOffice: row.isHeadOffice || false,
+      latitude: row.latitude != null ? String(row.latitude) : "",
+      longitude: row.longitude != null ? String(row.longitude) : "",
+      parentId: row.parentId || "",
+      canAssignGuard: row.canAssignGuard || false,
+      canAssignEmployee: row.canAssignEmployee || false,
+      canAssignClient: row.canAssignClient || false,
+      categoryId: row.categoryId || "",
     })
   }
 
@@ -162,15 +211,36 @@ export default function MasterManager({
 
     if (supportsDescription) payload.description = form.description.trim() || null
     if (supportsContact) payload.contact = form.contact.trim() || null
+    if (supportsVendorFields) {
+      payload.companyPhone = form.companyPhone.trim() || null
+      payload.contactPerson = form.contactPerson.trim() || null
+      payload.contactPersonPhone = form.contactPersonPhone.trim() || null
+      payload.address = form.address.trim() || null
+    }
     if (supportsUnitShortCode) payload.shortCode = form.shortCode.trim()
 
     if (supportsStoreFields) {
       payload.code = form.code.trim()
       payload.type = form.type.trim() || null
+      payload.prefix = form.prefix.trim() || null
+      payload.isHeadOffice = form.isHeadOffice
+      payload.latitude = form.latitude.trim() ? Number(form.latitude) : null
+      payload.longitude = form.longitude.trim() ? Number(form.longitude) : null
       payload.contactNumber = form.contactNumber.trim() || null
       payload.address = form.address.trim() || null
       payload.regionalOfficeId = form.regionalOfficeId || null
       payload.isActive = true
+    }
+    
+    if (supportsCategoryFields) {
+      payload.parentId = form.parentId || null
+      payload.canAssignGuard = form.canAssignGuard
+      payload.canAssignEmployee = form.canAssignEmployee
+      payload.canAssignClient = form.canAssignClient
+    }
+
+    if (supportsStatusCategory) {
+      payload.categoryId = form.categoryId || null
     }
 
     setSaving(true)
@@ -239,6 +309,26 @@ export default function MasterManager({
               <input className="ui-input" value={form.contact} onChange={(e) => setForm((prev) => ({ ...prev, contact: e.target.value }))} />
             </div>
           ) : null}
+          {supportsVendorFields ? (
+            <>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Company Phone</label>
+                <input className="ui-input" value={form.companyPhone} onChange={(e) => setForm((prev) => ({ ...prev, companyPhone: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person</label>
+                <input className="ui-input" value={form.contactPerson} onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person Phone</label>
+                <input className="ui-input" value={form.contactPersonPhone} onChange={(e) => setForm((prev) => ({ ...prev, contactPersonPhone: e.target.value }))} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Address</label>
+                <input className="ui-input" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} />
+              </div>
+            </>
+          ) : null}
 
           {supportsStoreFields ? (
             <>
@@ -269,7 +359,85 @@ export default function MasterManager({
                 <label className="mb-1 block text-sm text-[var(--text-muted)]">Address</label>
                 <input className="ui-input" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} />
               </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Prefix</label>
+                <input className="ui-input" value={form.prefix} onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))} placeholder="e.g. WH-KHI" />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="isHeadOffice"
+                  checked={form.isHeadOffice}
+                  onChange={(e) => setForm((prev) => ({ ...prev, isHeadOffice: e.target.checked }))}
+                />
+                <label htmlFor="isHeadOffice" className="text-sm text-[var(--text-muted)]">Is Head Office</label>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Latitude</label>
+                <input className="ui-input" type="number" step="any" value={form.latitude} onChange={(e) => setForm((prev) => ({ ...prev, latitude: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Longitude</label>
+                <input className="ui-input" type="number" step="any" value={form.longitude} onChange={(e) => setForm((prev) => ({ ...prev, longitude: e.target.value }))} />
+              </div>
             </>
+          ) : null}
+
+          {supportsCategoryFields ? (
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Parent Category</label>
+              <select className="ui-select" value={form.parentId} onChange={(e) => setForm((prev) => ({ ...prev, parentId: e.target.value }))}>
+                <option value="">None (Top Level)</option>
+                {rows
+                  .filter((r) => r.id !== editingId)
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          ) : null}
+          {supportsCategoryFields ? (
+            <div className="md:col-span-2 flex flex-wrap gap-4 pt-6">
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <input
+                  type="checkbox"
+                  checked={form.canAssignGuard}
+                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignGuard: e.target.checked }))}
+                />
+                Guard
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <input
+                  type="checkbox"
+                  checked={form.canAssignEmployee}
+                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignEmployee: e.target.checked }))}
+                />
+                Employee
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <input
+                  type="checkbox"
+                  checked={form.canAssignClient}
+                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignClient: e.target.checked }))}
+                />
+                Client
+              </label>
+            </div>
+          ) : null}
+          {supportsStatusCategory ? (
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Category</label>
+              <select className="ui-select" value={form.categoryId} onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value }))}>
+                <option value="">None</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : null}
         </div>
 
@@ -300,10 +468,28 @@ export default function MasterManager({
                 { key: "code", header: "Code" },
                 { key: "type", header: "Type" },
                 { key: "regionalOffice", header: "Regional Office", render: (row: Row) => row.regionalOffice?.name || "—" },
+                { key: "prefix", header: "Prefix" },
+                { key: "isHeadOffice", header: "H.O", render: (row: Row) => (row.isHeadOffice ? "Yes" : "No") },
+              ]
+            : []),
+          ...(supportsCategoryFields ? [{ key: "parent", header: "Parent", render: (row: Row) => row.parent?.name || "—" }] : []),
+          ...(supportsCategoryFields
+            ? [
+                { key: "canAssignGuard", header: "Guard", render: (row: Row) => (row.canAssignGuard ? "Yes" : "No") },
+                { key: "canAssignEmployee", header: "Employee", render: (row: Row) => (row.canAssignEmployee ? "Yes" : "No") },
+                { key: "canAssignClient", header: "Client", render: (row: Row) => (row.canAssignClient ? "Yes" : "No") },
               ]
             : []),
           ...(supportsUnitShortCode ? [{ key: "shortCode", header: "Short Code" }] : []),
           ...(supportsContact ? [{ key: "contact", header: "Contact", render: (row: Row) => row.contact || "—" }] : []),
+          ...(supportsVendorFields
+            ? [
+                { key: "companyPhone", header: "Company Phone", render: (row: Row) => row.companyPhone || "—" },
+                { key: "contactPerson", header: "Contact Person", render: (row: Row) => row.contactPerson || "—" },
+                { key: "contactPersonPhone", header: "Contact Phone", render: (row: Row) => row.contactPersonPhone || "—" },
+              ]
+            : []),
+          ...(supportsStatusCategory ? [{ key: "category", header: "Category", render: (row: Row) => row.category?.name || "—" }] : []),
           ...(supportsDescription ? [{ key: "description", header: "Description", render: (row: Row) => row.description || "—" }] : []),
           {
             key: "actions",

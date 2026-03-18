@@ -19,6 +19,11 @@ type Product = {
   unit?: Option | null
   status?: Option | null
   condition?: Option | null
+  category?: Option | null
+  weaponType?: Option | null
+  calibre?: Option | null
+  description?: string | null
+  imageUrl?: string | null
 }
 
 const EMPTY_FORM = {
@@ -28,6 +33,11 @@ const EMPTY_FORM = {
   unitId: "",
   statusId: "",
   conditionId: "",
+  categoryId: "",
+  weaponTypeId: "",
+  calibreId: "",
+  description: "",
+  imageUrl: "",
   serialRequired: false,
 }
 
@@ -37,6 +47,9 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
   const [units, setUnits] = useState<Option[]>([])
   const [statuses, setStatuses] = useState<Option[]>([])
   const [conditions, setConditions] = useState<Option[]>([])
+  const [categories, setCategories] = useState<Option[]>([])
+  const [weaponTypes, setWeaponTypes] = useState<Option[]>([])
+  const [calibres, setCalibres] = useState<Option[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [search, setSearch] = useState("")
   const [saving, setSaving] = useState(false)
@@ -47,12 +60,15 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
     setLoading(true)
     setNotice(null)
     try {
-      const [productRows, brandRows, unitRows, statusRows, conditionRows] = await Promise.all([
+      const [productRows, brandRows, unitRows, statusRows, conditionRows, categoryRows, weaponTypeRows, calibreRows] = await Promise.all([
         apiGet<Product[]>("/api/store-inventory/v2/products?includeBalances=true"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/brands"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/units"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/statuses"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/conditions"),
+        apiGet<Option[]>("/api/store-inventory/v2/masters/categories"),
+        apiGet<Option[]>("/api/store-inventory/v2/masters/weapon-types"),
+        apiGet<Option[]>("/api/store-inventory/v2/masters/calibres"),
       ])
 
       setProducts(productRows)
@@ -60,6 +76,9 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
       setUnits(unitRows)
       setStatuses(statusRows)
       setConditions(conditionRows)
+      setCategories(categoryRows)
+      setWeaponTypes(weaponTypeRows)
+      setCalibres(calibreRows)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load products."
       setNotice({ type: "error", message })
@@ -96,6 +115,11 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
         unitId: form.unitId || null,
         statusId: form.statusId || null,
         conditionId: form.conditionId || null,
+        categoryId: form.categoryId || null,
+        weaponTypeId: form.weaponTypeId || null,
+        calibreId: form.calibreId || null,
+        description: form.description.trim() || null,
+        imageUrl: form.imageUrl.trim() || null,
         serialRequired: form.serialRequired,
       })
 
@@ -143,6 +167,17 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
           <Select label="Unit" value={form.unitId} onChange={(value) => setForm((prev) => ({ ...prev, unitId: value }))} options={units} />
           <Select label="Status" value={form.statusId} onChange={(value) => setForm((prev) => ({ ...prev, statusId: value }))} options={statuses} />
           <Select label="Condition" value={form.conditionId} onChange={(value) => setForm((prev) => ({ ...prev, conditionId: value }))} options={conditions} />
+          <Select label="Category" value={form.categoryId} onChange={(value) => setForm((prev) => ({ ...prev, categoryId: value }))} options={categories} />
+          <Select label="Weapon Type" value={form.weaponTypeId} onChange={(value) => setForm((prev) => ({ ...prev, weaponTypeId: value }))} options={weaponTypes} />
+          <Select label="Calibre" value={form.calibreId} onChange={(value) => setForm((prev) => ({ ...prev, calibreId: value }))} options={calibres} />
+          <div className="xl:col-span-2">
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Description</label>
+            <textarea className="ui-input min-h-[80px]" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
+          </div>
+          <div className="xl:col-span-2">
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Image URL / Base64</label>
+            <input className="ui-input" value={form.imageUrl} onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))} />
+          </div>
         </div>
 
         <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
@@ -179,6 +214,9 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
               { key: "name", header: "Name", sortable: true },
               { key: "brand", header: "Brand", render: (row) => row.brand?.name || "—" },
               { key: "unit", header: "Unit", render: (row) => row.unit?.name || "—" },
+              { key: "category", header: "Category", render: (row) => row.category?.name || "—" },
+              { key: "weaponType", header: "Weapon Type", render: (row) => row.weaponType?.name || "—" },
+              { key: "calibre", header: "Calibre", render: (row) => row.calibre?.name || "—" },
               { key: "status", header: "Status", render: (row) => row.status?.name || "—" },
               { key: "condition", header: "Condition", render: (row) => row.condition?.name || "—" },
               { key: "serialRequired", header: "Serial", render: (row) => (row.serialRequired ? "Yes" : "No") },

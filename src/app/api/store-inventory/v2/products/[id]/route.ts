@@ -9,6 +9,19 @@ const productInclude = {
   unit: true,
   status: true,
   condition: true,
+  category: true,
+  weaponType: true,
+  calibre: true,
+  licenseType: true,
+  variation: true,
+  repairing: true,
+  balances: true,
+}
+const legacyProductInclude = {
+  brand: true,
+  unit: true,
+  status: true,
+  condition: true,
   weaponType: true,
   calibre: true,
   licenseType: true,
@@ -26,10 +39,20 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const { id } = await params
 
   try {
-    const row = await prisma.storeInventoryProduct.findUnique({
-      where: { id },
-      include: productInclude,
-    })
+    let row
+    try {
+      row = await prisma.storeInventoryProduct.findUnique({
+        where: { id },
+        include: productInclude,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ""
+      if (!message.includes("Unknown field `category`")) throw error
+      row = await prisma.storeInventoryProduct.findUnique({
+        where: { id },
+        include: legacyProductInclude,
+      })
+    }
     if (!row) return notFound("Product not found.")
 
     return ok(row)
@@ -55,6 +78,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (body.sku != null) data.sku = String(body.sku).trim()
     if (body.name != null) data.name = String(body.name).trim()
     if (body.description != null) data.description = asText(body.description)
+    if (body.imageUrl != null) data.imageUrl = asText(body.imageUrl)
     if (body.serialRequired != null) data.serialRequired = asBool(body.serialRequired)
     if (body.minStockLevel != null) data.minStockLevel = parseNonNegativeInt(body.minStockLevel)
     if (body.maxStockLevel != null) data.maxStockLevel = parseNonNegativeInt(body.maxStockLevel)
@@ -67,6 +91,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (body.unitId != null) data.unitId = asText(body.unitId)
     if (body.statusId != null) data.statusId = asText(body.statusId)
     if (body.conditionId != null) data.conditionId = asText(body.conditionId)
+    if (body.categoryId != null) data.categoryId = asText(body.categoryId)
     if (body.weaponTypeId != null) data.weaponTypeId = asText(body.weaponTypeId)
     if (body.calibreId != null) data.calibreId = asText(body.calibreId)
     if (body.licenseTypeId != null) data.licenseTypeId = asText(body.licenseTypeId)
@@ -75,11 +100,31 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (Object.keys(data).length === 0) return badRequest("No valid fields provided for update.")
 
-    const updated = await prisma.storeInventoryProduct.update({
-      where: { id },
-      data,
-      include: productInclude,
-    })
+    let updated
+    try {
+      updated = await prisma.storeInventoryProduct.update({
+        where: { id },
+        data,
+        include: productInclude,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ""
+      if (
+        !message.includes("Unknown argument `categoryId`") &&
+        !message.includes("Unknown argument `imageUrl`") &&
+        !message.includes("Unknown field `category`")
+      ) {
+        throw error
+      }
+      const fallbackData = { ...data }
+      delete fallbackData.categoryId
+      delete fallbackData.imageUrl
+      updated = await prisma.storeInventoryProduct.update({
+        where: { id },
+        data: fallbackData,
+        include: legacyProductInclude,
+      })
+    }
 
     await emitInventoryV2Audit({
       userId: session.userId,
