@@ -30,6 +30,10 @@ type Guard = {
   cnic: string
   phone: string
   regionalOfficeId: string
+  designation?: string | null
+  guardType?: string | null
+  status?: string | null
+  supervisorName?: string | null // fetched separately
 }
 
 type RegionalOffice = {
@@ -100,6 +104,7 @@ export default function DeployGuardForm() {
   const [selectedBranch, setSelectedBranch] = useState("")
   const [selectedGuard, setSelectedGuard] = useState("")
   const [selectedRegionalOffice, setSelectedRegionalOffice] = useState("")
+  const [guardSupervisor, setGuardSupervisor] = useState<string>("—")
 
 
   const [clientGuardTypes, setClientGuardTypes] = useState<string[]>([])
@@ -135,6 +140,17 @@ export default function DeployGuardForm() {
     }
     loadGuards(selectedRegionalOffice)
   }, [selectedRegionalOffice])
+
+  // Fetch guard supervisor when a guard is selected
+  useEffect(() => {
+    if (!selectedGuard) { setGuardSupervisor("—"); return }
+    fetch(`/api/guards/${selectedGuard}/supervisor`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        setGuardSupervisor(data?.supervisorName ?? "—")
+      })
+      .catch(() => setGuardSupervisor("—"))
+  }, [selectedGuard])
 
   const loadClientGuardTypes = async (clientId: string) => {
     try {
@@ -189,7 +205,16 @@ export default function DeployGuardForm() {
       const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}&status=ACTIVE`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
-        setGuards(data)
+        setGuards(data.map((g: Guard & Record<string, unknown>) => ({
+          id: g.id,
+          name: g.name,
+          cnic: g.cnic,
+          phone: g.phone,
+          regionalOfficeId: g.regionalOfficeId,
+          designation: (g.designation as string | null) ?? null,
+          guardType: (g.guardType as string | null) ?? null,
+          status: (g.status as string | null) ?? null,
+        })))
       } else {
         setGuards(LEGACY_GUARDS)
       }
@@ -236,7 +261,7 @@ export default function DeployGuardForm() {
           nightShiftStart: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftStart : null,
           nightShiftEnd: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftEnd : null,
           deploymentType,
-          deploymentNature,
+          deploymentNature: deploymentNature || "PERMANENT",
           isExtraGuard,
           comment: isExtraGuard ? comment : null,
           status: guardDeploymentStatus || "ACTIVE",
@@ -380,24 +405,32 @@ export default function DeployGuardForm() {
           </div>
 
           {selectedGuardData ? (
-            <div className="mt-4 p-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)]">
-              <h3 className="font-medium mb-2">Selected Guard Details:</h3>
+            <div className="mt-4 p-4 rounded-[var(--radius-md)] border border-blue-200 bg-blue-50/60">
+              <h3 className="text-sm font-semibold text-blue-800 mb-3">Selected Guard Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Name</label>
-                  <input value={selectedGuardData.name} readOnly className="ui-input bg-slate-50" />
+                  <label className="block text-xs text-blue-600 mb-1">Guard&apos;s Name</label>
+                  <input value={selectedGuardData.name} readOnly className="ui-input bg-white text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Designations</label>
-                  <input value={designation || "Designation"} readOnly className="ui-input bg-slate-50" />
+                  <label className="block text-xs text-blue-600 mb-1">CNIC</label>
+                  <input value={selectedGuardData.cnic} readOnly className="ui-input bg-white text-sm font-mono" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Guard&apos;s Type</label>
-                  <input value={guardType || "Type"} readOnly className="ui-input bg-slate-50" />
+                  <label className="block text-xs text-blue-600 mb-1">Phone</label>
+                  <input value={selectedGuardData.phone} readOnly className="ui-input bg-white text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">Supervisor Name</label>
-                  <input name="Supervisor Name" value="—" readOnly className="ui-input bg-slate-50" />
+                  <label className="block text-xs text-blue-600 mb-1">Deployment Designation</label>
+                  <input value={designation || "—"} readOnly className="ui-input bg-white text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-blue-600 mb-1">Guard Type</label>
+                  <input value={guardType || selectedGuardData.guardType || "—"} readOnly className="ui-input bg-white text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-blue-600 mb-1">Supervisor</label>
+                  <input value={guardSupervisor} readOnly className="ui-input bg-white text-sm" />
                 </div>
               </div>
             </div>

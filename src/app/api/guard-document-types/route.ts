@@ -36,8 +36,10 @@ async function ensureSystemVerificationDocs() {
   for (const name of SYSTEM_VERIFICATION_TYPES) {
     await prisma.guardDocumentType.upsert({
       where: { name },
-      create: { name, sortOrder: 50, docCategory: "VERIFICATION", isSystemGenerated: false } as Record<string, unknown>,
-      update: { docCategory: "VERIFICATION" } as Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      create: { name, sortOrder: 50, docCategory: "VERIFICATION", isSystemGenerated: false } as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      update: { docCategory: "VERIFICATION" } as any,
     })
   }
 }
@@ -106,7 +108,8 @@ export async function GET(request: NextRequest) {
       if (needsMigration.length > 0) {
         await prisma.guardDocumentType.updateMany({
           where: { id: { in: needsMigration.map((t) => t.id) } },
-          data: { docCategory: "ATTACHMENT" } as Record<string, unknown>,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: { docCategory: "ATTACHMENT" } as any,
         })
         types = await prisma.guardDocumentType.findMany({
           where,
@@ -153,7 +156,8 @@ export async function POST(request: NextRequest) {
     const newOrder = (maxOrder._max.sortOrder ?? 0) + 1
 
     const docType = await prisma.guardDocumentType.create({
-      data: { name, isActive: true, sortOrder: newOrder, docCategory } as Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { name, isActive: true, sortOrder: newOrder, docCategory } as any,
     })
 
     return NextResponse.json(docType, { status: 201 })

@@ -95,35 +95,104 @@ export async function POST(request: NextRequest) {
         const isBranchless = body.isBranchless === "true"
         const defaultBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""
 
+        // Resolve city — form sends it as `clientLocation`
+        const city = body.clientLocation || body.city || null
+
+        // Resolve regionId — form sends it as `locationRegionalOffice`
+        const regionId = body.locationRegionalOffice || body.regionId || null
+
+        // Resolve GPS — prefer manual override over map picker
+        const latitude  = parseFloat(body.latitudeManual  || body.latitude  || "") || null
+        const longitude = parseFloat(body.longitudeManual || body.longitude || "") || null
+
+        // Parse numeric capacities
+        const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
+        const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
+
         const client = await prisma.client.create({
             data: {
-                name: body.name,
-                email: body.email || null,
-                type: body.type,
+                // Core
+                name:             body.name,
+                email:            body.email            || null,
+                type:             body.type,
                 isBranchless,
                 headOfficeAddress: body.headOfficeAddress || null,
-                city: body.city || null,
-                status: body.status || "ACTIVE",
-                logoUrl: body.logoUrl || null,
-                ntn: body.ntn || null,
-                strn: body.strn || null,
-                contractUrl: body.contractUrl || null,
-                contractAttachments: Array.isArray(body.contractAttachments) && body.contractAttachments.length > 0 ? body.contractAttachments : undefined,
-                regionId: body.regionId || null,
+                city,
+                status:           body.status           || "ACTIVE",
+                logoUrl:          body.logoUrl           || null,
+                ntn:              body.ntn               || null,
+                strn:             body.strn              || null,
+                contractUrl:      body.contractUrl       || null,
+                contractAttachments: Array.isArray(body.contractAttachments) && body.contractAttachments.length > 0
+                    ? body.contractAttachments : undefined,
+                regionId,
+                enrollmentDate:   body.enrollmentDate ? new Date(body.enrollmentDate) : new Date(),
+
+                // Contact
+                contactPerson:   body.contactPerson  || null,
+                phone:           body.contactNumber  || null,
+                contactNumbers:  Array.isArray(body.contactNumbers) && body.contactNumbers.length > 0
+                    ? body.contactNumbers : undefined,
+                postalCode:      body.clientPostalCode || null,
+
+                // Introducer
+                introducerName:          body.introducerName          || null,
+                introducerContactNumber: body.introducerContactNumber || null,
+                introducerAddress:       body.introducerAddress       || null,
+                introducerCnic:          body.introducerCnicNumber    || null,
+
+                // Operational
+                operationalProvinces: body.operationalProvinces || null,
+
+                // Assigned users
+                assignedManagerId: body.assignedManagerId || null,
+
+                // GPS
+                latitude,
+                longitude,
+
+                // Capacities
+                dayGuardCapacity:        toInt(body.dayGuardCapacity),
+                nightGuardCapacity:      toInt(body.nightGuardCapacity),
+                daySupervisorCapacity:   toInt(body.daySupervisorCapacity),
+                nightSupervisorCapacity: toInt(body.nightSupervisorCapacity),
+                cpoCapacity:             toInt(body.cpoCapacity),
+
+                // Contract details
+                contractStart:            body.contractStart      ? new Date(body.contractStart)      : null,
+                contractEnd:              body.contractEnd        ? new Date(body.contractEnd)        : null,
+                contractRateStart:        body.contractRateStart  ? new Date(body.contractRateStart)  : null,
+                contractRateEnd:          body.contractRateEnd    ? new Date(body.contractRateEnd)    : null,
+                contractGuardDesignation: body.contractGuardDesignation  || null,
+                contractAdditionalGuards: toInt(body.contractAdditionalGuards),
+                contractGuardExService:   body.contractGuardExService    || null,
+                contractPrice:            toFloat(body.contractPrice),
+
                 // Auto-create the first branch if a name was provided (branch clients only)
                 ...(!isBranchless && defaultBranchName ? {
                     branches: {
                         create: {
-                            name: defaultBranchName,
-                            isHeadOffice: true,
-                            address: body.headOfficeAddress || null,
-                            city: body.city || null,
+                            name:          defaultBranchName,
+                            type:          body.branchType        || null,
+                            isHeadOffice:  true,
+                            address:       body.headOfficeAddress || null,
+                            city,
+                            contactPerson: body.contactPerson     || null,
+                            contactPhone:  body.contactNumber     || null,
                         },
                     },
                 } : {}),
             },
             include: { branches: true },
         })
+
+        // Create supervisor assignment if provided
+        const supervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
+        if (supervisorId) {
+            await prisma.clientSupervisorAssignment.create({
+                data: { clientId: client.id, supervisorId },
+            }).catch(() => { /* ignore if user not found */ })
+        }
 
         return NextResponse.json(client, { status: 201 })
     } catch (error: unknown) {

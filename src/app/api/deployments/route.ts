@@ -151,26 +151,64 @@ export async function POST(request: NextRequest) {
             return badRequest("Branch does not belong to the selected client.")
         }
 
-        if (isWorkflowRuleEnabled("deployments.singleActivePerGuard")) {
-            // Guard can only have one active deployment at a time.
-            const existingDeployment = await prisma.deployment.findFirst({
-                where: {
-                    guardId,
-                    status: "ACTIVE",
-                },
-                select: { id: true },
+        // ── Shift-conflict check (replaces singleActivePerGuard with smarter logic) ──
+        // Rules:
+        //   • A guard with BOTH shift cannot be deployed anywhere else.
+        //   • A guard cannot be deployed in the same shift type at two different places.
+        //   • A guard with DAY can get a NIGHT double-duty (and vice versa).
+        //   • A guard cannot be given BOTH shift if they already have any active deployment.
+        //   • Max 2 concurrent active deployments (one DAY + one NIGHT).
+        {
+            const activeDeployments = await prisma.deployment.findMany({
+                where: { guardId, status: "ACTIVE" },
+                select: { id: true, shiftType: true, clientId: true, branchId: true },
             })
 
-            if (existingDeployment) {
-                return conflict("This guard already has an active deployment.")
+            if (activeDeployments.length > 0) {
+                const activeShifts = activeDeployments.map((d) => d.shiftType) // DAY | NIGHT | BOTH
+
+                // If trying to deploy as BOTH — not allowed when already deployed anywhere
+                if (shiftType === "BOTH") {
+                    return conflict(
+                        "Cannot assign a BOTH-shift deployment when the guard already has an active deployment. " +
+                        "End the existing deployment first."
+                    )
+                }
+
+                // If existing deployment is BOTH — blocks everything
+                if (activeShifts.includes("BOTH")) {
+                    return conflict(
+                        "Guard is already deployed on a BOTH-shift and cannot take on any additional deployment."
+                    )
+                }
+
+                // If new shift conflicts with any existing shift
+                if (activeShifts.includes(shiftType)) {
+                    const label = shiftType === "DAY" ? "day" : "night"
+                    return conflict(
+                        `Guard already has an active ${label}-shift deployment. ` +
+                        `A guard can only be double-deployed if the shifts (DAY/NIGHT) do not overlap.`
+                    )
+                }
+
+                // At this point: existing is DAY and new is NIGHT (or vice versa) — double duty allowed
+                // Enforce cap of 2 active deployments
+                if (activeDeployments.length >= 2) {
+                    return conflict("Guard already has 2 active deployments (maximum allowed).")
+                }
+            } else if (isWorkflowRuleEnabled("deployments.singleActivePerGuard") && shiftType === "BOTH") {
+                // legacy rule still respected for BOTH shift when no existing deployments
+                // (no-op: BOTH with no existing is fine — handled above)
             }
         }
 
-        const numericRate = parseOptionalNumber(body?.rate)
-        const numericSalary = parseOptionalNumber(body?.salary)
-        const numericOvertime = parseOptionalNumber(body?.overtime)
-        const numericExtraHours = parseOptionalNumber(body?.extraHours)
-        const numericPostAllowance = parseOptionalNumber(body?.postAllowance)
+        // ── Numeric field parsing — treat missing/empty as null (not an error) ──
+        const numericRate         = body?.rate         != null && body.rate         !== "" ? parseOptionalNumber(body.rate)         : null
+        const numericSalary       = body?.salary       != null && body.salary       !== "" ? parseOptionalNumber(body.salary)       : null
+        const numericOvertime     = body?.overtime     != null && body.overtime     !== "" ? parseOptionalNumber(body.overtime)     : null
+        const numericExtraHours   = body?.extraHours   != null && body.extraHours   !== "" ? parseOptionalNumber(body.extraHours)   : null
+        const numericPostAllowance= body?.postAllowance!= null && body.postAllowance!== "" ? parseOptionalNumber(body.postAllowance): null
+
         if (
             numericRate === undefined ||
             numericSalary === undefined ||
@@ -181,6 +219,10 @@ export async function POST(request: NextRequest) {
             return badRequest("Numeric fields contain invalid values.")
         }
 
+        const deploymentStatus = body.status && ["ACTIVE","PENDING","INACTIVE"].includes(String(body.status))
+            ? String(body.status)
+            : "ACTIVE"
+
         const data: Prisma.DeploymentUncheckedCreateInput = {
             guardId,
             clientId,
@@ -190,7 +232,7 @@ export async function POST(request: NextRequest) {
             designation,
             shiftType,
             rate: numericRate ?? null,
-            status: "ACTIVE",
+            status: deploymentStatus,
             notes: body.notes ? String(body.notes) : null,
             guardType: body.guardType ? String(body.guardType) : null,
             salary: numericSalary ?? null,
@@ -202,6 +244,7 @@ export async function POST(request: NextRequest) {
             nightShiftStart: body.nightShiftStart ? String(body.nightShiftStart) : null,
             nightShiftEnd: body.nightShiftEnd ? String(body.nightShiftEnd) : null,
             deploymentType: body.deploymentType ? String(body.deploymentType) : "REGULAR",
+            deploymentNature: body.deploymentNature ? String(body.deploymentNature) : "PERMANENT",
             isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
             comment: body.comment ? String(body.comment) : null,
         }
@@ -210,11 +253,48 @@ export async function POST(request: NextRequest) {
             data,
             include: {
                 guard: true,
-                client: true,
+                client: { select: { id: true, name: true } },
                 branch: true,
                 regionalOffice: true,
             },
         })
+
+        // ── Business logic: auto-mark attendance for today if deployment is ACTIVE ──
+        // Determine attendance type based on whether a record already exists (double duty)
+        if (deploymentStatus === "ACTIVE") {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+
+            // Check if an attendance record already exists today (prior deployment = double duty)
+            const existing = await prisma.attendance.findUnique({
+                where: { guardId_date: { guardId, date: today } },
+                select: { id: true, shiftType: true },
+            })
+
+            const attendanceType = existing
+                ? (shiftType === "DAY" ? "DOUBLE_DUTY_DAY" : "DOUBLE_DUTY_NIGHT")
+                : "PRESENT"
+
+            await prisma.attendance.upsert({
+                where: { guardId_date: { guardId, date: today } },
+                create: {
+                    guardId,
+                    date: today,
+                    status: "PRESENT",
+                    shiftType,
+                    attendanceType,
+                    deploymentId: deployment.id,
+                    clientId,
+                    clientName: deployment.client.name,
+                    isAutoGenerated: true,
+                },
+                update: {
+                    // Upgrade to double-duty type — keep manual overrides untouched (isAutoGenerated=false)
+                    attendanceType,
+                    shiftType: existing?.shiftType ? "BOTH" : shiftType,
+                },
+            })
+        }
 
         return NextResponse.json(deployment, { status: 201 })
     } catch (error: unknown) {

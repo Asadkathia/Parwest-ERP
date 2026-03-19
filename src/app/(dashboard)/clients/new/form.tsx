@@ -68,7 +68,8 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [introducerAddress, setIntroducerAddress] = useState("")
     const [defaultBranchName, setDefaultBranchName] = useState("")
     const [contactNumbers, setContactNumbers] = useState<string[]>([""])
-    const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([])
+    const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
+    const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
     const [contractFile, setContractFile] = useState<string | null>(null)
     const [contractFileName, setContractFileName] = useState("")
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
@@ -96,10 +97,13 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
             .then((r) => r.ok ? r.json() : [])
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
-                    setStaffUsers(
-                        (data as { id: string; name?: string | null }[])
-                            .filter((u) => u.name)
-                            .map((u) => ({ id: u.id, name: u.name as string }))
+                    const users = data as { id: string; name?: string | null; role?: { name?: string | null } }[]
+                    const toOption = (u: typeof users[0]) => ({ id: u.id, name: u.name as string })
+                    setSupervisorUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption)
+                    )
+                    setManagerUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption)
                     )
                 }
             })
@@ -402,7 +406,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
                             <SearchSelect
                                 name="assignedSupervisorId"
-                                options={staffUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
                                 placeholder="— Select Supervisor —"
                             />
                         </div>
@@ -410,7 +414,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
                             <SearchSelect
                                 name="assignedManagerId"
-                                options={staffUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
                                 placeholder="— Select Manager —"
                             />
                         </div>

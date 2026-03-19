@@ -414,6 +414,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
             <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
             <Field label="NEXT OF KIN *" name="nextOfKin" required />
+            <Field label="NATIONALITY" name="nationality" placeholder="e.g. Pakistani" />
             <div className="space-y-3 lg:col-span-3">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 CONTACT # (FORMAT: +92-300-1234567) <span className="text-red-500">*</span>

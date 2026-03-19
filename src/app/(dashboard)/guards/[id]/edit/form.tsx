@@ -55,6 +55,7 @@ type Guard = {
     bankName: string | null
     bankAccountNumber: string | null
     bankAccountType: string | null
+    bankAccountsJson?: string | null
     paymentMode?: string | null
     guardCategory?: string | null
     photoUrl?: string | null
@@ -855,51 +856,28 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                 {/* Banking Information */}
                 <div>
                     <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Banking Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Bank Name
-                            </label>
-                            <input
-                                type="text"
-                                name="bankName"
-                                defaultValue={guard.bankName || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="e.g., HBL, MCB, UBL"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Number
-                            </label>
-                            <input
-                                type="text"
-                                name="bankAccountNumber"
-                                defaultValue={guard.bankAccountNumber || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Account number"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Account Type
-                            </label>
-                            <select
-                                name="bankAccountType"
-                                defaultValue={guard.bankAccountType || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select type</option>
-                                <option value="Savings">Savings</option>
-                                <option value="Current">Current</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <GuardAccountsEditor />
-                    </div>
+                    <GuardAccountsEditor defaultValue={(() => {
+                        try {
+                            const p = JSON.parse(guard.bankAccountsJson || "[]")
+                            if (Array.isArray(p) && p.length > 0) return p
+                        } catch { /* ignore */ }
+                        // Fall back to flat fields if no JSON accounts saved yet
+                        if (guard.bankName || guard.bankAccountNumber) {
+                            return [{
+                                id: "legacy-primary",
+                                bankName: guard.bankName || "",
+                                accountTitle: "",
+                                accountNumber: guard.bankAccountNumber || "",
+                                iban: "",
+                                branchCode: "",
+                                accountType: (guard.bankAccountType === "Current" ? "CURRENT" : "SAVINGS") as "SAVINGS" | "CURRENT",
+                                accountStatus: "ACTIVE" as const,
+                                walletType: "BANK" as const,
+                                isActive: true,
+                            }]
+                        }
+                        return undefined
+                    })()} />
                 </div>
 
                 {/* Nearest Relatives */}

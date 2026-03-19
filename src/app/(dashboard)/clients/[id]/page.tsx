@@ -92,6 +92,7 @@ export default async function ClientDetailPage({
     endDate?: string
     supervisor?: string
     manager?: string
+    guardStatus?: string
   }>
 }) {
   const session = await auth()
@@ -109,6 +110,7 @@ export default async function ClientDetailPage({
     endDate = "",
     supervisor = "",
     manager = "",
+    guardStatus = "All",
   } = await searchParams
   const activeTab: TabKey = isTab(tabParam) ? tabParam : "general-information"
   const showCount = toSafeNumber(show, 10)
@@ -126,6 +128,15 @@ export default async function ClientDetailPage({
           },
         },
         orderBy: { name: "asc" },
+      },
+      deployments: {
+        include: { guard: true, branch: true },
+        orderBy: { deploymentDate: "desc" },
+      },
+      supervisorAssignments: {
+        where: { status: "ACTIVE" },
+        include: { supervisor: { select: { name: true, email: true } } },
+        take: 1,
       },
       pricingConfigs: {
         orderBy: { guardType: "asc" },
@@ -180,6 +191,24 @@ export default async function ClientDetailPage({
       if (startDate && !deployment.deploymentDate) return false
       if (endDate && !deployment.deploymentDate) return false
       if (selectDate && toIsoDate(deployment.deploymentDate) !== selectDate) return false
+      return true
+    })
+    .slice(0, showCount)
+
+  // ── Full deployment history (all statuses, from client.deployments directly) ──
+  const guardStatusLower = guardStatus.toLowerCase()
+  const deploymentHistory = (client.deployments || [])
+    .filter((d) => {
+      if (guardStatusLower === "active") return d.status === "ACTIVE"
+      if (guardStatusLower === "previous") return d.status !== "ACTIVE"
+      return true
+    })
+    .filter((d) => {
+      const guardName = d.guard?.name?.toLowerCase() || ""
+      const guardParwest = d.guard?.parwestId?.toLowerCase() || ""
+      const branchName = (d.branch?.name || "").toLowerCase()
+      if (normalizedSearch && !guardName.includes(normalizedSearch) && !guardParwest.includes(normalizedSearch) && !branchName.includes(normalizedSearch)) return false
+      if (selectDate && toIsoDate(d.deploymentDate) !== selectDate) return false
       return true
     })
     .slice(0, showCount)
@@ -291,76 +320,182 @@ export default async function ClientDetailPage({
       </div>
 
       {activeTab === "general-information" ? (
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">GENERAL INFORMATION</h2>
-            <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-              <Edit className="h-4 w-4" />
-              Edit
-            </Link>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
-              <div className="space-y-3">
-                {client.logoUrl ? (
-                  <Image
-                    src={client.logoUrl}
-                    alt={client.name}
-                    width={220}
-                    height={192}
-                    unoptimized
-                    className="h-48 w-full rounded-[var(--radius-md)] border border-[var(--border)] object-cover"
-                  />
-                ) : (
-                  <div className="flex h-48 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] text-sm text-[var(--text-muted)]">
-                    PHOTO NOT AVAILABLE
-                  </div>
-                )}
-                <button type="button" className="ui-btn ui-btn-primary w-full">
-                  UPLOAD PICTURE
-                </button>
+        <div className="space-y-4">
+          {/* ── Profile header card ── */}
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-[var(--text)]">GENERAL INFORMATION</h2>
+              <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Link>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              {/* Logo + quick metrics */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-[200px_1fr]">
+                <div className="space-y-3">
+                  {client.logoUrl ? (
+                    <Image
+                      src={client.logoUrl}
+                      alt={client.name}
+                      width={200}
+                      height={176}
+                      unoptimized
+                      className="h-44 w-full rounded-[var(--radius-md)] border border-[var(--border)] object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-44 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] text-xs text-[var(--text-muted)]">
+                      PHOTO NOT AVAILABLE
+                    </div>
+                  )}
+                  <button type="button" className="ui-btn ui-btn-primary w-full text-xs">UPLOAD PICTURE</button>
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <InfoCell label="BRANCHES" value={String(client.branches.length)} />
+                  <InfoCell label="DAY DUTY GUARDS" value={String(uniqueDayGuardIds.size)} />
+                  <InfoCell label="NIGHT DUTY GUARDS" value={String(uniqueNightGuardIds.size)} />
+                  <InfoCell label="LOCATION SUPERVISORS" value={String(locationSupervisors)} />
+                  <InfoCell label="CPO" value={String(cpoCount)} />
+                  <InfoCell label="GUARD-LESS BRANCHES" value={String(guardLessBranches)} accent />
+                  <InfoCell label="TOTAL ACTIVE GUARDS" value={String(uniqueDayGuardIds.size + uniqueNightGuardIds.size)} />
+                  <InfoCell label="TOTAL DEPLOYMENTS" value={String(client.deployments?.length ?? 0)} />
+                </div>
               </div>
+            </CardBody>
+          </Card>
 
+          {/* ── Basic Details ── */}
+          <Card>
+            <CardHeader>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CLIENT DETAILS</h3>
+            </CardHeader>
+            <CardBody>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <InfoCell label="NAME" value={client.name} />
-                <InfoCell label="EMAIL" value={client.email || "—"} />
-                <InfoCell label="CURRENT STATUS" value={client.status} />
-                <InfoCell label="CHANGE STATUS" value="CLICK TO CHANGE STATUS" accent />
-
                 <InfoCell label="CLIENT TYPE" value={client.type} />
+                <InfoCell label="EMAIL" value={client.email || "—"} />
+                <InfoCell label="STATUS" value={client.status} accent={client.status === "ACTIVE"} />
                 <InfoCell label="CITY" value={client.city || "—"} />
-                <InfoCell label="ADDRESS" value={headAddress} />
-                <InfoCell label="ZIP CODE" value={getZipCode(headAddress)} />
-
-                <InfoCell label="BRANCHES" value={String(client.branches.length)} />
-                <InfoCell label="DAY DUTY GUARDS" value={String(uniqueDayGuardIds.size)} />
-                <InfoCell label="NIGHT DUTY GUARDS" value={String(uniqueNightGuardIds.size)} />
-                <InfoCell label="LOCATION SUPERVISORS" value={String(locationSupervisors)} />
-
-                <InfoCell label="CPO" value={String(cpoCount)} />
-                <InfoCell label="GUARD LESS BRANCHES" value={String(guardLessBranches)} accent />
+                <InfoCell label="POSTAL CODE" value={client.postalCode || "—"} />
+                <InfoCell label="ENROLLMENT DATE" value={formatDate(client.enrollmentDate)} />
+                <InfoCell label="REGION" value={client.region?.name || "—"} />
+                <InfoCell label="BRANCHLESS CLIENT" value={client.isBranchless ? "Yes" : "No"} />
+                <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
+                <InfoCell label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
+                <InfoCell label="NTN" value={client.ntn || "—"} />
+                <InfoCell label="STRN" value={client.strn || "—"} />
               </div>
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+
+          {/* ── Contact Information ── */}
+          <Card>
+            <CardHeader>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTACT INFORMATION</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <InfoCell label="CONTACT PERSON" value={client.contactPerson || "—"} />
+                <InfoCell label="PRIMARY PHONE" value={client.phone || "—"} />
+                <InfoCell
+                  label="ADDITIONAL NUMBERS"
+                  value={
+                    Array.isArray(client.contactNumbers) && (client.contactNumbers as string[]).length > 0
+                      ? (client.contactNumbers as string[]).join(", ")
+                      : "—"
+                  }
+                />
+                <InfoCell label="ASSIGNED SUPERVISOR" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* ── Introducer Information (conditional) ── */}
+          {(client.introducerName || client.introducerContactNumber || client.introducerCnic) ? (
+            <Card>
+              <CardHeader>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">INTRODUCER INFORMATION</h3>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <InfoCell label="INTRODUCER NAME" value={client.introducerName || "—"} />
+                  <InfoCell label="CONTACT NUMBER" value={client.introducerContactNumber || "—"} />
+                  <InfoCell label="CNIC" value={client.introducerCnic || "—"} />
+                  <InfoCell label="ADDRESS" value={client.introducerAddress || "—"} />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/* ── Guard Capacity (conditional) ── */}
+          {(client.dayGuardCapacity != null || client.nightGuardCapacity != null || client.daySupervisorCapacity != null || client.nightSupervisorCapacity != null || client.cpoCapacity != null) ? (
+            <Card>
+              <CardHeader>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">GUARD CAPACITY (CONFIGURED)</h3>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                  <InfoCell label="DAY GUARDS" value={client.dayGuardCapacity != null ? String(client.dayGuardCapacity) : "—"} />
+                  <InfoCell label="NIGHT GUARDS" value={client.nightGuardCapacity != null ? String(client.nightGuardCapacity) : "—"} />
+                  <InfoCell label="DAY SUPERVISORS" value={client.daySupervisorCapacity != null ? String(client.daySupervisorCapacity) : "—"} />
+                  <InfoCell label="NIGHT SUPERVISORS" value={client.nightSupervisorCapacity != null ? String(client.nightSupervisorCapacity) : "—"} />
+                  <InfoCell label="CPO CAPACITY" value={client.cpoCapacity != null ? String(client.cpoCapacity) : "—"} />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/* ── Contract Details (conditional) ── */}
+          {(client.contractStart || client.contractEnd || client.contractPrice != null || client.contractGuardDesignation) ? (
+            <Card>
+              <CardHeader>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTRACT DETAILS</h3>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <InfoCell label="CONTRACT START" value={formatDate(client.contractStart)} />
+                  <InfoCell label="CONTRACT END" value={formatDate(client.contractEnd)} />
+                  <InfoCell label="RATE PERIOD START" value={formatDate(client.contractRateStart)} />
+                  <InfoCell label="RATE PERIOD END" value={formatDate(client.contractRateEnd)} />
+                  <InfoCell label="GUARD DESIGNATION" value={client.contractGuardDesignation || "—"} />
+                  <InfoCell label="ADDITIONAL GUARDS" value={client.contractAdditionalGuards != null ? String(client.contractAdditionalGuards) : "—"} />
+                  <InfoCell label="EX-SERVICE TYPE" value={client.contractGuardExService || "—"} />
+                  <InfoCell label="CONTRACT PRICE" value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"} />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+        </div>
       ) : null}
 
       {activeTab === "assigned-guards" ? (
         <Card>
-          <CardHeader>
-            <h2 className="text-base font-semibold text-[var(--text)]">ASSIGNED GUARDS</h2>
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--text)]">ASSIGNED GUARDS</h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Full deployment history — current &amp; previous</p>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                Active: {(client.deployments || []).filter(d => d.status === "ACTIVE").length}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                Previous: {(client.deployments || []).filter(d => d.status !== "ACTIVE").length}
+              </span>
+            </div>
           </CardHeader>
           <CardBody className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="assigned-guards">
-              <FilterField label="Select Supervisor" name="supervisor" defaultValue={supervisor} />
-              <FilterField label="Select Manager" name="manager" defaultValue={manager} />
+              <FilterField label="Status" name="guardStatus" as="select" defaultValue={guardStatus} options={["All", "Active", "Previous"]} />
               <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
               <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
               <FilterField label="Search:" name="search" defaultValue={listSearch} />
             </LegacyFilterForm>
 
-            {filteredAssignedRows.length === 0 ? (
-              <EmptyTableMessage message="No assigned guards found." />
+            {deploymentHistory.length === 0 ? (
+              <EmptyTableMessage message="No guard deployment records found." />
             ) : (
               <TableWrapper>
                 <thead>
@@ -370,18 +505,35 @@ export default async function ClientDetailPage({
                     <Th>BRANCH</Th>
                     <Th>DESIGNATION</Th>
                     <Th>SHIFT</Th>
-                    <Th>DEPLOYMENT TYPE</Th>
+                    <Th>DEPLOYED ON</Th>
+                    <Th>END DATE</Th>
+                    <Th>TYPE</Th>
+                    <Th>STATUS</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAssignedRows.map(({ deployment, branch }) => (
-                    <tr key={deployment.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{deployment.guard?.parwestId || "—"}</Td>
-                      <Td>{deployment.guard?.name || "—"}</Td>
-                      <Td>{branch.name}</Td>
-                      <Td>{normalizeDesignation(deployment.designation)}</Td>
-                      <Td>{normalizeShift(deployment.shiftType)}</Td>
-                      <Td>{deployment.deploymentType || "REGULAR"}</Td>
+                  {deploymentHistory.map((d) => (
+                    <tr key={d.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <Td>{d.guard?.parwestId || "—"}</Td>
+                      <Td>{d.guard?.name || "—"}</Td>
+                      <Td>{d.branch?.name || "—"}</Td>
+                      <Td>{normalizeDesignation(d.designation)}</Td>
+                      <Td>{normalizeShift(d.shiftType)}</Td>
+                      <Td>{formatDate(d.deploymentDate)}</Td>
+                      <Td>{d.endDate ? formatDate(d.endDate) : "—"}</Td>
+                      <Td>{d.deploymentType || "REGULAR"}</Td>
+                      <Td>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          d.status === "ACTIVE"
+                            ? "bg-green-100 text-green-800"
+                            : d.status === "PENDING"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-600"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${d.status === "ACTIVE" ? "bg-green-500" : d.status === "PENDING" ? "bg-yellow-500" : "bg-gray-400"}`} />
+                          {d.status}
+                        </span>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -723,52 +875,68 @@ export default async function ClientDetailPage({
           </CardHeader>
           <CardBody className="space-y-6">
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BASIC INFORMATION</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">CLIENT CONTACT</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="NAME" value={client.name} />
-                <FieldDisplay label="EMAIL *" value={client.email || "—"} />
-                <FieldDisplay label="CONTACT NUMBER" value={primaryBranch?.contactPhone || "—"} />
+                <FieldDisplay label="EMAIL" value={client.email || "—"} />
+                <FieldDisplay label="CONTACT PERSON" value={client.contactPerson || "—"} />
+                <FieldDisplay label="PRIMARY PHONE" value={client.phone || "—"} />
                 <FieldDisplay label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTACT PERSON INFO</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <FieldDisplay label="NAME" value={primaryBranch?.contactPerson || "—"} />
-                <FieldDisplay label="CNIC #" value="—" />
-                <FieldDisplay label="PHONE NUMBER" value={primaryBranch?.contactPhone || "—"} />
-                <FieldDisplay label="EMAIL" value={primaryBranch?.contactEmail || "—"} />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BRANCH MANAGER&apos;S INFORMATION</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <FieldDisplay label="Manager *" value={primaryBranch?.contactPerson || "—"} />
-                <FieldDisplay label="Manager Contact Number *" value={primaryBranch?.contactPhone || "—"} />
-                <FieldDisplay label="NUMBER" value={primaryBranch?.contactPhone || "—"} />
-                <FieldDisplay label="EMAIL" value={primaryBranch?.contactEmail || "—"} />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">OPERATIONS MANAGER&apos;S INFORMATION</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <FieldDisplay label="Manager *" value={primaryBranch?.contactPerson || "—"} />
-                <FieldDisplay label="Manager Contact Number" value={primaryBranch?.contactPhone || "—"} />
-                <FieldDisplay label="Select City" value={primaryBranch?.city || client.city || "—"} />
-                <FieldDisplay label="EMAIL" value={primaryBranch?.contactEmail || "—"} />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">SUPERVISOR&apos;S INFORMATION</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <FieldDisplay label="Supervisor *" value={activeDeploymentRows[0]?.deployment?.guard?.name || "—"} />
-                <FieldDisplay label="Supervisor Contact Number *" value={activeDeploymentRows[0]?.deployment?.guard?.phone || "—"} />
+                <FieldDisplay label="CITY" value={client.city || "—"} />
+                <FieldDisplay label="POSTAL CODE" value={client.postalCode || "—"} />
                 <FieldDisplay label="REGION" value={client.region?.name || "—"} />
+              </div>
+            </div>
+
+            {client.introducerName ? (
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">INTRODUCER INFORMATION</h3>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <FieldDisplay label="INTRODUCER NAME" value={client.introducerName || "—"} />
+                  <FieldDisplay label="CONTACT NUMBER" value={client.introducerContactNumber || "—"} />
+                  <FieldDisplay label="CNIC" value={client.introducerCnic || "—"} />
+                  <FieldDisplay label="ADDRESS" value={client.introducerAddress || "—"} />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BRANCH CONTACT INFORMATION</h3>
+              {client.branches.length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">No branches found.</p>
+              ) : (
+                <TableWrapper>
+                  <thead>
+                    <tr>
+                      <Th>BRANCH</Th>
+                      <Th>CITY</Th>
+                      <Th>CONTACT PERSON</Th>
+                      <Th>PHONE</Th>
+                      <Th>EMAIL</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {client.branches.map((b) => (
+                      <tr key={b.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                        <Td>{b.name}</Td>
+                        <Td>{b.city || "—"}</Td>
+                        <Td>{b.contactPerson || "—"}</Td>
+                        <Td>{b.contactPhone || "—"}</Td>
+                        <Td>{b.contactEmail || "—"}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </TableWrapper>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">ASSIGNED SUPERVISOR</h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <FieldDisplay label="SUPERVISOR NAME" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
+                <FieldDisplay label="SUPERVISOR EMAIL" value={client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
                 <FieldDisplay label="BRANCHLESS" value={client.isBranchless ? "Yes" : "No"} />
+                <FieldDisplay label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
               </div>
             </div>
           </CardBody>

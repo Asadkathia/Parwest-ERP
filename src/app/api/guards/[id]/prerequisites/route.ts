@@ -76,9 +76,9 @@ export async function POST(
     const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true } })
     if (!guard) return notFound("Guard not found")
 
-    const uploaderName = (session as Record<string, unknown> & { user?: { name?: string; email?: string } }).user?.name
-      ?? (session as Record<string, unknown> & { user?: { name?: string; email?: string } }).user?.email
-      ?? null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sessionUser = (session as any)?.user as { name?: string; email?: string } | undefined
+    const uploaderName = sessionUser?.name ?? sessionUser?.email ?? null
 
     // If a previous record with a file exists, archive it to history before replacing
     const existing = await prisma.guardPrerequisite.findUnique({

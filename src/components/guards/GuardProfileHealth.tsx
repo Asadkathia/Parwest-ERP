@@ -111,21 +111,23 @@ type Section = { label: string; value: number; color: string }
 // ── component ─────────────────────────────────────────────────────────────────
 export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
     const [show, setShow] = useState(false)
-    const [visible, setVisible] = useState(false)
+    // Phase controls the animation sequence
+    // 0 = hidden, 1 = panel expanding (max-width), 2 = items appearing, 3 = bar filling
+    const [phase, setPhase] = useState(0)
     const [docPct, setDocPct] = useState<number | null>(null)
     const [docLoading, setDocLoading] = useState(false)
 
-    // animate in/out
     useEffect(() => {
-        let rafId: number | null = null
+        let t1: ReturnType<typeof setTimeout>
+        let t2: ReturnType<typeof setTimeout>
         if (show) {
-            rafId = requestAnimationFrame(() => setVisible(true))
+            setPhase(1)                           // panel expands right
+            t1 = setTimeout(() => setPhase(2), 200) // items slide in
+            t2 = setTimeout(() => setPhase(3), 640) // bar fills
         } else {
-            rafId = requestAnimationFrame(() => setVisible(false))
+            setPhase(0)
         }
-        return () => {
-            if (rafId !== null) cancelAnimationFrame(rafId)
-        }
+        return () => { clearTimeout(t1); clearTimeout(t2) }
     }, [show])
 
     useEffect(() => {
@@ -147,12 +149,8 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                 ).length
                 setDocPct(Math.round((uploaded / active.length) * 100))
             })
-            .catch(() => {
-                if (!cancelled) setDocPct(0)
-            })
-            .finally(() => {
-                if (!cancelled) setDocLoading(false)
-            })
+            .catch(() => { if (!cancelled) setDocPct(0) })
+            .finally(() => { if (!cancelled) setDocLoading(false) })
         return () => {
             cancelled = true
             void markLoading
@@ -180,11 +178,11 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
     )
 
     const sections: Section[] = [
-        { label: "Personal Info",      color: "#3b82f6", value: calcPct(personalFields.filter(has).length, personalFields.length) },
-        { label: "Contact Info",       color: "#8b5cf6", value: calcPct(contactFields.filter(has).length, contactFields.length) },
-        { label: "Employment",         color: "#f59e0b", value: calcPct(employmentFields.filter(has).length, employmentFields.length) },
-        { label: "Nearest Relatives",  color: "#10b981", value: relPct },
-        { label: "Documents",          color: "#ef4444", value: docLoading ? 0 : (docPct ?? 0) },
+        { label: "Personal Info",     color: "#3b82f6", value: calcPct(personalFields.filter(has).length, personalFields.length) },
+        { label: "Contact Info",      color: "#8b5cf6", value: calcPct(contactFields.filter(has).length, contactFields.length) },
+        { label: "Employment",        color: "#f59e0b", value: calcPct(employmentFields.filter(has).length, employmentFields.length) },
+        { label: "Nearest Relatives", color: "#10b981", value: relPct },
+        { label: "Documents",         color: "#ef4444", value: docLoading ? 0 : (docPct ?? 0) },
     ]
 
     const overall = Math.round(sections.reduce((s, x) => s + x.value, 0) / sections.length)
@@ -192,7 +190,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
 
     return (
         <div
-            className="relative inline-flex items-center gap-3 cursor-default"
+            className="flex items-center gap-0 cursor-default"
             onMouseEnter={() => setShow(true)}
             onMouseLeave={() => setShow(false)}
         >
@@ -206,86 +204,105 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                     {overall}%
                 </span>
             </div>
-            <div className="leading-tight">
+            <div className="leading-tight ml-3 shrink-0">
                 <div className="text-xs font-semibold text-gray-700">Profile</div>
                 <div className="text-[11px] text-gray-400">Completeness</div>
             </div>
 
-            {/* ── Popover: expands to the right ── */}
+            {/* ── Inline expandable panel ── */}
             <div
-                className="absolute left-full top-1/2 ml-3 z-50 pointer-events-none"
                 style={{
-                    transform: `translateY(-50%) translateX(${visible ? "0px" : "-10px"})`,
-                    opacity: visible ? 1 : 0,
-                    transition: "opacity 0.25s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1)",
+                    maxWidth: phase >= 1 ? "520px" : "0px",
+                    opacity: phase >= 1 ? 1 : 0,
+                    overflow: "hidden",
+                    transition: phase >= 1
+                        ? "max-width 0.42s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease"
+                        : "max-width 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.15s ease",
+                    display: "flex",
+                    alignItems: "stretch",
+                    flexShrink: 0,
                 }}
             >
-                {/* Left arrow tip */}
+                {/* Vertical divider */}
                 <div
-                    className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-l border-b border-gray-100 rotate-45"
+                    className="mx-4 w-px bg-gray-200 self-stretch shrink-0"
+                    style={{
+                        opacity: phase >= 1 ? 1 : 0,
+                        transition: "opacity 0.2s ease 0.15s",
+                    }}
                 />
 
-                <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 min-w-[380px]">
-                    <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">
+                {/* Content */}
+                <div className="flex flex-col justify-center gap-2 py-0.5" style={{ minWidth: "460px" }}>
+                    {/* Label */}
+                    <div
+                        className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
+                        style={{
+                            opacity: phase >= 2 ? 1 : 0,
+                            transform: phase >= 2 ? "translateX(0)" : "translateX(-6px)",
+                            transition: "opacity 0.22s ease 0.05s, transform 0.28s cubic-bezier(0.34,1.2,0.64,1) 0.05s",
+                        }}
+                    >
                         Profile Health
                     </div>
 
-                    {/* Section rings */}
-                    <div className="flex items-start justify-between gap-1">
+                    {/* Section rings row */}
+                    <div className="flex items-center gap-4">
                         {sections.map((s, i) => (
                             <div
                                 key={s.label}
-                                className="flex flex-col items-center gap-1.5"
+                                className="flex flex-col items-center gap-1"
                                 style={{
-                                    opacity: visible ? 1 : 0,
-                                    transform: `translateX(${visible ? "0px" : "-6px"})`,
-                                    transition: `opacity 0.3s ease ${0.08 + i * 0.06}s, transform 0.35s cubic-bezier(0.34,1.3,0.64,1) ${0.08 + i * 0.06}s`,
+                                    opacity: phase >= 2 ? 1 : 0,
+                                    transform: phase >= 2 ? "translateY(0px)" : "translateY(10px)",
+                                    transition: `opacity 0.28s ease ${i * 0.06}s, transform 0.34s cubic-bezier(0.34,1.4,0.64,1) ${i * 0.06}s`,
                                 }}
                             >
                                 <div className="relative">
                                     <Ring
                                         pct={s.value}
-                                        size={54}
+                                        size={44}
                                         stroke={4}
                                         color={s.color}
                                         animate={show}
-                                        delay={100 + i * 70}
+                                        delay={200 + i * 70}
                                     />
                                     <span
-                                        className="absolute inset-0 flex items-center justify-center text-[10px] font-bold"
+                                        className="absolute inset-0 flex items-center justify-center text-[9px] font-bold"
                                         style={{ color: s.color }}
                                     >
                                         {s.value}%
                                     </span>
                                 </div>
-                                <span className="text-[10px] text-gray-500 text-center leading-tight max-w-[60px]">
+                                <span className="text-[9px] text-gray-500 text-center leading-tight whitespace-nowrap">
                                     {s.label}
                                 </span>
                             </div>
                         ))}
-                    </div>
 
-                    {/* Overall progress bar */}
-                    <div
-                        className="mt-4 pt-3 border-t border-gray-100"
-                        style={{
-                            opacity: visible ? 1 : 0,
-                            transition: "opacity 0.3s ease 0.45s",
-                        }}
-                    >
-                        <div className="flex items-center justify-between text-xs mb-1.5">
-                            <span className="text-gray-500 font-medium">Overall Completeness</span>
-                            <span className="font-bold" style={{ color: overallColor }}>{overall}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full rounded-full"
-                                style={{
-                                    width: visible ? `${overall}%` : "0%",
-                                    background: overallColor,
-                                    transition: "width 0.7s cubic-bezier(0.4,0,0.2,1) 0.4s",
-                                }}
-                            />
+                        {/* Overall bar — inline after rings */}
+                        <div
+                            className="flex-1 ml-2"
+                            style={{
+                                opacity: phase >= 2 ? 1 : 0,
+                                transition: "opacity 0.3s ease 0.3s",
+                                minWidth: "90px",
+                            }}
+                        >
+                            <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="text-gray-500 font-medium">Overall</span>
+                                <span className="font-bold" style={{ color: overallColor }}>{overall}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                        width: phase >= 3 ? `${overall}%` : "0%",
+                                        background: `linear-gradient(90deg, ${overallColor}99, ${overallColor})`,
+                                        transition: "width 0.65s cubic-bezier(0.4,0,0.2,1) 0s",
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

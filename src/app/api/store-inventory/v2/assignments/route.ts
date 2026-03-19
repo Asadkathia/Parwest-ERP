@@ -135,7 +135,8 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        const assignmentData: Prisma.StoreInventoryAssignmentUncheckedCreateInput = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const assignmentData: any = {
             storeId,
             productId: line.productId,
             conditionId: line.conditionId,
