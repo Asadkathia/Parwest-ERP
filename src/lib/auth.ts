@@ -6,8 +6,20 @@ import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
+const authSecret =
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    (process.env.NODE_ENV !== "production"
+        ? "parwest-local-dev-secret-change-me"
+        : undefined)
+
+if (!authSecret && process.env.NODE_ENV === "production") {
+    throw new Error("Missing AUTH_SECRET/NEXTAUTH_SECRET for NextAuth in production.")
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
     adapter: PrismaAdapter(prisma) as Adapter,
+    secret: authSecret,
     session: {
         strategy: "jwt",
     },
