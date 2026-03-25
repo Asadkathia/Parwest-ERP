@@ -1,5 +1,10 @@
 import { NextRequest } from "next/server"
-import { Prisma, StoreInventoryAssignmentStatus, StoreInventoryMovementType } from "@prisma/client"
+import {
+  Prisma,
+  StoreInventoryAssignmentStatus,
+  StoreInventoryAssignmentTargetType,
+  StoreInventoryMovementType,
+} from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
@@ -9,6 +14,8 @@ const assignmentInclude = {
   store: true,
   product: true,
   condition: true,
+  assignedToGuard: { select: { id: true, name: true, parwestId: true, cnic: true } },
+  assignedToClient: { select: { id: true, name: true, type: true } },
   assignedToUser: { select: { id: true, name: true, email: true } },
   assignedByUser: { select: { id: true, name: true, email: true } },
   returnedByUser: { select: { id: true, name: true, email: true } },
@@ -53,20 +60,33 @@ function normalizeLines(body: Record<string, unknown>): AssignmentLineInput[] | 
   ]
 }
 
+function normalizeAssignedToType(value: unknown): StoreInventoryAssignmentTargetType {
+  const raw = String(value ?? "").trim().toUpperCase()
+  if (raw === "GUARD") return StoreInventoryAssignmentTargetType.GUARD
+  if (raw === "CLIENT") return StoreInventoryAssignmentTargetType.CLIENT
+  return StoreInventoryAssignmentTargetType.EMPLOYEE
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")?.trim() || undefined
+  const assignedToType = searchParams.get("assignedToType")?.trim().toUpperCase() || undefined
   const assignedToUserId = searchParams.get("assignedToUserId")?.trim() || undefined
+  const assignedToGuardId = searchParams.get("assignedToGuardId")?.trim() || undefined
+  const assignedToClientId = searchParams.get("assignedToClientId")?.trim() || undefined
   const storeId = searchParams.get("storeId")?.trim() || undefined
 
   try {
     const rows = await prisma.storeInventoryAssignment.findMany({
       where: {
         status: status ? (status as StoreInventoryAssignmentStatus) : undefined,
+        assignedToType: assignedToType ? (assignedToType as StoreInventoryAssignmentTargetType) : undefined,
         assignedToUserId,
+        assignedToGuardId,
+        assignedToClientId,
         storeId,
       },
       include: assignmentInclude,
@@ -91,11 +111,31 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>
     const storeId = String(body.storeId ?? "").trim()
+    const assignedToType = normalizeAssignedToType(body.assignedToType)
     const assignedToUserId = String(body.assignedToUserId ?? "").trim()
+    const assignedToGuardId = String(body.assignedToGuardId ?? "").trim()
+    const assignedToClientId = String(body.assignedToClientId ?? "").trim()
+    const assignedAtRaw = String(body.assignedAt ?? "").trim()
+    const assignedAt = assignedAtRaw ? new Date(assignedAtRaw) : new Date()
+    const remarks = asText(body.remarks)
     const lines = normalizeLines(body)
 
-    if (!storeId || !assignedToUserId || !lines) {
-      return badRequest("storeId, assignedToUserId, and non-empty assignment lines are required.")
+    if (Number.isNaN(assignedAt.getTime())) {
+      return badRequest("Invalid assignedAt date.")
+    }
+
+    if (!storeId || !lines) {
+      return badRequest("storeId and non-empty assignment lines are required.")
+    }
+
+    if (assignedToType === StoreInventoryAssignmentTargetType.EMPLOYEE && !assignedToUserId) {
+      return badRequest("assignedToUserId is required for employee assignments.")
+    }
+    if (assignedToType === StoreInventoryAssignmentTargetType.GUARD && !assignedToGuardId) {
+      return badRequest("assignedToGuardId is required for guard assignments.")
+    }
+    if (assignedToType === StoreInventoryAssignmentTargetType.CLIENT && !assignedToClientId) {
+      return badRequest("assignedToClientId is required for client assignments.")
     }
 
     const created = await prisma.$transaction(async (tx) => {
@@ -135,17 +175,23 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const assignmentData: any = {
-            storeId,
-            productId: line.productId,
-            conditionId: line.conditionId,
-            assignedToUserId,
-            assignedByUserId: session.userId,
-            quantity: line.quantity,
-            status: StoreInventoryAssignmentStatus.ASSIGNED,
-            expectedReturnAt: body.expectedReturnAt ? new Date(String(body.expectedReturnAt)) : null,
-            notes: line.notes ?? asText(body.notes),
+        const assignmentData = {
+          storeId,
+          productId: line.productId,
+          conditionId: line.conditionId,
+          assignedToType,
+          assignedToUserId:
+            assignedToType === StoreInventoryAssignmentTargetType.EMPLOYEE ? assignedToUserId : null,
+          assignedToGuardId:
+            assignedToType === StoreInventoryAssignmentTargetType.GUARD ? assignedToGuardId : null,
+          assignedToClientId:
+            assignedToType === StoreInventoryAssignmentTargetType.CLIENT ? assignedToClientId : null,
+          assignedByUserId: session.userId,
+          quantity: line.quantity,
+          status: StoreInventoryAssignmentStatus.ASSIGNED,
+          assignedAt,
+          expectedReturnAt: body.expectedReturnAt ? new Date(String(body.expectedReturnAt)) : null,
+          notes: line.notes ?? remarks ?? asText(body.notes),
         }
 
         const createdAssignment = await tx.storeInventoryAssignment.create({
@@ -162,7 +208,12 @@ export async function POST(request: NextRequest) {
             performedById: session.userId,
             referenceType: "ASSIGNMENT",
             referenceId: createdAssignment.id,
-            notes: `Assignment checkout to user ${assignedToUserId}`,
+            notes:
+              assignedToType === StoreInventoryAssignmentTargetType.GUARD
+                ? `Assignment checkout to guard ${assignedToGuardId}`
+                : assignedToType === StoreInventoryAssignmentTargetType.CLIENT
+                  ? `Assignment checkout to client ${assignedToClientId}`
+                  : `Assignment checkout to employee ${assignedToUserId}`,
           },
         })
 
@@ -177,14 +228,21 @@ export async function POST(request: NextRequest) {
     await emitInventoryV2Audit({
       userId: session.userId,
       event: "ASSIGNMENT_CREATED",
-      description: `Created ${created.length} assignment line(s) for user ${assignedToUserId}`,
+      description:
+        assignedToType === StoreInventoryAssignmentTargetType.GUARD
+          ? `Created ${created.length} guard assignment line(s) for guard ${assignedToGuardId}`
+          : assignedToType === StoreInventoryAssignmentTargetType.CLIENT
+            ? `Created ${created.length} client assignment line(s) for client ${assignedToClientId}`
+            : `Created ${created.length} employee assignment line(s) for user ${assignedToUserId}`,
       request,
     })
 
     return ok(created, 201)
   } catch (error) {
     const code = getPrismaCode(error)
-    if (code === "P2003") return badRequest("Invalid store/product/condition/user reference.")
+    if (code === "P2003") {
+      return badRequest("Invalid store/product/condition/assignee reference.")
+    }
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
       return badRequest("Insufficient stock available for one or more assignment lines.")
     }

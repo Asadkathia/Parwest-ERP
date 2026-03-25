@@ -44,6 +44,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         include: {
           store: true,
           product: true,
+          condition: true,
+          assignedToGuard: { select: { id: true, name: true, parwestId: true, cnic: true } },
+          assignedToClient: { select: { id: true, name: true, type: true } },
           assignedToUser: { select: { id: true, name: true, email: true } },
           assignedByUser: { select: { id: true, name: true, email: true } },
           returnedByUser: { select: { id: true, name: true, email: true } },
@@ -79,7 +82,12 @@ export async function POST(request: NextRequest, { params }: Params) {
             performedById: session.userId,
             referenceType: "ASSIGNMENT_RETURN",
             referenceId: current.id,
-            notes: `Assignment return from user ${current.assignedToUserId}`,
+            notes:
+              current.assignedToType === "GUARD"
+                ? `Assignment return from guard ${current.assignedToGuardId}`
+                : current.assignedToType === "CLIENT"
+                  ? `Assignment return from client ${current.assignedToClientId}`
+                  : `Assignment return from employee ${current.assignedToUserId}`,
           },
         })
       }

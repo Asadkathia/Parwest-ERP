@@ -40,28 +40,48 @@ const baseNameUpdate = (body: Record<string, unknown>) => {
   return next
 }
 
+function generateStoreCode(type: unknown): string {
+  const prefix = normalizeStoreType(type) === "WAREHOUSE" ? "WH" : "ST"
+  const stamp = Date.now().toString(36).toUpperCase()
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase()
+  return `${prefix}-${stamp}-${random}`
+}
+
+function normalizeStoreType(value: unknown): "STORE" | "WAREHOUSE" {
+  const raw = String(value ?? "").trim().toUpperCase()
+  if (raw === "WAREHOUSE") return "WAREHOUSE"
+  if (raw === "STORE") return "STORE"
+  // Default to STORE for non-normalized legacy values.
+  return "STORE"
+}
+
 const storesConfig: MasterResourceConfig = {
   delegate: prisma.store as unknown as MasterResourceConfig["delegate"],
   orderBy: { name: "asc" },
   include: { regionalOffice: true },
-  buildCreateData: (body) => ({
-    code: String(body.code ?? "").trim(),
-    name: String(body.name ?? "").trim(),
-    type: body.type ? String(body.type).trim() : null,
-    prefix: body.prefix ? String(body.prefix).trim() : null,
-    isHeadOffice: body.isHeadOffice === true,
-    latitude: body.latitude != null ? Number(body.latitude) : null,
-    longitude: body.longitude != null ? Number(body.longitude) : null,
-    address: body.address ? String(body.address).trim() : null,
-    contactNumber: body.contactNumber ? String(body.contactNumber).trim() : null,
-    isActive: body.isActive == null ? true : Boolean(body.isActive),
-    regionalOfficeId: body.regionalOfficeId ? String(body.regionalOfficeId).trim() : null,
-  }),
+  buildCreateData: (body) => {
+    const type = normalizeStoreType(body.type)
+    const inputCode = String(body.code ?? "").trim()
+
+    return {
+      code: inputCode || generateStoreCode(type),
+      name: String(body.name ?? "").trim(),
+      type,
+      prefix: body.prefix ? String(body.prefix).trim() : null,
+      isHeadOffice: body.isHeadOffice === true,
+      latitude: body.latitude != null ? Number(body.latitude) : null,
+      longitude: body.longitude != null ? Number(body.longitude) : null,
+      address: body.address ? String(body.address).trim() : null,
+      contactNumber: body.contactNumber ? String(body.contactNumber).trim() : null,
+      isActive: body.isActive == null ? true : Boolean(body.isActive),
+      regionalOfficeId: body.regionalOfficeId ? String(body.regionalOfficeId).trim() : null,
+    }
+  },
   buildUpdateData: (body) => {
     const next: Record<string, unknown> = {}
     if (body.code != null) next.code = String(body.code).trim()
     if (body.name != null) next.name = String(body.name).trim()
-    if (body.type != null) next.type = body.type ? String(body.type).trim() : null
+    if (body.type != null) next.type = normalizeStoreType(body.type)
     if (body.prefix != null) next.prefix = body.prefix ? String(body.prefix).trim() : null
     if (body.isHeadOffice != null) next.isHeadOffice = Boolean(body.isHeadOffice)
     if (body.latitude != null) next.latitude = Number(body.latitude)

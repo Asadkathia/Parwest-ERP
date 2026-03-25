@@ -8,7 +8,7 @@ import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 
-type Option = { id: string; name: string }
+type Option = { id: string; name: string; type?: string | null }
 type Product = { id: string; sku: string; name: string }
 type DemandLine = { id: string; product: Product; requestedQty: number; approvedQty?: number | null; fulfilledQty: number }
 type Demand = {
@@ -39,6 +39,9 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState("")
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+
+  const isWarehouse = (store: Option) => String(store.type ?? "").trim().toUpperCase() === "WAREHOUSE"
+  const isStore = (store: Option) => !isWarehouse(store)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,6 +76,11 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
 
     if (lines.some((l) => !l.productId || !Number.isFinite(l.requestedQty) || l.requestedQty <= 0)) {
       setNotice({ type: "error", message: "Valid products and positive quantities are required." })
+      return
+    }
+
+    if (!form.fromStoreId || !form.toStoreId) {
+      setNotice({ type: "error", message: "From Store and To Warehouse are required." })
       return
     }
 
@@ -183,8 +191,18 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
       {!responseMode ? (
         <FilterBar className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Select label="From Store" value={form.fromStoreId} onChange={(value) => setForm((prev) => ({ ...prev, fromStoreId: value }))} options={stores} allowEmpty />
-            <Select label="To Store" value={form.toStoreId} onChange={(value) => setForm((prev) => ({ ...prev, toStoreId: value }))} options={stores} allowEmpty />
+            <Select
+              label="From Store *"
+              value={form.fromStoreId}
+              onChange={(value) => setForm((prev) => ({ ...prev, fromStoreId: value }))}
+              options={stores.filter(isStore)}
+            />
+            <Select
+              label="To Warehouse *"
+              value={form.toStoreId}
+              onChange={(value) => setForm((prev) => ({ ...prev, toStoreId: value }))}
+              options={stores.filter(isWarehouse)}
+            />
             <div>
               <label className="mb-1 block text-sm text-[var(--text-muted)]">Reason</label>
               <input className="ui-input" value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} />

@@ -5,10 +5,71 @@ import { emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } 
 import { getMasterConfig, isValidMasterResource } from "@/lib/inventory/store-v2-masters"
 import { prisma } from "@/lib/db"
 
+const REGION_PREFIX_MAP: Record<string, string> = {
+  lahore: "LHR",
+  karachi: "KHI",
+  islamabad: "ISB",
+  peshawar: "PEW",
+  quetta: "UET",
+  multan: "MUX",
+  faisalabad: "LYP",
+  gujranwala: "GJW",
+  sialkot: "SKT",
+  sahiwal: "SWL",
+  rawalpindi: "RWP",
+}
+
 function parseResource(request: NextRequest): string {
   const pathname = new URL(request.url).pathname
   const parts = pathname.split("/").filter(Boolean)
   return parts[parts.length - 1] ?? ""
+}
+
+function normalizeStoreType(value: unknown): "STORE" | "WAREHOUSE" {
+  return String(value ?? "").trim().toUpperCase() === "WAREHOUSE" ? "WAREHOUSE" : "STORE"
+}
+
+function deriveRegionPrefix(name: string | null | undefined): string {
+  const raw = String(name ?? "").trim()
+  if (!raw) return "GEN"
+
+  const mapped = REGION_PREFIX_MAP[raw.toLowerCase()]
+  if (mapped) return mapped
+
+  const normalized = raw.replace(/[^A-Za-z]/g, "").toUpperCase()
+  if (normalized.length >= 3) return normalized.slice(0, 3)
+  if (normalized.length > 0) return normalized.padEnd(3, "X")
+  return "GEN"
+}
+
+async function buildRegionBasedStoreCode(body: Record<string, unknown>): Promise<string> {
+  const type = normalizeStoreType(body.type)
+  const typePrefix = type === "WAREHOUSE" ? "WH" : "ST"
+  const regionalOfficeId = String(body.regionalOfficeId ?? "").trim()
+
+  let regionPrefix = "GEN"
+  if (regionalOfficeId) {
+    const office = await prisma.regionalOffice.findUnique({
+      where: { id: regionalOfficeId },
+      select: {
+        name: true,
+        seriesCode: true,
+        region: { select: { name: true } },
+      },
+    })
+
+    if (office?.region?.name) {
+      regionPrefix = deriveRegionPrefix(office.region.name)
+    } else if (office?.name) {
+      regionPrefix = deriveRegionPrefix(office.name)
+    } else if (office?.seriesCode) {
+      regionPrefix = deriveRegionPrefix(office.seriesCode)
+    }
+  }
+
+  const stamp = Date.now().toString(36).toUpperCase()
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase()
+  return `${regionPrefix}-${typePrefix}-${stamp}-${random}`
 }
 
 export async function GET(request: NextRequest) {
@@ -37,7 +98,7 @@ export async function GET(request: NextRequest) {
         rows = await prisma.storeInventoryStatus.findMany({
           select: { id: true, name: true, createdAt: true, updatedAt: true },
           orderBy: { name: "asc" },
-        } as any)
+        })
       } else if (message.includes("Unknown field")) {
         rows = await config.delegate.findMany({
           orderBy: config.orderBy,
@@ -66,12 +127,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as Record<string, unknown>
+    const payloadBody: Record<string, unknown> = { ...body }
+    if (resource === "stores" && !String(payloadBody.code ?? "").trim()) {
+      payloadBody.code = await buildRegionBasedStoreCode(payloadBody)
+    }
+
     const config = getMasterConfig(resource)
-    const data = config.buildCreateData(body)
+    const data = config.buildCreateData(payloadBody)
 
     if (
       ("name" in data && typeof data.name === "string" && data.name.length === 0) ||
-      (resource === "stores" && (typeof data.code !== "string" || data.code.length === 0)) ||
+      (resource === "stores" &&
+        (!("type" in data) || (data.type !== "STORE" && data.type !== "WAREHOUSE"))) ||
       (resource === "units" && (typeof data.shortCode !== "string" || data.shortCode.length === 0))
     ) {
       return badRequest("Required fields are missing.")

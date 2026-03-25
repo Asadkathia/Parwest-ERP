@@ -17,6 +17,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       include: {
         store: true,
         product: true,
+        condition: true,
+        assignedToGuard: { select: { id: true, name: true, parwestId: true, cnic: true } },
+        assignedToClient: { select: { id: true, name: true, type: true } },
         assignedToUser: { select: { id: true, name: true, email: true } },
         assignedByUser: { select: { id: true, name: true, email: true } },
         returnedByUser: { select: { id: true, name: true, email: true } },

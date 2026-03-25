@@ -62,6 +62,15 @@ function normalizeDemandStatus(raw: unknown): StoreInventoryDemandStatus {
   return StoreInventoryDemandStatus.SENT
 }
 
+function normalizeStoreKind(raw: unknown): "STORE" | "WAREHOUSE" | "UNKNOWN" {
+  const value = String(raw ?? "").trim().toUpperCase()
+  if (value === "STORE") return "STORE"
+  if (value === "WAREHOUSE") return "WAREHOUSE"
+  if (value.includes("WAREHOUSE")) return "WAREHOUSE"
+  if (value.includes("STORE")) return "STORE"
+  return "UNKNOWN"
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
@@ -101,8 +110,28 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Record<string, unknown>
     const lines = normalizeLines(body.lines)
     const status = normalizeDemandStatus(body.status)
+    const fromStoreId = asText(body.fromStoreId)
+    const toStoreId = asText(body.toStoreId)
 
     if (!lines) return badRequest("Demand lines are required.")
+    if (!fromStoreId || !toStoreId) {
+      return badRequest("fromStoreId and toStoreId are required.")
+    }
+
+    const [fromStore, toStore] = await Promise.all([
+      prisma.store.findUnique({ where: { id: fromStoreId }, select: { id: true, type: true } }),
+      prisma.store.findUnique({ where: { id: toStoreId }, select: { id: true, type: true } }),
+    ])
+
+    if (!fromStore || !toStore) {
+      return badRequest("Invalid fromStoreId or toStoreId.")
+    }
+
+    const fromKind = normalizeStoreKind(fromStore.type)
+    const toKind = normalizeStoreKind(toStore.type)
+    if (fromKind !== "STORE" || toKind !== "WAREHOUSE") {
+      return badRequest("Demand flow must be Store -> Warehouse.")
+    }
 
     const created = await prisma.storeInventoryDemand.create({
       data: {
@@ -111,8 +140,8 @@ export async function POST(request: NextRequest) {
         requiredBy: body.requiredBy ? new Date(String(body.requiredBy)) : null,
         reason: asText(body.reason),
         notes: asText(body.notes),
-        fromStoreId: asText(body.fromStoreId),
-        toStoreId: asText(body.toStoreId),
+        fromStoreId,
+        toStoreId,
         requestedById: session.userId,
         approvedById: null,
         lines: {

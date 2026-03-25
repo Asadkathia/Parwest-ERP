@@ -44,8 +44,9 @@ export default async function StoreInventoryScreenPage({ params }: { params: Pro
   if (screen === 'adjustment-create') return <AdjustmentsManager createMode />
   if (screen === 'demands-send') return <DemandsManager />
   if (screen === 'demands-response') return <DemandsManager responseMode />
-  if (screen === 'inventory-assignments') return <AssignmentsManager />
-  if (screen === 'employee-assignments') return <AssignmentsManager employeeMode />
+  if (screen === 'inventory-assignments') return <AssignmentsManager assignmentType="GUARD" />
+  if (screen === 'employee-assignments') return <AssignmentsManager assignmentType="EMPLOYEE" />
+  if (screen === 'client-assignments') return <AssignmentsManager assignmentType="CLIENT" />
   if (screen === 'inventories') return <InventoriesManager />
   if (screen === 'audits') return <AuditManager />
   if (screen === 'roles') redirect('/users/roles')

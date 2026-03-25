@@ -98,8 +98,9 @@ const navItems: NavNode[] = [
                 icon: Building2,
                 children: [
                     { title: "Inventory", href: "/store-inventory/inventories", icon: Search },
-                    { title: "Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
-                    { title: "All Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
+                    { title: "Guard Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
+                    { title: "Employee Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
+                    { title: "Client Assignments", href: "/store-inventory/client-assignments", icon: MapPin },
                     { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
                     { title: "Demands", href: "/store-inventory/demands-send", icon: ClipboardList },
                     { title: "Demands Response", href: "/store-inventory/demands-response", icon: ClipboardList },

@@ -21,6 +21,7 @@ const links = [
   { label: 'Conditions', href: '/store-inventory/conditions' },
   { label: 'Employee Assignments', href: '/store-inventory/employee-assignments' },
   { label: 'Inventory Assignments', href: '/store-inventory/inventory-assignments' },
+  { label: 'Client Assignments', href: '/store-inventory/client-assignments' },
   { label: 'Audits', href: '/store-inventory/audits' },
 ]
 

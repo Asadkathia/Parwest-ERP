@@ -11,6 +11,7 @@ export const storeInventoryLinks = [
   { label: 'Inventories', href: '/store-inventory/inventories' },
   { label: 'Inventory Assignments', href: '/store-inventory/inventory-assignments' },
   { label: 'Employee Assignments', href: '/store-inventory/employee-assignments' },
+  { label: 'Client Assignments', href: '/store-inventory/client-assignments' },
   { label: 'Demand Send', href: '/store-inventory/demands-send' },
   { label: 'Demand Response', href: '/store-inventory/demands-response' },
   { label: 'Stores', href: '/store-inventory/stores' },
@@ -95,6 +96,11 @@ export const storeInventoryScreens: Record<string, ScreenConfig> = {
   'employee-assignments': {
     title: 'Employee Inventory Assignments',
     table: { columns: ['Sr#', 'Employee ID', 'Employee Name', 'Product', 'Assigned By', 'Assigned At', 'Status'] },
+    actions: ['Search', 'Clear Filters'],
+  },
+  'client-assignments': {
+    title: 'Client Inventory Assignments',
+    table: { columns: ['Sr#', 'Client', 'Product', 'Assigned By', 'Assigned At', 'Status'] },
     actions: ['Search', 'Clear Filters'],
   },
   'demands-send': {

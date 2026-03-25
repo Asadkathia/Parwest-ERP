@@ -33,6 +33,12 @@ enum StoreInventoryAssignmentStatus {
   DAMAGED
 }
 
+enum StoreInventoryAssignmentTargetType {
+  GUARD
+  EMPLOYEE
+  CLIENT
+}
+
 enum StoreInventoryMovementType {
   PURCHASE
   ADJUSTMENT_IN
@@ -291,6 +297,7 @@ model Guard {
   loans                 Loan[]
   attendances           Attendance[]
   inventoryAssignments  InventoryAssignment[]
+  storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentGuardAssignee")
   residenceAssignment   ResidenceAssignment?
   trainings             Training[]
   supervisorAssignments GuardSupervisorAssignment[]
@@ -620,6 +627,7 @@ model Client {
   deployments           Deployment[]
   pricingConfigs        PricingConfig[]
   inventoryAssignments  InventoryAssignment[]
+  storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentClientAssignee")
   invoices              Invoice[]
   deploymentRates       DeploymentRate[]
   supervisorAssignments ClientSupervisorAssignment[]
@@ -1255,6 +1263,7 @@ model StoreInventoryAssignment {
   id               String                         @id @default(cuid())
   quantity         Int                            @default(1)
   status           StoreInventoryAssignmentStatus @default(ASSIGNED)
+  assignedToType   StoreInventoryAssignmentTargetType @default(EMPLOYEE)
   assignedAt       DateTime                       @default(now())
   expectedReturnAt DateTime?
   returnedAt       DateTime?
@@ -1268,8 +1277,12 @@ model StoreInventoryAssignment {
   product          StoreInventoryProduct @relation(fields: [productId], references: [id])
   conditionId      String?
   condition        StoreInventoryConditionV2? @relation(fields: [conditionId], references: [id])
-  assignedToUserId String
-  assignedToUser   User                  @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assignedToUserId String?
+  assignedToUser   User?                 @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assignedToGuardId String?
+  assignedToGuard   Guard?               @relation("StoreInventoryAssignmentGuardAssignee", fields: [assignedToGuardId], references: [id])
+  assignedToClientId String?
+  assignedToClient   Client?             @relation("StoreInventoryAssignmentClientAssignee", fields: [assignedToClientId], references: [id])
   assignedByUserId String
   assignedByUser   User                  @relation("StoreInventoryAssignmentIssuer", fields: [assignedByUserId], references: [id])
   returnedByUserId String?
@@ -1279,6 +1292,9 @@ model StoreInventoryAssignment {
   @@index([productId])
   @@index([conditionId])
   @@index([assignedToUserId])
+  @@index([assignedToGuardId])
+  @@index([assignedToClientId])
+  @@index([assignedToType])
   @@index([assignedByUserId])
   @@index([returnedByUserId])
   @@index([status])

@@ -76,7 +76,7 @@ const EMPTY_FORM = {
   companyPhone: "",
   contactPerson: "",
   contactPersonPhone: "",
-  type: "",
+  type: "STORE",
   contactNumber: "",
   address: "",
   regionalOfficeId: "",
@@ -173,7 +173,7 @@ export default function MasterManager({
       companyPhone: row.companyPhone || "",
       contactPerson: row.contactPerson || "",
       contactPersonPhone: row.contactPersonPhone || "",
-      type: row.type || "",
+      type: row.type === "WAREHOUSE" ? "WAREHOUSE" : "STORE",
       contactNumber: row.contactNumber || "",
       address: row.address || "",
       regionalOfficeId: row.regionalOfficeId || "",
@@ -192,11 +192,6 @@ export default function MasterManager({
   const submit = async () => {
     if (!form.name.trim()) {
       setNotice({ type: "error", message: "Name is required." })
-      return
-    }
-
-    if (supportsStoreFields && !form.code.trim()) {
-      setNotice({ type: "error", message: "Code is required for stores." })
       return
     }
 
@@ -220,8 +215,8 @@ export default function MasterManager({
     if (supportsUnitShortCode) payload.shortCode = form.shortCode.trim()
 
     if (supportsStoreFields) {
-      payload.code = form.code.trim()
-      payload.type = form.type.trim() || null
+      const normalizedType = form.type === "WAREHOUSE" ? "WAREHOUSE" : "STORE"
+      payload.type = normalizedType
       payload.prefix = form.prefix.trim() || null
       payload.isHeadOffice = form.isHeadOffice
       payload.latitude = form.latitude.trim() ? Number(form.latitude) : null
@@ -333,12 +328,32 @@ export default function MasterManager({
           {supportsStoreFields ? (
             <>
               <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Code *</label>
-                <input className="ui-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} />
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Code (Auto-generated)</label>
+                <input
+                  className="ui-input"
+                  value={editingId ? form.code : ""}
+                  readOnly
+                  placeholder={editingId ? "" : "Generated on create from region + type"}
+                />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Type</label>
-                <input className="ui-input" value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))} placeholder="MAIN / REGIONAL" />
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Type *</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`ui-btn ${form.type === "STORE" ? "ui-btn-primary" : "ui-btn-secondary"}`}
+                    onClick={() => setForm((prev) => ({ ...prev, type: "STORE" }))}
+                  >
+                    Store
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-btn ${form.type === "WAREHOUSE" ? "ui-btn-primary" : "ui-btn-secondary"}`}
+                    onClick={() => setForm((prev) => ({ ...prev, type: "WAREHOUSE" }))}
+                  >
+                    Warehouse
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm text-[var(--text-muted)]">Regional Office</label>
