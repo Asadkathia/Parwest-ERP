@@ -121,17 +121,79 @@ export default function SidebarNav({ items, openSections, onToggleSection, onNav
                         >
                           {child.children.map((grandChild) => (
                             <li key={grandChild.title}>
-                              <Link
-                                href={grandChild.href!}
-                                onClick={onNavigate}
-                                className={cn(
-                                  "flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--sidebar-surface)]",
-                                  isActive(grandChild.href!) && "bg-[var(--brand)] text-white"
-                                )}
-                              >
-                                <grandChild.icon className="h-4 w-4" />
-                                <span>{grandChild.title}</span>
-                              </Link>
+                              {grandChild.children?.length ? (
+                                <div>
+                                  <button
+                                    onClick={() => toggleSubGroup(`${child.title}::${grandChild.title}`)}
+                                    className={cn(
+                                      "w-full flex items-center justify-between rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--sidebar-surface)]",
+                                      hasActiveDescendant(grandChild) && "bg-[var(--sidebar-surface)] text-white"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <grandChild.icon className="h-4 w-4" />
+                                      <span>{grandChild.title}</span>
+                                    </div>
+                                    <span
+                                      className={cn(
+                                        "text-xs transition-transform duration-200",
+                                        openSubGroups.includes(`${child.title}::${grandChild.title}`) ? "rotate-180" : "rotate-0"
+                                      )}
+                                    >
+                                      ⌄
+                                    </span>
+                                  </button>
+                                  <ul
+                                    className={cn(
+                                      "ml-2 mt-1 space-y-1 border-l border-[var(--sidebar-border)] pl-3",
+                                      "overflow-hidden transition-all duration-300 ease-in-out",
+                                      openSubGroups.includes(`${child.title}::${grandChild.title}`)
+                                        ? "max-h-[420px] opacity-100"
+                                        : "max-h-0 opacity-0"
+                                    )}
+                                  >
+                                    {grandChild.children.map((greatGrandChild) => (
+                                      <li key={greatGrandChild.title}>
+                                        {greatGrandChild.href ? (
+                                          <Link
+                                            href={greatGrandChild.href}
+                                            onClick={onNavigate}
+                                            className={cn(
+                                              "flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--sidebar-surface)]",
+                                              isActive(greatGrandChild.href) && "bg-[var(--brand)] text-white"
+                                            )}
+                                          >
+                                            <greatGrandChild.icon className="h-4 w-4" />
+                                            <span>{greatGrandChild.title}</span>
+                                          </Link>
+                                        ) : (
+                                          <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-500">
+                                            <greatGrandChild.icon className="h-4 w-4" />
+                                            <span>{greatGrandChild.title}</span>
+                                          </div>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : grandChild.href ? (
+                                <Link
+                                  href={grandChild.href}
+                                  onClick={onNavigate}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--sidebar-surface)]",
+                                    isActive(grandChild.href) && "bg-[var(--brand)] text-white"
+                                  )}
+                                >
+                                  <grandChild.icon className="h-4 w-4" />
+                                  <span>{grandChild.title}</span>
+                                </Link>
+                              ) : (
+                                <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-500">
+                                  <grandChild.icon className="h-4 w-4" />
+                                  <span>{grandChild.title}</span>
+                                </div>
+                              )}
                             </li>
                           ))}
                         </ul>

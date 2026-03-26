@@ -74,6 +74,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const body = (await request.json()) as Record<string, unknown>
     const data: Record<string, unknown> = {}
+    const size = asText(body.size)
+    const color = asText(body.color)
+    let resolvedVariationId: string | null | undefined
+
+    if (body.variationId != null) {
+      resolvedVariationId = asText(body.variationId)
+    } else if (size || color) {
+      const variationName = [size, color].filter(Boolean).join(" / ")
+      if (variationName) {
+        try {
+          const variation = await prisma.storeInventoryVariation.upsert({
+            where: { name: variationName },
+            update: {},
+            create: { name: variationName },
+          })
+          resolvedVariationId = variation.id
+        } catch {
+          resolvedVariationId = undefined
+        }
+      }
+    }
 
     if (body.sku != null) data.sku = String(body.sku).trim()
     if (body.name != null) data.name = String(body.name).trim()
@@ -95,7 +116,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (body.weaponTypeId != null) data.weaponTypeId = asText(body.weaponTypeId)
     if (body.calibreId != null) data.calibreId = asText(body.calibreId)
     if (body.licenseTypeId != null) data.licenseTypeId = asText(body.licenseTypeId)
-    if (body.variationId != null) data.variationId = asText(body.variationId)
+    if (resolvedVariationId !== undefined) data.variationId = resolvedVariationId
     if (body.repairingId != null) data.repairingId = asText(body.repairingId)
 
     if (Object.keys(data).length === 0) return badRequest("No valid fields provided for update.")

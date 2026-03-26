@@ -120,6 +120,25 @@ export async function POST(request: NextRequest) {
     const sku = String(body.sku ?? "").trim()
     const name = String(body.name ?? "").trim()
     if (!sku || !name) return badRequest("sku and name are required.")
+    const size = asText(body.size)
+    const color = asText(body.color)
+
+    let resolvedVariationId = asText(body.variationId)
+    if (!resolvedVariationId && (size || color)) {
+      const variationName = [size, color].filter(Boolean).join(" / ")
+      if (variationName) {
+        try {
+          const variation = await prisma.storeInventoryVariation.upsert({
+            where: { name: variationName },
+            update: {},
+            create: { name: variationName },
+          })
+          resolvedVariationId = variation.id
+        } catch {
+          // fallback to provided variationId behavior if variation table is unavailable
+        }
+      }
+    }
 
     const baseData: any = {
       sku,
@@ -142,7 +161,7 @@ export async function POST(request: NextRequest) {
       weaponTypeId: asText(body.weaponTypeId),
       calibreId: asText(body.calibreId),
       licenseTypeId: asText(body.licenseTypeId),
-      variationId: asText(body.variationId),
+      variationId: resolvedVariationId,
       repairingId: asText(body.repairingId),
     }
     let created

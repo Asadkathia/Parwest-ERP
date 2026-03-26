@@ -28,6 +28,18 @@ type AssignmentLineInput = {
   notes: string | null
 }
 
+type CategoryScope = "NON_WEAPON" | "WEAPON"
+
+function isWeaponCategoryName(value: string | null | undefined): boolean {
+  const text = String(value ?? "").trim().toLowerCase()
+  return text.includes("weapon") || text.includes("ammo")
+}
+
+function normalizeCategoryScope(value: unknown): CategoryScope {
+  const raw = String(value ?? "").trim().toUpperCase()
+  return raw === "WEAPON" ? "WEAPON" : "NON_WEAPON"
+}
+
 function normalizeLines(body: Record<string, unknown>): AssignmentLineInput[] | null {
   if (Array.isArray(body.lines) && body.lines.length > 0) {
     const lines: AssignmentLineInput[] = []
@@ -78,6 +90,7 @@ export async function GET(request: NextRequest) {
   const assignedToGuardId = searchParams.get("assignedToGuardId")?.trim() || undefined
   const assignedToClientId = searchParams.get("assignedToClientId")?.trim() || undefined
   const storeId = searchParams.get("storeId")?.trim() || undefined
+  const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
 
   try {
     const rows = await prisma.storeInventoryAssignment.findMany({
@@ -88,6 +101,33 @@ export async function GET(request: NextRequest) {
         assignedToGuardId,
         assignedToClientId,
         storeId,
+        ...(categoryScope === "WEAPON"
+          ? {
+              product: {
+                category: {
+                  is: {
+                    OR: [
+                      { name: { contains: "weapon", mode: "insensitive" } },
+                      { name: { contains: "ammo", mode: "insensitive" } },
+                    ],
+                  },
+                },
+              },
+            }
+          : {
+              NOT: {
+                product: {
+                  category: {
+                    is: {
+                      OR: [
+                        { name: { contains: "weapon", mode: "insensitive" } },
+                        { name: { contains: "ammo", mode: "insensitive" } },
+                      ],
+                    },
+                  },
+                },
+              },
+            }),
       },
       include: assignmentInclude,
       orderBy: { assignedAt: "desc" },
@@ -119,6 +159,7 @@ export async function POST(request: NextRequest) {
     const assignedAt = assignedAtRaw ? new Date(assignedAtRaw) : new Date()
     const remarks = asText(body.remarks)
     const lines = normalizeLines(body)
+    const categoryScope = normalizeCategoryScope(body.categoryScope)
 
     if (Number.isNaN(assignedAt.getTime())) {
       return badRequest("Invalid assignedAt date.")
@@ -136,6 +177,29 @@ export async function POST(request: NextRequest) {
     }
     if (assignedToType === StoreInventoryAssignmentTargetType.CLIENT && !assignedToClientId) {
       return badRequest("assignedToClientId is required for client assignments.")
+    }
+
+    const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
+    const selectedProducts = await prisma.storeInventoryProduct.findMany({
+      where: { id: { in: lineProductIds } },
+      select: {
+        id: true,
+        category: { select: { name: true } },
+      },
+    })
+    if (categoryScope === "WEAPON") {
+      const nonWeaponProduct = selectedProducts.find((product) => !isWeaponCategoryName(product.category?.name))
+      if (nonWeaponProduct) {
+        return badRequest("Only weapon/ammo category products are allowed in weapon assignments.")
+      }
+    } else {
+      const invalidWeaponProduct = selectedProducts.find((product) => isWeaponCategoryName(product.category?.name))
+      if (invalidWeaponProduct) {
+        return badRequest("Weapon/ammo category products are restricted from this assignment flow.")
+      }
+    }
+    if (selectedProducts.length !== lineProductIds.length) {
+      return badRequest("One or more selected products are invalid.")
     }
 
     const created = await prisma.$transaction(async (tx) => {

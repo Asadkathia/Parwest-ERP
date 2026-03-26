@@ -4,6 +4,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
 
 const purchaseInclude = {
   store: true,
@@ -49,8 +50,20 @@ type PurchaseLineInput = {
   notes: string | null
 }
 
+type CategoryScope = "NON_WEAPON" | "WEAPON"
+
+function isWeaponCategoryName(value: string | null | undefined): boolean {
+  const text = String(value ?? "").trim().toLowerCase()
+  return text.includes("weapon") || text.includes("ammo")
+}
+
+function normalizeCategoryScope(value: unknown): CategoryScope {
+  const raw = String(value ?? "").trim().toUpperCase()
+  return raw === "WEAPON" ? "WEAPON" : "NON_WEAPON"
+}
+
 function normalizeStatus(raw: unknown): StoreInventoryPurchaseStatus {
-  const value = String(raw ?? "RECEIVED").trim().toUpperCase()
+  const value = String(raw ?? "DRAFT").trim().toUpperCase()
   if (value === "DRAFT") return StoreInventoryPurchaseStatus.DRAFT
   if (value === "CANCELLED") return StoreInventoryPurchaseStatus.CANCELLED
   return StoreInventoryPurchaseStatus.RECEIVED
@@ -87,12 +100,48 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get("storeId")?.trim() || undefined
   const status = searchParams.get("status")?.trim() || undefined
+  const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
   const take = Math.min(Number(searchParams.get("take") ?? "100") || 100, 500)
 
   try {
     const where: any = {
       storeId,
       status: status ? (status as StoreInventoryPurchaseStatus) : undefined,
+      ...(categoryScope === "WEAPON"
+        ? {
+            lines: {
+              some: {
+                product: {
+                  category: {
+                    is: {
+                      OR: [
+                        { name: { contains: "weapon", mode: "insensitive" } },
+                        { name: { contains: "ammo", mode: "insensitive" } },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {
+            NOT: {
+              lines: {
+                some: {
+                  product: {
+                    category: {
+                      is: {
+                        OR: [
+                          { name: { contains: "weapon", mode: "insensitive" } },
+                          { name: { contains: "ammo", mode: "insensitive" } },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          }),
     }
     let rows
     try {
@@ -123,7 +172,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return ok(rows)
+    const normalizedRows = rows.map((row: any) => {
+      const decoded = parsePurchaseNotes(row.notes)
+      return {
+        ...row,
+        notes: decoded.note,
+        purchaseOrder: decoded.purchaseOrder,
+        workflow: decoded.workflow,
+      }
+    })
+
+    return ok(normalizedRows)
   } catch (error) {
     console.error("store-inventory v2 purchases GET failed", error)
     return internalServerError("Failed to fetch purchases.")
@@ -142,22 +201,67 @@ export async function POST(request: NextRequest) {
     const storeId = String(body.storeId ?? "").trim()
     const lines = normalizeLines(body.lines)
     const status = normalizeStatus(body.status)
+    const categoryScope = normalizeCategoryScope(body.categoryScope)
+
+    const note = asText(body.note ?? body.notes)
+    const poMeta = {
+      approvalReference: asText(body.approvalReference),
+      invoiceDate: asText(body.invoiceDate),
+      deliveryChallanNumber: asText(body.deliveryChallanNumber),
+    }
 
     if (!storeId || !lines) {
       return badRequest("storeId and a non-empty lines array are required.")
     }
 
+    const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
+    const selectedProducts = await prisma.storeInventoryProduct.findMany({
+      where: { id: { in: lineProductIds } },
+      select: {
+        id: true,
+        category: { select: { name: true } },
+      },
+    })
+    if (categoryScope === "WEAPON") {
+      const nonWeaponProduct = selectedProducts.find((product) => !isWeaponCategoryName(product.category?.name))
+      if (nonWeaponProduct) {
+        return badRequest("Only weapon/ammo category products are allowed in weapon purchases.")
+      }
+    } else {
+      const invalidWeaponProduct = selectedProducts.find((product) => isWeaponCategoryName(product.category?.name))
+      if (invalidWeaponProduct) {
+        return badRequest("Weapon/ammo category products are restricted from Store/Warehouse purchases.")
+      }
+    }
+    if (selectedProducts.length !== lineProductIds.length) {
+      return badRequest("One or more selected products are invalid.")
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const baseData: any = {
         referenceNo: asText(body.referenceNo),
-        invoiceNo: asText(body.invoiceNo),
+        invoiceNo: asText(body.invoiceNo ?? body.invoiceNumber),
         attachmentUrl: asText(body.attachmentUrl),
         supplierName: asText(body.supplierName),
         vendorId: asText(body.vendorId),
         status,
         purchasedAt: body.purchasedAt ? new Date(String(body.purchasedAt)) : undefined,
         receivedAt: status === StoreInventoryPurchaseStatus.RECEIVED ? new Date() : null,
-        notes: asText(body.notes),
+        notes: serializePurchaseNotes({
+          note,
+          purchaseOrder: poMeta,
+          workflow: {
+            history: [
+              {
+                status: status === StoreInventoryPurchaseStatus.RECEIVED ? "RECEIVED" : "PENDING",
+                changedByUserId: session.userId,
+                changedByName: null,
+                changedAt: new Date().toISOString(),
+                remarks: "Purchase created",
+              },
+            ],
+          },
+        }),
         storeId,
         createdById: session.userId,
         approvedById: asText(body.approvedById),
@@ -195,7 +299,7 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (status !== StoreInventoryPurchaseStatus.CANCELLED) {
+      if (status === StoreInventoryPurchaseStatus.RECEIVED) {
         for (const line of createdPurchase.lines) {
           const delta = line.quantity
 

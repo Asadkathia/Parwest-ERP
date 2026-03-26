@@ -988,6 +988,27 @@ model StoreInventoryLicenseType {
   products StoreInventoryProduct[]
 }
 
+model StoreInventoryLicense {
+  id             String   @id @default(cuid())
+  validity       String
+  licenseNumber  String   @unique
+  clientId       String?
+  weaponNumber   String?
+  weaponTypeId   String?
+  calibreId      String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  attachmentName String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([weaponTypeId])
+  @@index([calibreId])
+  @@index([createdById])
+}
+
 model StoreInventoryVariation {
   id        String   @id @default(cuid())
   name      String   @unique

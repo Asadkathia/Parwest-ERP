@@ -3,14 +3,18 @@ import { Prisma, StoreInventoryDemandResponseStatus, StoreInventoryDemandStatus,
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 
 type Params = { params: Promise<{ id: string }> }
 
 type ResponseLineInput = {
   demandLineId: string
   productId: string
+  fulfilledNewQty: number
+  fulfilledReusableQty: number
   quantity: number
+  requestedQty?: number
   notes: string | null
 }
 
@@ -31,18 +35,29 @@ function normalizeLines(input: unknown): ResponseLineInput[] | null {
     const row = raw as Record<string, unknown>
     const demandLineId = String(row.demandLineId ?? "").trim()
     const productId = String(row.productId ?? "").trim()
-    const quantity = parsePositiveInt(row.quantity)
-    if (!demandLineId || !productId || quantity == null) return null
+
+    const fulfilledNewQty = parseNonNegativeInt(row.fulfilledNewQty ?? row.newQty ?? 0)
+    const fulfilledReusableQty = parseNonNegativeInt(row.fulfilledReusableQty ?? row.reusableQty ?? 0)
+    const explicitQuantity = row.quantity != null ? parseNonNegativeInt(row.quantity) : null
+
+    if (!demandLineId || !productId) return null
+    if (fulfilledNewQty == null || fulfilledReusableQty == null) return null
+
+    const quantity = explicitQuantity ?? fulfilledNewQty + fulfilledReusableQty
+    if (quantity <= 0) continue
 
     lines.push({
       demandLineId,
       productId,
+      fulfilledNewQty,
+      fulfilledReusableQty,
       quantity,
+      requestedQty: parseNonNegativeInt(row.requestedQty ?? 0) ?? 0,
       notes: asText(row.notes),
     })
   }
 
-  return lines
+  return lines.length ? lines : null
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -59,81 +74,91 @@ export async function POST(request: NextRequest, { params }: Params) {
     const responderStoreId = String(body.responderStoreId ?? "").trim()
     const lines = normalizeLines(body.lines)
     const status = normalizeStatus(body.status)
+    const responseRemarks = asText(body.responseRemarks ?? body.notes)
 
     if (!responderStoreId || !lines) {
       return badRequest("responderStoreId and non-empty lines are required.")
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const demand = await tx.storeInventoryDemand.findUnique({
-        where: { id: demandId },
-      })
-      if (!demand) throw new Error("DEMAND_NOT_FOUND")
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const demand = await tx.storeInventoryDemand.findUnique({
+          where: { id: demandId },
+          include: { lines: true },
+        })
+        if (!demand) throw new Error("DEMAND_NOT_FOUND")
 
-      const createdResponse = await tx.storeInventoryDemandResponse.create({
-        data: {
-          demandId,
-          responderStoreId,
-          responderId: session.userId,
-          status,
-          notes: asText(body.notes),
-          lines: {
-            create: lines.map((line) => ({
-              demandLineId: line.demandLineId,
-              productId: line.productId,
-              quantity: line.quantity,
-              notes: line.notes,
-            })),
+        const existingResponses = await tx.storeInventoryDemandResponse.count({ where: { demandId } })
+        if (existingResponses > 0) {
+          throw new Error("RESPONSE_ALREADY_EXISTS")
+        }
+
+        if (!demand.toStoreId || responderStoreId !== demand.toStoreId) {
+          throw new Error("INVALID_RESPONDER_STORE")
+        }
+
+        const createdResponse = await tx.storeInventoryDemandResponse.create({
+          data: {
+            demandId,
+            responderStoreId,
+            responderId: session.userId,
+            status,
+            notes: null,
+            lines: {
+              create: lines.map((line) => ({
+                demandLineId: line.demandLineId,
+                productId: line.productId,
+                quantity: line.quantity,
+                notes: line.notes,
+              })),
+            },
           },
-        },
-        include: {
-          lines: true,
-        },
-      })
+          include: {
+            lines: true,
+          },
+        })
 
-      if (status === StoreInventoryDemandResponseStatus.APPROVED || status === StoreInventoryDemandResponseStatus.FULFILLED) {
-        for (const line of lines) {
-          const balance = await tx.storeInventoryBalance.findUnique({
-            where: {
-              storeId_productId: {
+        if (status === StoreInventoryDemandResponseStatus.APPROVED || status === StoreInventoryDemandResponseStatus.FULFILLED) {
+          for (const line of lines) {
+            const balance = await tx.storeInventoryBalance.findUnique({
+              where: {
+                storeId_productId: {
+                  storeId: responderStoreId,
+                  productId: line.productId,
+                },
+              },
+            })
+
+            const onHand = balance?.quantityOnHand ?? 0
+            if (onHand < line.quantity) {
+              throw new Error(`INSUFFICIENT_STOCK:${line.productId}`)
+            }
+
+            await tx.storeInventoryBalance.update({
+              where: {
+                storeId_productId: {
+                  storeId: responderStoreId,
+                  productId: line.productId,
+                },
+              },
+              data: {
+                quantityOnHand: { decrement: line.quantity },
+              },
+            })
+
+            await tx.storeInventoryMovement.create({
+              data: {
+                movementType: StoreInventoryMovementType.DEMAND_OUT,
+                quantity: line.quantity,
                 storeId: responderStoreId,
                 productId: line.productId,
+                performedById: session.userId,
+                referenceType: "DEMAND_RESPONSE",
+                referenceId: createdResponse.id,
+                notes: `Demand response allocation for ${demandId}`,
               },
-            },
-          })
+            })
 
-          const onHand = balance?.quantityOnHand ?? 0
-          if (onHand < line.quantity) {
-            throw new Error(`INSUFFICIENT_STOCK:${line.productId}`)
-          }
-
-          await tx.storeInventoryBalance.update({
-            where: {
-              storeId_productId: {
-                storeId: responderStoreId,
-                productId: line.productId,
-              },
-            },
-            data: {
-              quantityOnHand: { decrement: line.quantity },
-            },
-          })
-
-          await tx.storeInventoryMovement.create({
-            data: {
-              movementType: StoreInventoryMovementType.DEMAND_OUT,
-              quantity: line.quantity,
-              storeId: responderStoreId,
-              productId: line.productId,
-              performedById: session.userId,
-              referenceType: "DEMAND_RESPONSE",
-              referenceId: createdResponse.id,
-              notes: `Demand response for ${demandId}`,
-            },
-          })
-
-          const demandLine = await tx.storeInventoryDemandLine.findUnique({ where: { id: line.demandLineId } })
-          if (demandLine) {
             await tx.storeInventoryDemandLine.update({
               where: { id: line.demandLineId },
               data: {
@@ -142,35 +167,47 @@ export async function POST(request: NextRequest, { params }: Params) {
             })
           }
         }
+
+        const metadata = {
+          version: 1 as const,
+          responseRemarks,
+          allocations: lines.map((line) => ({
+            demandLineId: line.demandLineId,
+            productId: line.productId,
+            requestedQty: line.requestedQty ?? 0,
+            fulfilledNewQty: line.fulfilledNewQty,
+            fulfilledReusableQty: line.fulfilledReusableQty,
+            note: line.notes,
+          })),
+          transport: null,
+          receive: null,
+        }
+
+        await tx.storeInventoryDemandResponse.update({
+          where: { id: createdResponse.id },
+          data: { notes: serializeDemandResponseMeta(metadata) },
+        })
+
+        const updatedDemand = await tx.storeInventoryDemand.update({
+          where: { id: demandId },
+          data: {
+            status: demand.status === StoreInventoryDemandStatus.SENT ? StoreInventoryDemandStatus.APPROVED : demand.status,
+            approvedById: demand.status === StoreInventoryDemandStatus.SENT ? session.userId : demand.approvedById,
+            approvedAt: demand.status === StoreInventoryDemandStatus.SENT ? new Date() : demand.approvedAt,
+            fulfilledAt: null,
+          },
+          include: {
+            lines: true,
+            responses: { include: { lines: true } },
+          },
+        })
+
+        return { createdResponse, updatedDemand }
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
-
-      const refreshedLines = await tx.storeInventoryDemandLine.findMany({ where: { demandId } })
-      const totalRequested = refreshedLines.reduce((sum, line) => sum + line.requestedQty, 0)
-      const totalFulfilled = refreshedLines.reduce((sum, line) => sum + line.fulfilledQty, 0)
-
-      let nextDemandStatus = demand.status
-      if (totalFulfilled >= totalRequested && totalRequested > 0) {
-        nextDemandStatus = StoreInventoryDemandStatus.FULFILLED
-      } else if (totalFulfilled > 0) {
-        nextDemandStatus = StoreInventoryDemandStatus.PARTIALLY_FULFILLED
-      }
-
-      const updatedDemand = await tx.storeInventoryDemand.update({
-        where: { id: demandId },
-        data: {
-          status: nextDemandStatus,
-          fulfilledAt: nextDemandStatus === StoreInventoryDemandStatus.FULFILLED ? new Date() : null,
-        },
-        include: {
-          lines: true,
-          responses: { include: { lines: true } },
-        },
-      })
-
-      return { createdResponse, updatedDemand }
-    }, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    })
+    )
 
     await emitInventoryV2Audit({
       userId: session.userId,
@@ -187,6 +224,14 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (error instanceof Error && error.message === "DEMAND_NOT_FOUND") {
       return notFound("Demand not found.")
+    }
+
+    if (error instanceof Error && error.message === "RESPONSE_ALREADY_EXISTS") {
+      return badRequest("This demand already has an allocation response.")
+    }
+
+    if (error instanceof Error && error.message === "INVALID_RESPONDER_STORE") {
+      return badRequest("Responder store must be the demand target warehouse.")
     }
 
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK:")) {

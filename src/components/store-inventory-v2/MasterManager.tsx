@@ -24,6 +24,7 @@ type MasterResource =
 
 type RegionalOffice = { id: string; name: string }
 type Option = { id: string; name: string }
+type CategoryAssignee = "GUARD" | "EMPLOYEE" | "CLIENT"
 
 type Row = {
   id: string
@@ -67,7 +68,32 @@ type Props = {
   supportsStatusCategory?: boolean
 }
 
-const EMPTY_FORM = {
+type FormState = {
+  name: string
+  code: string
+  shortCode: string
+  description: string
+  contact: string
+  companyPhone: string
+  contactPerson: string
+  contactPersonPhone: string
+  type: "STORE" | "WAREHOUSE"
+  contactNumber: string
+  address: string
+  regionalOfficeId: string
+  prefix: string
+  isHeadOffice: boolean
+  latitude: string
+  longitude: string
+  parentId: string
+  canAssignGuard: boolean
+  canAssignEmployee: boolean
+  canAssignClient: boolean
+  categoryId: string
+  assignee: CategoryAssignee[]
+}
+
+const EMPTY_FORM: FormState = {
   name: "",
   code: "",
   shortCode: "",
@@ -89,6 +115,37 @@ const EMPTY_FORM = {
   canAssignEmployee: false,
   canAssignClient: false,
   categoryId: "",
+  assignee: [],
+}
+
+function resolveCategoryAssignees(row: {
+  canAssignGuard?: boolean
+  canAssignEmployee?: boolean
+  canAssignClient?: boolean
+}): CategoryAssignee[] {
+  const active = [
+    row.canAssignGuard ? "GUARD" : null,
+    row.canAssignEmployee ? "EMPLOYEE" : null,
+    row.canAssignClient ? "CLIENT" : null,
+  ].filter(Boolean) as CategoryAssignee[]
+
+  return active
+}
+
+function formatCategoryAssignees(row: {
+  canAssignGuard?: boolean
+  canAssignEmployee?: boolean
+  canAssignClient?: boolean
+}): string {
+  const labels: Record<CategoryAssignee, string> = {
+    GUARD: "Guard",
+    EMPLOYEE: "Employee",
+    CLIENT: "Client",
+  }
+
+  const active = resolveCategoryAssignees(row)
+  if (active.length === 0) return "—"
+  return active.map((value) => labels[value]).join(", ")
 }
 
 export default function MasterManager({
@@ -103,6 +160,7 @@ export default function MasterManager({
   supportsVendorFields = false,
   supportsStatusCategory = false,
 }: Props) {
+  const isVendorResource = resource === "vendors"
   const [rows, setRows] = useState<Row[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
   const [categories, setCategories] = useState<Option[]>([])
@@ -111,7 +169,7 @@ export default function MasterManager({
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [query, setQuery] = useState("")
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
   const resetForm = () => {
     setForm(EMPTY_FORM)
@@ -186,6 +244,7 @@ export default function MasterManager({
       canAssignEmployee: row.canAssignEmployee || false,
       canAssignClient: row.canAssignClient || false,
       categoryId: row.categoryId || "",
+      assignee: resolveCategoryAssignees(row),
     })
   }
 
@@ -193,6 +252,16 @@ export default function MasterManager({
     if (!form.name.trim()) {
       setNotice({ type: "error", message: "Name is required." })
       return
+    }
+
+    if (supportsVendorFields) {
+      if (!form.companyPhone.trim() || !form.contactPerson.trim() || !form.contactPersonPhone.trim() || !form.address.trim()) {
+        setNotice({
+          type: "error",
+          message: "Company phone, contact person name/phone, and address are required for vendors.",
+        })
+        return
+      }
     }
 
     if (supportsUnitShortCode && !form.shortCode.trim()) {
@@ -229,9 +298,9 @@ export default function MasterManager({
     
     if (supportsCategoryFields) {
       payload.parentId = form.parentId || null
-      payload.canAssignGuard = form.canAssignGuard
-      payload.canAssignEmployee = form.canAssignEmployee
-      payload.canAssignClient = form.canAssignClient
+      payload.canAssignGuard = form.assignee.includes("GUARD")
+      payload.canAssignEmployee = form.assignee.includes("EMPLOYEE")
+      payload.canAssignClient = form.assignee.includes("CLIENT")
     }
 
     if (supportsStatusCategory) {
@@ -280,7 +349,7 @@ export default function MasterManager({
       <FilterBar className="space-y-4">
         <div className={`grid grid-cols-1 gap-4 ${supportsStoreFields ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Name *</label>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">{isVendorResource ? "Company Name *" : "Name *"}</label>
             <input className="ui-input" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
           </div>
 
@@ -311,7 +380,7 @@ export default function MasterManager({
                 <input className="ui-input" value={form.companyPhone} onChange={(e) => setForm((prev) => ({ ...prev, companyPhone: e.target.value }))} />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person</label>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person Name</label>
                 <input className="ui-input" value={form.contactPerson} onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))} />
               </div>
               <div>
@@ -414,31 +483,31 @@ export default function MasterManager({
             </div>
           ) : null}
           {supportsCategoryFields ? (
-            <div className="md:col-span-2 flex flex-wrap gap-4 pt-6">
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                <input
-                  type="checkbox"
-                  checked={form.canAssignGuard}
-                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignGuard: e.target.checked }))}
-                />
-                Guard
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                <input
-                  type="checkbox"
-                  checked={form.canAssignEmployee}
-                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignEmployee: e.target.checked }))}
-                />
-                Employee
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                <input
-                  type="checkbox"
-                  checked={form.canAssignClient}
-                  onChange={(e) => setForm((prev) => ({ ...prev, canAssignClient: e.target.checked }))}
-                />
-                Client
-              </label>
+            <div>
+              <label className="mb-2 block text-sm text-[var(--text-muted)]">Assignees</label>
+              <div className="flex flex-wrap gap-4 rounded-md border border-[var(--border)] p-3">
+                {([
+                  { value: "GUARD", label: "Guard" },
+                  { value: "EMPLOYEE", label: "Employee" },
+                  { value: "CLIENT", label: "Client" },
+                ] as Array<{ value: CategoryAssignee; label: string }>).map((option) => (
+                  <label key={option.value} className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                    <input
+                      type="checkbox"
+                      checked={form.assignee.includes(option.value)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          assignee: e.target.checked
+                            ? [...prev.assignee, option.value]
+                            : prev.assignee.filter((value) => value !== option.value),
+                        }))
+                      }
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
             </div>
           ) : null}
           {supportsStatusCategory ? (
@@ -490,9 +559,7 @@ export default function MasterManager({
           ...(supportsCategoryFields ? [{ key: "parent", header: "Parent", render: (row: Row) => row.parent?.name || "—" }] : []),
           ...(supportsCategoryFields
             ? [
-                { key: "canAssignGuard", header: "Guard", render: (row: Row) => (row.canAssignGuard ? "Yes" : "No") },
-                { key: "canAssignEmployee", header: "Employee", render: (row: Row) => (row.canAssignEmployee ? "Yes" : "No") },
-                { key: "canAssignClient", header: "Client", render: (row: Row) => (row.canAssignClient ? "Yes" : "No") },
+                { key: "assignee", header: "Assignees", render: (row: Row) => formatCategoryAssignees(row) },
               ]
             : []),
           ...(supportsUnitShortCode ? [{ key: "shortCode", header: "Short Code" }] : []),
@@ -500,8 +567,9 @@ export default function MasterManager({
           ...(supportsVendorFields
             ? [
                 { key: "companyPhone", header: "Company Phone", render: (row: Row) => row.companyPhone || "—" },
-                { key: "contactPerson", header: "Contact Person", render: (row: Row) => row.contactPerson || "—" },
-                { key: "contactPersonPhone", header: "Contact Phone", render: (row: Row) => row.contactPersonPhone || "—" },
+                { key: "contactPerson", header: "Contact Person Name", render: (row: Row) => row.contactPerson || "—" },
+                { key: "contactPersonPhone", header: "Contact Person Phone", render: (row: Row) => row.contactPersonPhone || "—" },
+                { key: "address", header: "Address", render: (row: Row) => row.address || "—" },
               ]
             : []),
           ...(supportsStatusCategory ? [{ key: "category", header: "Category", render: (row: Row) => row.category?.name || "—" }] : []),

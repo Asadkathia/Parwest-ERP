@@ -14,7 +14,7 @@ const links = [
   { label: 'Demand Response', href: '/store-inventory/demands-response' },
   { label: 'Stores', href: '/store-inventory/stores' },
   { label: 'Vendors', href: '/store-inventory/vendors' },
-  { label: 'Weapons', href: '/store-inventory/weapons' },
+  { label: 'Weapon Types', href: '/store-inventory/weapon-types' },
   { label: 'Brands', href: '/store-inventory/brands' },
   { label: 'Units', href: '/store-inventory/units' },
   { label: 'Categories', href: '/store-inventory/categories' },

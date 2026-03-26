@@ -30,6 +30,11 @@ type DemandLineInput = {
   notes: string | null
 }
 
+function isWeaponCategoryName(value: string | null | undefined): boolean {
+  const text = String(value ?? "").trim().toLowerCase()
+  return text.includes("weapon") || text.includes("ammo")
+}
+
 function normalizeLines(input: unknown): DemandLineInput[] | null {
   if (!Array.isArray(input) || input.length === 0) return null
   const lines: DemandLineInput[] = []
@@ -116,6 +121,22 @@ export async function POST(request: NextRequest) {
     if (!lines) return badRequest("Demand lines are required.")
     if (!fromStoreId || !toStoreId) {
       return badRequest("fromStoreId and toStoreId are required.")
+    }
+
+    const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
+    const selectedProducts = await prisma.storeInventoryProduct.findMany({
+      where: { id: { in: lineProductIds } },
+      select: {
+        id: true,
+        category: { select: { name: true } },
+      },
+    })
+    const invalidWeaponProduct = selectedProducts.find((product) => isWeaponCategoryName(product.category?.name))
+    if (invalidWeaponProduct) {
+      return badRequest("Weapon/ammo category products are restricted from Store/Warehouse demands.")
+    }
+    if (selectedProducts.length !== lineProductIds.length) {
+      return badRequest("One or more selected products are invalid.")
     }
 
     const [fromStore, toStore] = await Promise.all([

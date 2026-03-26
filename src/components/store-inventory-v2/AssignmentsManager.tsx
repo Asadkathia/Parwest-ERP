@@ -9,12 +9,21 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 
 type AssignmentType = "GUARD" | "EMPLOYEE" | "CLIENT"
+type ProductScope = "NON_WEAPON" | "WEAPON"
 
 type Option = { id: string; name: string }
+type InventoryBalance = {
+  id: string
+  storeId: string
+  productId: string
+  quantityOnHand: number
+  quantityHeld: number
+}
 type Product = {
   id: string
   sku: string
   name: string
+  category?: { id: string; name: string } | null
   calibre?: { id: string; name: string } | null
   weaponType?: { id: string; name: string } | null
 }
@@ -46,6 +55,7 @@ type ClientBranch = {
   id: string
   name: string
   code?: string | null
+  supervisorId?: string | null
   supervisorName?: string | null
   activeDeployments?: number | null
 }
@@ -54,6 +64,12 @@ type Deployment = {
   id: string
   guardId: string
   status?: string | null
+  shiftType?: string | null
+  deploymentType?: string | null
+  designation?: string | null
+  guard?: { id: string; name?: string | null; parwestId?: string | null } | null
+  clientId?: string | null
+  branchId?: string | null
   branch?: { id: string; name?: string | null; code?: string | null } | null
 }
 
@@ -85,10 +101,17 @@ const INITIAL_FORM = {
   lines: [{ productId: "", conditionId: "", quantity: "1", notes: "" }],
 }
 
-function titleForType(type: AssignmentType): string {
-  if (type === "GUARD") return "Guard Inventory Assignment"
-  if (type === "CLIENT") return "Client Assignment"
-  return "Employee Inventory Assignment"
+const INITIAL_RETURN_FORM = {
+  assignmentId: "",
+  status: "RETURNED",
+  notes: "",
+}
+
+function titleForType(type: AssignmentType, scope: ProductScope): string {
+  const prefix = scope === "WEAPON" ? "Weapon " : ""
+  if (type === "GUARD") return `${prefix}Guard Inventory Assignment`
+  if (type === "CLIENT") return `${prefix}Client Assignment`
+  return `${prefix}Employee Inventory Assignment`
 }
 
 function assigneeLabel(type: AssignmentType): string {
@@ -114,15 +137,25 @@ function lineProduct(products: Product[], productId: string): Product | null {
   return products.find((row) => row.id === productId) || null
 }
 
-export default function AssignmentsManager({ assignmentType = "GUARD" }: { assignmentType?: AssignmentType }) {
+export default function AssignmentsManager({
+  assignmentType = "GUARD",
+  productScope = "NON_WEAPON",
+}: {
+  assignmentType?: AssignmentType
+  productScope?: ProductScope
+}) {
   const [rows, setRows] = useState<Assignment[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [balances, setBalances] = useState<InventoryBalance[]>([])
   const [conditions, setConditions] = useState<Condition[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [guards, setGuards] = useState<Guard[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [branches, setBranches] = useState<ClientBranch[]>([])
+  const [activeClientDeployments, setActiveClientDeployments] = useState<Deployment[]>([])
+  const [clientManagerName, setClientManagerName] = useState("")
+  const [showPreviousAssignments, setShowPreviousAssignments] = useState(false)
   const [guardDeployment, setGuardDeployment] = useState<Deployment | null>(null)
   const [assigneeQuery, setAssigneeQuery] = useState("")
   const [form, setForm] = useState(INITIAL_FORM)
@@ -130,6 +163,8 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [returnDraft, setReturnDraft] = useState(INITIAL_RETURN_FORM)
+  const [returning, setReturning] = useState(false)
 
   const selectedEmployee = useMemo(
     () => (assignmentType === "EMPLOYEE" ? employees.find((row) => row.id === form.assignedToId) || null : null),
@@ -143,19 +178,28 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
     () => (assignmentType === "CLIENT" ? branches.find((row) => row.id === form.branchId) || null : null),
     [assignmentType, branches, form.branchId]
   )
+  const previousAssignments = useMemo(() => {
+    if (assignmentType !== "CLIENT" || !form.assignedToId) return []
+    return rows
+      .filter((row) => row.assignedToClient?.id === form.assignedToId)
+      .sort((a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime())
+  }, [assignmentType, form.assignedToId, rows])
 
   const load = useCallback(async () => {
     setLoading(true)
     setNotice(null)
     try {
-      const [assignmentRows, storeRows, productRows, conditionRows, userRows, guardRows, clientRows] = await Promise.all([
-        apiGet<Assignment[]>(`/api/store-inventory/v2/assignments?assignedToType=${assignmentType}`),
+      const [assignmentRows, storeRows, productRows, conditionRows, userRows, guardRows, clientRows, inventoryRows] = await Promise.all([
+        apiGet<Assignment[]>(
+          `/api/store-inventory/v2/assignments?assignedToType=${assignmentType}&categoryScope=${productScope}`
+        ),
         apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
         apiGet<Product[]>("/api/store-inventory/v2/products"),
         apiGet<Condition[]>("/api/store-inventory/v2/masters/conditions"),
         apiGet<Employee[]>("/api/users?status=ACTIVE"),
         apiGet<Guard[]>("/api/guards?status=ACTIVE"),
         apiGet<Client[]>("/api/clients?status=ACTIVE"),
+        apiGet<Array<InventoryBalance & { store?: { id?: string }; product?: { id?: string } }>>("/api/store-inventory/v2/inventories"),
       ])
 
       setRows(assignmentRows)
@@ -165,6 +209,15 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
       setEmployees(userRows)
       setGuards(guardRows)
       setClients(clientRows)
+      setBalances(
+        inventoryRows.map((row) => ({
+          id: row.id,
+          storeId: row.store?.id || row.storeId || "",
+          productId: row.product?.id || row.productId || "",
+          quantityOnHand: row.quantityOnHand,
+          quantityHeld: row.quantityHeld,
+        }))
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load assignments."
       setNotice({ type: "error", message })
@@ -172,7 +225,7 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
     } finally {
       setLoading(false)
     }
-  }, [assignmentType])
+  }, [assignmentType, productScope])
 
   useEffect(() => {
     void load()
@@ -182,6 +235,8 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
     if (assignmentType !== "CLIENT") return
     if (!form.assignedToId) {
       setBranches([])
+      setActiveClientDeployments([])
+      setClientManagerName("")
       setForm((prev) => ({ ...prev, branchId: "" }))
       return
     }
@@ -192,6 +247,8 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
         const branchRows = await apiGet<ClientBranch[]>(`/api/clients/${encodeURIComponent(form.assignedToId)}/branches`)
         if (!cancelled) {
           setBranches(branchRows)
+          setActiveClientDeployments([])
+          setClientManagerName("")
           setForm((prev) => ({
             ...prev,
             branchId: branchRows.some((b) => b.id === prev.branchId) ? prev.branchId : "",
@@ -206,6 +263,56 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
       cancelled = true
     }
   }, [assignmentType, form.assignedToId])
+
+  useEffect(() => {
+    if (assignmentType !== "CLIENT" || !form.assignedToId || !form.branchId) {
+      setActiveClientDeployments([])
+      setClientManagerName("")
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [deploymentRows, csRows] = await Promise.all([
+          apiGet<Deployment[]>("/api/deployments"),
+          apiGet<Array<{ supervisor?: { id?: string; name?: string } | null }>>(
+            `/api/users/cs-relationships?clientId=${encodeURIComponent(form.assignedToId)}&branchId=${encodeURIComponent(form.branchId)}`
+          ),
+        ])
+
+        if (!cancelled) {
+          const active = deploymentRows.filter(
+            (row) =>
+              row.clientId === form.assignedToId &&
+              row.branchId === form.branchId &&
+              String(row.status || "").toUpperCase() === "ACTIVE"
+          )
+          setActiveClientDeployments(active)
+        }
+
+        const supervisorId = csRows[0]?.supervisor?.id
+        if (!supervisorId) {
+          if (!cancelled) setClientManagerName("")
+          return
+        }
+
+        const msRows = await apiGet<Array<{ manager?: { id?: string; name?: string } | null }>>(
+          `/api/users/ms-relationships?supervisorId=${encodeURIComponent(supervisorId)}`
+        )
+        if (!cancelled) setClientManagerName(msRows[0]?.manager?.name || "")
+      } catch {
+        if (!cancelled) {
+          setActiveClientDeployments([])
+          setClientManagerName("")
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [assignmentType, form.assignedToId, form.branchId])
 
   useEffect(() => {
     if (assignmentType !== "GUARD") return
@@ -253,6 +360,26 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
     return q ? source.filter((row) => row.name.toLowerCase().includes(q)) : source
   }, [assignmentType, assigneeQuery, clients, employees, guards])
 
+  const scopedProducts = useMemo(() => {
+    return products.filter((product) => {
+      const category = String(product.category?.name ?? "").toLowerCase()
+      const isWeaponOrAmmo = category.includes("weapon") || category.includes("ammo")
+      return productScope === "WEAPON" ? isWeaponOrAmmo : !isWeaponOrAmmo
+    })
+  }, [products, productScope])
+
+  const inventoryFor = useCallback(
+    (storeId: string | undefined, productId: string) => {
+      if (!storeId || !productId) return { available: 0, reusable: 0 }
+      const row = balances.find((item) => item.storeId === storeId && item.productId === productId)
+      return {
+        available: row?.quantityOnHand ?? 0,
+        reusable: row?.quantityHeld ?? 0,
+      }
+    },
+    [balances]
+  )
+
   const createAssignment = async () => {
     const lines = form.lines.map((line) => ({
       productId: line.productId,
@@ -276,6 +403,17 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
       setNotice({ type: "error", message: "Branch is required for client assignments." })
       return
     }
+    for (const line of lines) {
+      const stock = inventoryFor(form.storeId, line.productId)
+      if (line.quantity > stock.available) {
+        const product = products.find((row) => row.id === line.productId)
+        setNotice({
+          type: "error",
+          message: `${product?.name || "Selected product"} exceeds available new stock (${stock.available}).`,
+        })
+        return
+      }
+    }
 
     setSaving(true)
     setNotice(null)
@@ -290,6 +428,7 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
       const payload: Record<string, unknown> = {
         storeId: form.storeId,
         assignedToType: assignmentType,
+        categoryScope: productScope,
         assignedAt: form.assignedAt || today,
         remarks,
         lines,
@@ -332,14 +471,34 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
     }))
   }
 
-  const returnAssignment = async (id: string) => {
+  const openReturnModal = (id: string) => {
+    setReturnDraft({
+      assignmentId: id,
+      status: "RETURNED",
+      notes: "",
+    })
+  }
+
+  const closeReturnModal = () => {
+    setReturnDraft(INITIAL_RETURN_FORM)
+  }
+
+  const returnAssignment = async () => {
+    if (!returnDraft.assignmentId) return
+    setReturning(true)
     try {
-      await apiSend<Assignment>(`/api/store-inventory/v2/assignments/${id}/return`, "POST", { status: "RETURNED" })
-      setNotice({ type: "success", message: "Assignment returned successfully." })
+      await apiSend<Assignment>(`/api/store-inventory/v2/assignments/${returnDraft.assignmentId}/return`, "POST", {
+        status: returnDraft.status,
+        notes: returnDraft.notes.trim() || null,
+      })
+      setNotice({ type: "success", message: "Assignment closed successfully." })
+      closeReturnModal()
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to return assignment."
       setNotice({ type: "error", message })
+    } finally {
+      setReturning(false)
     }
   }
 
@@ -355,7 +514,10 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
 
   return (
     <div className="space-y-6">
-      <SectionTitle title={titleForType(assignmentType)} subtitle={`Staging-aligned ${assigneeLabel(assignmentType).toLowerCase()} assignment flow.`} />
+      <SectionTitle
+        title={titleForType(assignmentType, productScope)}
+        subtitle={`Staging-aligned ${productScope === "WEAPON" ? "weapon " : ""}${assigneeLabel(assignmentType).toLowerCase()} assignment flow.`}
+      />
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
       <FilterBar className="space-y-4">
@@ -416,23 +578,64 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
         ) : null}
 
         {assignmentType === "CLIENT" ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2">
-            <ReadOnlyField label="Manager/Supervisor" value={selectedBranch?.supervisorName || "—"} />
-            <ReadOnlyField label="Active Deployment" value={String(selectedBranch?.activeDeployments ?? 0)} />
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <ReadOnlyField label="Manager" value={clientManagerName || "—"} />
+              <ReadOnlyField label="Supervisor" value={selectedBranch?.supervisorName || "—"} />
+              <ReadOnlyField label="Active Deployment" value={String(activeClientDeployments.length || selectedBranch?.activeDeployments || 0)} />
+              <div className="flex items-end">
+                <ActionButton variant="secondary" onClick={() => setShowPreviousAssignments(true)}>
+                  Show Previous Assignments
+                </ActionButton>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="font-medium text-[var(--text-muted)]">Active Deployment ({activeClientDeployments.length})</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                      <th className="p-2">Guard Name</th>
+                      <th className="p-2">Deployed As</th>
+                      <th className="p-2">Shift</th>
+                      <th className="p-2">Deployment Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeClientDeployments.length ? (
+                      activeClientDeployments.map((row) => (
+                        <tr key={row.id} className="border-b border-[var(--border)]">
+                          <td className="p-2">{row.guard?.parwestId ? `${row.guard.parwestId} : ${row.guard?.name || ""}` : row.guard?.name || "—"}</td>
+                          <td className="p-2">{row.designation || "Guard"}</td>
+                          <td className="p-2">{String(row.shiftType || "—").replaceAll("_", " ")}</td>
+                          <td className="p-2">{row.deploymentType || "Regular"}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="p-2 text-[var(--text-muted)]" colSpan={4}>No active deployments.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         ) : null}
 
         <div className="space-y-4">
           <div className="font-medium text-[var(--text-muted)]">Products Table *</div>
           {form.lines.map((line, index) => {
             const selectedProduct = lineProduct(products, line.productId)
+            const stock = inventoryFor(form.storeId, line.productId)
             return (
             <div key={index} className="grid grid-cols-1 gap-4 items-end border-b border-[var(--border)] pb-4 md:grid-cols-12">
               <div className="md:col-span-4">
                 <label className="mb-1 block text-xs text-[var(--text-muted)]">Select Product</label>
                 <select className="ui-select" value={line.productId} onChange={(e) => updateLine(index, "productId", e.target.value)}>
                   <option value="">Type/select product code</option>
-                  {products.map((product) => (
+                  {scopedProducts.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.sku} - {product.name}
                     </option>
@@ -447,18 +650,6 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
                 <label className="mb-1 block text-xs text-[var(--text-muted)]">Product Name</label>
                 <input className="ui-input" value={selectedProduct?.name || ""} readOnly />
               </div>
-              {assignmentType === "CLIENT" ? (
-                <>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-xs text-[var(--text-muted)]">Calibre</label>
-                    <input className="ui-input" value={selectedProduct?.calibre?.name || ""} readOnly />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-xs text-[var(--text-muted)]">Weapon Type</label>
-                    <input className="ui-input" value={selectedProduct?.weaponType?.name || ""} readOnly />
-                  </div>
-                </>
-              ) : null}
               <div className="md:col-span-2">
                 <label className="mb-1 block text-xs text-[var(--text-muted)]">Product Condition</label>
                 <select className="ui-select" value={line.conditionId} onChange={(e) => updateLine(index, "conditionId", e.target.value)}>
@@ -474,7 +665,15 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
                 <label className="mb-1 block text-xs text-[var(--text-muted)]">Product Quantity</label>
                 <input className="ui-input" min={1} type="number" value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
               </div>
-              <div className="md:col-span-4">
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Available New</label>
+                <input className="ui-input" value={String(stock.available)} readOnly />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-[var(--text-muted)]">Available Reusable</label>
+                <input className="ui-input" value={String(stock.reusable)} readOnly />
+              </div>
+              <div className="md:col-span-3">
                 <label className="mb-1 block text-xs text-[var(--text-muted)]">Notes</label>
                 <input className="ui-input" value={line.notes} onChange={(e) => updateLine(index, "notes", e.target.value)} />
               </div>
@@ -521,14 +720,14 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
           { key: "assignedByUser", header: "Assigned By", render: (row) => row.assignedByUser.name },
           { key: "assignedAt", header: "Assigned At", render: (row) => new Date(row.assignedAt).toLocaleDateString("en-GB") },
           { key: "notes", header: "Remarks", render: (row) => row.notes || "—" },
-          { key: "returnedAt", header: "Revoked At", render: (row) => (row.returnedAt ? new Date(row.returnedAt).toLocaleDateString("en-GB") : "—") },
+          { key: "returnedAt", header: "Returned At", render: (row) => (row.returnedAt ? new Date(row.returnedAt).toLocaleDateString("en-GB") : "—") },
           {
             key: "actions",
             header: "Action",
             render: (row) =>
               row.status === "ASSIGNED" ? (
-                <button className="text-[var(--brand)] hover:underline" onClick={() => void returnAssignment(row.id)}>
-                  Revoke
+                <button className="text-[var(--brand)] hover:underline" onClick={() => openReturnModal(row.id)}>
+                  Return
                 </button>
               ) : (
                 <span className="text-xs text-[var(--text-muted)]">Closed</span>
@@ -536,6 +735,91 @@ export default function AssignmentsManager({ assignmentType = "GUARD" }: { assig
           },
         ]}
       />
+
+      {assignmentType === "CLIENT" && showPreviousAssignments ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Already Assignments</h3>
+              <button className="text-sm text-[var(--text-muted)] hover:underline" onClick={() => setShowPreviousAssignments(false)}>
+                Close
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                    <th className="p-2">Store Inventory</th>
+                    <th className="p-2">Name</th>
+                    <th className="p-2">Assign Date</th>
+                    <th className="p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previousAssignments.length ? (
+                    previousAssignments.map((row) => (
+                      <tr key={row.id} className="border-b border-[var(--border)]">
+                        <td className="p-2">{row.store.name}</td>
+                        <td className="p-2">{row.product.name}</td>
+                        <td className="p-2">{new Date(row.assignedAt).toLocaleDateString("en-GB")}</td>
+                        <td className="p-2">{row.status}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="p-3 text-[var(--text-muted)]" colSpan={4}>No assignments yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {returnDraft.assignmentId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Return Assignment</h3>
+              <button className="text-sm text-[var(--text-muted)] hover:underline" onClick={closeReturnModal}>
+                Close
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Status</label>
+                <select
+                  className="ui-select"
+                  value={returnDraft.status}
+                  onChange={(e) => setReturnDraft((prev) => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="RETURNED">Returned</option>
+                  <option value="DAMAGED">Damaged</option>
+                  <option value="LOST">Lost</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Remarks</label>
+                <textarea
+                  className="ui-input min-h-24"
+                  placeholder="Optional return remarks"
+                  value={returnDraft.notes}
+                  onChange={(e) => setReturnDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <ActionButton onClick={() => void returnAssignment()} disabled={returning}>
+                  {returning ? "Saving..." : "Submit Return"}
+                </ActionButton>
+                <ActionButton variant="secondary" onClick={closeReturnModal} disabled={returning}>
+                  Cancel
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

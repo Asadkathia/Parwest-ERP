@@ -50,6 +50,7 @@ export async function GET(
             city: b.city,
             address: b.address,
             contactPerson: b.contactPerson,
+            supervisorId: b.supervisorAssignments[0]?.supervisor?.id ?? null,
             supervisorName: b.supervisorAssignments[0]?.supervisor?.name ?? null,
             activeDeployments: b._count.deployments,
         }))

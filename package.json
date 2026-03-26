@@ -40,7 +40,9 @@
     "inventory:v2:stage-env": "node scripts/generate-inventory-v2-stage-env.mjs",
     "inventory:v2:parity-diff": "node scripts/inventory-v2-parity-diff.mjs",
     "inventory:v2:cleanup-test-data": "node scripts/cleanup-inventory-v2-test-data.mjs",
-    "inventory:v2:backfill:legacy": "node scripts/backfill-inventory-v2-from-legacy.mjs"
+    "inventory:v2:backfill:legacy": "node scripts/backfill-inventory-v2-from-legacy.mjs",
+    "inventory:v2:seed-demand-test-data": "node scripts/seed-store-inventory-v2-demand-test-data.mjs",
+    "inventory:v2:clear-data": "node scripts/clear-store-inventory-v2-data.mjs"
   },
   "keywords": [],
   "author": "",

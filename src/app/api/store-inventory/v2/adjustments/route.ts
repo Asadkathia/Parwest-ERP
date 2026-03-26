@@ -20,7 +20,10 @@ type AdjustmentLineInput = {
   quantity: number
   unitCost: number | null
   notes: string | null
+  adjustmentType: StoreInventoryAdjustmentType | null
 }
+
+type CategoryScope = "NON_WEAPON" | "WEAPON_AMMO"
 
 function normalizeType(raw: unknown): StoreInventoryAdjustmentType | null {
   const value = String(raw ?? "").trim().toUpperCase()
@@ -28,6 +31,16 @@ function normalizeType(raw: unknown): StoreInventoryAdjustmentType | null {
   if (value === "DECREASE") return StoreInventoryAdjustmentType.DECREASE
   if (value === "SET") return StoreInventoryAdjustmentType.SET
   return null
+}
+
+function normalizeCategoryScope(value: unknown): CategoryScope {
+  const raw = String(value ?? "").trim().toUpperCase()
+  return raw === "WEAPON_AMMO" ? "WEAPON_AMMO" : "NON_WEAPON"
+}
+
+function isWeaponOrAmmoCategoryName(value: string | null | undefined): boolean {
+  const text = String(value ?? "").trim().toLowerCase()
+  return text.includes("weapon") || text.includes("ammo")
 }
 
 function normalizeLines(input: unknown): AdjustmentLineInput[] | null {
@@ -47,6 +60,7 @@ function normalizeLines(input: unknown): AdjustmentLineInput[] | null {
       quantity,
       unitCost,
       notes: asText(row.notes),
+      adjustmentType: normalizeType(row.adjustmentType),
     })
   }
 
@@ -60,12 +74,48 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get("storeId")?.trim() || undefined
   const adjustmentType = searchParams.get("adjustmentType")?.trim() || undefined
+  const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
 
   try {
     const rows = await prisma.storeInventoryAdjustment.findMany({
       where: {
         storeId,
         adjustmentType: adjustmentType ? (adjustmentType as StoreInventoryAdjustmentType) : undefined,
+        ...(categoryScope === "WEAPON_AMMO"
+          ? {
+              lines: {
+                some: {
+                  product: {
+                    category: {
+                      is: {
+                        OR: [
+                          { name: { contains: "weapon", mode: "insensitive" } },
+                          { name: { contains: "ammo", mode: "insensitive" } },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            }
+          : {
+              NOT: {
+                lines: {
+                  some: {
+                    product: {
+                      category: {
+                        is: {
+                          OR: [
+                            { name: { contains: "weapon", mode: "insensitive" } },
+                            { name: { contains: "ammo", mode: "insensitive" } },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            }),
       },
       include: adjustmentInclude,
       orderBy: { createdAt: "desc" },
@@ -91,9 +141,33 @@ export async function POST(request: NextRequest) {
     const storeId = String(body.storeId ?? "").trim()
     const adjustmentType = normalizeType(body.adjustmentType)
     const lines = normalizeLines(body.lines)
+    const categoryScope = normalizeCategoryScope(body.categoryScope)
 
     if (!storeId || !adjustmentType || !lines) {
       return badRequest("storeId, adjustmentType, and non-empty lines are required.")
+    }
+
+    const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
+    const selectedProducts = await prisma.storeInventoryProduct.findMany({
+      where: { id: { in: lineProductIds } },
+      select: {
+        id: true,
+        category: { select: { name: true } },
+      },
+    })
+    if (selectedProducts.length !== lineProductIds.length) {
+      return badRequest("One or more selected products are invalid.")
+    }
+    if (categoryScope === "WEAPON_AMMO") {
+      const nonScopedProduct = selectedProducts.find((product) => !isWeaponOrAmmoCategoryName(product.category?.name))
+      if (nonScopedProduct) {
+        return badRequest("Only weapon/ammo category products are allowed in weapon adjustments.")
+      }
+    } else {
+      const scopedProduct = selectedProducts.find((product) => isWeaponOrAmmoCategoryName(product.category?.name))
+      if (scopedProduct) {
+        return badRequest("Weapon/ammo category products are restricted from regular adjustments.")
+      }
     }
 
     const created = await prisma.$transaction(async (tx) => {
@@ -122,10 +196,11 @@ export async function POST(request: NextRequest) {
           })
 
         const before = current?.quantityOnHand ?? 0
+        const lineAdjustmentType = line.adjustmentType ?? adjustmentType
         const delta =
-          adjustmentType === StoreInventoryAdjustmentType.INCREASE
+          lineAdjustmentType === StoreInventoryAdjustmentType.INCREASE
             ? line.quantity
-            : adjustmentType === StoreInventoryAdjustmentType.DECREASE
+            : lineAdjustmentType === StoreInventoryAdjustmentType.DECREASE
               ? -line.quantity
               : line.quantity - before
         const after = before + delta

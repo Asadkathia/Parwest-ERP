@@ -97,13 +97,25 @@ const navItems: NavNode[] = [
                 title: "Warehouses & Stores",
                 icon: Building2,
                 children: [
-                    { title: "Inventory", href: "/store-inventory/inventories", icon: Search },
+                    { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
+                    {
+                        title: "Demands",
+                        icon: ClipboardList,
+                        children: [
+                            { title: "Demand Request", href: "/store-inventory/demands-send", icon: ClipboardList },
+                            { title: "Demand Respond", href: "/store-inventory/demands-response", icon: ClipboardList },
+                        ],
+                    },
+                ],
+            },
+            {
+                title: "Management",
+                icon: Search,
+                children: [
+                    { title: "Inventory List", href: "/store-inventory/inventories", icon: Search },
                     { title: "Guard Assignments", href: "/store-inventory/inventory-assignments", icon: MapPin },
                     { title: "Employee Assignments", href: "/store-inventory/employee-assignments", icon: MapPin },
                     { title: "Client Assignments", href: "/store-inventory/client-assignments", icon: MapPin },
-                    { title: "Stores", href: "/store-inventory/stores", icon: Building2 },
-                    { title: "Demands", href: "/store-inventory/demands-send", icon: ClipboardList },
-                    { title: "Demands Response", href: "/store-inventory/demands-response", icon: ClipboardList },
                 ],
             },
             {
@@ -119,7 +131,15 @@ const navItems: NavNode[] = [
                 title: "Product Definition",
                 icon: Settings,
                 children: [
-                    { title: "Weapons", href: "/store-inventory/weapons", icon: Package },
+                    {
+                        title: "Weapons",
+                        icon: Package,
+                        children: [
+                            { title: "Weapon Types", href: "/store-inventory/weapon-types", icon: Package },
+                            { title: "Calibres", href: "/store-inventory/calibres", icon: Settings },
+                            { title: "Licenses", href: "/store-inventory/licenses", icon: FileText },
+                        ],
+                    },
                     { title: "Products", href: "/store-inventory/products", icon: Package },
                     { title: "Create Product", href: "/store-inventory/product-create", icon: Upload },
                     { title: "Brands", href: "/store-inventory/brands", icon: Package },
@@ -129,8 +149,6 @@ const navItems: NavNode[] = [
                     { title: "Conditions", href: "/store-inventory/conditions", icon: Settings },
                     { title: "Variations", href: "/store-inventory/variations", icon: Settings },
                     { title: "Repairings", href: "/store-inventory/repairings", icon: History },
-                    { title: "Calibres", href: "/store-inventory/calibres", icon: Settings },
-                    { title: "Licenses", href: "/store-inventory/licenses", icon: FileText },
                     { title: "Product Unique Items", href: "/store-inventory/product-unique-items", icon: Package },
                 ],
             },
@@ -142,6 +160,19 @@ const navItems: NavNode[] = [
                     { title: "Create Adjustment", href: "/store-inventory/adjustment-create", icon: Upload },
                     { title: "Audits", href: "/store-inventory/audits", icon: History },
                     { title: "Dashboard", href: "/store-inventory", icon: LayoutDashboard },
+                ],
+            },
+            {
+                title: "Weapon Operations",
+                icon: Package,
+                children: [
+                    { title: "Weapon Inventory", href: "/store-inventory/weapon-inventories", icon: Search },
+                    { title: "Ammo Inventory", href: "/store-inventory/ammo-inventories", icon: Search },
+                    { title: "Weapon Purchases", href: "/store-inventory/weapon-purchases", icon: FileText },
+                    { title: "Create Weapon Purchase", href: "/store-inventory/weapon-purchase-create", icon: Upload },
+                    { title: "Weapon Adjustments", href: "/store-inventory/weapon-adjustments", icon: History },
+                    { title: "Create Weapon Adjustment", href: "/store-inventory/weapon-adjustment-create", icon: Upload },
+                    { title: "Weapon Client Assignment", href: "/store-inventory/weapon-client-assignments", icon: MapPin },
                 ],
             },
         ],
