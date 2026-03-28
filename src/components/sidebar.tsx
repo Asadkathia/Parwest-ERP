@@ -200,6 +200,14 @@ const allNavItems: NavNode[] = [
         ],
     },
     {
+        title: "Admin Approvals",
+        icon: ShieldAlert,
+        module: "ADMIN_APPROVALS",
+        children: [
+            { title: "Guards Approval", href: "/admin-approvals/guards-approval", icon: ShieldAlert },
+        ],
+    },
+    {
         title: "Ticketing",
         icon: Ticket,
         module: "TICKETING",
