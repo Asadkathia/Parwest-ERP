@@ -24,6 +24,12 @@ export async function PATCH(
     if (body.phone !== undefined) data.phone = body.phone ? String(body.phone) : null
     if (body.mobile !== undefined) data.mobile = body.mobile ? String(body.mobile) : null
     if (body.fax !== undefined) data.fax = body.fax ? String(body.fax) : null
+    if (body.latitude !== undefined) {
+      data.latitude = body.latitude !== null && body.latitude !== "" ? parseFloat(String(body.latitude)) : null
+    }
+    if (body.longitude !== undefined) {
+      data.longitude = body.longitude !== null && body.longitude !== "" ? parseFloat(String(body.longitude)) : null
+    }
 
     if (Object.keys(data).length === 0) {
       return badRequest("No valid fields provided.")

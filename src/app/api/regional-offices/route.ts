@@ -70,9 +70,17 @@ export async function POST(request: NextRequest) {
         const phone = body?.phone ? String(body.phone) : null
         const mobile = body?.mobile ? String(body.mobile) : null
         const fax = body?.fax ? String(body.fax) : null
+        const latitude = body?.latitude != null && body.latitude !== "" ? parseFloat(String(body.latitude)) : null
+        const longitude = body?.longitude != null && body.longitude !== "" ? parseFloat(String(body.longitude)) : null
 
         if (!name || !seriesCode || !regionId) {
             return badRequest("name, seriesCode and regionId are required.")
+        }
+        if (latitude != null && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+            return badRequest("Latitude must be between -90 and 90.")
+        }
+        if (longitude != null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+            return badRequest("Longitude must be between -180 and 180.")
         }
 
         if (isRuntimeMockEnabled()) {
@@ -103,6 +111,8 @@ export async function POST(request: NextRequest) {
                 phone,
                 mobile,
                 fax,
+                ...(latitude != null ? { latitude } : {}),
+                ...(longitude != null ? { longitude } : {}),
             },
             include: {
                 region: true,
