@@ -22,7 +22,7 @@ export default async function DashboardLayout({
                 <form
                     action={async () => {
                         "use server"
-                        await signOut()
+                        await signOut({ redirectTo: "/login" })
                     }}
                 >
                     <ActionButton type="submit" variant="secondary">
