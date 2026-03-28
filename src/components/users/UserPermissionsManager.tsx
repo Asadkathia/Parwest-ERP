@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
@@ -8,6 +8,7 @@ import DataTable from "@/components/shared/DataTable"
 import { Checkbox } from "@/components/ui/form-controls"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
+import { ChevronDown, X } from "lucide-react"
 
 const modules = [
   "GUARDS",
@@ -42,6 +43,114 @@ type ApiUserRow = { id: string; name?: string | null; email?: string | null }
 
 function emptyMap(): PermissionMap {
   return { CREATE: false, VIEW: false, UPDATE: false, DELETE: false, REQUISITIONS: false }
+}
+
+function UserSearchSelect({
+  users,
+  value,
+  onChange,
+}: {
+  users: UserRow[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selected = users.find((u) => u.id === value)
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return users
+    const q = search.toLowerCase()
+    return users.filter(
+      (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    )
+  }, [users, search])
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch("")
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  function handleOpen() {
+    setOpen(true)
+    setSearch("")
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  function handleSelect(id: string) {
+    onChange(id)
+    setOpen(false)
+    setSearch("")
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={handleOpen}
+        className="ui-select flex items-center justify-between gap-2 text-left w-full"
+      >
+        <span className={selected ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
+          {selected ? `${selected.name} (${selected.email})` : "Select user..."}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+          {/* Search input */}
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or email..."
+              className="flex-1 bg-transparent text-sm outline-none text-[var(--text)] placeholder:text-[var(--text-muted)]"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")}>
+                <X className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              </button>
+            )}
+          </div>
+          {/* Options list */}
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-4 py-3 text-sm text-[var(--text-muted)]">No users found.</li>
+            ) : (
+              filtered.map((u) => (
+                <li key={u.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(u.id)}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--surface-muted)] transition-colors ${
+                      u.id === value ? "bg-[var(--surface-muted)] font-medium text-[var(--brand)]" : "text-[var(--text)]"
+                    }`}
+                  >
+                    <span className="font-medium">{u.name}</span>
+                    <span className="ml-1.5 text-[var(--text-muted)]">({u.email})</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function UserPermissionsManager() {
@@ -211,13 +320,7 @@ export default function UserPermissionsManager() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select User</label>
-            <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)} className="ui-select">
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} ({user.email})
-                </option>
-              ))}
-            </select>
+            <UserSearchSelect users={users} value={selectedUser} onChange={setSelectedUser} />
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Search Module</label>
