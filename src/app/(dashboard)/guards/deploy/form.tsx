@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { DollarSign, FileText, MapPin, Users } from "lucide-react"
+import { FileText, MapPin, Users, Shield, Calendar, Clock } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import Link from "next/link"
 
 type Client = {
   id: string
@@ -26,14 +27,18 @@ type Branch = {
 
 type Guard = {
   id: string
+  parwestId?: string | null
   name: string
   cnic: string
   phone: string
+  photoUrl?: string | null
   regionalOfficeId: string
   designation?: string | null
   guardType?: string | null
+  isExService?: boolean | null
+  exServiceType?: string | null
   status?: string | null
-  supervisorName?: string | null // fetched separately
+  supervisorName?: string | null
 }
 
 type RegionalOffice = {
@@ -41,6 +46,45 @@ type RegionalOffice = {
   name: string
   seriesCode: string
   regionId: string
+}
+
+type GuardDeployment = {
+  id: string
+  status: string
+  shiftType: string
+  designation: string
+  deploymentType: string | null
+  deploymentNature: string | null
+  deploymentDate: string
+  endDate: string | null
+  dayShiftStart: string | null
+  dayShiftEnd: string | null
+  nightShiftStart: string | null
+  nightShiftEnd: string | null
+  client: { id: string; name: string }
+  branch: { id: string; name: string; city: string | null } | null
+}
+
+type AllDeploymentRow = {
+  id: string
+  status: string
+  shiftType: string
+  designation: string
+  deploymentType: string | null
+  deploymentDate: string
+  endDate: string | null
+  guard: {
+    id: string
+    parwestId: string
+    name: string
+    phone: string | null
+    photoUrl: string | null
+    isExService: boolean
+    exServiceType: string | null
+  }
+  client: { id: string; name: string }
+  branch: { id: string; name: string; city: string | null } | null
+  regionalOffice: { id: string; name: string }
 }
 
 const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
@@ -52,42 +96,66 @@ const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
   { id: "legacy-faisalabad", name: "faisalabad", seriesCode: "FSD", regionId: "legacy-region-punjab" },
 ]
 
-const LEGACY_CLIENTS: Client[] = [
-  { id: "legacy-client-nbp", name: "National Bank of Pakistan", type: "bank" },
-  { id: "legacy-client-scb", name: "Standard Chartered Bank Limited Pakistan", type: "bank" },
-  { id: "legacy-client-ubl", name: "United Bank Limited", type: "bank" },
-  { id: "legacy-client-mcb", name: "MCB Bank Ltd", type: "bank" },
-  { id: "legacy-client-fbl", name: "Faysal Bank Limited", type: "bank" },
-  { id: "legacy-client-summit", name: "Summit Bank Limited", type: "bank" },
-  { id: "legacy-client-meezan", name: "Meezan Bank Limited", type: "bank" },
-  { id: "legacy-client-bahl", name: "Bank Al Habib Limited", type: "bank" },
-  { id: "legacy-client-samba", name: "Samba Bank Limited", type: "bank" },
-]
-
-const LEGACY_BRANCH_DEFAULTS = { address: null, contactPerson: null, supervisorName: null, activeDeployments: 0 }
-
-const LEGACY_BRANCHES_BY_CLIENT: Record<string, Branch[]> = {
-  "legacy-client-nbp": [
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-nbp-ho", name: "NBP Head Office", code: "NBP-HO", city: "Lahore" },
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-nbp-jail", name: "NBP Jail Road", code: "NBP-JR", city: "Lahore" },
-  ],
-  "legacy-client-scb": [
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-scb-main", name: "SCB Main Branch", code: "SCB-MAIN", city: "Karachi" },
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-scb-cantt", name: "SCB Cantt Branch", code: "SCB-CNT", city: "Lahore" },
-  ],
-  "legacy-client-ubl": [
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-ubl-gulberg", name: "UBL Gulberg", code: "UBL-GLB", city: "Lahore" },
-  ],
-  "legacy-client-mcb": [
-    { ...LEGACY_BRANCH_DEFAULTS, id: "legacy-branch-mcb-fsd", name: "MCB Faisalabad", code: "MCB-FSD", city: "Faisalabad" },
-  ],
-}
 
 const LEGACY_GUARDS: Guard[] = [
   { id: "legacy-guard-1", name: "Muhammad Usman", cnic: "35202-7833617-5", phone: "+92-300-1111111", regionalOfficeId: "legacy-head-office-lahore" },
   { id: "legacy-guard-2", name: "Muhammad Junaid", cnic: "37201-2345678-9", phone: "+92-300-2222222", regionalOfficeId: "legacy-faisalabad" },
   { id: "legacy-guard-3", name: "Akbar Ali", cnic: "38403-0948145-3", phone: "+92-300-3333333", regionalOfficeId: "legacy-gujranwala" },
 ]
+
+// ── Static option lists ────────────────────────────────────────────────────
+const DESIGNATION_OPTIONS = [
+  { id: "Guard", name: "Guard" },
+  { id: "location supervisor", name: "Location Supervisor" },
+  { id: "cpo", name: "CPO" },
+  { id: "SO", name: "SO" },
+  { id: "ASO", name: "ASO" },
+  { id: "LSO", name: "LSO" },
+  { id: "Receptionist", name: "Receptionist" },
+  { id: "CCTV Operator", name: "CCTV Operator" },
+  { id: "Complaint Receiver", name: "Complaint Receiver" },
+]
+
+const SHIFT_OPTIONS = [
+  { id: "DAY", name: "Day" },
+  { id: "NIGHT", name: "Night" },
+]
+
+const DEPLOYMENT_TYPE_OPTIONS = [
+  { id: "REGULAR", name: "Regular" },
+  { id: "OVERTIME", name: "Overtime" },
+]
+
+const DEPLOYMENT_NATURE_OPTIONS = [
+  { id: "PERMANENT", name: "Permanent" },
+  { id: "TEMPORARY", name: "Temporary" },
+]
+
+function formatDate(iso: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+}
+
+function ShiftBadge({ shift }: { shift: string }) {
+  const cls = shift === "DAY"
+    ? "bg-amber-100 text-amber-800 border border-amber-200"
+    : "bg-indigo-100 text-indigo-800 border border-indigo-200"
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
+      <Clock className="h-3 w-3" />
+      {shift}
+    </span>
+  )
+}
+
+function StatusDot({ status }: { status: string }) {
+  const cls = status === "ACTIVE"
+    ? "bg-emerald-500"
+    : status === "PENDING"
+    ? "bg-amber-400"
+    : "bg-gray-400"
+  return <span className={`inline-block h-2 w-2 rounded-full ${cls}`} />
+}
 
 export default function DeployGuardForm() {
   const router = useRouter()
@@ -97,6 +165,8 @@ export default function DeployGuardForm() {
 
   const [clients, setClients] = useState<Client[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [branchesLoading, setBranchesLoading] = useState(false)
+  const [branchesLoaded, setBranchesLoaded] = useState(false)
   const [guards, setGuards] = useState<Guard[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
 
@@ -106,15 +176,10 @@ export default function DeployGuardForm() {
   const [selectedRegionalOffice, setSelectedRegionalOffice] = useState("")
   const [guardSupervisor, setGuardSupervisor] = useState<string>("—")
 
-
   const [clientGuardTypes, setClientGuardTypes] = useState<string[]>([])
 
   const [designation, setDesignation] = useState("")
   const [guardType, setGuardType] = useState("")
-  const [salary, setSalary] = useState("")
-  const [overtime, setOvertime] = useState("")
-  const [extraHours, setExtraHours] = useState("")
-  const [postAllowance, setPostAllowance] = useState("")
   const [shiftType, setShiftType] = useState("DAY")
   const [dayShiftStart, setDayShiftStart] = useState("08:00")
   const [dayShiftEnd, setDayShiftEnd] = useState("20:00")
@@ -125,32 +190,92 @@ export default function DeployGuardForm() {
   const [deploymentNature, setDeploymentNature] = useState("PERMANENT")
   const [isExtraGuard, setIsExtraGuard] = useState(false)
   const [comment, setComment] = useState("")
-  const [guardDeploymentStatus, setGuardDeploymentStatus] = useState("ACTIVE")
+
+  // Guard deployment history
+  const [guardDeployments, setGuardDeployments] = useState<GuardDeployment[]>([])
+  const [guardDeploymentsLoading, setGuardDeploymentsLoading] = useState(false)
+
+  // Guard eligibility
+  const [eligibility, setEligibility] = useState<Eligibility>(null)
+  const [eligibilityLoading, setEligibilityLoading] = useState(false)
+
+  // All deployments listing
+  const [allDeployments, setAllDeployments] = useState<AllDeploymentRow[]>([])
+  const [allDeploymentsLoading, setAllDeploymentsLoading] = useState(true)
 
   useEffect(() => {
-    loadClients()
     loadRegionalOffices()
+    loadAllDeployments()
   }, [])
 
   useEffect(() => {
+    setSelectedClient("")
+    setSelectedBranch("")
+    setSelectedGuard("")
     if (!selectedRegionalOffice) {
+      setClients([])
       setGuards([])
-      setSelectedGuard("")
       return
     }
+    loadClients(selectedRegionalOffice)
     loadGuards(selectedRegionalOffice)
   }, [selectedRegionalOffice])
 
-  // Fetch guard supervisor when a guard is selected
   useEffect(() => {
-    if (!selectedGuard) { setGuardSupervisor("—"); return }
+    if (!selectedGuard) {
+      setGuardSupervisor("—")
+      setGuardDeployments([])
+      setDeploymentType("REGULAR")
+      setEligibility(null)
+      return
+    }
     fetch(`/api/guards/${selectedGuard}/supervisor`)
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        setGuardSupervisor(data?.supervisorName ?? "—")
-      })
+      .then((data) => setGuardSupervisor(data?.supervisorName ?? "—"))
       .catch(() => setGuardSupervisor("—"))
+
+    // Fetch guard's deployments to auto-detect overtime
+    setGuardDeploymentsLoading(true)
+    fetch(`/api/guards/${selectedGuard}/deployments`)
+      .then((r) => r.json())
+      .then((data: GuardDeployment[]) => {
+        setGuardDeployments(data)
+        const hasActive = data.some((d) => d.status === "ACTIVE")
+        setDeploymentType(hasActive ? "OVERTIME" : "REGULAR")
+      })
+      .catch(() => {
+        setGuardDeployments([])
+        setDeploymentType("REGULAR")
+      })
+      .finally(() => setGuardDeploymentsLoading(false))
+
+    // Fetch eligibility checks
+    setEligibilityLoading(true)
+    fetch(`/api/guards/${selectedGuard}/eligibility`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setEligibility(data))
+      .catch(() => setEligibility(null))
+      .finally(() => setEligibilityLoading(false))
   }, [selectedGuard])
+
+  // Extra guard always means Temporary deployment
+  useEffect(() => {
+    if (isExtraGuard) setDeploymentNature("TEMPORARY")
+  }, [isExtraGuard])
+
+  const loadAllDeployments = async () => {
+    try {
+      const res = await fetch("/api/deployments")
+      if (res.ok) {
+        const data = await res.json() as AllDeploymentRow[]
+        setAllDeployments(Array.isArray(data) ? data.slice(0, 24) : [])
+      }
+    } catch {
+      setAllDeployments([])
+    } finally {
+      setAllDeploymentsLoading(false)
+    }
+  }
 
   const loadClientGuardTypes = async (clientId: string) => {
     try {
@@ -167,6 +292,9 @@ export default function DeployGuardForm() {
   }
 
   useEffect(() => {
+    setBranches([])
+    setBranchesLoaded(false)
+    setSelectedBranch("")
     if (!selectedClient) {
       setClientGuardTypes([])
       setGuardType("")
@@ -176,27 +304,27 @@ export default function DeployGuardForm() {
     loadClientGuardTypes(selectedClient)
   }, [selectedClient])
 
-  const loadClients = async () => {
+  const loadClients = async (regionalOfficeId: string) => {
     try {
-      const res = await fetch("/api/clients")
+      const res = await fetch(`/api/clients?regionalOfficeId=${regionalOfficeId}`)
       const data = await res.json()
-      setClients(Array.isArray(data) && data.length > 0 ? data : LEGACY_CLIENTS)
+      setClients(Array.isArray(data) && data.length > 0 ? data : [])
     } catch {
-      setClients(LEGACY_CLIENTS)
+      setClients([])
     }
   }
 
   const loadBranches = async (clientId: string) => {
+    setBranchesLoading(true)
     try {
       const res = await fetch(`/api/clients/${clientId}/branches`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        setBranches(data)
-      } else {
-        setBranches(LEGACY_BRANCHES_BY_CLIENT[clientId] || [])
-      }
+      setBranches(Array.isArray(data) ? data : [])
     } catch {
-      setBranches(LEGACY_BRANCHES_BY_CLIENT[clientId] || [])
+      setBranches([])
+    } finally {
+      setBranchesLoading(false)
+      setBranchesLoaded(true)
     }
   }
 
@@ -207,12 +335,16 @@ export default function DeployGuardForm() {
       if (Array.isArray(data) && data.length > 0) {
         setGuards(data.map((g: Guard & Record<string, unknown>) => ({
           id: g.id,
+          parwestId: (g.parwestId as string | null) ?? null,
           name: g.name,
           cnic: g.cnic,
           phone: g.phone,
+          photoUrl: (g.photoUrl as string | null) ?? null,
           regionalOfficeId: g.regionalOfficeId,
           designation: (g.designation as string | null) ?? null,
           guardType: (g.guardType as string | null) ?? null,
+          isExService: (g.isExService as boolean | null) ?? null,
+          exServiceType: (g.exServiceType as string | null) ?? null,
           status: (g.status as string | null) ?? null,
         })))
       } else {
@@ -233,11 +365,29 @@ export default function DeployGuardForm() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError("")
     setNotice("")
+
+    // Branch is required when the client has branches
+    if (branchesLoaded && branches.length > 0 && !selectedBranch) {
+      setError("Please select a branch. This client has branches and a branch must be chosen.")
+      setLoading(false)
+      return
+    }
+
+    // Guard must pass all eligibility checks
+    if (eligibility && !eligibility.eligible) {
+      const failed = Object.values(eligibility.checks)
+        .filter((c) => !c.pass)
+        .map((c) => c.label)
+        .join(", ")
+      setError(`Guard is not eligible for deployment. Failed checks: ${failed}.`)
+      setLoading(false)
+      return
+    }
 
     try {
       const res = await fetch("/api/deployments", {
@@ -252,19 +402,15 @@ export default function DeployGuardForm() {
           guardType,
           deploymentDate,
           shiftType,
-          salary: salary ? parseFloat(salary) : null,
-          overtime: overtime ? parseFloat(overtime) : null,
-          extraHours: extraHours ? parseFloat(extraHours) : null,
-          postAllowance: postAllowance ? parseFloat(postAllowance) : null,
-          dayShiftStart: shiftType === "DAY" || shiftType === "BOTH" ? dayShiftStart : null,
-          dayShiftEnd: shiftType === "DAY" || shiftType === "BOTH" ? dayShiftEnd : null,
-          nightShiftStart: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftStart : null,
-          nightShiftEnd: shiftType === "NIGHT" || shiftType === "BOTH" ? nightShiftEnd : null,
+          dayShiftStart: shiftType === "DAY" ? dayShiftStart : null,
+          dayShiftEnd: shiftType === "DAY" ? dayShiftEnd : null,
+          nightShiftStart: shiftType === "NIGHT" ? nightShiftStart : null,
+          nightShiftEnd: shiftType === "NIGHT" ? nightShiftEnd : null,
           deploymentType,
-          deploymentNature: deploymentNature || "PERMANENT",
+          deploymentNature: isExtraGuard ? "TEMPORARY" : (deploymentNature || "PERMANENT"),
           isExtraGuard,
           comment: isExtraGuard ? comment : null,
-          status: guardDeploymentStatus || "ACTIVE",
+          status: "ACTIVE",
         }),
       })
 
@@ -289,6 +435,17 @@ export default function DeployGuardForm() {
   const selectedGuardData = guards.find((g) => g.id === selectedGuard)
   const selectedBranchData = branches.find((b) => b.id === selectedBranch) ?? null
 
+  const activeDeployments = guardDeployments.filter((d) => d.status === "ACTIVE")
+
+  // Options derived from fetched data
+  const regionalOfficeOptions = regionalOffices.map((o) => ({ id: o.id, name: `${o.name} (${o.seriesCode})` }))
+  const clientOptions = clients.map((c) => ({ id: c.id, name: `${c.name} (${c.type})` }))
+  const branchOptions = branches.map((b) => ({ id: b.id, name: b.city ? `${b.name} - ${b.city}` : b.name }))
+  const guardOptions = guards.map((g) => ({
+    id: g.id,
+    name: g.parwestId ? `${g.parwestId} — ${g.name}` : g.name,
+  }))
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <SectionTitle title="Deploy Guards" subtitle="Guard deployment form" />
@@ -297,6 +454,8 @@ export default function DeployGuardForm() {
       {notice ? <InlineAlert type="success" message={notice} /> : null}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* ── Branch Details ─────────────────────────────────────────────── */}
         <section className="ui-card p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-[var(--brand)]" />
@@ -304,59 +463,60 @@ export default function DeployGuardForm() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Regional Office <span className="text-red-500">*</span></label>
-              <select name="regional_office_id" value={selectedRegionalOffice} onChange={(e) => setSelectedRegionalOffice(e.target.value)} required className="ui-select">
-                <option value="">Nothing selected</option>
-                {regionalOffices
-                  .map((office) => (
-                    <option key={office.id} value={office.id}>
-                      {office.name} ({office.seriesCode})
-                    </option>
-                  ))}
-              </select>
-            </div>
+            <SearchableCombobox
+              label="Regional Office"
+              required
+              value={selectedRegionalOffice}
+              onChange={setSelectedRegionalOffice}
+              options={regionalOfficeOptions}
+              placeholder="Select regional office..."
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Select Client <span className="text-red-500">*</span></label>
-              <select name="client_id_on_user_profile" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} required className="ui-select">
-                <option value="">--Select Client--</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name} ({client.type})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableCombobox
+              label="Select Client"
+              required
+              value={selectedClient}
+              onChange={setSelectedClient}
+              options={clientOptions}
+              placeholder={selectedRegionalOffice ? "Select client..." : "Select regional office first..."}
+              disabled={!selectedRegionalOffice}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Branch</label>
-              <select name="branch_id_on_user_profile" value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} disabled={!selectedClient} className="ui-select disabled:bg-slate-100">
-                <option value="">Nothing selected</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}{branch.city ? ` - ${branch.city}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Branch — required when client has branches, hidden when branchless */}
+            {!selectedClient || branchesLoading ? (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Branch</label>
+                <div className="ui-input bg-slate-50 text-slate-400 text-sm flex items-center cursor-not-allowed">
+                  {branchesLoading ? "Loading branches…" : "Select client first"}
+                </div>
+              </div>
+            ) : branchesLoaded && branches.length === 0 ? (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Branch</label>
+                <div className="ui-input bg-emerald-50 text-emerald-700 text-sm flex items-center gap-2 border-emerald-200">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                  Branchless Client — no branch required
+                </div>
+              </div>
+            ) : (
+              <SearchableCombobox
+                label="Branch *"
+                required
+                value={selectedBranch}
+                onChange={setSelectedBranch}
+                options={branchOptions}
+                placeholder="Select branch..."
+              />
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deploy as</label>
-              <select name="deploy_as" value={designation} onChange={(e) => setDesignation(e.target.value)} required className="ui-select">
-                <option value="">--Select Deployment Type--</option>
-                <option value="Guard">Guard</option>
-                <option value="location supervisor">location supervisor</option>
-                <option value="cpo">cpo</option>
-                <option value="SO">SO</option>
-                <option value="ASO">ASO</option>
-                <option value="LSO">LSO</option>
-                <option value="Receptionist">Receptionist</option>
-                <option value="CCTV Operator">CCTV Operator</option>
-                <option value="Complaint Receiver">Complaint Receiver</option>
-              </select>
-            </div>
-
+            <SearchableCombobox
+              label="Deploy As"
+              required
+              value={designation}
+              onChange={setDesignation}
+              options={DESIGNATION_OPTIONS}
+              placeholder="Select deployment role..."
+            />
           </div>
 
           {selectedBranchData && (
@@ -386,113 +546,79 @@ export default function DeployGuardForm() {
           )}
         </section>
 
-        <section className="ui-card p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-[var(--brand)]" />
-            Deploy Guards
-          </h2>
+        {/* ── Select Guard ───────────────────────────────────────────────── */}
+        <section className={selectedGuardData ? "grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start" : ""}>
+          <div className="ui-card p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-[var(--brand)]" />
+              Deploy Guards
+            </h2>
 
-          <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Select Guard</label>
-            <select name="guard_id" value={selectedGuard} onChange={(e) => setSelectedGuard(e.target.value)} required disabled={!selectedRegionalOffice} className="ui-select disabled:bg-slate-100">
-              <option value="">--Select Guard--</option>
-              {guards.map((guard) => (
-                <option key={guard.id} value={guard.id}>
-                  {guard.name} - {guard.cnic} - {guard.phone}
-                </option>
-              ))}
-            </select>
-          </div>
+            <SearchableCombobox
+              label="Select Guard"
+              required
+              value={selectedGuard}
+              onChange={setSelectedGuard}
+              options={guardOptions}
+              placeholder={selectedRegionalOffice ? "Select guard..." : "Select regional office first..."}
+              disabled={!selectedRegionalOffice}
+            />
 
-          {selectedGuardData ? (
-            <div className="mt-4 p-4 rounded-[var(--radius-md)] border border-blue-200 bg-blue-50/60">
-              <h3 className="text-sm font-semibold text-blue-800 mb-3">Selected Guard Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">Guard&apos;s Name</label>
-                  <input value={selectedGuardData.name} readOnly className="ui-input bg-white text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">CNIC</label>
-                  <input value={selectedGuardData.cnic} readOnly className="ui-input bg-white text-sm font-mono" />
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">Phone</label>
-                  <input value={selectedGuardData.phone} readOnly className="ui-input bg-white text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">Deployment Designation</label>
-                  <input value={designation || "—"} readOnly className="ui-input bg-white text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">Guard Type</label>
-                  <input value={guardType || selectedGuardData.guardType || "—"} readOnly className="ui-input bg-white text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-600 mb-1">Supervisor</label>
-                  <input value={guardSupervisor} readOnly className="ui-input bg-white text-sm" />
+            {/* Active deployments alert — shown when guard already deployed */}
+            {!guardDeploymentsLoading && activeDeployments.length > 0 ? (
+              <div className="mt-3 p-4 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50">
+                <p className="text-xs font-semibold text-amber-700 mb-2 uppercase tracking-wide">
+                  Guard Already Deployed — Deployment Type set to Overtime
+                </p>
+                <div className="space-y-1.5">
+                  {activeDeployments.map((d) => (
+                    <div key={d.id} className="flex flex-wrap items-center gap-2 text-sm text-amber-900 bg-white rounded border border-amber-200 px-3 py-2">
+                      <ShiftBadge shift={d.shiftType} />
+                      <span className="font-medium">{d.client.name}</span>
+                      {d.branch && <span className="text-amber-600">· {d.branch.name}{d.branch.city ? `, ${d.branch.city}` : ""}</span>}
+                      <span className="ml-auto text-xs text-amber-500">Since {formatDate(d.deploymentDate)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            ) : null}
+          </div>
+
+          {/* Guard Profile Card — appears when a guard is selected */}
+          {selectedGuardData ? (
+            <GuardProfileCard
+              guard={selectedGuardData}
+              supervisor={guardSupervisor}
+              deployments={guardDeployments}
+              loading={guardDeploymentsLoading}
+              eligibility={eligibility}
+              eligibilityLoading={eligibilityLoading}
+            />
           ) : null}
         </section>
 
-        <section className="ui-card p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-[var(--brand)]" />
-            Financial Details
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Salary</label>
-              <input name="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="Guards salary" className="ui-input" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Overtime</label>
-              <input name="overtime" type="number" value={overtime} onChange={(e) => setOvertime(e.target.value)} placeholder="Guards Overtime Pay" className="ui-input" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Extra Hours</label>
-              <input name="extra_hours" type="number" value={extraHours} onChange={(e) => setExtraHours(e.target.value)} placeholder="Extra hours salary" className="ui-input" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Post Allowance</label>
-              <input name="post_allowance" type="number" value={postAllowance} onChange={(e) => setPostAllowance(e.target.value)} placeholder="Guards post allowance" className="ui-input" />
-            </div>
-          </div>
-        </section>
-
+        {/* ── Shift & Deployment Options ─────────────────────────────────── */}
         <section className="ui-card p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-[var(--brand)]" />
-            Shift & Deployment Options
+            Shift &amp; Deployment Options
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Shift</label>
-              <div className="flex gap-4 text-sm mt-2">
-                <label className="inline-flex items-center gap-2">
-                  <input name="shift" type="radio" checked={shiftType === "DAY"} onChange={() => setShiftType("DAY")} className="h-4 w-4 accent-[var(--brand)]" />
-                  <span>Day</span>
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input name="shift" type="radio" checked={shiftType === "NIGHT"} onChange={() => setShiftType("NIGHT")} className="h-4 w-4 accent-[var(--brand)]" />
-                  <span>Night</span>
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input name="shift" type="radio" checked={shiftType === "BOTH"} onChange={() => setShiftType("BOTH")} className="h-4 w-4 accent-[var(--brand)]" />
-                  <span>Both</span>
-                </label>
-              </div>
-            </div>
+            <SearchableCombobox
+              label="Shift"
+              value={shiftType}
+              onChange={setShiftType}
+              options={SHIFT_OPTIONS}
+              placeholder="Select shift..."
+            />
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Date</label>
               <input name="deployment_date" type="date" value={deploymentDate} onChange={(e) => setDeploymentDate(e.target.value)} required className="ui-input" />
             </div>
 
-            {(shiftType === "DAY" || shiftType === "BOTH") ? (
+            {shiftType === "DAY" ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Day Shift Start</label>
@@ -505,7 +631,7 @@ export default function DeployGuardForm() {
               </>
             ) : null}
 
-            {(shiftType === "NIGHT" || shiftType === "BOTH") ? (
+            {shiftType === "NIGHT" ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Night Shift Start</label>
@@ -518,20 +644,33 @@ export default function DeployGuardForm() {
               </>
             ) : null}
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment</label>
-              <select name="deployment_type" value={deploymentType} onChange={(e) => setDeploymentType(e.target.value)} className="ui-select">
-                <option value="REGULAR">Regular</option>
-                <option value="OVERTIME">Overtime</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Nature</label>
-              <select name="deployment_nature" value={deploymentNature} onChange={(e) => setDeploymentNature(e.target.value)} className="ui-select">
-                <option value="PERMANENT">Permanent</option>
-                <option value="TEMPORARY">Temporary</option>
-              </select>
-            </div>
+            <SearchableCombobox
+              label="Deployment"
+              value={deploymentType}
+              onChange={setDeploymentType}
+              options={DEPLOYMENT_TYPE_OPTIONS}
+              placeholder="Select deployment type..."
+            />
+
+            {/* Deployment Nature — locked to Temporary when Extra Guard is checked */}
+            {isExtraGuard ? (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Nature</label>
+                <div className="ui-input bg-slate-50 text-slate-500 text-sm flex items-center gap-2 cursor-not-allowed">
+                  <span>Temporary</span>
+                  <span className="ml-auto text-xs text-slate-400">(Extra Guard)</span>
+                </div>
+              </div>
+            ) : (
+              <SearchableCombobox
+                label="Deployment Nature"
+                value={deploymentNature}
+                onChange={setDeploymentNature}
+                options={DEPLOYMENT_NATURE_OPTIONS}
+                placeholder="Select nature..."
+              />
+            )}
+
             <div className="flex items-end">
               <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
                 <input
@@ -559,16 +698,6 @@ export default function DeployGuardForm() {
                 />
               </div>
             ) : null}
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Guard Deployment Status*</label>
-              <select name="Select Action:" value={guardDeploymentStatus} onChange={(e) => setGuardDeploymentStatus(e.target.value)} className="ui-select">
-                <option value="">Select Status</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PENDING">PENDING</option>
-                <option value="INACTIVE">INACTIVE</option>
-              </select>
-            </div>
           </div>
         </section>
 
@@ -580,6 +709,412 @@ export default function DeployGuardForm() {
           <input type="checkbox" name="check" className="h-4 w-4 self-center accent-[var(--brand)]" />
         </div>
       </form>
+
+      {/* ── Deployment Listings ────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Shield className="w-5 h-5 text-[var(--brand)]" />
+            Guard Deployments
+          </h2>
+          <Link href="/deployments" className="text-sm text-[var(--brand)] hover:underline font-medium">
+            View All
+          </Link>
+        </div>
+
+        {allDeploymentsLoading ? (
+          <div className="ui-card p-8 text-center text-[var(--text-muted)]">
+            Loading deployments...
+          </div>
+        ) : allDeployments.length === 0 ? (
+          <div className="ui-card p-8 text-center text-[var(--text-muted)]">
+            No deployments found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {allDeployments.map((dep) => (
+              <DeploymentCard key={dep.id} deployment={dep} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+// ── Guard Profile Card ─────────────────────────────────────────────────────
+type EligibilityCheck = { pass: boolean; label: string; message: string }
+type Eligibility = { eligible: boolean; checks: Record<string, EligibilityCheck> } | null
+
+function GuardProfileCard({
+  guard,
+  supervisor,
+  deployments,
+  loading,
+  eligibility,
+  eligibilityLoading,
+}: {
+  guard: Guard
+  supervisor: string
+  deployments: GuardDeployment[]
+  loading: boolean
+  eligibility: Eligibility
+  eligibilityLoading: boolean
+}) {
+  const guardTypeLabel = guard.isExService
+    ? `Ex-Service (${guard.exServiceType || "Unknown"})`
+    : guard.isExService === false
+    ? "Civilian"
+    : guard.guardType || "—"
+
+  const active = deployments.filter((d) => d.status === "ACTIVE")
+  const past = deployments.filter((d) => d.status !== "ACTIVE").slice(0, 4)
+
+  return (
+    <div className="ui-card p-5 space-y-4 sticky top-4">
+      {/* Photo + identity */}
+      <div className="flex items-center gap-3">
+        {guard.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={guard.photoUrl}
+            alt={guard.name}
+            className="h-16 w-16 rounded-full object-cover border-2 border-[var(--border)] shrink-0"
+          />
+        ) : (
+          <div className="h-16 w-16 rounded-full bg-[var(--brand)]/10 border-2 border-[var(--border)] flex items-center justify-center shrink-0">
+            <span className="text-xl font-bold text-[var(--brand)]">
+              {guard.name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="font-bold text-[var(--text)] text-base truncate">{guard.name}</p>
+          {guard.parwestId && (
+            <p className="text-xs text-[var(--text-muted)]">{guard.parwestId}</p>
+          )}
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+            ACTIVE
+          </span>
+        </div>
+      </div>
+
+      {/* Details grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        <div>
+          <span className="block text-[var(--text-muted)]">Phone</span>
+          <span className="font-medium text-[var(--text)]">{guard.phone || "—"}</span>
+        </div>
+        <div>
+          <span className="block text-[var(--text-muted)]">Type</span>
+          <span className="font-medium text-[var(--text)]">{guardTypeLabel}</span>
+        </div>
+        <div className="col-span-2">
+          <span className="block text-[var(--text-muted)]">Supervisor</span>
+          <span className="font-medium text-[var(--text)]">{supervisor}</span>
+        </div>
+      </div>
+
+      {/* ── Eligibility Checks ─────────────────────────────────────────── */}
+      <div>
+        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
+          Deployment Eligibility
+        </p>
+        {eligibilityLoading ? (
+          <p className="text-xs text-[var(--text-muted)]">Checking eligibility…</p>
+        ) : eligibility ? (
+          <div className="space-y-1.5">
+            {/* Overall badge */}
+            <div className={`flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-xs font-semibold border ${
+              eligibility.eligible
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-red-50 border-red-200 text-red-800"
+            }`}>
+              <span className={`h-2 w-2 rounded-full shrink-0 ${eligibility.eligible ? "bg-emerald-500" : "bg-red-500"}`} />
+              {eligibility.eligible ? "Eligible for Deployment" : "Not Eligible for Deployment"}
+            </div>
+            {/* Individual checks */}
+            {Object.values(eligibility.checks).map((check) => (
+              <div key={check.label} className="flex items-start gap-2 text-xs">
+                {check.pass ? (
+                  <svg className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                )}
+                <div>
+                  <span className={`font-semibold ${check.pass ? "text-[var(--text)]" : "text-red-700"}`}>
+                    {check.label}
+                  </span>
+                  <span className="text-[var(--text-muted)] ml-1">— {check.message}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)] italic">Could not load eligibility data</p>
+        )}
+      </div>
+
+      {/* Active deployments */}
+      {loading ? (
+        <p className="text-xs text-[var(--text-muted)]">Loading deployments…</p>
+      ) : active.length > 0 ? (
+        <div>
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Currently Deployed</p>
+          <div className="space-y-2">
+            {active.map((d) => (
+              <div key={d.id} className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <ShiftBadge shift={d.shiftType} />
+                  <span className="font-semibold text-emerald-800">{d.client.name}</span>
+                </div>
+                {d.branch && (
+                  <span className="text-emerald-600">{d.branch.name}{d.branch.city ? `, ${d.branch.city}` : ""}</span>
+                )}
+                <div className="text-emerald-500 mt-0.5">Since {formatDate(d.deploymentDate)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-[var(--text-muted)] italic">No active deployments</div>
+      )}
+
+      {/* Past deployments */}
+      {past.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Recent History</p>
+          <div className="space-y-1.5">
+            {past.map((d) => (
+              <div key={d.id} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
+                <div className="flex items-center gap-1.5 justify-between">
+                  <span className="font-medium text-[var(--text)] truncate">{d.client.name}</span>
+                  <ShiftBadge shift={d.shiftType} />
+                </div>
+                <div className="text-[var(--text-muted)] mt-0.5">
+                  {formatDate(d.deploymentDate)} → {d.endDate ? formatDate(d.endDate) : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Deployment Card ────────────────────────────────────────────────────────
+function DeploymentCard({ deployment: dep }: { deployment: AllDeploymentRow }) {
+  const guardType = dep.guard.isExService
+    ? `Ex-Service (${dep.guard.exServiceType || "Unknown"})`
+    : "Civilian"
+
+  const shiftLabel = dep.shiftType === "DAY" ? "Day" : dep.shiftType === "NIGHT" ? "Night" : dep.shiftType
+
+  return (
+    <Link href={`/deployments/${dep.id}`} className="block group">
+      <div className="ui-card p-4 hover:shadow-md transition-shadow border border-[var(--border)] hover:border-[var(--brand)]/40">
+        {/* Guard identity row */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="relative shrink-0">
+            {dep.guard.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={dep.guard.photoUrl}
+                alt={dep.guard.name}
+                className="h-11 w-11 rounded-full object-cover border-2 border-[var(--border)]"
+              />
+            ) : (
+              <div className="h-11 w-11 rounded-full bg-[var(--brand)]/10 border-2 border-[var(--border)] flex items-center justify-center">
+                <span className="text-sm font-bold text-[var(--brand)]">
+                  {dep.guard.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${dep.status === "ACTIVE" ? "bg-emerald-500" : dep.status === "PENDING" ? "bg-amber-400" : "bg-gray-400"}`} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[var(--text)] text-sm truncate group-hover:text-[var(--brand)] transition-colors">
+              {dep.guard.name}
+            </p>
+            <p className="text-xs text-[var(--text-muted)] truncate">{dep.guard.parwestId}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+              dep.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
+              dep.status === "PENDING" ? "bg-amber-100 text-amber-700" :
+              "bg-gray-100 text-gray-600"
+            }`}>
+              <StatusDot status={dep.status} />
+              {dep.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Guard type */}
+        <p className="text-xs text-[var(--text-muted)] mb-3">{guardType}</p>
+
+        {/* Deployment details */}
+        <div className="space-y-1.5 text-sm">
+          <div className="flex items-start gap-2">
+            <MapPin className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <span className="font-medium text-[var(--text)] truncate block">{dep.client.name}</span>
+              {dep.branch && (
+                <span className="text-xs text-[var(--text-muted)] truncate block">
+                  {dep.branch.name}{dep.branch.city ? ` · ${dep.branch.city}` : ""}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+              dep.shiftType === "DAY"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-indigo-50 text-indigo-700 border-indigo-200"
+            }`}>
+              <Clock className="h-3 w-3" />
+              {shiftLabel}
+            </span>
+            {dep.deploymentType && (
+              <span className="text-xs text-[var(--text-muted)] bg-[var(--surface-muted)] px-2 py-0.5 rounded-full">
+                {dep.deploymentType === "OVERTIME" ? "Overtime" : "Regular"}
+              </span>
+            )}
+            <span className="text-xs text-[var(--text-muted)] ml-auto flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {formatDate(dep.deploymentDate)}
+            </span>
+          </div>
+        </div>
+
+        {/* Designation */}
+        <div className="mt-3 pt-3 border-t border-[var(--border)]">
+          <span className="text-xs text-[var(--text-muted)]">Role: </span>
+          <span className="text-xs font-medium text-[var(--text)]">{dep.designation || "—"}</span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// ── SearchableCombobox ─────────────────────────────────────────────────────
+function SearchableCombobox({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Search...",
+  disabled = false,
+  required = false,
+}: {
+  label: string
+  value: string
+  onChange: (id: string) => void
+  options: { id: string; name: string }[]
+  placeholder?: string
+  disabled?: boolean
+  required?: boolean
+}) {
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const selected = options.find((o) => o.id === value)
+  const filtered = query
+    ? options.filter((o) => o.name.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+        {label}{required ? <span className="text-red-500 ml-1">*</span> : null}
+      </label>
+      <div ref={ref} className="relative">
+        <div
+          className={`ui-select flex cursor-pointer items-center justify-between gap-2${disabled ? " opacity-50 pointer-events-none bg-slate-100" : ""}`}
+          onClick={() => { if (!disabled) { setOpen((v) => !v); setQuery("") } }}
+        >
+          <span className={selected ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
+            {selected ? selected.name : placeholder}
+          </span>
+          <svg className="h-4 w-4 shrink-0 text-[var(--text-muted)]" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+          </svg>
+        </div>
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+            <div className="p-2 border-b border-[var(--border)]">
+              <input
+                autoFocus
+                className="ui-input py-1 text-sm"
+                placeholder="Type to search..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setOpen(false); setQuery("") }
+                  if (e.key === "Enter" && filtered.length > 0) {
+                    onChange(filtered[0].id)
+                    setOpen(false)
+                    setQuery("")
+                  }
+                }}
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-[var(--text-muted)]">No results found</div>
+              ) : (
+                filtered.map((option) => {
+                  // Detect "ID — Name" pattern and split for two-line rendering
+                  const dashIdx = option.name.indexOf(" — ")
+                  const hasIdPrefix = dashIdx !== -1
+                  const idPart = hasIdPrefix ? option.name.slice(0, dashIdx) : null
+                  const namePart = hasIdPrefix ? option.name.slice(dashIdx + 3) : option.name
+                  return (
+                    <div
+                      key={option.id}
+                      className={`cursor-pointer px-3 py-2 text-sm hover:bg-[var(--primary)]/10 ${option.id === value ? "text-[var(--primary)]" : "text-[var(--text)]"}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        onChange(option.id)
+                        setOpen(false)
+                        setQuery("")
+                      }}
+                    >
+                      {hasIdPrefix ? (
+                        <>
+                          <span className="font-semibold">{idPart}</span>
+                          <span className="text-[var(--text-muted)]"> — </span>
+                          <span>{namePart}</span>
+                        </>
+                      ) : (
+                        option.name
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

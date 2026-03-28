@@ -66,6 +66,8 @@ export async function POST(
             return badRequest("End date cannot be in the future")
         }
 
+        const revokedByName = (session.user as { name?: string })?.name ?? null
+
         // End the deployment
         const deployment = await prisma.deployment.update({
             where: { id },
@@ -73,6 +75,7 @@ export async function POST(
                 status: "INACTIVE",
                 endDate: endDate,
                 endReason: body.reason || null,
+                revokedByName,
             },
             include: {
                 guard: true,

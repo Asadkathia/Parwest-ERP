@@ -1,5 +1,22 @@
 export type GuardLooseRow = Record<string, unknown>
 
+export type DeploymentAuditRecord = {
+  id: string
+  status: string
+  shiftType: string
+  designation: string
+  deploymentDate: string | Date
+  endDate: string | Date | null
+  endReason: string | null
+  deploymentType: string | null
+  deploymentNature: string | null
+  deployedByName: string | null
+  revokedByName: string | null
+  client: { id: string; name: string }
+  branch: { id: string; name: string; city: string | null } | null
+  regionalOffice: { id: string; name: string }
+}
+
 export type AttendanceRecord = {
   date: string | Date
   status: string

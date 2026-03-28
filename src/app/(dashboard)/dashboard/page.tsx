@@ -10,10 +10,77 @@ import ActionButton from "@/components/ui/action-button"
 import { Select } from "@/components/ui/form-controls"
 import StatusChip from "@/components/ui/status-chip"
 import GuardClientMapCard from "@/components/dashboard/GuardClientMapCard"
+import { prisma } from "@/lib/db"
+import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 
 export default async function DashboardPage() {
   const session = await auth()
   if (!session) redirect("/login")
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  let totalGuards = 0
+  let activeDeployments = 0
+  let totalClients = 0
+  let pendingTickets = 0
+
+  type MapClient = { id: string; name: string; city: string | null; latitude: number | null; longitude: number | null }
+  type MapOffice = { id: string; name: string; seriesCode: string; address: string | null; latitude: number | null; longitude: number | null }
+
+  let mapClients: MapClient[] = []
+  let mapOffices: MapOffice[] = []
+
+  try {
+    const [guards, deps, clients, tickets, officesRaw] = await Promise.all([
+      prisma.guard.count({ where: { status: "ACTIVE" } }),
+      prisma.deployment.count({ where: { status: "ACTIVE" } }),
+      prisma.client.count(),
+      // Pending = not closed/resolved (safe across any status naming convention)
+      prisma.ticket.count({
+        where: {
+          status: {
+            name: { notIn: ["CLOSED", "RESOLVED", "COMPLETED", "Closed", "Resolved"] },
+          },
+        },
+      }),
+      prisma.regionalOffice.findMany({
+        select: {
+          id: true,
+          name: true,
+          seriesCode: true,
+          address: true,       // added in latest schema
+          latitude: true,
+          longitude: true,
+        },
+      }),
+    ])
+    totalGuards = guards
+    activeDeployments = deps
+    totalClients = clients
+    pendingTickets = tickets
+    mapOffices = officesRaw.map((o) => ({
+      id: o.id,
+      name: o.name,
+      seriesCode: o.seriesCode,
+      address: (o as Record<string, unknown>).address as string | null ?? null,
+      latitude: (o as Record<string, unknown>).latitude as number | null ?? null,
+      longitude: (o as Record<string, unknown>).longitude as number | null ?? null,
+    }))
+
+    const clientRows = await prisma.client.findMany({
+      select: { id: true, name: true, city: true, latitude: true, longitude: true },
+    })
+    mapClients = clientRows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      city: c.city ?? null,
+      latitude: c.latitude ?? null,
+      longitude: c.longitude ?? null,
+    }))
+  } catch (error) {
+    if (!isPrismaMissingSchemaError(error)) {
+      console.error("DashboardPage stats query failed:", error)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -32,10 +99,10 @@ export default async function DashboardPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Guards" value={0} tone="brand" icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Active Deployments" value={0} tone="success" icon={<MapPinned className="h-5 w-5" />} />
-        <StatCard label="Total Clients" value={0} tone="warning" icon={<Building2 className="h-5 w-5" />} />
-        <StatCard label="Pending Tickets" value={0} tone="danger" icon={<MessageSquareMore className="h-5 w-5" />} />
+        <StatCard label="Total Guards" value={totalGuards} tone="brand" icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Active Deployments" value={activeDeployments} tone="success" icon={<MapPinned className="h-5 w-5" />} />
+        <StatCard label="Total Clients" value={totalClients} tone="warning" icon={<Building2 className="h-5 w-5" />} />
+        <StatCard label="Pending Tickets" value={pendingTickets} tone="danger" icon={<MessageSquareMore className="h-5 w-5" />} />
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -67,52 +134,54 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <SectionTitle
-              title="Things To Do"
-              subtitle="Today's events"
-              action={
-                <div className="flex items-center gap-2">
-                  <Select className="w-40">
-                    <option>All Clients</option>
-                  </Select>
-                  <ActionButton>New To Do</ActionButton>
+          <Card>
+            <CardHeader>
+              <SectionTitle
+                title="Things To Do"
+                subtitle="Today's events"
+                action={
+                  <div className="flex items-center gap-2">
+                    <Select className="w-40">
+                      <option>All Clients</option>
+                    </Select>
+                    <ActionButton>New To Do</ActionButton>
+                  </div>
+                }
+              />
+            </CardHeader>
+            <CardBody className="space-y-4">
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[linear-gradient(180deg,#f8faff_0%,#f4f7ff_100%)] p-4">
+                <div className="grid grid-cols-6 gap-3 text-center text-xs text-[var(--text-muted)] mb-4">
+                  {["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26"].map((day, idx) => (
+                    <div key={day} className={idx === 1 ? "font-semibold text-[var(--brand)]" : ""}>{day}</div>
+                  ))}
                 </div>
-              }
-            />
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[linear-gradient(180deg,#f8faff_0%,#f4f7ff_100%)] p-4">
-              <div className="grid grid-cols-6 gap-3 text-center text-xs text-[var(--text-muted)] mb-4">
-                {["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26"].map((day, idx) => (
-                  <div key={day} className={idx === 1 ? "font-semibold text-[var(--brand)]" : ""}>{day}</div>
-                ))}
+                <div className="space-y-2">
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                    <p className="font-medium">Fire Inspection today</p>
+                    <p className="text-xs text-[var(--text-muted)]">2:00 pm</p>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                    <p className="font-medium">Waste pickup scheduled</p>
+                    <p className="text-xs text-[var(--text-muted)]">2:00 to 4:00 pm</p>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
+                    <p className="font-medium">Night supervisor briefing</p>
+                    <p className="text-xs text-[var(--text-muted)]">8:00 pm</p>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                  <p className="font-medium">Fire Inspection today</p>
-                  <p className="text-xs text-[var(--text-muted)]">2:00 pm</p>
-                </div>
-                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                  <p className="font-medium">Waste pickup scheduled</p>
-                  <p className="text-xs text-[var(--text-muted)]">2:00 to 4:00 pm</p>
-                </div>
-                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                  <p className="font-medium">Night supervisor briefing</p>
-                  <p className="text-xs text-[var(--text-muted)]">8:00 pm</p>
-                </div>
+              <div className="flex items-center justify-between">
+                <StatusChip variant="success" label="Online Users : 53" />
+                <Link href="/dashboard/online-users" className="text-sm font-semibold text-[var(--brand)] hover:underline">
+                  Open Online Users
+                </Link>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <StatusChip variant="success" label="Online Users : 53" />
-              <Link href="/dashboard/online-users" className="text-sm font-semibold text-[var(--brand)] hover:underline">
-                Open Online Users
-              </Link>
-            </div>
-          </CardBody>
-        </Card>
-        <GuardClientMapCard />
+            </CardBody>
+          </Card>
+
+          {/* Map — real Leaflet with client + regional office pins */}
+          <GuardClientMapCard clients={mapClients} regionalOffices={mapOffices} />
         </div>
 
         <div className="space-y-4">

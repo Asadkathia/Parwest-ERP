@@ -2,58 +2,63 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
-import { Plus, MapPin, Activity, PauseCircle } from "lucide-react"
+import { Plus, MapPin, Activity, PauseCircle, Clock, RefreshCw, ShieldOff } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
-import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
+
+type DeploymentRow = {
+  id: string
+  status: string
+  shiftType: string
+  designation: string
+  deploymentDate: Date
+  endDate: Date | null
+  deploymentType: string | null
+  deploymentNature: string | null
+  deployedByName: string | null
+  regionalOfficeId: string
+  guard: { id: string; parwestId: string; name: string; phone: string | null; photoUrl: string | null }
+  client: { id: string; name: string }
+  branch: { id: string; name: string; city: string | null } | null
+  regionalOffice: { id: string; name: string }
+}
 
 export default async function DeploymentsPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  let deployments: Array<{
-    id: string
-    guardId: string
-    clientId: string
-    branchId: string | null
-    deploymentDate: Date
-    status: "ACTIVE" | "PENDING" | "INACTIVE" | string
-    regionId?: string | null
-    regionalOfficeId?: string | null
-  }> = []
+  let deployments: DeploymentRow[] = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0 }
-  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
   try {
     const [rows, total, active, inactive] = await Promise.all([
       prisma.deployment.findMany({
-        take: 20,
+        take: 50,
         orderBy: { createdAt: "desc" },
+        include: {
+          guard: {
+            select: { id: true, parwestId: true, name: true, phone: true, photoUrl: true },
+          },
+          client: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true, city: true } },
+          regionalOffice: { select: { id: true, name: true } },
+        },
       }),
       prisma.deployment.count(),
       prisma.deployment.count({ where: { status: "ACTIVE" } }),
       prisma.deployment.count({ where: { status: "INACTIVE" } }),
     ])
-    deployments = rows
+    deployments = rows as DeploymentRow[]
     stats.total = total
     stats.active = active
     stats.inactive = inactive
-    if (mockMode) {
-      dbWarning = "Mock mode enabled: showing deployment data via runtime adapter."
-    }
   } catch (error) {
-    deployments = []
-    stats.total = 0
-    stats.active = 0
-    stats.inactive = 0
-
     if (isPrismaMissingSchemaError(error)) {
       dbWarning = "Database schema is not fully migrated yet. Deployment data is unavailable."
     } else {
@@ -63,13 +68,13 @@ export default async function DeploymentsPage() {
   }
 
   deployments = applyManagerScope(deployments, scope, {
-    regionId: (row) => row.regionId,
     regionalOfficeId: (row) => row.regionalOfficeId,
-  })
+  }) as DeploymentRow[]
+
   if (scope) {
     dbWarning = dbWarning
-      ? `${dbWarning} Manager scope active: showing deployments for your region/regional office only.`
-      : "Manager scope active: showing deployments for your region/regional office only."
+      ? `${dbWarning} Manager scope: showing your region only.`
+      : "Manager scope: showing your region only."
   }
 
   return (
@@ -78,9 +83,9 @@ export default async function DeploymentsPage() {
         title="Deployments"
         subtitle="Manage guard deployments to client locations"
         action={
-          <Link href="/deployments/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+          <Link href="/guards/deploy" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            New Deployment
+            Deploy Guard
           </Link>
         }
       />
@@ -92,59 +97,131 @@ export default async function DeploymentsPage() {
         <StatCard label="Inactive" value={stats.inactive} icon={<PauseCircle className="h-5 w-5" />} tone="warning" />
       </div>
 
-      <FilterBar>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" className="ui-input" placeholder="Search by guard, client, branch..." />
-          <select className="ui-select">
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="PENDING">Pending</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-          <select className="ui-select">
-            <option value="">All Clients</option>
-          </select>
-        </div>
-      </FilterBar>
-
       <section className="ui-card overflow-x-auto">
-        <table className="w-full min-w-[980px]">
+        <table className="w-full min-w-[900px]">
           <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Guard</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Client</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Branch</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Start Date</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">End Date</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Guard</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Client · Branch</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Shift</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Designation</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Start Date</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">End Date</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {deployments.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={8} className="px-6 py-12 text-center text-[var(--text-muted)]">
                   <p className="text-base font-medium text-[var(--text)]">No deployments found.</p>
                 </td>
               </tr>
             ) : (
-              deployments.map((deployment) => (
-                <tr key={deployment.id} className="hover:bg-[var(--surface-muted)]">
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.guardId || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.clientId || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{deployment.branchId || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{new Date(deployment.deploymentDate).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">—</td>
-                  <td className="px-6 py-4 text-sm">
+              deployments.map((dep) => (
+                <tr key={dep.id} className="hover:bg-[var(--surface-muted)] transition-colors">
+                  {/* Guard */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {dep.guard.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={dep.guard.photoUrl}
+                          alt={dep.guard.name}
+                          className="h-8 w-8 rounded-full object-cover border border-[var(--border)] shrink-0"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-[var(--brand)]/10 border border-[var(--border)] flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-[var(--brand)]">
+                            {dep.guard.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[var(--text)] truncate">{dep.guard.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{dep.guard.parwestId}</p>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Client · Branch */}
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium text-[var(--text)]">{dep.client.name}</p>
+                    {dep.branch ? (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {dep.branch.name}{dep.branch.city ? `, ${dep.branch.city}` : ""}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">—</p>
+                    )}
+                  </td>
+
+                  {/* Shift */}
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                      dep.shiftType === "DAY"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    }`}>
+                      <Clock className="h-3 w-3" />
+                      {dep.shiftType}
+                    </span>
+                  </td>
+
+                  {/* Designation */}
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)]">{dep.designation || "—"}</td>
+
+                  {/* Start Date */}
+                  <td className="px-4 py-3 text-sm text-[var(--text)] whitespace-nowrap">
+                    {new Date(dep.deploymentDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                  </td>
+
+                  {/* End Date */}
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] whitespace-nowrap">
+                    {dep.endDate
+                      ? new Date(dep.endDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                      : "—"}
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3">
                     <StatusChip
-                      label={deployment.status}
-                      variant={deployment.status === "ACTIVE" ? "success" : deployment.status === "PENDING" ? "warning" : "neutral"}
+                      label={dep.status}
+                      variant={dep.status === "ACTIVE" ? "success" : dep.status === "PENDING" ? "warning" : "neutral"}
                     />
                   </td>
-                  <td className="px-6 py-4 text-sm">
-                    <Link href={`/deployments/${deployment.id}`} className="text-[var(--brand)] hover:underline font-medium">
-                      View
-                    </Link>
+
+                  {/* Actions */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/deployments/${dep.id}`}
+                        className="text-xs text-[var(--brand)] hover:underline font-medium"
+                      >
+                        View
+                      </Link>
+                      {dep.status === "ACTIVE" ? (
+                        <>
+                          <span className="text-[var(--border)]">·</span>
+                          <Link
+                            href={`/deployments/${dep.id}/edit`}
+                            className="text-xs text-[var(--text-muted)] hover:text-[var(--brand)] font-medium inline-flex items-center gap-1"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Change
+                          </Link>
+                          <span className="text-[var(--border)]">·</span>
+                          <Link
+                            href={`/deployments/${dep.id}/end`}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium inline-flex items-center gap-1"
+                          >
+                            <ShieldOff className="h-3 w-3" />
+                            Revoke
+                          </Link>
+                        </>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))

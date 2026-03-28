@@ -36,6 +36,7 @@ type GuardDetailModel = GuardTabModel & {
         id: string; status: string; designation: string; shiftType: string
         deploymentDate: Date; endDate: Date | null; endReason: string | null
         salary: number | null; deploymentNature: string | null; deploymentType: string | null
+        deployedByName: string | null; revokedByName: string | null
         client: { id: string; name: string }
         branch: { id: string; name: string; city: string | null } | null
         regionalOffice: { id: string; name: string }
@@ -222,23 +223,29 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                 quantity: a.quantity,
             }
         }),
-        // Real deployment history
+        // Real deployment history — shape matches DeploymentAuditRecord for AttendanceTab
         deployments: rawDeployments.map((d) => ({
             id: d.id,
-            client: d.client.name,
-            clientId: d.client.id,
-            branch: d.branch?.name ?? null,
-            branchCity: d.branch?.city ?? null,
             status: d.status,
-            designation: d.designation,
             shiftType: d.shiftType,
-            startDate: d.deploymentDate,
+            designation: d.designation,
+            deploymentDate: d.deploymentDate,
             endDate: d.endDate ?? null,
             endReason: d.endReason ?? null,
-            salary: d.salary ?? null,
-            deploymentNature: d.deploymentNature ?? null,
             deploymentType: d.deploymentType ?? null,
-            regionalOffice: d.regionalOffice.name,
+            deploymentNature: d.deploymentNature ?? null,
+            deployedByName: (d as Record<string, unknown>).deployedByName as string | null ?? null,
+            revokedByName: (d as Record<string, unknown>).revokedByName as string | null ?? null,
+            client: d.client,
+            branch: d.branch ?? null,
+            regionalOffice: d.regionalOffice,
+            // Legacy flat fields for DeploymentHistoryTab
+            clientName: d.client.name,
+            clientId: d.client.id,
+            branchName: d.branch?.name ?? null,
+            branchCity: d.branch?.city ?? null,
+            salary: d.salary ?? null,
+            regionalOfficeName: d.regionalOffice.name,
         })),
     }
 

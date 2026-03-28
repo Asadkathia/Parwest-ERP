@@ -17,10 +17,12 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url)
         const regionId = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
         const status = searchParams.get("status")
 
         const where: Prisma.ClientWhereInput = {}
         if (regionId) where.regionId = regionId
+        if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
         if (status) where.status = status
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
 

@@ -79,7 +79,12 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "attachments":
                 return <AttachmentsTab guardId={guard.id || ""} />
             case "attendance":
-                return <AttendanceTab attendance={guard.attendance || []} attendanceSummary={guard.attendanceSummary || {}} />
+                return <AttendanceTab
+                    attendance={guard.attendance || []}
+                    attendanceSummary={guard.attendanceSummary || {}}
+                    deployments={(guard.deployments || []) as import("@/components/guards/tabs/types").DeploymentAuditRecord[]}
+                    guardId={guard.id || ""}
+                />
             case "inventory":
                 return <InventoryTab inventory={guard.inventory || []} />
             case "salaries":

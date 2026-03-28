@@ -223,6 +223,8 @@ export async function POST(request: NextRequest) {
             ? String(body.status)
             : "ACTIVE"
 
+        const deployedByName = (session.user as { name?: string })?.name ?? null
+
         const data: Prisma.DeploymentUncheckedCreateInput = {
             guardId,
             clientId,
@@ -247,6 +249,7 @@ export async function POST(request: NextRequest) {
             deploymentNature: body.deploymentNature ? String(body.deploymentNature) : "PERMANENT",
             isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
             comment: body.comment ? String(body.comment) : null,
+            deployedByName,
         }
 
         const deployment = await prisma.deployment.create({

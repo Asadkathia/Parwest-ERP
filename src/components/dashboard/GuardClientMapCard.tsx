@@ -1,31 +1,73 @@
-export default function GuardClientMapCard() {
-  const points = Array.from({ length: 14 }).map((_, idx) => ({
-    id: `map-point-${idx + 1}`,
-    x: 10 + ((idx * 17) % 78),
-    y: 12 + ((idx * 11) % 70),
-    type: idx % 3 === 0 ? "client" : "guard",
-  }))
+"use client"
+
+import dynamic from "next/dynamic"
+import { MapPin } from "lucide-react"
+
+type MapClient = {
+  id: string
+  name: string
+  city: string | null
+  latitude: number | null
+  longitude: number | null
+}
+type MapOffice = {
+  id: string
+  name: string
+  seriesCode: string
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+}
+
+// Dynamic import to prevent SSR — Leaflet requires window
+const LocationMap = dynamic(() => import("./LocationMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-72 bg-[var(--surface-muted)] rounded-[var(--radius-md)] border border-[var(--border)]">
+      <p className="text-sm text-[var(--text-muted)]">Loading map…</p>
+    </div>
+  ),
+})
+
+export default function GuardClientMapCard({
+  clients = [],
+  regionalOffices = [],
+}: {
+  clients?: MapClient[]
+  regionalOffices?: MapOffice[]
+}) {
+  const clientPins  = clients.filter((c) => c.latitude != null && c.longitude != null)
+  const officePins  = regionalOffices.filter((o) => o.latitude != null && o.longitude != null)
+  const hasNoCoords = clientPins.length === 0 && officePins.length === 0
 
   return (
     <section className="ui-card p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Guard & Client Map</h3>
-        <p className="text-xs text-[var(--text-muted)]">Illustrative plotted coverage</p>
+        <h3 className="text-sm font-semibold text-[var(--text)] flex items-center gap-1.5">
+          <MapPin className="h-4 w-4 text-[var(--brand)]" />
+          Deployment Coverage Map
+        </h3>
+        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            Clients ({clientPins.length})
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+            Regional Offices ({officePins.length})
+          </span>
+        </div>
       </div>
-      <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[radial-gradient(circle_at_20%_10%,#dbe9ff_0,#f7faff_45%,#eef4ff_100%)] h-72">
-        <div className="absolute inset-0 opacity-40 bg-[linear-gradient(0deg,transparent_24%,#cfdcf5_25%,transparent_26%,transparent_74%,#cfdcf5_75%,transparent_76%),linear-gradient(90deg,transparent_24%,#cfdcf5_25%,transparent_26%,transparent_74%,#cfdcf5_75%,transparent_76%)] bg-[size:40px_40px]" />
-        {points.map((point) => (
-          <span
-            key={point.id}
-            className={`absolute h-3 w-3 rounded-full ${point.type === "client" ? "bg-emerald-500" : "bg-[var(--brand)]"} shadow`}
-            style={{ left: `${point.x}%`, top: `${point.y}%` }}
-          />
-        ))}
+
+      <div className="relative h-80 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border)]">
+        <LocationMap clients={clients} regionalOffices={regionalOffices} />
       </div>
-      <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[var(--brand)]" /> Guards</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Clients</span>
-      </div>
+
+      {hasNoCoords && (
+        <p className="text-xs text-[var(--text-muted)] text-center">
+          No coordinates configured yet. Add latitude/longitude to clients or regional offices to see pins.
+        </p>
+      )}
     </section>
   )
 }

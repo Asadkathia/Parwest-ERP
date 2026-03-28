@@ -29,8 +29,7 @@ export default async function EndDeploymentPage({ params }: { params: Promise<{ 
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="End Deployment" subtitle={`End the deployment for ${deployment.guard.name} at ${deployment.client.name}`} />
-
+            <SectionTitle title="Revoke Deployment" subtitle={`Revoke deployment for ${deployment.guard.name} at ${deployment.client.name}`} />
             <EndDeploymentForm deployment={deployment} />
         </div>
     )

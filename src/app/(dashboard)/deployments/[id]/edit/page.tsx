@@ -57,11 +57,10 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Edit Deployment" subtitle={`Update deployment information for ${deployment.guard.name}`} />
+            <SectionTitle title="Change Deployment" subtitle={`Update deployment for ${deployment.guard.name}`} />
 
             <DeploymentEditForm
                 deployment={deployment}
-                guards={guards}
                 clients={clients}
                 regionalOffices={regionalOffices}
             />
