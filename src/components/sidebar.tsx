@@ -320,9 +320,9 @@ export function Sidebar() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const permissions = ((session?.user as any)?.permissions as string[]) || []
 
-    // SuperAdmin bypass: Admin role with NO permissions assigned = unrestricted.
-    // Admin role WITH permissions = regional admin, show only permitted modules.
-    const isUnrestrictedAdmin = userRole === "Admin" && permissions.length === 0
+    // Admin role is always unrestricted — sees all modules regardless of permissions.
+    // Non-admin users see only modules matching their assigned permissions.
+    const isUnrestrictedAdmin = userRole === "Admin"
 
     const navItems = status === "loading"
         ? [] // show nothing while loading to avoid flash
