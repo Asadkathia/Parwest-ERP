@@ -70,6 +70,9 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [contactNumbers, setContactNumbers] = useState<string[]>([""])
     const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
     const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
+    const [selectedRegionId, setSelectedRegionId] = useState("")
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
+    const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
     const [contractFile, setContractFile] = useState<string | null>(null)
     const [contractFileName, setContractFileName] = useState("")
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
@@ -92,8 +95,12 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
             .catch(() => {})
     }, [])
 
+    // Load managers/supervisors — filtered by region when selected
     useEffect(() => {
-        fetch("/api/users?limit=500")
+        const url = selectedRegionId
+            ? `/api/users?limit=500&regionId=${selectedRegionId}`
+            : "/api/users?limit=500"
+        fetch(url)
             .then((r) => r.ok ? r.json() : [])
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
@@ -108,7 +115,22 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                 }
             })
             .catch(() => {})
-    }, [])
+    }, [selectedRegionId])
+
+    // Load regional offices when region changes
+    useEffect(() => {
+        setSelectedRegionalOfficeId("")
+        setRegionalOffices([])
+        if (!selectedRegionId) return
+        fetch(`/api/regional-offices?regionId=${selectedRegionId}`)
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setRegionalOffices((data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })))
+                }
+            })
+            .catch(() => {})
+    }, [selectedRegionId])
 
     const applyOcrFields = (fields: Record<string, string>) => {
         const form = formRef.current
@@ -305,6 +327,10 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                             <input type="text" name="contactPerson" required className="ui-input" placeholder="Contact person" />
                         </div>
                         <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person Designation</label>
+                            <input type="text" name="contactPersonDesignation" className="ui-input" placeholder="e.g., Manager, Director, Officer" />
+                        </div>
+                        <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number *</label>
                             <div className="space-y-2">
                                 {contactNumbers.map((num, idx) => (
@@ -398,24 +424,57 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                     </div>
                 </div>
 
-                {/* Supervisor & Manager Assignment */}
+                {/* Region / Regional Office + Manager & Supervisor Assignment */}
                 <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Supervisor &amp; Manager Assignment</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Row 1: Region → Regional Office */}
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
-                            <SearchSelect
-                                name="assignedSupervisorId"
-                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder="— Select Supervisor —"
-                            />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
+                            <select
+                                name="regionId"
+                                className="ui-input"
+                                value={selectedRegionId}
+                                onChange={(e) => setSelectedRegionId(e.target.value)}
+                            >
+                                <option value="">— Select Region —</option>
+                                {regions.map((r) => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                            </select>
                         </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
+                            <select
+                                name="regionalOfficeId"
+                                className="ui-input"
+                                value={selectedRegionalOfficeId}
+                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+                                disabled={!selectedRegionId}
+                            >
+                                <option value="">
+                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
+                                </option>
+                                {regionalOffices.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {/* Row 2: Manager → Supervisor (manager first) */}
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
                             <SearchSelect
                                 name="assignedManagerId"
                                 options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder="— Select Manager —"
+                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
+                            <SearchSelect
+                                name="assignedSupervisorId"
+                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
                             />
                         </div>
                     </div>
@@ -425,18 +484,6 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                 {isBranchless && (
                     <div className="space-y-6">
                         <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Location Information</h2>
-
-                        {/* Regional Office ABOVE the map so its dropdown is never hidden */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="md:col-span-2">
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
-                                <SearchSelect
-                                    name="locationRegionalOffice"
-                                    options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                                    placeholder="— Select Regional Office —"
-                                />
-                            </div>
-                        </div>
 
                         {/* Map picker */}
                         <div>
@@ -524,16 +571,6 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                 {!isBranchless && (
                     <div className="space-y-6">
                         <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Information</h2>
-
-                        {/* Regional Office ABOVE the map */}
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
-                            <SearchSelect
-                                name="locationRegionalOffice"
-                                options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                                placeholder="— Select Regional Office —"
-                            />
-                        </div>
 
                         {/* Map picker */}
                         <div>
@@ -707,25 +744,46 @@ function ContractFields({ regions, prefix }: { regions: Region[]; prefix: string
                     placeholder="— Select Regional Office —"
                 />
             </div>
+            {/* spacer to keep grid aligned */}
+            <div />
+
+            {/* Day Guards */}
+            <div className="md:col-span-2">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
+                        <SearchSelect name={n("contractDayGuardDesignation")} options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
+                        <SearchSelect name={n("contractDayGuardExService")} options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Night Guards */}
+            <div className="md:col-span-2">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
+                        <SearchSelect name={n("contractNightGuardDesignation")} options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
+                        <SearchSelect name={n("contractNightGuardExService")} options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                    </div>
+                </div>
+            </div>
+
             <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                <SearchSelect
-                    name={n("contractGuardDesignation")}
-                    options={DESIGNATION_OPTIONS}
-                    placeholder="Select designation"
-                />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Day Guards</label>
+                <input type="number" name={n("contractAdditionalDayGuards")} className="ui-input" placeholder="0" min={0} />
             </div>
             <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Guards</label>
-                <input type="number" name={n("contractAdditionalGuards")} className="ui-input" placeholder="0" min={0} />
-            </div>
-            <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                <SearchSelect
-                    name={n("contractGuardExService")}
-                    options={EX_SERVICE_OPTIONS}
-                    placeholder="Select"
-                />
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Night Guards</label>
+                <input type="number" name={n("contractAdditionalNightGuards")} className="ui-input" placeholder="0" min={0} />
             </div>
             <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Price</label>

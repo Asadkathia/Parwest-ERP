@@ -89,10 +89,11 @@ export async function POST(request: NextRequest) {
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
+        let officeSeriesCode: string | null = null
         if (bodyRegionalOfficeId) {
             const office = await prisma.regionalOffice.findUnique({
                 where: { id: bodyRegionalOfficeId },
-                select: { id: true, regionId: true },
+                select: { id: true, regionId: true, seriesCode: true },
             })
             if (!office) {
                 return badRequest("Selected regional office does not exist.")
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
             if (!bodyRegionId) {
                 bodyRegionId = office.regionId || null
             }
+            officeSeriesCode = office.seriesCode || null
         }
 
         if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId, regionalOfficeId: bodyRegionalOfficeId })) {
@@ -142,20 +144,23 @@ export async function POST(request: NextRequest) {
         }
 
         const generateNextParwestId = async () => {
+            const prefix = officeSeriesCode ? `PW-${officeSeriesCode}` : "PW"
             const candidates = await prisma.guard.findMany({
-                where: { parwestId: { startsWith: "PW-" } },
+                where: { parwestId: { startsWith: `${prefix}-` } },
                 select: { parwestId: true },
                 orderBy: { createdAt: "desc" },
                 take: 1000,
             })
             let maxNumber = 0
+            const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            const pattern = new RegExp(`^${escapedPrefix}-(\\d+)$`)
             for (const row of candidates) {
-                const match = row.parwestId.match(/^PW-(\d+)$/)
+                const match = row.parwestId.match(pattern)
                 if (!match) continue
                 const numeric = Number(match[1])
                 if (Number.isFinite(numeric) && numeric > maxNumber) maxNumber = numeric
             }
-            return `PW-${String(maxNumber + 1).padStart(5, "0")}`
+            return `${prefix}-${String(maxNumber + 1).padStart(5, "0")}`
         }
 
         // Parse bankAccounts JSON array if provided
@@ -214,14 +219,17 @@ export async function POST(request: NextRequest) {
             try { parsedPrevEmployments = JSON.parse(String(body.previousEmploymentsJson)) } catch { /* ignore */ }
         }
 
-        // Derive exServiceType + isExService
-        const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true)
+        // Derive exServiceType + isExService from multi-entry or legacy body fields
+        const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true) ?? parsedPrevEmployments[0] ?? null
         const exServiceType = derivedExService
             ? (derivedExService.type ?? "CIVILIAN")
             : (str(body.exServiceType) ?? "CIVILIAN")
         const isExService = parsedPrevEmployments.length > 0
             ? parsedPrevEmployments.some((e) => e.isExService === true)
             : ["ARMY","POLICE","RANGERS","MUJAHID","OTHER"].includes(exServiceType)
+
+        // For the flat legacy fields, fall back to first multi-entry's values when body fields are absent
+        const fe = derivedExService
 
         const createGuardPayload = (parwestId: string) => ({
             parwestId,
@@ -257,20 +265,20 @@ export async function POST(request: NextRequest) {
             joiningDate: dt(body.joiningDate),
             joiningAge: num(body.joiningAge),
             enrolledBy: str(body.enrolledBy),
-            // Previous employment
+            // Previous employment — flat fields fall back to first multi-entry record
             isExService,
             exServiceType,
-            exServiceRank: str(body.exServiceRank),
-            exServiceRegiment: str(body.exServiceRegiment),
-            exServiceRegistrationNo: str(body.exServiceRegistrationNo),
-            exServiceUnit: str(body.exServiceUnit),
+            exServiceRank: str(body.exServiceRank) ?? str(fe?.rank),
+            exServiceRegiment: str(body.exServiceRegiment) ?? str(fe?.unit),
+            exServiceRegistrationNo: str(body.exServiceRegistrationNo) ?? str(fe?.registrationNo),
+            exServiceUnit: str(body.exServiceUnit) ?? str(fe?.unit),
             exServicePeriod: str(body.exServicePeriod),
-            exServiceYears: num(body.exServiceYears),
-            exServiceMonths: num(body.exServiceMonths),
+            exServiceYears: num(body.exServiceYears) ?? num(fe?.years),
+            exServiceMonths: num(body.exServiceMonths) ?? num(fe?.months),
             exServiceOtherLabel: str(body.exServiceOtherLabel),
-            dateOfEnrollment: dt(body.dateOfEnrollment),
-            dateOfDischarge: dt(body.dateOfDischarge),
-            exServiceRemarks: str(body.exServiceRemarks),
+            dateOfEnrollment: dt(body.dateOfEnrollment) ?? dt(fe?.dateOfEnrollment),
+            dateOfDischarge: dt(body.dateOfDischarge) ?? dt(fe?.dateOfDischarge),
+            exServiceRemarks: str(body.exServiceRemarks) ?? str(fe?.remarks),
             // Address contacts
             currentAddressContact: str(body.currentAddressContact),
             permanentAddressContact: str(body.permanentAddressContact),
@@ -351,6 +359,22 @@ export async function POST(request: NextRequest) {
                         })
                     } catch {
                         // Non-critical — guard is already created
+                    }
+                }
+
+                // Assign supervisor if provided during enrollment
+                const supervisorId = str(body.supervisorId)
+                if (supervisorId) {
+                    try {
+                        await prisma.guardSupervisorAssignment.create({
+                            data: {
+                                guardId: guard.id,
+                                supervisorId,
+                                status: "ACTIVE",
+                            },
+                        })
+                    } catch {
+                        // Non-critical — guard is already created, supervisor can be assigned later
                     }
                 }
 

@@ -18,15 +18,18 @@ import {
     Sparkles,
     Menu,
     X,
+    ShieldAlert,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
+import { useSession } from "next-auth/react"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
 
-const navItems: NavNode[] = [
+const allNavItems: NavNode[] = [
     {
         title: "Dashboard",
         icon: LayoutDashboard,
+        module: null, // always visible
         children: [
             { title: "Home", href: "/dashboard", icon: LayoutDashboard },
             { title: "Online Users", href: "/dashboard/online-users", icon: Users },
@@ -38,6 +41,7 @@ const navItems: NavNode[] = [
     {
         title: "Guards",
         icon: Users,
+        module: "GUARDS",
         children: [
             { title: "All Guards", href: "/guards", icon: Users },
             { title: "Add Guard", href: "/guards/new", icon: Users },
@@ -60,6 +64,7 @@ const navItems: NavNode[] = [
     {
         title: "Payroll",
         icon: DollarSign,
+        module: "PAYROLL",
         children: [
             { title: "Operations", href: "/payroll/operations", icon: DollarSign },
             { title: "Loans", href: "/payroll/operations/loan", icon: DollarSign },
@@ -75,6 +80,7 @@ const navItems: NavNode[] = [
     {
         title: "Clients",
         icon: Building2,
+        module: "CLIENTS",
         children: [
             { title: "All Clients", href: "/clients", icon: Building2 },
             { title: "Add Client", href: "/clients/new", icon: Building2 },
@@ -92,6 +98,7 @@ const navItems: NavNode[] = [
     {
         title: "Inventory",
         icon: Package,
+        module: "INVENTORY",
         children: [
             {
                 title: "Warehouses & Stores",
@@ -180,6 +187,7 @@ const navItems: NavNode[] = [
     {
         title: "Users",
         icon: Users,
+        module: "USERS",
         children: [
             { title: "All Users", href: "/users", icon: Users },
             { title: "Add User", href: "/users/new", icon: Users },
@@ -194,6 +202,7 @@ const navItems: NavNode[] = [
     {
         title: "Ticketing",
         icon: Ticket,
+        module: "TICKETING",
         children: [
             { title: "All Tickets", href: "/tickets", icon: Ticket },
             { title: "Create Ticket", href: "/tickets/new", icon: Ticket },
@@ -203,6 +212,7 @@ const navItems: NavNode[] = [
     {
         title: "Settings",
         icon: Settings,
+        module: "SETTINGS",
         children: [
             { title: "Regions", href: "/settings/regions", icon: MapPin },
             { title: "Regional Offices", href: "/settings/offices", icon: Building2 },
@@ -217,6 +227,7 @@ const navItems: NavNode[] = [
     {
         title: "Reports",
         icon: FileText,
+        module: "REPORTS",
         children: [
             { title: "Overview", href: "/reports", icon: FileText },
             { title: "Scheduled", href: "/reports/scheduled", icon: FileText },
@@ -231,18 +242,30 @@ const navItems: NavNode[] = [
         title: "Imports",
         href: "/imports",
         icon: Upload,
+        module: "IMPORTS",
     },
     {
         title: "Requisitions",
         href: "/requisitions",
         icon: ClipboardList,
+        module: "REQUISITIONS",
     },
     {
         title: "Audit",
         href: "/audit",
         icon: History,
+        module: "AUDIT",
     },
 ]
+
+function filterNavByPermissions(items: NavNode[], permissions: string[], isAdmin: boolean): NavNode[] {
+    if (isAdmin) return items
+    return items.filter((item) => {
+        const mod = item.module
+        if (mod === null || mod === undefined) return true // Dashboard — always visible
+        return permissions.includes(mod)
+    })
+}
 
 function hasPathInTree(node: NavNode, pathname: string): boolean {
     if (node.href && (pathname === node.href || pathname.startsWith(node.href + "/"))) {
@@ -257,7 +280,7 @@ function hasPathInTree(node: NavNode, pathname: string): boolean {
 }
 
 function getActiveSectionTitle(pathname: string): string | null {
-    for (const item of navItems) {
+    for (const item of allNavItems) {
         if (!item.children) continue
         if (item.children.some((child) => hasPathInTree(child, pathname))) {
             return item.title
@@ -268,17 +291,20 @@ function getActiveSectionTitle(pathname: string): string | null {
 
 export function Sidebar() {
     const pathname = usePathname()
+    const { data: session, status } = useSession()
     const [openSections, setOpenSections] = useState<string[]>(() => {
         const active = getActiveSectionTitle(pathname)
         return active ? [active] : []
     })
     const [isMobileOpen, setIsMobileOpen] = useState(false)
 
-    const activeSections = useMemo(() => {
+    // When pathname changes, ensure the active section is open (without closing others)
+    useEffect(() => {
         const active = getActiveSectionTitle(pathname)
-        if (!active) return openSections
-        return openSections.includes(active) ? openSections : [active]
-    }, [openSections, pathname])
+        if (active) {
+            setOpenSections((prev) => (prev.includes(active) ? prev : [...prev, active]))
+        }
+    }, [pathname])
 
     const toggleSection = (title: string) => {
         setOpenSections((prev) =>
@@ -287,6 +313,20 @@ export function Sidebar() {
                 : [...prev, title]
         )
     }
+
+    // Derive visible nav items from session permissions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userRole = (session?.user as any)?.role as string | undefined
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const permissions = ((session?.user as any)?.permissions as string[]) || []
+
+    // SuperAdmin bypass: Admin role with NO permissions assigned = unrestricted.
+    // Admin role WITH permissions = regional admin, show only permitted modules.
+    const isUnrestrictedAdmin = userRole === "Admin" && permissions.length === 0
+
+    const navItems = status === "loading"
+        ? [] // show nothing while loading to avoid flash
+        : filterNavByPermissions(allNavItems, permissions, isUnrestrictedAdmin)
 
     const sidebarContent = (
         <div className="flex h-full flex-col">
@@ -297,13 +337,30 @@ export function Sidebar() {
                 </div>
             </div>
             <nav className="flex-1 overflow-y-auto p-4">
-                <SidebarNav
-                    items={navItems}
-                    openSections={activeSections}
-                    onToggleSection={toggleSection}
-                    onNavigate={() => setIsMobileOpen(false)}
-                />
+                {status === "loading" ? (
+                    <div className="space-y-2 pt-2">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="h-8 animate-pulse rounded bg-white/10" />
+                        ))}
+                    </div>
+                ) : (
+                    <SidebarNav
+                        items={navItems}
+                        openSections={openSections}
+                        onToggleSection={toggleSection}
+                        onNavigate={() => setIsMobileOpen(false)}
+                    />
+                )}
             </nav>
+            {/* Permission notice for non-admin users */}
+            {!isUnrestrictedAdmin && status === "authenticated" && navItems.length <= 1 && (
+                <div className="border-t border-[var(--sidebar-border)] p-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                        <span>No modules assigned. Contact your Admin.</span>
+                    </div>
+                </div>
+            )}
         </div>
     )
 

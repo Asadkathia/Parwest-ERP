@@ -10,13 +10,14 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
     const { id } = await params
 
-    const [client, regions] = await Promise.all([
-        prisma.client.findUnique({
-            where: { id },
-        }),
-        prisma.region.findMany({
-            orderBy: { name: "asc" },
-        }),
+    const [client, regions, supervisorAssignment] = await Promise.all([
+        prisma.client.findUnique({ where: { id } }),
+        prisma.region.findMany({ orderBy: { name: "asc" } }),
+        prisma.clientSupervisorAssignment.findFirst({
+            where: { clientId: id, branchId: null, status: "ACTIVE" },
+            orderBy: { createdAt: "desc" },
+            select: { supervisorId: true },
+        }).catch(() => null),
     ])
 
     if (!client) notFound()
@@ -25,7 +26,11 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         <div className="space-y-6">
             <SectionTitle title="Edit Client" subtitle={`Update client information for ${client.name}`} />
 
-            <ClientEditForm client={client} regions={regions} />
+            <ClientEditForm
+                client={client}
+                regions={regions}
+                currentSupervisorId={supervisorAssignment?.supervisorId ?? null}
+            />
         </div>
     )
 }

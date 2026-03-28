@@ -98,8 +98,9 @@ export async function POST(request: NextRequest) {
         // Resolve city — form sends it as `clientLocation`
         const city = body.clientLocation || body.city || null
 
-        // Resolve regionId — form sends it as `locationRegionalOffice`
-        const regionId = body.locationRegionalOffice || body.regionId || null
+        // Resolve regionId and regionalOfficeId
+        const regionId = body.regionId || body.locationRegionalOffice || null
+        const regionalOfficeId = body.regionalOfficeId || null
 
         // Resolve GPS — prefer manual override over map picker
         const latitude  = parseFloat(body.latitudeManual  || body.latitude  || "") || null
@@ -126,11 +127,13 @@ export async function POST(request: NextRequest) {
                 contractAttachments: Array.isArray(body.contractAttachments) && body.contractAttachments.length > 0
                     ? body.contractAttachments : undefined,
                 regionId,
+                regionalOfficeId,
                 enrollmentDate:   body.enrollmentDate ? new Date(body.enrollmentDate) : new Date(),
 
                 // Contact
-                contactPerson:   body.contactPerson  || null,
-                phone:           body.contactNumber  || null,
+                contactPerson:            body.contactPerson             || null,
+                contactPersonDesignation: body.contactPersonDesignation  || null,
+                phone:                    body.contactNumber             || null,
                 contactNumbers:  Array.isArray(body.contactNumbers) && body.contactNumbers.length > 0
                     ? body.contactNumbers : undefined,
                 postalCode:      body.clientPostalCode || null,
@@ -165,6 +168,12 @@ export async function POST(request: NextRequest) {
                 contractRateEnd:          body.contractRateEnd    ? new Date(body.contractRateEnd)    : null,
                 contractGuardDesignation: body.contractGuardDesignation  || null,
                 contractAdditionalGuards: toInt(body.contractAdditionalGuards),
+                contractDayGuardDesignation:   body.contractDayGuardDesignation   || null,
+                contractDayGuardExService:     body.contractDayGuardExService     || null,
+                contractNightGuardDesignation: body.contractNightGuardDesignation || null,
+                contractNightGuardExService:   body.contractNightGuardExService   || null,
+                contractAdditionalDayGuards:   toInt(body.contractAdditionalDayGuards),
+                contractAdditionalNightGuards: toInt(body.contractAdditionalNightGuards),
                 contractGuardExService:   body.contractGuardExService    || null,
                 contractPrice:            toFloat(body.contractPrice),
 

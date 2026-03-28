@@ -40,6 +40,7 @@ type GuardDetailModel = GuardTabModel & {
         branch: { id: string; name: string; city: string | null } | null
         regionalOffice: { id: string; name: string }
     }>
+    storeInventoryAssignments?: Array<Record<string, unknown>>
 }
 
 function toDateOrNull(value?: Date | string | null) {
@@ -70,7 +71,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     let guard: GuardDetailModel | null = null
 
     try {
-        const [guardData, activeSupervisor, attendanceRecords, deploymentRecords] = await Promise.all([
+        const [guardData, activeSupervisor, attendanceRecords, deploymentRecords, storeInventoryAssignments] = await Promise.all([
             prisma.guard.findUnique({
                 where: { id },
                 include: {
@@ -96,9 +97,20 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                     regionalOffice: { select: { id: true, name: true } },
                 },
             }).catch(() => []),
+            prisma.storeInventoryAssignment.findMany({
+                where: { assignedToGuardId: id },
+                orderBy: { assignedAt: "desc" },
+                include: {
+                    product: { include: { variation: { select: { name: true } } } },
+                    condition: { select: { name: true } },
+                    returnCondition: { select: { name: true } },
+                    assignedByUser: { select: { name: true } },
+                    returnedByUser: { select: { name: true } },
+                },
+            }).catch(() => []),
         ])
         guard = guardData
-            ? { ...guardData, managerName: activeSupervisor?.supervisor?.name ?? null, attendanceRecords, deploymentRecords }
+            ? { ...guardData, managerName: activeSupervisor?.supervisor?.name ?? null, attendanceRecords, deploymentRecords, storeInventoryAssignments }
             : null
     } catch (error) {
         if (!isPrismaMissingSchemaError(error)) {
@@ -142,6 +154,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     const g = guard as Record<string, unknown>
     const rawAttendance = guard.attendanceRecords ?? []
     const rawDeployments = guard.deploymentRecords ?? []
+    const rawStoreInventory = (g.storeInventoryAssignments as Array<Record<string, unknown>> | undefined) ?? []
 
     // Build attendance summary
     const presentCount = rawAttendance.filter((a) => a.status === "PRESENT").length
@@ -186,6 +199,29 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
             absent: absentCount,
             overtime: Math.round(totalOT * 10) / 10,
         },
+        // Store inventory history
+        storeInventory: rawStoreInventory.map((a) => {
+            const product = a.product as Record<string, unknown> | null
+            const variation = product?.variation as Record<string, unknown> | null
+            const condition = a.condition as Record<string, unknown> | null
+            const returnCondition = a.returnCondition as Record<string, unknown> | null
+            const assignedByUser = a.assignedByUser as Record<string, unknown> | null
+            const returnedByUser = a.returnedByUser as Record<string, unknown> | null
+            return {
+                id: a.id,
+                productName: product?.name ?? null,
+                productSku: product?.sku ?? null,
+                productVariation: variation?.name ?? null,
+                assignedAt: a.assignedAt,
+                conditionName: condition?.name ?? null,
+                assignedByName: assignedByUser?.name ?? null,
+                returnedAt: a.returnedAt,
+                returnConditionName: returnCondition?.name ?? null,
+                returnedByName: returnedByUser?.name ?? null,
+                status: a.status,
+                quantity: a.quantity,
+            }
+        }),
         // Real deployment history
         deployments: rawDeployments.map((d) => ({
             id: d.id,

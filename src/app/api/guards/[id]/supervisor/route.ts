@@ -12,13 +12,51 @@ export async function GET(
 
     const { id } = await params
 
-    const assignment = await prisma.guardSupervisorAssignment.findFirst({
+    // 1. Check direct GuardSupervisorAssignment first
+    const directAssignment = await prisma.guardSupervisorAssignment.findFirst({
         where: { guardId: id, status: "ACTIVE" },
-        include: { supervisor: { select: { name: true, email: true } } },
+        orderBy: { assignedAt: "desc" },
+        include: { supervisor: { select: { id: true, name: true, email: true } } },
     }).catch(() => null)
 
+    if (directAssignment?.supervisor) {
+        return NextResponse.json({
+            supervisorName: directAssignment.supervisor.name,
+            supervisorEmail: directAssignment.supervisor.email,
+            source: "direct",
+        })
+    }
+
+    // 2. Fall back: find supervisor through active deployment → ClientSupervisorAssignment
+    const deployment = await prisma.deployment.findFirst({
+        where: { guardId: id, status: "ACTIVE" },
+        select: { clientId: true, branchId: true },
+        orderBy: { deploymentDate: "desc" },
+    }).catch(() => null)
+
+    if (deployment?.clientId) {
+        const clientSupervisor = await prisma.clientSupervisorAssignment.findFirst({
+            where: {
+                clientId: deployment.clientId,
+                branchId: deployment.branchId ?? null,
+                status: "ACTIVE",
+            },
+            orderBy: { createdAt: "desc" },
+            include: { supervisor: { select: { id: true, name: true, email: true } } },
+        }).catch(() => null)
+
+        if (clientSupervisor?.supervisor) {
+            return NextResponse.json({
+                supervisorName: clientSupervisor.supervisor.name,
+                supervisorEmail: clientSupervisor.supervisor.email,
+                source: "deployment",
+            })
+        }
+    }
+
     return NextResponse.json({
-        supervisorName: assignment?.supervisor?.name ?? null,
-        supervisorEmail: assignment?.supervisor?.email ?? null,
+        supervisorName: null,
+        supervisorEmail: null,
+        source: null,
     })
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -104,6 +104,7 @@ const INITIAL_FORM = {
 const INITIAL_RETURN_FORM = {
   assignmentId: "",
   status: "RETURNED",
+  returnConditionId: "",
   notes: "",
 }
 
@@ -157,7 +158,7 @@ export default function AssignmentsManager({
   const [clientManagerName, setClientManagerName] = useState("")
   const [showPreviousAssignments, setShowPreviousAssignments] = useState(false)
   const [guardDeployment, setGuardDeployment] = useState<Deployment | null>(null)
-  const [assigneeQuery, setAssigneeQuery] = useState("")
+  const [guardSupervisorName, setGuardSupervisorName] = useState("")
   const [form, setForm] = useState(INITIAL_FORM)
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
@@ -318,18 +319,30 @@ export default function AssignmentsManager({
     if (assignmentType !== "GUARD") return
     if (!form.assignedToId) {
       setGuardDeployment(null)
+      setGuardSupervisorName("")
       return
     }
     let cancelled = false
     ;(async () => {
       try {
-        const deploymentRows = await apiGet<Deployment[]>("/api/deployments")
+        const [deploymentRows, supervisorRows] = await Promise.all([
+          apiGet<Deployment[]>("/api/deployments"),
+          apiGet<{ supervisorName?: string | null }>(
+            `/api/guards/${encodeURIComponent(form.assignedToId)}/supervisor`
+          ).catch(() => ({ supervisorName: null })),
+        ])
         const active = deploymentRows.find(
           (row) => row.guardId === form.assignedToId && String(row.status || "").toUpperCase() === "ACTIVE"
         )
-        if (!cancelled) setGuardDeployment(active || null)
+        if (!cancelled) {
+          setGuardDeployment(active || null)
+          setGuardSupervisorName((supervisorRows as { supervisorName?: string | null }).supervisorName || "")
+        }
       } catch {
-        if (!cancelled) setGuardDeployment(null)
+        if (!cancelled) {
+          setGuardDeployment(null)
+          setGuardSupervisorName("")
+        }
       }
     })()
     return () => {
@@ -337,28 +350,7 @@ export default function AssignmentsManager({
     }
   }, [assignmentType, form.assignedToId])
 
-  const visibleAssignees = useMemo(() => {
-    const q = assigneeQuery.trim().toLowerCase()
-    if (assignmentType === "GUARD") {
-      const source = guards.map((row) => ({
-        id: row.id,
-        name: `${row.name}${row.parwestId ? ` (${row.parwestId})` : row.cnic ? ` (${row.cnic})` : ""}`,
-      }))
-      return q ? source.filter((row) => row.name.toLowerCase().includes(q)) : source
-    }
-    if (assignmentType === "CLIENT") {
-      const source = clients.map((row) => ({
-        id: row.id,
-        name: row.type ? `${row.name} (${row.type})` : row.name,
-      }))
-      return q ? source.filter((row) => row.name.toLowerCase().includes(q)) : source
-    }
-    const source = employees.map((row) => ({
-      id: row.id,
-      name: `${row.name}${row.email ? ` (${row.email})` : ""}`,
-    }))
-    return q ? source.filter((row) => row.name.toLowerCase().includes(q)) : source
-  }, [assignmentType, assigneeQuery, clients, employees, guards])
+
 
   const scopedProducts = useMemo(() => {
     return products.filter((product) => {
@@ -440,7 +432,6 @@ export default function AssignmentsManager({
       await apiSend<Assignment[]>("/api/store-inventory/v2/assignments", "POST", payload)
       setNotice({ type: "success", message: `${assigneeLabel(assignmentType)} assignment created successfully.` })
       setForm(INITIAL_FORM)
-      setAssigneeQuery("")
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to assign inventory."
@@ -475,6 +466,7 @@ export default function AssignmentsManager({
     setReturnDraft({
       assignmentId: id,
       status: "RETURNED",
+      returnConditionId: "",
       notes: "",
     })
   }
@@ -489,6 +481,7 @@ export default function AssignmentsManager({
     try {
       await apiSend<Assignment>(`/api/store-inventory/v2/assignments/${returnDraft.assignmentId}/return`, "POST", {
         status: returnDraft.status,
+        returnConditionId: returnDraft.returnConditionId || null,
         notes: returnDraft.notes.trim() || null,
       })
       setNotice({ type: "success", message: "Assignment closed successfully." })
@@ -522,32 +515,33 @@ export default function AssignmentsManager({
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Select label="Select Store *" value={form.storeId} onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))} options={stores} />
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">
-              {assignmentType === "GUARD" ? "Search Guard" : assignmentType === "CLIENT" ? "Select Client" : "Select Employee"}
-            </label>
-            <input
-              className="ui-input mb-2"
-              placeholder={`Type to search ${assigneeLabel(assignmentType).toLowerCase()}`}
-              value={assigneeQuery}
-              onChange={(e) => setAssigneeQuery(e.target.value)}
-            />
-            <select className="ui-select" value={form.assignedToId} onChange={(e) => setForm((prev) => ({ ...prev, assignedToId: e.target.value }))}>
-              <option value="">Select {assigneeLabel(assignmentType)}</option>
-              {visibleAssignees.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableCombobox
+            label="Select Store *"
+            value={form.storeId}
+            onChange={(value) => setForm((prev) => ({ ...prev, storeId: value }))}
+            options={stores}
+            placeholder="Search stores..."
+          />
+          <SearchableCombobox
+            label={assignmentType === "GUARD" ? "Search Guard" : assignmentType === "CLIENT" ? "Select Client" : "Select Employee"}
+            value={form.assignedToId}
+            onChange={(value) => setForm((prev) => ({ ...prev, assignedToId: value }))}
+            options={
+              assignmentType === "GUARD"
+                ? guards.map((g) => ({ id: g.id, name: `${g.name}${g.parwestId ? ` (${g.parwestId})` : ""}` }))
+                : assignmentType === "CLIENT"
+                ? clients.map((cl) => ({ id: cl.id, name: cl.type ? `${cl.name} (${cl.type})` : cl.name }))
+                : employees.map((e) => ({ id: e.id, name: `${e.name}${e.email ? ` (${e.email})` : ""}` }))
+            }
+            placeholder={`Search ${assignmentType === "GUARD" ? "guard" : assignmentType === "CLIENT" ? "client" : "employee"}...`}
+          />
           {assignmentType === "CLIENT" ? (
-            <Select
+            <SearchableCombobox
               label="Select Branch"
               value={form.branchId}
               onChange={(value) => setForm((prev) => ({ ...prev, branchId: value }))}
               options={branches.map((row) => ({ id: row.id, name: row.code ? `${row.name} (${row.code})` : row.name }))}
+              placeholder="Search branch..."
             />
           ) : (
             <div />
@@ -562,9 +556,7 @@ export default function AssignmentsManager({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <ReadOnlyField label="Guard Name" value={selectedGuard?.name || ""} />
             <ReadOnlyField label="Guard Status" value={selectedGuard?.status || ""} />
-            <ReadOnlyField label="Guard Supervisor" value="—" />
-            <ReadOnlyField label="Branch" value={guardDeployment?.branch?.name || ""} />
-            <ReadOnlyField label="Branch Code" value={guardDeployment?.branch?.code || ""} />
+            <ReadOnlyField label="Guard Supervisor" value={guardSupervisorName || "—"} />
           </div>
         ) : null}
 
@@ -694,7 +686,7 @@ export default function AssignmentsManager({
 
         <div className="flex gap-2">
           <ActionButton onClick={() => void createAssignment()} disabled={saving}>{saving ? "Assigning..." : "Assign Products"}</ActionButton>
-          <ActionButton variant="secondary" onClick={() => { setForm(INITIAL_FORM); setAssigneeQuery("") }}>Reset</ActionButton>
+          <ActionButton variant="secondary" onClick={() => { setForm(INITIAL_FORM); }}>Reset</ActionButton>
         </div>
       </FilterBar>
 
@@ -800,6 +792,19 @@ export default function AssignmentsManager({
                 </select>
               </div>
               <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Revoking Condition</label>
+                <select
+                  className="ui-select"
+                  value={returnDraft.returnConditionId}
+                  onChange={(e) => setReturnDraft((prev) => ({ ...prev, returnConditionId: e.target.value }))}
+                >
+                  <option value="">— Select Condition —</option>
+                  {conditions.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="mb-1 block text-sm text-[var(--text-muted)]">Remarks</label>
                 <textarea
                   className="ui-input min-h-24"
@@ -824,18 +829,94 @@ export default function AssignmentsManager({
   )
 }
 
-function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Option[] }) {
+function SearchableCombobox({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Search...",
+}: {
+  label: string
+  value: string
+  onChange: (id: string) => void
+  options: Option[]
+  placeholder?: string
+}) {
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const selected = options.find((o) => o.id === value)
+  const filtered = query
+    ? options.filter((o) => o.name.toLowerCase().includes(query.toLowerCase()))
+    : options
+
   return (
-    <div>
+    <div ref={ref} className="relative">
       <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <select className="ui-select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Select</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
+      <div
+        className="ui-input flex cursor-pointer items-center justify-between gap-2"
+        onClick={() => { setOpen((v) => !v); setQuery("") }}
+      >
+        <span className={selected ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
+          {selected ? selected.name : placeholder}
+        </span>
+        <svg className="h-4 w-4 shrink-0 text-[var(--text-muted)]" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+          <div className="p-2 border-b border-[var(--border)]">
+            <input
+              autoFocus
+              className="ui-input py-1 text-sm"
+              placeholder="Type to search..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setOpen(false); setQuery("") }
+                if (e.key === "Enter" && filtered.length > 0) {
+                  onChange(filtered[0].id)
+                  setOpen(false)
+                  setQuery("")
+                }
+              }}
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-[var(--text-muted)]">No results found</div>
+            ) : (
+              filtered.map((option) => (
+                <div
+                  key={option.id}
+                  className={`cursor-pointer px-3 py-2 text-sm hover:bg-[var(--primary)]/10 ${option.id === value ? "font-semibold text-[var(--primary)]" : "text-[var(--text)]"}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    onChange(option.id)
+                    setOpen(false)
+                    setQuery("")
+                  }}
+                >
+                  {option.name}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

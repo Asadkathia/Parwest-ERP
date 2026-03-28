@@ -452,8 +452,6 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
             <Field label="SECT *" name="sect" required placeholder="SECT" />
             <Field label="CAST *" name="cast" required placeholder="CAST" />
-            <SelectField label="DESIGNATION (TYPE)" name="designation" options={LEGACY_GUARD_TYPES} defaultValue="Guard" />
-            <Field label="SALARY *" name="salary" type="number" placeholder="Salary" required />
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Joining Date</label>
               <input

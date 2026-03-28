@@ -377,14 +377,6 @@ export default function SearchGuardsManager() {
             placeholder="Bank Account Type"
           />
           <Select
-            label="Payment Mode"
-            name="payment_mode"
-            value={filters.paymentMode}
-            onChange={(v) => setFilter("paymentMode", v)}
-            options={["BANK", "CASH"]}
-            placeholder="Payment Mode"
-          />
-          <Select
             label="Guard Category"
             name="guard_category"
             value={filters.guardCategory}

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import Image from "next/image"
 import { prisma } from "@/lib/db"
+import PricingManager from "@/components/clients/PricingManager"
 import Link from "next/link"
 import { ArrowLeft, Edit, FileText, Plus, Paperclip, Building2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
@@ -119,6 +120,7 @@ export default async function ClientDetailPage({
     where: { id },
     include: {
       region: true,
+      regionalOffice: { select: { id: true, name: true } },
       branches: {
         include: {
           deployments: {
@@ -152,6 +154,14 @@ export default async function ClientDetailPage({
   })
 
   if (!client) notFound()
+
+  // Resolve assigned manager name (stored as plain ID, no relation)
+  const assignedManager = client.assignedManagerId
+    ? await prisma.user.findUnique({
+        where: { id: client.assignedManagerId },
+        select: { name: true, email: true },
+      }).catch(() => null)
+    : null
 
   const allDeployments = client.branches.flatMap((branch) =>
     (branch.deployments || []).map((deployment) => ({ branch, deployment }))
@@ -379,6 +389,8 @@ export default async function ClientDetailPage({
                 <InfoCell label="POSTAL CODE" value={client.postalCode || "—"} />
                 <InfoCell label="ENROLLMENT DATE" value={formatDate(client.enrollmentDate)} />
                 <InfoCell label="REGION" value={client.region?.name || "—"} />
+                <InfoCell label="REGIONAL OFFICE" value={(client as unknown as { regionalOffice?: { name: string } | null }).regionalOffice?.name || "—"} />
+                <InfoCell label="ASSIGNED MANAGER" value={assignedManager?.name || assignedManager?.email || "—"} />
                 <InfoCell label="BRANCHLESS CLIENT" value={client.isBranchless ? "Yes" : "No"} />
                 <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
                 <InfoCell label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
@@ -396,6 +408,7 @@ export default async function ClientDetailPage({
             <CardBody>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <InfoCell label="CONTACT PERSON" value={client.contactPerson || "—"} />
+                <InfoCell label="CONTACT DESIGNATION" value={(client as unknown as { contactPersonDesignation?: string | null }).contactPersonDesignation || "—"} />
                 <InfoCell label="PRIMARY PHONE" value={client.phone || "—"} />
                 <InfoCell
                   label="ADDITIONAL NUMBERS"
@@ -405,7 +418,7 @@ export default async function ClientDetailPage({
                       : "—"
                   }
                 />
-                <InfoCell label="ASSIGNED SUPERVISOR" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
+                <InfoCell label="ASSIGNED SUPERVISOR" value={client.supervisorAssignments?.[0]?.supervisor?.name || client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
               </div>
             </CardBody>
           </Card>
@@ -446,25 +459,41 @@ export default async function ClientDetailPage({
           ) : null}
 
           {/* ── Contract Details (conditional) ── */}
-          {(client.contractStart || client.contractEnd || client.contractPrice != null || client.contractGuardDesignation) ? (
-            <Card>
-              <CardHeader>
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTRACT DETAILS</h3>
-              </CardHeader>
-              <CardBody>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <InfoCell label="CONTRACT START" value={formatDate(client.contractStart)} />
-                  <InfoCell label="CONTRACT END" value={formatDate(client.contractEnd)} />
-                  <InfoCell label="RATE PERIOD START" value={formatDate(client.contractRateStart)} />
-                  <InfoCell label="RATE PERIOD END" value={formatDate(client.contractRateEnd)} />
-                  <InfoCell label="GUARD DESIGNATION" value={client.contractGuardDesignation || "—"} />
-                  <InfoCell label="ADDITIONAL GUARDS" value={client.contractAdditionalGuards != null ? String(client.contractAdditionalGuards) : "—"} />
-                  <InfoCell label="EX-SERVICE TYPE" value={client.contractGuardExService || "—"} />
-                  <InfoCell label="CONTRACT PRICE" value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"} />
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
+          {(() => {
+            const c = client as unknown as {
+              contractDayGuardDesignation?: string | null
+              contractDayGuardExService?: string | null
+              contractNightGuardDesignation?: string | null
+              contractNightGuardExService?: string | null
+              contractAdditionalDayGuards?: number | null
+              contractAdditionalNightGuards?: number | null
+            }
+            const hasContract = client.contractStart || client.contractEnd || client.contractPrice != null ||
+              client.contractGuardDesignation || c.contractDayGuardDesignation || c.contractNightGuardDesignation
+            if (!hasContract) return null
+            return (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTRACT DETAILS</h3>
+                </CardHeader>
+                <CardBody>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoCell label="CONTRACT START" value={formatDate(client.contractStart)} />
+                    <InfoCell label="CONTRACT END" value={formatDate(client.contractEnd)} />
+                    <InfoCell label="RATE PERIOD START" value={formatDate(client.contractRateStart)} />
+                    <InfoCell label="RATE PERIOD END" value={formatDate(client.contractRateEnd)} />
+                    <InfoCell label="CONTRACT PRICE" value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"} />
+                    <InfoCell label="DAY GUARD DESIGNATION" value={c.contractDayGuardDesignation || client.contractGuardDesignation || "—"} />
+                    <InfoCell label="DAY GUARD EX-SERVICE" value={c.contractDayGuardExService || client.contractGuardExService || "—"} />
+                    <InfoCell label="ADDITIONAL DAY GUARDS" value={c.contractAdditionalDayGuards != null ? String(c.contractAdditionalDayGuards) : (client.contractAdditionalGuards != null ? String(client.contractAdditionalGuards) : "—")} />
+                    <InfoCell label="NIGHT GUARD DESIGNATION" value={c.contractNightGuardDesignation || "—"} />
+                    <InfoCell label="NIGHT GUARD EX-SERVICE" value={c.contractNightGuardExService || "—"} />
+                    <InfoCell label="ADDITIONAL NIGHT GUARDS" value={c.contractAdditionalNightGuards != null ? String(c.contractAdditionalNightGuards) : "—"} />
+                  </div>
+                </CardBody>
+              </Card>
+            )
+          })()}
         </div>
       ) : null}
 
@@ -639,39 +668,16 @@ export default async function ClientDetailPage({
 
       {activeTab === "pricing" ? (
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">PRICING</h2>
-            <Link href="/clients/pricing" className="ui-btn ui-btn-secondary">Open Pricing Module</Link>
+          <CardHeader>
+            <h2 className="text-base font-semibold text-[var(--text)]">CONTRACTS &amp; PRICING RATES</h2>
           </CardHeader>
-          <CardBody className="space-y-4">
-            <LegacyFilterForm clientId={client.id} tab="pricing">
-              <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
-              <FilterField label="Search:" name="search" defaultValue={listSearch} />
-              <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
-            </LegacyFilterForm>
-
-            {filteredPricingConfigs.length === 0 ? (
-              <EmptyTableMessage message="No pricing profiles configured." />
-            ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>GUARD TYPE</Th>
-                    <Th>RATE</Th>
-                    <Th>UPDATED</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPricingConfigs.map((config) => (
-                    <tr key={config.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{config.guardType}</Td>
-                      <Td>{config.rate.toLocaleString()}</Td>
-                      <Td>{formatDate(config.updatedAt)}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
-            )}
+          <CardBody>
+            <PricingManager
+              clientId={client.id}
+              clientName={client.name}
+              branches={client.branches.map((b) => ({ id: b.id, name: b.name }))}
+              isBranchless={client.isBranchless}
+            />
           </CardBody>
         </Card>
       ) : null}

@@ -27,30 +27,35 @@ export async function POST(request: NextRequest, { params }: Params) {
           : StoreInventoryAssignmentStatus.RETURNED
 
     const result = await prisma.$transaction(async (tx) => {
-      const current = await tx.storeInventoryAssignment.findUnique({ where: { id } })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const current = await tx.storeInventoryAssignment.findUnique({ where: { id } }) as any
       if (!current) throw new Error("ASSIGNMENT_NOT_FOUND")
       if (current.status !== StoreInventoryAssignmentStatus.ASSIGNED) {
         throw new Error("ASSIGNMENT_NOT_OPEN")
       }
 
+      const returnConditionId = asText(body.returnConditionId) ?? null
       const returned = await tx.storeInventoryAssignment.update({
         where: { id },
         data: {
           status: nextStatus,
           returnedAt: new Date(),
           returnedByUserId: session.userId,
+          returnConditionId: returnConditionId || null,
           notes: asText(body.notes) ?? current.notes,
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         include: {
           store: true,
           product: true,
           condition: true,
+          returnCondition: true,
           assignedToGuard: { select: { id: true, name: true, parwestId: true, cnic: true } },
           assignedToClient: { select: { id: true, name: true, type: true } },
           assignedToUser: { select: { id: true, name: true, email: true } },
           assignedByUser: { select: { id: true, name: true, email: true } },
           returnedByUser: { select: { id: true, name: true, email: true } },
-        },
+        } as any,
       })
 
       if (nextStatus === StoreInventoryAssignmentStatus.RETURNED) {

@@ -1,82 +1,143 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { ShoppingCart } from "lucide-react"
-import type { GuardLooseRow } from "@/components/guards/tabs/types"
 import Link from "next/link"
 
-type StoreInventoryItem = {
-    id: string
-    item?: string
-    quantity?: number
-    issueDate?: string
-    returnDate?: string
-    status?: string
+type StoreInventoryRow = {
+  id: string
+  productName: string
+  productSku: string
+  productVariation: string | null
+  quantity: number
+  assignedAt: string
+  conditionName: string | null
+  assignedByName: string | null
+  returnedAt: string | null
+  returnConditionName: string | null
+  returnedByName: string | null
+  status: string
 }
 
 interface StoreInventoryTabProps {
-    items: GuardLooseRow[]
+  guardId: string
+  // legacy prop — kept for backwards compat, ignored
+  items?: unknown[]
 }
 
-export default function StoreInventoryTab({ items }: StoreInventoryTabProps) {
-    const rows = items as StoreInventoryItem[]
-    const getStatusColor = (status: string) => {
-        if (status === "ISSUED") return "bg-blue-100 text-blue-800"
-        if (status === "RETURNED") return "bg-green-100 text-green-800"
-        return "bg-gray-100 text-gray-700"
-    }
+function formatDate(iso: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h2 className="text-2xl font-bold">Store Inventory</h2>
-                <Link href="/store-inventory/inventory-assignments" className="ui-btn ui-btn-secondary">
-                    Open Store Inventory V2
-                </Link>
-            </div>
+function StatusBadge({ status }: { status: string }) {
+  let cls = "bg-gray-100 text-gray-700"
+  if (status === "ASSIGNED") cls = "bg-blue-100 text-blue-800"
+  else if (status === "RETURNED") cls = "bg-green-100 text-green-800"
+  else if (status === "DAMAGED") cls = "bg-red-100 text-red-800"
+  else if (status === "LOST") cls = "bg-orange-100 text-orange-800"
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls}`}>
+      {status}
+    </span>
+  )
+}
 
-            {rows.length === 0 ? (
-                <div className="bg-white rounded-lg border p-12 text-center">
-                    <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No store inventory records found</p>
-                </div>
-            ) : (
-                <div className="bg-white rounded-lg border overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Return Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {rows.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-sm font-medium">{item.item || "—"}</td>
-                                    <td className="px-6 py-4 text-sm">{item.quantity || 0}</td>
-                                    <td className="px-6 py-4 text-sm">
-                                        {item.issueDate
-                                            ? new Date(item.issueDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-                                            : "—"}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm">
-                                        {item.returnDate
-                                            ? new Date(item.returnDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-                                            : "Not Returned"}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status || "ISSUED")}`}>
-                                            {item.status || "—"}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
+  const [rows, setRows] = useState<StoreInventoryRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!guardId) return
+    setLoading(true)
+    setError(null)
+    fetch(`/api/guards/${encodeURIComponent(guardId)}/store-inventory`)
+      .then((res) => res.json())
+      .then((data: StoreInventoryRow[]) => {
+        setRows(data)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("Failed to load store inventory:", err)
+        setError("Failed to load inventory records.")
+        setLoading(false)
+      })
+  }, [guardId])
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-2xl font-bold">Store Inventory</h2>
+        <Link href="/store-inventory/inventory-assignments" className="ui-btn ui-btn-secondary">
+          Open Store Inventory V2
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-lg border p-12 text-center">
+          <p className="text-gray-500">Loading inventory records...</p>
         </div>
-    )
+      ) : error ? (
+        <div className="bg-white rounded-lg border p-12 text-center">
+          <p className="text-red-500">{error}</p>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="bg-white rounded-lg border p-12 text-center">
+          <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No store inventory records found</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Product</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Variant / SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Qty</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Assign Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Assigning Condition</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Assigned By</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Revoking Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Revoking Condition</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Revoked By</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{row.productName}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {row.productVariation ? (
+                      <span>
+                        {row.productVariation}
+                        <span className="text-gray-400 ml-1">({row.productSku})</span>
+                      </span>
+                    ) : (
+                      row.productSku || "—"
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{row.quantity}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.assignedAt)}</td>
+                  <td className="px-4 py-3">{row.conditionName || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{row.assignedByName || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.returnedAt)}</td>
+                  <td className="px-4 py-3">{row.returnConditionName || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{row.returnedByName || "—"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={row.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
 }

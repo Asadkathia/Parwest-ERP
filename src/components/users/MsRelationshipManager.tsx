@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
+import { Pencil, X, Check } from "lucide-react"
 
 type Role = { id: string; name: string }
 type User = { id: string; name: string; roleId?: string | null; role?: { id: string; name: string } | null }
@@ -17,6 +17,85 @@ type RelationshipRow = {
   status: string
 }
 
+// ── Searchable dropdown ──────────────────────────────────────────────────────
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  placeholder: string
+}) {
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const selected = options.find((o) => o.value === value)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options.slice(0, 20)
+  }, [query, options])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  return (
+    <div ref={wrapRef}>
+      <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
+      <div className="relative">
+        <input
+          className="ui-input pr-8"
+          placeholder={placeholder}
+          value={open ? query : (selected?.label ?? "")}
+          onFocus={() => { setQuery(""); setOpen(true) }}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          autoComplete="off"
+        />
+        {value && !open && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-500"
+            onClick={() => { onChange(""); setQuery("") }}
+            tabIndex={-1}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-56 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-[var(--text-muted)]">No results</p>
+            ) : (
+              filtered.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)]"
+                  onMouseDown={() => { onChange(opt.value); setOpen(false); setQuery("") }}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function MsRelationshipManager() {
   const [rows, setRows] = useState<RelationshipRow[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -25,10 +104,17 @@ export default function MsRelationshipManager() {
   const [supervisorId, setSupervisorId] = useState("")
   const [effectiveDate, setEffectiveDate] = useState("")
   const [notes, setNotes] = useState("")
+  const [filterManagerId, setFilterManagerId] = useState("")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
+
+  // Edit state
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editSupervisorId, setEditSupervisorId] = useState("")
+  const [editManagerId, setEditManagerId] = useState("")
+  const [editSaving, setEditSaving] = useState(false)
 
   const managerRoleIds = useMemo(
     () => new Set(roles.filter((role) => /manager|admin/i.test(role.name)).map((role) => role.id)),
@@ -46,6 +132,12 @@ export default function MsRelationshipManager() {
   const supervisors = useMemo(
     () => users.filter((user) => (user.roleId && supervisorRoleIds.has(user.roleId)) || /supervisor/i.test(user.role?.name || "")),
     [users, supervisorRoleIds]
+  )
+
+  // Filtered rows by selected manager
+  const displayRows = useMemo(
+    () => filterManagerId ? rows.filter((r) => r.manager?.id === filterManagerId) : rows,
+    [rows, filterManagerId]
   )
 
   const load = async () => {
@@ -102,6 +194,8 @@ export default function MsRelationshipManager() {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.message || "Failed to create relationship.")
       setNotice("Relationship assigned.")
+      setManagerId("")
+      setSupervisorId("")
       setNotes("")
       setEffectiveDate("")
       await load()
@@ -126,85 +220,147 @@ export default function MsRelationshipManager() {
     }
   }
 
+  const startEdit = (row: RelationshipRow) => {
+    setEditId(row.id)
+    setEditManagerId(row.manager?.id ?? "")
+    setEditSupervisorId(row.supervisor?.id ?? "")
+  }
+
+  const cancelEdit = () => {
+    setEditId(null)
+    setEditManagerId("")
+    setEditSupervisorId("")
+  }
+
+  const saveEdit = async (id: string) => {
+    setNotice("")
+    setError("")
+    if (!editManagerId || !editSupervisorId) {
+      setError("Manager and supervisor are required.")
+      return
+    }
+    setEditSaving(true)
+    try {
+      // Delete old + create new (PATCH not available; this is the cleanest approach)
+      const delRes = await fetch(`/api/users/ms-relationships/${id}`, { method: "DELETE" })
+      if (!delRes.ok) throw new Error("Failed to remove old relationship.")
+      const createRes = await fetch("/api/users/ms-relationships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managerId: editManagerId, supervisorId: editSupervisorId }),
+      })
+      const payload = await createRes.json().catch(() => ({}))
+      if (!createRes.ok) throw new Error(payload?.message || "Failed to save updated relationship.")
+      setNotice("Relationship updated.")
+      cancelEdit()
+      await load()
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to update relationship.")
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const managerOptions = managers.map((m) => ({ value: m.id, label: m.name }))
+  const supervisorOptions = supervisors.map((s) => ({ value: s.id, label: s.name }))
+
   return (
     <div className="space-y-6">
       <SectionTitle title="M/S Relationship" subtitle="Assign managers to supervisors." />
       {notice ? <InlineAlert type="success" message={notice} /> : null}
       {error ? <InlineAlert type="error" message={error} /> : null}
 
-      <FilterBar className="space-y-4">
+      {/* Assign form */}
+      <div className="ui-card p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-[var(--text)]">New Assignment</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Select label="Manager" value={managerId} onChange={setManagerId} options={managers.map((m) => ({ value: m.id, label: m.name }))} placeholder="-- Select Manager --" />
-          <Select label="Supervisor" value={supervisorId} onChange={setSupervisorId} options={supervisors.map((s) => ({ value: s.id, label: s.name }))} placeholder="-- Select Supervisor --" />
-          <Input label="Effective Date" type="date" value={effectiveDate} onChange={setEffectiveDate} />
-          <Input label="Notes" value={notes} onChange={setNotes} />
+          <SearchableSelect label="Manager" value={managerId} onChange={setManagerId} options={managerOptions} placeholder="Search manager…" />
+          <SearchableSelect label="Supervisor" value={supervisorId} onChange={setSupervisorId} options={supervisorOptions} placeholder="Search supervisor…" />
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Effective Date</label>
+            <input className="ui-input" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Notes</label>
+            <input className="ui-input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton onClick={assign} disabled={saving}>{saving ? "Assigning..." : "Assign"}</ActionButton>
           <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</ActionButton>
         </div>
-      </FilterBar>
+      </div>
 
+      {/* Filter by manager */}
+      <div className="ui-card p-4">
+        <SearchableSelect
+          label="Filter by Manager (shows linked supervisors)"
+          value={filterManagerId}
+          onChange={setFilterManagerId}
+          options={[{ value: "", label: "— Show All —" }, ...managerOptions]}
+          placeholder="Search manager to filter…"
+        />
+      </div>
+
+      {/* Table */}
       <DataTable
-        rows={rows}
+        rows={displayRows}
         columns={[
-          { key: "manager", header: "Manager", render: (row) => row.manager?.name || "—" },
-          { key: "supervisor", header: "Supervisor", render: (row) => row.supervisor?.name || "—" },
-          { key: "effectiveDate", header: "Effective Date", render: (row) => new Date(row.effectiveDate).toLocaleDateString("en-US") },
+          {
+            key: "manager",
+            header: "Manager",
+            render: (row) => editId === row.id ? (
+              <SearchableSelect label="" value={editManagerId} onChange={setEditManagerId} options={managerOptions} placeholder="Manager…" />
+            ) : (row.manager?.name || "—"),
+          },
+          {
+            key: "supervisor",
+            header: "Supervisor",
+            render: (row) => editId === row.id ? (
+              <SearchableSelect label="" value={editSupervisorId} onChange={setEditSupervisorId} options={supervisorOptions} placeholder="Supervisor…" />
+            ) : (row.supervisor?.name || "—"),
+          },
+          {
+            key: "effectiveDate",
+            header: "Effective Date",
+            render: (row) => new Date(row.effectiveDate).toLocaleDateString("en-US"),
+          },
           { key: "status", header: "Status" },
-          { key: "action", header: "Action", render: (row) => <button className="text-red-600 hover:underline" onClick={() => void remove(row.id)}>Delete</button> },
+          {
+            key: "action",
+            header: "Action",
+            render: (row) => editId === row.id ? (
+              <div className="flex items-center gap-2">
+                <button
+                  className="inline-flex items-center gap-1 text-sm text-green-600 hover:underline disabled:opacity-50"
+                  onClick={() => void saveEdit(row.id)}
+                  disabled={editSaving}
+                >
+                  <Check className="h-3.5 w-3.5" />{editSaving ? "Saving…" : "Save"}
+                </button>
+                <button className="text-sm text-[var(--text-muted)] hover:underline" onClick={cancelEdit}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                  onClick={() => startEdit(row)}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
+                <button className="text-sm text-red-600 hover:underline" onClick={() => void remove(row.id)}>
+                  Delete
+                </button>
+              </div>
+            ),
+          },
         ]}
         rowKey="id"
-        emptyText={loading ? "Loading relationships..." : "No relationship records."}
+        emptyText={loading ? "Loading relationships..." : filterManagerId ? "No supervisors linked to this manager." : "No relationship records."}
         searchable={false}
       />
-    </div>
-  )
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  type?: string
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <input className="ui-input" type={type} value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
-  )
-}
-
-function Select({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: Array<{ value: string; label: string }>
-  placeholder: string
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <select className="ui-select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={`${label}-${option.value}`} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
     </div>
   )
 }

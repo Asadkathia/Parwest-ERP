@@ -119,6 +119,10 @@ export async function POST(request: NextRequest) {
       return badRequest("name, email, password, and roleId are required.")
     }
 
+    if (!email.endsWith("@parwestgroup.com")) {
+      return badRequest("Email must end with @parwestgroup.com.")
+    }
+
     if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {

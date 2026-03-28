@@ -125,9 +125,22 @@ export type GuardTabModel = {
   disability?: string | null
   identificationMark?: string | null
   // Previous employments (new multi-entry)
-  previousEmployments?: Array<{ type?: string; isExService?: boolean; rank?: string; registrationNo?: string; unit?: string }>
+  previousEmployments?: Array<{
+    type?: string
+    isExService?: boolean
+    rank?: string
+    registrationNo?: string
+    unit?: string
+    dateOfEnrollment?: string | null
+    dateOfDischarge?: string | null
+    years?: string | number | null
+    months?: string | number | null
+    remarks?: string | null
+  }>
   // Family
   familyMembers?: FamilyMember[]
+  // Enrollment metadata
+  createdAt?: string | Date | null
   // Age approval
   ageApprovalRequired?: boolean
   ageApprovalStatus?: string | null

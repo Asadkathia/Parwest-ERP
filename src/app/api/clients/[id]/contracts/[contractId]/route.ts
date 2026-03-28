@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/db"
+import { auth } from "@/lib/auth"
+import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string; contractId: string }> }
+) {
+    try {
+        const session = await auth()
+        if (!session) return unauthorized()
+        const { id: clientId, contractId } = await params
+        const actorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+
+        const body = await request.json()
+        const contract = await prisma.clientContract.findUnique({ where: { id: contractId } })
+        if (!contract) return notFound("Contract not found")
+
+        const name = body?.name ? String(body.name).trim() : contract.name
+        if (!name) return badRequest("Contract name is required.")
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const result = await tx.clientContract.update({
+                where: { id: contractId },
+                data: {
+                    name,
+                    type: body?.type ? String(body.type).toUpperCase() : contract.type,
+                    startDate: body?.startDate ? new Date(body.startDate) : contract.startDate,
+                    endDate: body?.endDate ? new Date(body.endDate) : contract.endDate,
+                    isActive: body?.isActive !== undefined ? Boolean(body.isActive) : contract.isActive,
+                },
+                include: {
+                    branch: { select: { id: true, name: true } },
+                    rates: { orderBy: [{ guardType: "asc" }, { createdAt: "asc" }] },
+                },
+            })
+
+            await tx.auditLog.create({
+                data: {
+                    userId: actorId,
+                    event: "CONTRACT_UPDATED",
+                    module: "CLIENTS",
+                    description: `Contract "${name}" (${contractId}) updated for client ${clientId}. By: ${actorName}`,
+                },
+            })
+
+            return result
+        })
+
+        return NextResponse.json(updated)
+    } catch (error) {
+        console.error("Error updating contract:", error)
+        return internalServerError("Failed to update contract")
+    }
+}

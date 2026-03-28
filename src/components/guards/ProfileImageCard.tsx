@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import Image from "next/image"
-import { UserCircle2 } from "lucide-react"
+import { UserCircle2, X } from "lucide-react"
 
 type Props = {
   guardId: string
@@ -36,8 +36,17 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState("")
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setLightboxOpen(false) }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [lightboxOpen])
 
   const onFileChange = (file: File | null) => {
     if (!file) return
@@ -83,18 +92,55 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
   }
 
   return (
+    <>
+      {/* Lightbox modal */}
+      {lightboxOpen && preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <div
+            className="relative max-w-lg w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute -top-3 -right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-lg hover:bg-gray-100"
+            >
+              <X className="h-4 w-4 text-gray-700" />
+            </button>
+            <Image
+              src={preview}
+              alt={guardName}
+              width={500}
+              height={500}
+              unoptimized
+              className="w-full rounded-xl object-contain shadow-2xl"
+            />
+            <p className="mt-2 text-center text-sm text-white font-medium">{guardName}</p>
+          </div>
+        </div>
+      )}
+
     <div className="ui-card p-4">
       <p className="text-sm font-semibold text-[var(--text)] mb-3">Profile Picture</p>
       <div className="flex items-center gap-4">
         {preview ? (
-          <Image
-            src={preview}
-            alt={guardName}
-            width={80}
-            height={80}
-            unoptimized
-            className="h-20 w-20 rounded-full object-cover border border-[var(--border)]"
-          />
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="focus:outline-none"
+            title="Click to enlarge"
+          >
+            <Image
+              src={preview}
+              alt={guardName}
+              width={80}
+              height={80}
+              unoptimized
+              className="h-20 w-20 rounded-full object-cover border border-[var(--border)] cursor-zoom-in hover:opacity-90 transition-opacity"
+            />
+          </button>
         ) : (
           <div className="h-20 w-20 rounded-full bg-[var(--surface-muted)] border border-[var(--border)] flex flex-col items-center justify-center text-[var(--text-muted)]">
             <UserCircle2 className="h-8 w-8 opacity-70" />
@@ -128,5 +174,6 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
         </div>
       </div>
     </div>
+    </>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Save, X, CheckCircle2, Upload, Plus } from "lucide-react"
+import { ArrowLeft, Save, X, Plus } from "lucide-react"
 import Link from "next/link"
 import SearchSelect from "@/components/ui/SearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
@@ -13,12 +13,23 @@ type Props = {
     clientId: string
     clientName: string
     regions: Region[]
+    defaultRegionId?: string | null
+    defaultRegionalOfficeId?: string | null
+    defaultManagerId?: string | null
 }
 
 const OFFICE_TYPE_OPTIONS = [
     "Main Branch", "Sub Branch", "Regional Office", "Area Office",
     "Field Office", "Cash Office", "ATM Site", "Warehouse", "Checkpoint", "Other",
 ].map((t) => ({ value: t, label: t }))
+
+const CITY_OPTIONS = [
+    "All Cities","Lahore","Gujranwala","Sahiwal","Islamabad","Karachi","Multan","Faisalabad",
+    "Khanpur","Chichawatni","Bahawalpur","Mian Channu","Khanewal","Ahmedpur East",
+    "Ahmed Nager Chatha","Ali Pur","Arifwala","Attock","Basti Malook","Bhagalchur",
+    "Bhalwal","Bahawalnagar","Bhaipheru","Bhakkar","Burewala","Chailianwala","Chakwal",
+    "Chiniot","Chowk Azam","Chowk Sarwar Shaheed","Daska",
+].map((c) => ({ value: c, label: c }))
 
 const PROVINCE_OPTIONS = [
     { value: "Punjab", label: "Punjab" },
@@ -47,22 +58,19 @@ const EX_SERVICE_OPTIONS = [
     { value: "Other", label: "Other" },
 ]
 
-function readFileAsBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = () => reject(new Error("Failed to read file"))
-        reader.readAsDataURL(file)
-    })
-}
-
-export default function BranchForm({ clientId, clientName, regions }: Props) {
+export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId }: Props) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
-    // Staff users for supervisor / manager dropdowns
-    const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([])
+    // Region / Regional Office (dynamic cascade)
+    const [selectedRegionId, setSelectedRegionId] = useState(defaultRegionId ?? "")
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(defaultRegionalOfficeId ?? "")
+    const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
+
+    // Manager / Supervisor (filtered by region)
+    const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
+    const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
 
     // Map → manual lat/lng auto-fill
     const [latManual, setLatManual] = useState("")
@@ -71,36 +79,45 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
     // Multiple contact phones
     const [contactPhones, setContactPhones] = useState<string[]>([""])
 
-    // Contract PDF attachment (single)
-    const [contractFile, setContractFile] = useState<string | null>(null)
-    const [contractFileName, setContractFileName] = useState("")
-
     // Additional file attachments (multi)
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
     const fileRef = useRef<HTMLInputElement>(null)
 
+    // Load regional offices when region changes
     useEffect(() => {
-        fetch("/api/users?limit=500")
+        if (selectedRegionId !== (defaultRegionId ?? "")) {
+            setSelectedRegionalOfficeId("")
+        }
+        setRegionalOffices([])
+        if (!selectedRegionId) return
+        fetch(`/api/regional-offices?regionId=${selectedRegionId}`)
             .then((r) => r.ok ? r.json() : [])
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
-                    setStaffUsers(
-                        (data as { id: string; name?: string | null }[])
-                            .filter((u) => u.name)
-                            .map((u) => ({ id: u.id, name: u.name as string }))
-                    )
+                    setRegionalOffices((data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })))
                 }
             })
             .catch(() => {})
-    }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedRegionId])
 
-    const handleContractFile = async (file: File | null) => {
-        if (!file) return
-        if (file.size > 5 * 1024 * 1024) { setError("Contract file must be under 5 MB"); return }
-        const base64 = await readFileAsBase64(file)
-        setContractFile(base64)
-        setContractFileName(file.name)
-    }
+    // Load managers/supervisors when region changes
+    useEffect(() => {
+        const url = selectedRegionId
+            ? `/api/users?limit=500&regionId=${selectedRegionId}`
+            : "/api/users?limit=500"
+        fetch(url)
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    const users = data as { id: string; name?: string | null; role?: { name?: string | null } }[]
+                    const toOption = (u: typeof users[0]) => ({ id: u.id, name: u.name as string })
+                    setManagerUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption))
+                    setSupervisorUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption))
+                }
+            })
+            .catch(() => {})
+    }, [selectedRegionId])
 
     const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files ?? [])
@@ -127,7 +144,8 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
             clientId,
             isHeadOffice: formData.get("isHeadOffice") === "on",
             contractAttachments: attachments,
-            ...(contractFile ? { contractUrl: contractFile } : {}),
+            regionId: selectedRegionId || null,
+            regionalOfficeId: selectedRegionalOfficeId || null,
         }
 
         try {
@@ -196,6 +214,60 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                     </div>
                 </div>
 
+                {/* ── Region & Assignment ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
+                            <select
+                                className="ui-input"
+                                value={selectedRegionId}
+                                onChange={(e) => setSelectedRegionId(e.target.value)}
+                            >
+                                <option value="">— Select Region —</option>
+                                {regions.map((r) => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
+                            <select
+                                name="regionalOfficeId"
+                                className="ui-input"
+                                value={selectedRegionalOfficeId}
+                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+                                disabled={!selectedRegionId}
+                            >
+                                <option value="">
+                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
+                                </option>
+                                {regionalOffices.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
+                            <SearchSelect
+                                name="assignedManagerId"
+                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                defaultValue={defaultManagerId ?? ""}
+                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
+                            <SearchSelect
+                                name="assignedSupervisorId"
+                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 {/* ── Location Information ── */}
                 <div className="space-y-6">
                     <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Location Information</h2>
@@ -208,21 +280,12 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">City</label>
-                            <input type="text" name="city" placeholder="e.g., Lahore, Karachi" className="ui-input" />
+                            <SearchSelect name="city" options={CITY_OPTIONS} placeholder="Select city" />
                         </div>
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
                             <SearchSelect name="province" options={PROVINCE_OPTIONS} placeholder="Select province" />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
-                            <SearchSelect
-                                name="regionalOfficeId"
-                                options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                                placeholder="— Select Regional Office —"
-                            />
                         </div>
                     </div>
 
@@ -240,7 +303,7 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                         />
                     </div>
 
-                    {/* Manual coordinate override */}
+                    {/* Manual coordinate override + capacities */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Latitude <span className="text-xs">(manual)</span></label>
@@ -285,7 +348,6 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                             <label className="block text-sm text-[var(--text-muted)] mb-1">CPO Capacity</label>
                             <input type="number" name="cpoCapacity" className="ui-input" placeholder="0" />
                         </div>
-
                     </div>
                 </div>
 
@@ -296,6 +358,10 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person</label>
                             <input type="text" name="contactPerson" placeholder="Name of contact person" className="ui-input" />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person Designation</label>
+                            <input type="text" name="contactPersonDesignation" placeholder="e.g., Branch Manager, Officer" className="ui-input" />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Phone</label>
@@ -336,29 +402,6 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                     </div>
                 </div>
 
-                {/* ── Supervisor & Manager Assignment ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Supervisor &amp; Manager Assignment</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
-                            <SearchSelect
-                                name="assignedSupervisorId"
-                                options={staffUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder="— Select Supervisor —"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
-                            <SearchSelect
-                                name="assignedManagerId"
-                                options={staffUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder="— Select Manager —"
-                            />
-                        </div>
-                    </div>
-                </div>
-
                 {/* ── Branch Contract ── */}
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Contract</h2>
@@ -379,53 +422,49 @@ export default function BranchForm({ clientId, clientName, regions }: Props) {
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate End</label>
                             <input type="date" name="contractRateEnd" className="ui-input" />
                         </div>
+
+                        {/* Day Guards */}
+                        <div className="md:col-span-2">
+                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
+                                    <SearchSelect name="contractDayGuardDesignation" options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
+                                    <SearchSelect name="contractDayGuardExService" options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Night Guards */}
+                        <div className="md:col-span-2">
+                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
+                                    <SearchSelect name="contractNightGuardDesignation" options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
+                                    <SearchSelect name="contractNightGuardExService" options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office (Contract)</label>
-                            <SearchSelect
-                                name="contractRegionalOffice"
-                                options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                                placeholder="— Select Regional Office —"
-                            />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Day Guards</label>
+                            <input type="number" name="contractAdditionalDayGuards" className="ui-input" placeholder="0" min={0} />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                            <SearchSelect name="contractGuardDesignation" options={DESIGNATION_OPTIONS} placeholder="Select designation" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Guards</label>
-                            <input type="number" name="contractAdditionalGuards" className="ui-input" placeholder="0" min={0} />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                            <SearchSelect name="contractGuardExService" options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Night Guards</label>
+                            <input type="number" name="contractAdditionalNightGuards" className="ui-input" placeholder="0" min={0} />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Price</label>
                             <input type="number" name="contractPrice" className="ui-input" placeholder="Price" />
                         </div>
-                    </div>
-                </div>
-
-                {/* ── Contract PDF Attachment ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contract Attachment (PDF)</h2>
-                    <div>
-                        <label className="block text-sm text-[var(--text-muted)] mb-2">Upload Contract (PDF / Image, max 5 MB)</label>
-                        {contractFile ? (
-                            <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-green-200 bg-green-50 px-4 py-3">
-                                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                                <span className="text-sm text-green-800 font-medium flex-1 truncate">{contractFileName}</span>
-                                <button type="button" onClick={() => { setContractFile(null); setContractFileName("") }} className="text-red-500 hover:text-red-700 flex-shrink-0">
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <label className="flex items-center gap-3 cursor-pointer rounded-[var(--radius-md)] border-2 border-dashed border-[var(--border)] px-4 py-5 hover:border-[var(--brand)] transition-colors">
-                                <Upload className="h-5 w-5 text-[var(--text-muted)]" />
-                                <span className="text-sm text-[var(--text-muted)]">Click to upload PDF or image</span>
-                                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => handleContractFile(e.target.files?.[0] || null)} />
-                            </label>
-                        )}
                     </div>
                 </div>
 

@@ -84,6 +84,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
+        const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
+
         const branch = await prisma.$transaction(async (tx) => {
             const created = await tx.branch.create({
                 data: {
@@ -94,16 +97,39 @@ export async function POST(request: NextRequest) {
                     city: body?.city ? String(body.city) : null,
                     province: body?.province ? String(body.province) : null,
                     contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
+                    contactPersonDesignation: body?.contactPersonDesignation ? String(body.contactPersonDesignation) : null,
                     contactPhone: body?.contactPhone ? String(body.contactPhone) : null,
                     contactEmail: body?.contactEmail ? String(body.contactEmail) : null,
                     isHeadOffice: body?.isHeadOffice === true,
                     contractUrl: body?.contractUrl ? String(body.contractUrl) : null,
                     contractAttachments: Array.isArray(body?.contractAttachments) && body.contractAttachments.length > 0 ? body.contractAttachments : undefined,
+                    assignedManagerId: body?.assignedManagerId ? String(body.assignedManagerId) : null,
+                    regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
+                    // Contract details
+                    contractStart:    body?.contractStart    ? new Date(body.contractStart)    : null,
+                    contractEnd:      body?.contractEnd      ? new Date(body.contractEnd)      : null,
+                    contractRateStart: body?.contractRateStart ? new Date(body.contractRateStart) : null,
+                    contractRateEnd:   body?.contractRateEnd   ? new Date(body.contractRateEnd)   : null,
+                    contractDayGuardDesignation:   body?.contractDayGuardDesignation   ? String(body.contractDayGuardDesignation)   : null,
+                    contractDayGuardExService:     body?.contractDayGuardExService     ? String(body.contractDayGuardExService)     : null,
+                    contractNightGuardDesignation: body?.contractNightGuardDesignation ? String(body.contractNightGuardDesignation) : null,
+                    contractNightGuardExService:   body?.contractNightGuardExService   ? String(body.contractNightGuardExService)   : null,
+                    contractAdditionalDayGuards:   toInt(body?.contractAdditionalDayGuards),
+                    contractAdditionalNightGuards: toInt(body?.contractAdditionalNightGuards),
+                    contractPrice:    toFloat(body?.contractPrice),
                 },
                 include: {
                     client: true,
                 },
             })
+
+            // Create supervisor assignment if provided
+            const supervisorId = body?.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
+            if (supervisorId) {
+                await tx.clientSupervisorAssignment.create({
+                    data: { clientId, branchId: created.id, supervisorId },
+                }).catch(() => { /* ignore if user not found */ })
+            }
 
             await tx.auditLog.create({
                 data: {

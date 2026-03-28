@@ -22,6 +22,22 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
         return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
     }
 
+    const formatTime = (date?: Date | string | null) => {
+        if (!date) return "—"
+        const d = new Date(date)
+        return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    }
+
+    const calculateCurrentAge = (dob?: Date | string | null): string | null => {
+        if (!dob) return null
+        const birth = new Date(dob)
+        const today = new Date()
+        let years = today.getFullYear() - birth.getFullYear()
+        const m = today.getMonth() - birth.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--
+        return `${years} years`
+    }
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case "ACTIVE": return "bg-green-100 text-green-800"
@@ -64,7 +80,7 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     <InfoField label="Father's Name" value={guard.fatherName} />
                     <InfoField label="Mother's Name" value={guard.motherName} />
                     <InfoField label="Date of Birth" value={formatDate(guard.dateOfBirth)} />
-                    <InfoField label="Age" value={guard.age != null ? `${guard.age} years` : null} />
+                    <InfoField label="Current Age" value={calculateCurrentAge(guard.dateOfBirth)} />
                     <InfoField label="Religion" value={guard.religion} />
                     <InfoField label="Sect" value={guard.sect} />
                     <InfoField label="Cast" value={guard.cast} />
@@ -74,6 +90,9 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     <InfoField label="Next of Kin" value={guard.nextOfKin} />
                     <InfoField label="Police Station" value={guard.policeStation} />
                     <InfoField label="Profile Introducer" value={guard.profileIntroducer} />
+                    <InfoField label="Enrolled By" value={guard.enrolledBy} />
+                    <InfoField label="Enrolled Date" value={formatDate(guard.createdAt)} />
+                    <InfoField label="Enrolled Time" value={formatTime(guard.createdAt)} />
                 </div>
             </div>
 
@@ -130,30 +149,75 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                     <Briefcase className="h-5 w-5" />
                     Previous Employment
                 </h3>
-                {!isPreviouslyServed ? (
-                    <div className="flex items-center gap-2 rounded-md bg-gray-50 border px-4 py-3">
-                        <span className="text-sm font-medium text-gray-700">Type:</span>
-                        <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">Civilian</span>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-700">Service Type:</span>
-                            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">{exLabel}</span>
+                {(() => {
+                    const multiEntries = Array.isArray(guard.previousEmployments) && guard.previousEmployments.length > 0
+                        ? guard.previousEmployments
+                        : null
+
+                    // Build display entries — prefer multi-entry JSON, fall back to flat fields
+                    const entries = multiEntries ?? (isPreviouslyServed ? [{
+                        type: exLabel,
+                        isExService: true,
+                        registrationNo: guard.exServiceRegistrationNo,
+                        rank: guard.exServiceRank,
+                        unit: guard.exServiceUnit || guard.exServiceRegiment,
+                        dateOfEnrollment: guard.dateOfEnrollment ? String(guard.dateOfEnrollment) : null,
+                        dateOfDischarge: guard.dateOfDischarge ? String(guard.dateOfDischarge) : null,
+                        years: guard.exServiceYears,
+                        months: guard.exServiceMonths,
+                        remarks: guard.exServiceRemarks,
+                    }] : [])
+
+                    if (entries.length === 0) {
+                        return (
+                            <div className="flex items-center gap-2 rounded-md bg-gray-50 border px-4 py-3">
+                                <span className="text-sm font-medium text-gray-700">Type:</span>
+                                <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">Civilian</span>
+                            </div>
+                        )
+                    }
+
+                    return (
+                        <div className="space-y-6">
+                            {entries.map((emp, idx) => {
+                                const yearsNum = emp.years != null ? parseInt(String(emp.years)) : null
+                                const monthsNum = emp.months != null ? parseInt(String(emp.months)) : null
+                                const serviceDuration = [
+                                    yearsNum ? `${yearsNum} year${yearsNum !== 1 ? "s" : ""}` : null,
+                                    monthsNum ? `${monthsNum} month${monthsNum !== 1 ? "s" : ""}` : null,
+                                ].filter(Boolean).join(" ") || null
+
+                                const enrollDate = formatDate(emp.dateOfEnrollment)
+                                const dischargeDate = formatDate(emp.dateOfDischarge)
+                                const servicePeriod = enrollDate !== "—" || dischargeDate !== "—"
+                                    ? `${enrollDate} → ${dischargeDate}`
+                                    : null
+
+                                return (
+                                    <div key={idx} className={entries.length > 1 ? "rounded-md border p-4" : ""}>
+                                        {entries.length > 1 && (
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Employment {idx + 1}</p>
+                                        )}
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <span className="text-sm font-medium text-gray-700">Service Type:</span>
+                                            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">
+                                                {emp.type || "—"}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <InfoField label="Registration No" value={emp.registrationNo} />
+                                            <InfoField label="Rank" value={emp.rank} />
+                                            <InfoField label="Unit / Regiment" value={emp.unit} />
+                                            <InfoField label="Service Period" value={servicePeriod} />
+                                            <InfoField label="Duration of Service" value={serviceDuration} />
+                                            <InfoField label="Remarks" value={emp.remarks} />
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <InfoField label="Registration No" value={guard.exServiceRegistrationNo} />
-                            <InfoField label="Rank" value={guard.exServiceRank} />
-                            <InfoField label="Unit / Regiment" value={guard.exServiceUnit || guard.exServiceRegiment} />
-                            <InfoField label="Service Period" value={guard.exServicePeriod} />
-                            <InfoField label="Years of Service" value={guard.exServiceYears != null ? `${guard.exServiceYears} years` : null} />
-                            <InfoField label="Months" value={guard.exServiceMonths != null ? `${guard.exServiceMonths} months` : null} />
-                            <InfoField label="Date of Enrollment" value={formatDate(guard.dateOfEnrollment)} />
-                            <InfoField label="Date of Discharge" value={formatDate(guard.dateOfDischarge)} />
-                            <InfoField label="Remarks" value={guard.exServiceRemarks} />
-                        </div>
-                    </div>
-                )}
+                    )
+                })()}
             </div>
 
             {/* Education */}

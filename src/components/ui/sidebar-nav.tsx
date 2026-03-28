@@ -10,6 +10,8 @@ export type NavNode = {
   href?: string
   icon: React.ComponentType<{ className?: string }>
   children?: NavNode[]
+  /** Top-level module key used for permission filtering. null = always visible. */
+  module?: string | null
 }
 
 type Props = {

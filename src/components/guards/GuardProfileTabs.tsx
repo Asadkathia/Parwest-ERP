@@ -99,7 +99,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "ojt":
                 return <OnJobTrainingsTab trainings={guard.ojtTrainings || []} />
             case "store-inventory":
-                return <StoreInventoryTab items={guard.storeInventory || []} />
+                return <StoreInventoryTab guardId={guard.id || ""} />
             case "service-history":
                 return <ServiceHistoryTab serviceHistory={guard.serviceHistory || []} />
             case "insurance":

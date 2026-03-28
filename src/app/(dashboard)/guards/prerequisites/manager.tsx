@@ -114,6 +114,20 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
   const [editPledgeTypeDesc, setEditPledgeTypeDesc] = useState("")
   const [confirmDeletePledgeType, setConfirmDeletePledgeType] = useState<PledgeableDocType | null>(null)
 
+  // Return conditions
+  type ReturnCondition = { id: string; name: string; description: string | null }
+  const [returnConditions, setReturnConditions] = useState<ReturnCondition[]>([])
+  const [returnCondLoading, setReturnCondLoading] = useState(true)
+  const [returnCondError, setReturnCondError] = useState("")
+  const [showAddReturnCond, setShowAddReturnCond] = useState(false)
+  const [newReturnCondName, setNewReturnCondName] = useState("")
+  const [newReturnCondDesc, setNewReturnCondDesc] = useState("")
+  const [savingReturnCond, setSavingReturnCond] = useState(false)
+  const [editingReturnCond, setEditingReturnCond] = useState<ReturnCondition | null>(null)
+  const [editReturnCondName, setEditReturnCondName] = useState("")
+  const [editReturnCondDesc, setEditReturnCondDesc] = useState("")
+  const [confirmDeleteReturnCond, setConfirmDeleteReturnCond] = useState<ReturnCondition | null>(null)
+
   // Age config
   type AgeConfig = { id: string; minAge: number; maxAge: number }
   const [ageConfig, setAgeConfig] = useState<AgeConfig | null>(null)
@@ -271,6 +285,78 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
   }, [])
 
   useEffect(() => { loadExServiceTypes() }, [loadExServiceTypes])
+
+  const loadReturnConditions = useCallback(async () => {
+    setReturnCondLoading(true)
+    setReturnCondError("")
+    try {
+      const res = await fetch("/api/pledge-return-conditions")
+      if (!res.ok) throw new Error()
+      setReturnConditions(await res.json())
+    } catch {
+      setReturnCondError("Failed to load return conditions")
+    } finally {
+      setReturnCondLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadReturnConditions() }, [loadReturnConditions])
+
+  const handleAddReturnCond = async () => {
+    const name = newReturnCondName.trim()
+    if (!name) return
+    setSavingReturnCond(true)
+    setReturnCondError("")
+    try {
+      const res = await fetch("/api/pledge-return-conditions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: newReturnCondDesc.trim() || null }),
+      })
+      if (!res.ok) { const d = await res.json(); setReturnCondError(d.error || "Failed"); return }
+      setShowAddReturnCond(false)
+      setNewReturnCondName("")
+      setNewReturnCondDesc("")
+      await loadReturnConditions()
+    } catch {
+      setReturnCondError("Failed to add return condition")
+    } finally {
+      setSavingReturnCond(false)
+    }
+  }
+
+  const handleEditReturnCond = async () => {
+    if (!editingReturnCond) return
+    const name = editReturnCondName.trim()
+    if (!name) return
+    setSavingReturnCond(true)
+    setReturnCondError("")
+    try {
+      const res = await fetch(`/api/pledge-return-conditions/${editingReturnCond.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: editReturnCondDesc.trim() || null }),
+      })
+      if (!res.ok) { const d = await res.json(); setReturnCondError(d.error || "Failed"); return }
+      setEditingReturnCond(null)
+      await loadReturnConditions()
+    } catch {
+      setReturnCondError("Failed to update return condition")
+    } finally {
+      setSavingReturnCond(false)
+    }
+  }
+
+  const handleDeleteReturnCond = async () => {
+    if (!confirmDeleteReturnCond) return
+    try {
+      await fetch(`/api/pledge-return-conditions/${confirmDeleteReturnCond.id}`, { method: "DELETE" })
+      setConfirmDeleteReturnCond(null)
+      await loadReturnConditions()
+    } catch {
+      setReturnCondError("Failed to delete return condition")
+    }
+  }
 
   const handleAddExServiceType = async () => {
     const name = newExServiceTypeName.trim().toUpperCase()
@@ -1226,6 +1312,161 @@ export default function PrerequisitesManager({ regions, regionalOffices }: Props
           )}
         </CardBody>
       </Card>
+
+      {/* ── Pledge Return Conditions ── */}
+      <Card>
+        <CardBody className="space-y-5">
+          <div className="flex items-center justify-between">
+            <SectionTitle title="Pledge Return Conditions" subtitle="Configure conditions that can be selected when a pledged document is temporarily issued back to a guard." />
+            <button
+              onClick={() => { setShowAddReturnCond(true); setNewReturnCondName(""); setNewReturnCondDesc("") }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Add Condition
+            </button>
+          </div>
+
+          {returnCondError ? <InlineAlert type="error" message={returnCondError} /> : null}
+
+          {showAddReturnCond && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
+              <div>
+                <label className="ui-label">Condition Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  className="ui-input"
+                  placeholder="e.g., Medical Emergency, Court Requirement"
+                  value={newReturnCondName}
+                  onChange={(e) => setNewReturnCondName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="ui-label">Description <span className="text-xs font-normal text-[var(--text-muted)]">(optional)</span></label>
+                <input
+                  type="text"
+                  className="ui-input"
+                  placeholder="Brief description"
+                  value={newReturnCondDesc}
+                  onChange={(e) => setNewReturnCondDesc(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddReturnCond}
+                  disabled={savingReturnCond || !newReturnCondName.trim()}
+                  className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingReturnCond ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setShowAddReturnCond(false)}
+                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {returnCondLoading ? (
+            <p className="py-4 text-center text-sm text-[var(--text-muted)]">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                    {["#", "Condition", "Description", "Actions"].map((h) => (
+                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {returnConditions.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--text-muted)]">No return conditions configured yet</td></tr>
+                  ) : returnConditions.map((rc, idx) => (
+                    <tr key={rc.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-[var(--text)]">
+                        {editingReturnCond?.id === rc.id ? (
+                          <input
+                            type="text"
+                            className="ui-input"
+                            value={editReturnCondName}
+                            onChange={(e) => setEditReturnCondName(e.target.value)}
+                          />
+                        ) : rc.name}
+                      </td>
+                      <td className="px-4 py-2 text-[var(--text-muted)]">
+                        {editingReturnCond?.id === rc.id ? (
+                          <input
+                            type="text"
+                            className="ui-input"
+                            value={editReturnCondDesc}
+                            onChange={(e) => setEditReturnCondDesc(e.target.value)}
+                          />
+                        ) : (rc.description || "—")}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editingReturnCond?.id === rc.id ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleEditReturnCond}
+                              disabled={savingReturnCond}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                            >
+                              <Check className="h-3 w-3" /> Save
+                            </button>
+                            <button
+                              onClick={() => setEditingReturnCond(null)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            >
+                              <XIcon className="h-3 w-3" /> Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { setEditingReturnCond(rc); setEditReturnCondName(rc.name); setEditReturnCondDesc(rc.description || "") }}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                            >
+                              <Pencil className="h-3 w-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteReturnCond(rc)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* ── Delete Return Condition Confirm ── */}
+      {confirmDeleteReturnCond && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-[var(--border)] p-6 space-y-4">
+            <p className="font-semibold text-[var(--text)]">Delete Return Condition</p>
+            <p className="text-sm text-[var(--text-muted)]">Delete <strong>{confirmDeleteReturnCond.name}</strong>? This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteReturnCond(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancel</button>
+              <button
+                onClick={handleDeleteReturnCond}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardBody className="space-y-5">

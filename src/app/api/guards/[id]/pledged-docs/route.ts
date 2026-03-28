@@ -20,6 +20,12 @@ export async function GET(
     const records = await prisma.guardPledgedDocumentRecord.findMany({
       where: { guardId: id },
       orderBy: { createdAt: "desc" },
+      include: {
+        returnCondition: { select: { id: true, name: true } },
+        history: {
+          orderBy: { performedAt: "desc" },
+        },
+      },
     })
 
     return NextResponse.json(records)
@@ -52,19 +58,30 @@ export async function POST(
     const notes = body?.notes ? String(body.notes) : null
 
     const typedSession = session as unknown as { user?: { name?: string; email?: string } }
-    const receivedBy = typedSession.user?.name ?? typedSession.user?.email ?? null
+    const performedBy = typedSession.user?.name ?? typedSession.user?.email ?? null
 
     const record = await prisma.guardPledgedDocumentRecord.create({
       data: {
         guardId: id,
         documentTypeName,
-        receivedBy,
+        receivedBy: performedBy,
         attachmentData,
         attachmentName,
         notes,
         status: "HELD",
       },
     })
+
+    // Write audit history
+    await prisma.guardPledgedDocumentHistory.create({
+      data: {
+        recordId: record.id,
+        guardId: id,
+        action: "CREATED",
+        performedBy,
+        details: JSON.stringify({ documentTypeName, notes }),
+      },
+    }).catch(() => { /* non-critical */ })
 
     return NextResponse.json(record, { status: 201 })
   } catch (error) {

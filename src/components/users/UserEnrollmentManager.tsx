@@ -87,12 +87,19 @@ export default function UserEnrollmentManager() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const EMAIL_DOMAIN = "@parwestgroup.com"
+
   const onSubmit = async () => {
     setNotice("")
     setError("")
 
     if (!form.name || !form.email || !form.roleId || !form.contactNumber || !form.password) {
       setError("Please fill all required fields.")
+      return
+    }
+
+    if (!form.email.endsWith(EMAIL_DOMAIN)) {
+      setError(`Email must end with ${EMAIL_DOMAIN}.`)
       return
     }
 
@@ -132,7 +139,7 @@ export default function UserEnrollmentManager() {
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="User's Name" required value={form.name} onChange={(v) => setField("name", v)} />
-          <Field label="Email" required type="email" value={form.email} onChange={(v) => setField("email", v)} />
+          <Field label="Email (must end with @parwestgroup.com)" required type="email" value={form.email} onChange={(v) => setField("email", v)} />
 
           <SelectField
             label="User Role"

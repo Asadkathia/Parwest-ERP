@@ -33,16 +33,19 @@ const MOCK_OFFICES = [
     },
 ]
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        const { searchParams } = new URL(request.url)
+        const regionId = searchParams.get("regionId") || undefined
+
         if (isRuntimeMockEnabled()) {
-            return NextResponse.json(MOCK_OFFICES, { status: 200 })
+            const filtered = regionId ? MOCK_OFFICES.filter((o) => o.regionId === regionId) : MOCK_OFFICES
+            return NextResponse.json(filtered, { status: 200 })
         }
 
         const regionalOffices = await prisma.regionalOffice.findMany({
-            include: {
-                region: true,
-            },
+            where: regionId ? { regionId } : undefined,
+            include: { region: true },
             orderBy: { name: "asc" },
         })
         return NextResponse.json(regionalOffices, { status: 200 })

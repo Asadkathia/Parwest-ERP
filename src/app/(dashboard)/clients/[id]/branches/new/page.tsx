@@ -13,7 +13,7 @@ export default async function NewBranchPage({ params }: { params: Promise<{ id: 
     const [client, regions] = await Promise.all([
         prisma.client.findUnique({
             where: { id },
-            select: { id: true, name: true },
+            select: { id: true, name: true, regionId: true, regionalOfficeId: true, assignedManagerId: true },
         }),
         prisma.region.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }).catch(() => []),
     ])
@@ -23,7 +23,14 @@ export default async function NewBranchPage({ params }: { params: Promise<{ id: 
     return (
         <div className="space-y-6">
             <SectionTitle title="Add New Branch" subtitle={`Add a new branch for ${client.name}`} />
-            <BranchForm clientId={client.id} clientName={client.name} regions={regions} />
+            <BranchForm
+                clientId={client.id}
+                clientName={client.name}
+                regions={regions}
+                defaultRegionId={client.regionId}
+                defaultRegionalOfficeId={client.regionalOfficeId}
+                defaultManagerId={client.assignedManagerId}
+            />
         </div>
     )
 }

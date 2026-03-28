@@ -14,6 +14,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const row = await prisma.storeInventoryAssignment.findUnique({
       where: { id },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       include: {
         store: true,
         product: true,
@@ -23,7 +24,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
         assignedToUser: { select: { id: true, name: true, email: true } },
         assignedByUser: { select: { id: true, name: true, email: true } },
         returnedByUser: { select: { id: true, name: true, email: true } },
-      },
+      } as any,
     })
 
     if (!row) return notFound("Assignment not found.")

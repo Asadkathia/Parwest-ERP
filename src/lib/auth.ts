@@ -5,27 +5,11 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-
-const authSecret =
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    (process.env.NODE_ENV !== "production"
-        ? "parwest-local-dev-secret-change-me"
-        : undefined)
-
-if (!authSecret && process.env.NODE_ENV === "production") {
-    throw new Error("Missing AUTH_SECRET/NEXTAUTH_SECRET for NextAuth in production.")
-}
+import { authConfig } from "@/auth.config"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+    ...authConfig,
     adapter: PrismaAdapter(prisma) as Adapter,
-    secret: authSecret,
-    session: {
-        strategy: "jwt",
-    },
-    pages: {
-        signIn: "/login",
-    },
     providers: [
         Credentials({
             name: "credentials",
@@ -63,6 +47,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     return null
                 }
 
+                // Load permissions so they're stored in the JWT token.
+                // Only include modules where at least one permission is enabled.
+                let permissions: string[] = []
+                try {
+                    const perms = await prisma.userPermission.findMany({
+                        where: {
+                            userId: user.id,
+                            OR: [
+                                { canView: true },
+                                { canCreate: true },
+                                { canUpdate: true },
+                                { canDelete: true },
+                                { canRequisition: true },
+                            ],
+                        },
+                        select: { module: true },
+                    })
+                    permissions = perms.map((p) => p.module)
+                } catch {
+                    permissions = []
+                }
+
                 return {
                     id: user.id,
                     email: user.email,
@@ -70,26 +76,54 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     role: user.role.name,
                     regionId: user.regionId,
                     regionalOfficeId: user.regionalOfficeId,
+                    permissions,
                 }
             },
         }),
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async jwt({ token, user }: { token: any; user?: any }) {
+            // On initial sign-in, user object is present — copy fields into token
             if (user) {
                 token.id = user.id
                 token.role = user.role
-                token.regionId = (user as { regionId?: string | null }).regionId || null
-                token.regionalOfficeId = (user as { regionalOfficeId?: string | null }).regionalOfficeId || null
+                token.regionId = user.regionId ?? null
+                token.regionalOfficeId = user.regionalOfficeId ?? null
+                token.permissions = user.permissions ?? []
+            } else if (token.id) {
+                // On subsequent requests, refresh permissions from DB so changes
+                // take effect without requiring the user to re-login.
+                // Only include modules where at least one permission is enabled.
+                try {
+                    const perms = await prisma.userPermission.findMany({
+                        where: {
+                            userId: token.id as string,
+                            OR: [
+                                { canView: true },
+                                { canCreate: true },
+                                { canUpdate: true },
+                                { canDelete: true },
+                                { canRequisition: true },
+                            ],
+                        },
+                        select: { module: true },
+                    })
+                    token.permissions = perms.map((p) => p.module)
+                } catch {
+                    // Keep existing permissions on DB error
+                }
             }
             return token
         },
-        async session({ session, token }) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        session({ session, token }: { session: any; token: any }) {
             if (session.user) {
                 session.user.id = token.id as string
                 session.user.role = token.role as string
-                ;(session.user as { regionId?: string | null }).regionId = (token.regionId as string | null) || null
-                ;(session.user as { regionalOfficeId?: string | null }).regionalOfficeId = (token.regionalOfficeId as string | null) || null
+                session.user.regionId = (token.regionId as string | null) ?? null
+                session.user.regionalOfficeId = (token.regionalOfficeId as string | null) ?? null
+                session.user.permissions = (token.permissions as string[]) ?? []
             }
             return session
         },
