@@ -11,35 +11,9 @@ export default async function PrerequisitesPage() {
     if (!session) redirect("/login")
 
     let regions: Array<{ id: string; name: string }> = []
-    let regionalOffices: Array<{
-        id: string
-        name: string
-        seriesCode: string
-        regionId: string
-        region: { id: string; name: string }
-    }> = []
     let dbWarning = ""
     try {
-        ;[regions, regionalOffices] = await Promise.all([
-            prisma.region.findMany({
-                orderBy: { name: "asc" },
-            }),
-            prisma.regionalOffice.findMany({
-                select: {
-                    id: true,
-                    name: true,
-                    seriesCode: true,
-                    regionId: true,
-                    region: {
-                        select: {
-                            id: true,
-                            name: true,
-                        },
-                    },
-                },
-                orderBy: { name: "asc" },
-            }),
-        ])
+        regions = await prisma.region.findMany({ orderBy: { name: "asc" } })
     } catch (error) {
         if (isPrismaMissingSchemaError(error)) {
             dbWarning = "Database schema is not fully migrated yet. Prerequisite lookup data is temporarily unavailable."
@@ -57,7 +31,7 @@ export default async function PrerequisitesPage() {
             />
             {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-            <PrerequisitesManager regions={regions} regionalOffices={regionalOffices} />
+            <PrerequisitesManager regions={regions} />
         </div>
     )
 }
