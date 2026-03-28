@@ -5,24 +5,43 @@ import Link from "next/link"
 import { Plus, Users as UsersIcon, UserCheck, UserX } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
-import FilterBar from "@/components/ui/filter-bar"
-import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
+import UsersTable from "@/components/users/UsersTable"
 
 export default async function UsersPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  let users: Awaited<ReturnType<typeof prisma.user.findMany>> = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isAdmin = (session.user as any)?.role === "Admin"
+
+  type UserRow = {
+    id: string
+    name: string
+    email: string
+    status: string
+    lastLoginAt: Date | null
+    role: { name: string } | null
+  }
+
+  let users: UserRow[] = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0 }
 
   try {
     const [rows, total, active, inactive] = await Promise.all([
       prisma.user.findMany({
-        take: 20,
+        take: 100,
         orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          lastLoginAt: true,
+          role: { select: { name: true } },
+        },
       }),
       prisma.user.count(),
       prisma.user.count({ where: { status: "ACTIVE" } }),
@@ -61,60 +80,13 @@ export default async function UsersPage() {
         <StatCard label="Inactive" value={stats.inactive} icon={<UserX className="h-5 w-5" />} tone="warning" />
       </div>
 
-      <FilterBar>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Search by name or email..." className="ui-input" />
-          <select className="ui-select">
-            <option value="">All Roles</option>
-          </select>
-          <select className="ui-select">
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-        </div>
-      </FilterBar>
-
-      <section className="ui-card overflow-x-auto">
-        <table className="w-full min-w-[960px]">
-          <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Last Login</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {users.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-[var(--text-muted)]">
-                  <p className="text-base font-medium text-[var(--text)]">No users found.</p>
-                </td>
-              </tr>
-            ) : (
-              users.map((user) => (
-                <tr key={user.id} className="hover:bg-[var(--surface-muted)]">
-                  <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{user.name}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{user.email}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{user.roleId || "—"}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <StatusChip label={user.status} variant={user.status === "ACTIVE" ? "success" : "warning"} />
-                  </td>
-                  <td className="px-6 py-4 text-sm text-[var(--text-muted)]">—</td>
-                  <td className="px-6 py-4 text-sm">
-                    <Link href="/users/search" className="text-[var(--brand)] hover:underline font-medium">
-                      Manage
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+      <UsersTable
+        initialUsers={users.map((u) => ({
+          ...u,
+          lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+        }))}
+        isAdmin={isAdmin}
+      />
     </div>
   )
 }

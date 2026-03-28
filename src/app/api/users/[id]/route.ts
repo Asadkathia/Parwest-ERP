@@ -95,3 +95,48 @@ export async function PATCH(
     return internalServerError("Failed to update user")
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session) return unauthorized()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actorRole = (session.user as any)?.role as string | undefined
+    if (actorRole !== "Admin") return forbidden("Only Admin can delete users.")
+
+    const { id } = await context.params
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actorId = (session.user as any)?.id as string | undefined
+
+    if (id === actorId) {
+      return NextResponse.json({ message: "You cannot delete your own account." }, { status: 400 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true },
+    })
+    if (!user) return notFound("User not found.")
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id } })
+      await tx.auditLog.create({
+        data: {
+          userId: actorId ?? null,
+          event: "USER_DELETED",
+          module: "USERS",
+          description: `Deleted user ${user.id} (${user.email} — ${user.name})`,
+        },
+      })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("DELETE /api/users/[id]:", error)
+    return internalServerError("Failed to delete user.")
+  }
+}

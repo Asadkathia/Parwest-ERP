@@ -69,6 +69,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     permissions = []
                 }
 
+                // Stamp last login time (fire-and-forget, don't block auth)
+                prisma.user.update({
+                    where: { id: user.id },
+                    data: { lastLoginAt: new Date() },
+                }).catch(() => {})
+
                 return {
                     id: user.id,
                     email: user.email,
