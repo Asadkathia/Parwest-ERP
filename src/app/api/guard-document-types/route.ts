@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 // System-generated document placeholders (always present for every guard)
-export const SYSTEM_GENERATED_TYPES = [
+const SYSTEM_GENERATED_TYPES = [
   "Form A (Without Sign)",
   "Form B (Without Sign and Thumb Impressions)",
   "Employee Card",
