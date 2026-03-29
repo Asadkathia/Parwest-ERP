@@ -389,6 +389,16 @@ model GuardDocumentType {
   updatedAt        DateTime @updatedAt
 }
 
+model GuardDeploymentInventoryRule {
+  id                String   @id @default(cuid())
+  ruleKey           String   @unique @default("default")
+  isActive          Boolean  @default(false)
+  minimumAssignedItems Int  @default(1)
+  allowedCategoryIds Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model GuardPrerequisite {
   id                 String    @id @default(cuid())
   guardId            String

@@ -22,6 +22,20 @@ type GuardDocumentType = {
   isSystemGenerated: boolean
 }
 
+type InventoryCategory = {
+  id: string
+  name: string
+}
+
+type DeploymentInventoryRule = {
+  id: string
+  ruleKey: string
+  isActive: boolean
+  minimumAssignedItems: number
+  allowedCategoryIds: string[]
+  updatedAt?: string
+}
+
 type Props = {
   regions: Region[]
 }
@@ -117,6 +131,14 @@ export default function PrerequisitesManager({ regions }: Props) {
   const [editReturnCondDesc, setEditReturnCondDesc] = useState("")
   const [confirmDeleteReturnCond, setConfirmDeleteReturnCond] = useState<ReturnCondition | null>(null)
 
+  // Deployment inventory prerequisite rule
+  const [inventoryRule, setInventoryRule] = useState<DeploymentInventoryRule | null>(null)
+  const [inventoryRuleLoading, setInventoryRuleLoading] = useState(true)
+  const [inventoryRuleSaving, setInventoryRuleSaving] = useState(false)
+  const [inventoryRuleError, setInventoryRuleError] = useState("")
+  const [inventoryRuleNotice, setInventoryRuleNotice] = useState("")
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([])
+
 
   const loadDocTypes = useCallback(async () => {
     setDocTypesLoading(true)
@@ -182,6 +204,100 @@ export default function PrerequisitesManager({ regions }: Props) {
   }, [])
 
   useEffect(() => { loadReturnConditions() }, [loadReturnConditions])
+
+  const loadDeploymentInventoryRule = useCallback(async () => {
+    setInventoryRuleLoading(true)
+    setInventoryRuleError("")
+    try {
+      const [ruleRes, categoriesRes] = await Promise.all([
+        fetch("/api/guard-deployment-inventory-rule"),
+        fetch("/api/store-inventory/v2/masters/categories"),
+      ])
+
+      if (!ruleRes.ok) throw new Error("Failed to load deployment inventory rule")
+      if (!categoriesRes.ok) throw new Error("Failed to load inventory categories")
+
+      const rulePayload = await ruleRes.json()
+      const ruleData = (rulePayload?.data ?? rulePayload) as Partial<DeploymentInventoryRule>
+
+      const categoriesPayload = await categoriesRes.json()
+      const categoryRows = Array.isArray(categoriesPayload)
+        ? categoriesPayload
+        : Array.isArray(categoriesPayload?.data)
+          ? categoriesPayload.data
+          : []
+
+      const parsedCategories = categoryRows
+        .map((row: unknown) => {
+          const item = row as Record<string, unknown>
+          return {
+            id: String(item?.id ?? "").trim(),
+            name: String(item?.name ?? "").trim(),
+          }
+        })
+        .filter((row: InventoryCategory) => row.id.length > 0 && row.name.length > 0)
+
+      setInventoryCategories(parsedCategories)
+      setInventoryRule({
+        id: String(ruleData.id ?? ""),
+        ruleKey: String(ruleData.ruleKey ?? "default"),
+        isActive: ruleData.isActive === true,
+        minimumAssignedItems: Math.max(0, Number(ruleData.minimumAssignedItems ?? 1) || 0),
+        allowedCategoryIds: Array.isArray(ruleData.allowedCategoryIds)
+          ? ruleData.allowedCategoryIds.map((entry) => String(entry ?? "").trim()).filter((entry) => entry.length > 0)
+          : [],
+        updatedAt: typeof ruleData.updatedAt === "string" ? ruleData.updatedAt : undefined,
+      })
+    } catch {
+      setInventoryRuleError("Failed to load deployment inventory prerequisite settings")
+    } finally {
+      setInventoryRuleLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadDeploymentInventoryRule() }, [loadDeploymentInventoryRule])
+
+  const toggleAllowedCategory = (categoryId: string) => {
+    setInventoryRule((prev) => {
+      if (!prev) return prev
+      const has = prev.allowedCategoryIds.includes(categoryId)
+      return {
+        ...prev,
+        allowedCategoryIds: has
+          ? prev.allowedCategoryIds.filter((id) => id !== categoryId)
+          : [...prev.allowedCategoryIds, categoryId],
+      }
+    })
+  }
+
+  const handleSaveDeploymentInventoryRule = async () => {
+    if (!inventoryRule) return
+    setInventoryRuleSaving(true)
+    setInventoryRuleError("")
+    setInventoryRuleNotice("")
+    try {
+      const res = await fetch("/api/guard-deployment-inventory-rule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: inventoryRule.isActive,
+          minimumAssignedItems: Math.max(0, Math.floor(inventoryRule.minimumAssignedItems || 0)),
+          allowedCategoryIds: inventoryRule.allowedCategoryIds,
+        }),
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        setInventoryRuleError(payload?.message || payload?.error || "Failed to save deployment inventory prerequisite settings")
+        return
+      }
+      await loadDeploymentInventoryRule()
+      setInventoryRuleNotice("Deployment inventory prerequisite settings saved.")
+    } catch {
+      setInventoryRuleError("Failed to save deployment inventory prerequisite settings")
+    } finally {
+      setInventoryRuleSaving(false)
+    }
+  }
 
   const handleAddReturnCond = async () => {
     const name = newReturnCondName.trim()
@@ -490,6 +606,104 @@ export default function PrerequisitesManager({ regions }: Props) {
   return (
     <div className="space-y-8">
       {error ? <InlineAlert type="error" message={error} /> : null}
+
+      {/* ── Deployment Inventory Prerequisite ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <SectionTitle
+            title="Deployment Inventory Prerequisite"
+            subtitle="Control guard deployment blocking by minimum assigned inventory and optional category restrictions."
+          />
+
+          {inventoryRuleError ? <InlineAlert type="error" message={inventoryRuleError} /> : null}
+          {inventoryRuleNotice ? <InlineAlert type="success" message={inventoryRuleNotice} /> : null}
+
+          {inventoryRuleLoading || !inventoryRule ? (
+            <p className="text-sm text-[var(--text-muted)]">Loading rule settings...</p>
+          ) : (
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={inventoryRule.isActive}
+                  onChange={(event) =>
+                    setInventoryRule((prev) => prev ? { ...prev, isActive: event.target.checked } : prev)
+                  }
+                  className="h-4 w-4"
+                />
+                <span className="text-sm font-medium text-[var(--text)]">
+                  Require inventory assignment before deployment
+                </span>
+              </label>
+
+              <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+                <div>
+                  <label className="mb-1 block text-sm text-[var(--text-muted)]">
+                    Minimum assigned items
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={inventoryRule.minimumAssignedItems}
+                    onChange={(event) =>
+                      setInventoryRule((prev) => {
+                        if (!prev) return prev
+                        const value = Number(event.target.value)
+                        return {
+                          ...prev,
+                          minimumAssignedItems: Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0,
+                        }
+                      })
+                    }
+                    className="ui-input"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-[var(--text-muted)]">
+                    Allowed categories <span className="text-xs font-normal">(optional filter)</span>
+                  </label>
+                  <div className="max-h-44 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+                    {inventoryCategories.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)]">No categories found.</p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {inventoryCategories.map((category) => (
+                          <label key={category.id} className="flex items-center gap-2 text-sm text-[var(--text)]">
+                            <input
+                              type="checkbox"
+                              checked={inventoryRule.allowedCategoryIds.includes(category.id)}
+                              onChange={() => toggleAllowedCategory(category.id)}
+                              className="h-4 w-4"
+                            />
+                            <span>{category.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Leave all unchecked to allow any category.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <ActionButton onClick={handleSaveDeploymentInventoryRule} disabled={inventoryRuleSaving}>
+                  {inventoryRuleSaving ? "Saving..." : "Save Rule"}
+                </ActionButton>
+                <ActionButton
+                  variant="secondary"
+                  onClick={loadDeploymentInventoryRule}
+                  disabled={inventoryRuleSaving}
+                >
+                  Reset
+                </ActionButton>
+              </div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Prerequisite Document Types (DB-backed) ── */}
       <Card>

@@ -7,6 +7,7 @@ import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import GuardProfileHealth from "@/components/guards/GuardProfileHealth"
 import MentalHealthBadge from "@/components/guards/MentalHealthBadge"
+import GuardLifecycleProgress from "@/components/guards/GuardLifecycleProgress"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
@@ -42,6 +43,8 @@ type GuardDetailModel = GuardTabModel & {
         regionalOffice: { id: string; name: string }
     }>
     storeInventoryAssignments?: Array<Record<string, unknown>>
+    verificationDocTypes?: Array<{ name: string }>
+    verificationPrerequisites?: Array<{ docTypeName: string; status: string }>
 }
 
 function toDateOrNull(value?: Date | string | null) {
@@ -62,6 +65,13 @@ function calculateAge(dateOfBirth?: Date | string | null, referenceDate?: Date |
     return years >= 0 ? years : null
 }
 
+function formatShortDate(value?: Date | string | null) {
+    if (!value) return null
+    const parsed = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+}
+
 export default async function GuardDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
@@ -72,7 +82,15 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     let guard: GuardDetailModel | null = null
 
     try {
-        const [guardData, activeSupervisor, attendanceRecords, deploymentRecords, storeInventoryAssignments] = await Promise.all([
+        const [
+            guardData,
+            activeSupervisor,
+            attendanceRecords,
+            deploymentRecords,
+            storeInventoryAssignments,
+            verificationDocTypes,
+            verificationPrerequisites,
+        ] = await Promise.all([
             prisma.guard.findUnique({
                 where: { id },
                 include: {
@@ -109,9 +127,25 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                     returnedByUser: { select: { name: true } },
                 },
             }).catch(() => []),
+            prisma.guardDocumentType.findMany({
+                where: { isActive: true, docCategory: "VERIFICATION" },
+                select: { name: true },
+            }).catch(() => []),
+            prisma.guardPrerequisite.findMany({
+                where: { guardId: id },
+                select: { docTypeName: true, status: true },
+            }).catch(() => []),
         ])
         guard = guardData
-            ? { ...guardData, managerName: activeSupervisor?.supervisor?.name ?? null, attendanceRecords, deploymentRecords, storeInventoryAssignments }
+            ? {
+                ...guardData,
+                managerName: activeSupervisor?.supervisor?.name ?? null,
+                attendanceRecords,
+                deploymentRecords,
+                storeInventoryAssignments,
+                verificationDocTypes,
+                verificationPrerequisites,
+            }
             : null
     } catch (error) {
         if (!isPrismaMissingSchemaError(error)) {
@@ -156,11 +190,22 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     const rawAttendance = guard.attendanceRecords ?? []
     const rawDeployments = guard.deploymentRecords ?? []
     const rawStoreInventory = (g.storeInventoryAssignments as Array<Record<string, unknown>> | undefined) ?? []
+    const verificationDocTypes = (g.verificationDocTypes as Array<{ name: string }> | undefined) ?? []
+    const verificationPrerequisites =
+        (g.verificationPrerequisites as Array<{ docTypeName: string; status: string }> | undefined) ?? []
 
     // Build attendance summary
     const presentCount = rawAttendance.filter((a) => a.status === "PRESENT").length
     const absentCount  = rawAttendance.filter((a) => a.status === "ABSENT").length
     const totalOT      = rawAttendance.reduce((s, a) => s + (a.overtimeHours ?? 0), 0)
+    const verificationTotal = verificationDocTypes.length
+    const verificationStatusByDoc = new Map(verificationPrerequisites.map((row) => [row.docTypeName, row.status]))
+    const verificationVerified = verificationDocTypes.filter((row) => verificationStatusByDoc.get(row.name) === "VERIFIED").length
+    const assignedInventoryCount = rawStoreInventory.filter((row) => row.status === "ASSIGNED").length
+    const activeDeploymentsCount = rawDeployments.filter((row) => row.status === "ACTIVE").length
+    const revokedDeploymentsCount = rawDeployments.filter((row) => row.status === "INACTIVE" || row.endDate).length
+    const currentDeployment = rawDeployments.find((row) => row.status === "ACTIVE")
+    const latestEndedDeployment = rawDeployments.find((row) => row.status === "INACTIVE" || row.endDate)
 
     const guardWithTabs = {
         ...guard,
@@ -320,6 +365,35 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                         <div className="mt-4">
                             <GuardProfileHealth guard={guardWithTabs as Parameters<typeof GuardProfileHealth>[0]["guard"]} />
                         </div>
+                        <GuardLifecycleProgress
+                            guardStatus={guard.status}
+                            verificationTotal={verificationTotal}
+                            verificationVerified={verificationVerified}
+                            assignedInventoryCount={assignedInventoryCount}
+                            activeDeploymentsCount={activeDeploymentsCount}
+                            revokedDeploymentsCount={revokedDeploymentsCount}
+                            currentDeployment={
+                                currentDeployment
+                                    ? {
+                                        clientName: currentDeployment.client?.name ?? "Unknown Client",
+                                        branchName: currentDeployment.branch?.name ?? null,
+                                        shiftType: currentDeployment.shiftType ?? null,
+                                        designation: currentDeployment.designation ?? null,
+                                        deploymentDate: formatShortDate(currentDeployment.deploymentDate),
+                                    }
+                                    : null
+                            }
+                            latestEndedDeployment={
+                                !currentDeployment && latestEndedDeployment
+                                    ? {
+                                        clientName: latestEndedDeployment.client?.name ?? "Unknown Client",
+                                        branchName: latestEndedDeployment.branch?.name ?? null,
+                                        endDate: formatShortDate(latestEndedDeployment.endDate ?? null),
+                                        endReason: latestEndedDeployment.endReason ?? null,
+                                    }
+                                    : null
+                            }
+                        />
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
