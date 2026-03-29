@@ -76,6 +76,12 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
     const [latManual, setLatManual] = useState("")
     const [lngManual, setLngManual] = useState("")
 
+    // Locker branch radio
+    const [isLockerBranch, setIsLockerBranch] = useState<"yes" | "no">("no")
+
+    // Operations manager selection (separate from assigned manager)
+    const [selectedOperationsManagerId, setSelectedOperationsManagerId] = useState("")
+
     // Multiple contact phones
     const [contactPhones, setContactPhones] = useState<string[]>([""])
 
@@ -143,9 +149,11 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
             ...Object.fromEntries(formData.entries()),
             clientId,
             isHeadOffice: formData.get("isHeadOffice") === "on",
+            isLockerBranch,
             contractAttachments: attachments,
             regionId: selectedRegionId || null,
             regionalOfficeId: selectedRegionalOfficeId || null,
+            operationsManagerId: selectedOperationsManagerId || null,
         }
 
         try {
@@ -178,14 +186,14 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
 
             <div className="space-y-8">
 
-                {/* ── Basic Information ── */}
+                {/* ── Add Client's New Branch ── */}
                 <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Add Client&apos;s New Branch</h2>
                     <p className="mb-4 text-sm text-[var(--text-muted)]">Creating branch for: <span className="font-medium text-[var(--text)]">{clientName}</span></p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Branch Name <span className="text-red-500">*</span>
+                                Name Of Branch <span className="text-red-500">*</span>
                             </label>
                             <input type="text" name="name" required placeholder="e.g., Main Branch, Gulberg Branch" className="ui-input" />
                         </div>
@@ -210,60 +218,6 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                                 <input type="checkbox" name="isHeadOffice" className="h-4 w-4 accent-[var(--brand)]" />
                                 <span className="text-sm text-[var(--text)]">This is the head office</span>
                             </label>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Region & Assignment ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
-                            <select
-                                className="ui-input"
-                                value={selectedRegionId}
-                                onChange={(e) => setSelectedRegionId(e.target.value)}
-                            >
-                                <option value="">— Select Region —</option>
-                                {regions.map((r) => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
-                            <select
-                                name="regionalOfficeId"
-                                className="ui-input"
-                                value={selectedRegionalOfficeId}
-                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId}
-                            >
-                                <option value="">
-                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
-                                </option>
-                                {regionalOffices.map((o) => (
-                                    <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
-                            <SearchSelect
-                                name="assignedManagerId"
-                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                defaultValue={defaultManagerId ?? ""}
-                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
-                            <SearchSelect
-                                name="assignedSupervisorId"
-                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
-                            />
                         </div>
                     </div>
                 </div>
@@ -303,10 +257,12 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                         />
                     </div>
 
-                    {/* Manual coordinate override + capacities */}
+                    {/* Manual coordinate override */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Latitude <span className="text-xs">(manual)</span></label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Latitude <span className="text-red-500">*</span> <span className="text-xs font-normal">(manual override)</span>
+                            </label>
                             <input
                                 type="text"
                                 name="latitudeManual"
@@ -317,7 +273,9 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Longitude <span className="text-xs">(manual)</span></label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Longitude <span className="text-red-500">*</span> <span className="text-xs font-normal">(manual override)</span>
+                            </label>
                             <input
                                 type="text"
                                 name="longitudeManual"
@@ -327,44 +285,149 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                                 onChange={(e) => setLngManual(e.target.value)}
                             />
                         </div>
+                    </div>
+                </div>
 
+                {/* ── Region & Assignment ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Day Guard Capacity</label>
-                            <input type="number" name="dayGuardCapacity" className="ui-input" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Region</label>
+                            <select
+                                className="ui-input"
+                                value={selectedRegionId}
+                                onChange={(e) => setSelectedRegionId(e.target.value)}
+                            >
+                                <option value="">— Select Region —</option>
+                                {regions.map((r) => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Night Guard Capacity</label>
-                            <input type="number" name="nightGuardCapacity" className="ui-input" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
+                            <select
+                                name="regionalOfficeId"
+                                className="ui-input"
+                                value={selectedRegionalOfficeId}
+                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+                                disabled={!selectedRegionId}
+                            >
+                                <option value="">
+                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
+                                </option>
+                                {regionalOffices.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Day Supervisor Capacity</label>
-                            <input type="number" name="daySupervisorCapacity" className="ui-input" placeholder="0" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Night Supervisor Capacity</label>
-                            <input type="number" name="nightSupervisorCapacity" className="ui-input" placeholder="0" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">CPO Capacity</label>
-                            <input type="number" name="cpoCapacity" className="ui-input" placeholder="0" />
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
+                            <SearchSelect
+                                name="assignedManagerId"
+                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                defaultValue={defaultManagerId ?? ""}
+                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* ── Contact Information ── */}
+                {/* ── Capacity Requirements ── */}
                 <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Information</h2>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Capacity Requirements</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <CapField label="Day CPO's Required" name="dayCpoCapacity" required />
+                        <CapField label="Night CPO's Required" name="nightCpoCapacity" required />
+                        <CapField label="Day SO Capacity" name="daySoCapacity" required />
+                        <CapField label="Night SO Capacity" name="nightSoCapacity" required />
+                        <CapField label="Day ASO Capacity" name="dayAsoCapacity" required />
+                        <CapField label="Night ASO Capacity" name="nightAsoCapacity" required />
+                        <CapField label="Day LSO Capacity" name="dayLsoCapacity" required />
+                        <CapField label="Night LSO Capacity" name="nightLsoCapacity" required />
+                        <CapField label="Day Supervisors Required" name="daySupervisorCapacity" required />
+                        <CapField label="Night Supervisors Required" name="nightSupervisorCapacity" required />
+                        <CapField label="Day Guards" name="dayGuardCapacity" required />
+                        <CapField label="Night Guards" name="nightGuardCapacity" required />
+                        <CapField label="Day CCTV Operators" name="dayCctvCapacity" required />
+                        <CapField label="Night CCTV Operators" name="nightCctvCapacity" required />
+                        <CapField label="Day Receptionists" name="dayReceptionistCapacity" required />
+                        <CapField label="Night Receptionists" name="nightReceptionistCapacity" required />
+                    </div>
+                </div>
+
+                {/* ── Branch Enrollment & Locker ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Branch Enrollment Date <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                name="enrollmentDate"
+                                className="ui-input"
+                                defaultValue={new Date().toISOString().slice(0, 10)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-2">
+                                Locker Branch <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="isLockerBranchRadio"
+                                        value="yes"
+                                        checked={isLockerBranch === "yes"}
+                                        onChange={() => setIsLockerBranch("yes")}
+                                        className="h-4 w-4 accent-[var(--brand)]"
+                                    />
+                                    <span className="text-sm text-[var(--text)]">Yes</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="isLockerBranchRadio"
+                                        value="no"
+                                        checked={isLockerBranch === "no"}
+                                        onChange={() => setIsLockerBranch("no")}
+                                        className="h-4 w-4 accent-[var(--brand)]"
+                                    />
+                                    <span className="text-sm text-[var(--text)]">No</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Contact Person Info ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Person Info</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
                             <input type="text" name="contactPerson" placeholder="Name of contact person" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person Designation</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Designation</label>
                             <input type="text" name="contactPersonDesignation" placeholder="e.g., Branch Manager, Officer" className="ui-input" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Phone</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC #</label>
+                            <input
+                                type="text"
+                                name="contactPersonCnic"
+                                placeholder="#####-#######-#"
+                                className="ui-input"
+                                maxLength={15}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Phone Number</label>
                             <div className="space-y-2">
                                 {contactPhones.map((num, idx) => (
                                     <div key={idx} className="flex items-center gap-2">
@@ -390,14 +453,79 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                                     <Plus size={13} /> Add another number
                                 </button>
                             </div>
-                            {/* Hidden inputs for form submission */}
                             {contactPhones.filter(p => p.trim()).map((p, idx) => (
                                 <input key={idx} type="hidden" name={idx === 0 ? "contactPhone" : `contactPhone_${idx}`} value={p} />
                             ))}
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Email</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
                             <input type="email" name="contactEmail" placeholder="branch@example.com" className="ui-input" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Branch Manager's Information ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Manager&apos;s Information</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
+                            <input type="text" name="branchManagerName" placeholder="Manager's full name" className="ui-input" />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
+                            <input type="tel" name="branchManagerContact" placeholder="0300-1234567" className="ui-input" />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
+                            <input type="email" name="branchManagerEmail" placeholder="manager@example.com" className="ui-input" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Operations Manager's Information ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Operations Manager&apos;s Information</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Manager <span className="text-red-500">*</span>
+                            </label>
+                            <SearchSelect
+                                name="_operationsManagerId"
+                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                onChange={(val) => setSelectedOperationsManagerId(val)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Manager Contact Number <span className="text-red-500">*</span>
+                            </label>
+                            <input type="tel" name="operationsManagerContact" placeholder="0300-1234567" className="ui-input" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Supervisor's Information ── */}
+                <div>
+                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Supervisor&apos;s Information</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Supervisor <span className="text-red-500">*</span>
+                            </label>
+                            <SearchSelect
+                                name="assignedSupervisorId"
+                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                Supervisor Contact Number <span className="text-red-500">*</span>
+                            </label>
+                            <input type="tel" name="supervisorContact" placeholder="0300-1234567" className="ui-input" />
                         </div>
                     </div>
                 </div>
@@ -461,10 +589,6 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Night Guards</label>
                             <input type="number" name="contractAdditionalNightGuards" className="ui-input" placeholder="0" min={0} />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Price</label>
-                            <input type="number" name="contractPrice" className="ui-input" placeholder="Price" />
-                        </div>
                     </div>
                 </div>
 
@@ -518,5 +642,17 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                 </button>
             </div>
         </form>
+    )
+}
+
+// Helper component for capacity number inputs
+function CapField({ label, name, required }: { label: string; name: string; required?: boolean }) {
+    return (
+        <div>
+            <label className="block text-xs text-[var(--text-muted)] mb-1">
+                {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <input type="number" name={name} className="ui-input" placeholder="0" min={0} defaultValue={0} />
+        </div>
     )
 }

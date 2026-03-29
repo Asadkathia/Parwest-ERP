@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
         const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
         const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
 
+        const toDate = (v: unknown) => { const d = v ? new Date(String(v)) : null; return d && !isNaN(d.getTime()) ? d : null }
+        const toBool = (v: unknown) => v === true || v === "true" || v === "on"
+
         const branch = await prisma.$transaction(async (tx) => {
             const created = await tx.branch.create({
                 data: {
@@ -106,17 +109,52 @@ export async function POST(request: NextRequest) {
                     assignedManagerId: body?.assignedManagerId ? String(body.assignedManagerId) : null,
                     regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
                     // Contract details
-                    contractStart:    body?.contractStart    ? new Date(body.contractStart)    : null,
-                    contractEnd:      body?.contractEnd      ? new Date(body.contractEnd)      : null,
-                    contractRateStart: body?.contractRateStart ? new Date(body.contractRateStart) : null,
-                    contractRateEnd:   body?.contractRateEnd   ? new Date(body.contractRateEnd)   : null,
+                    contractStart:    toDate(body?.contractStart),
+                    contractEnd:      toDate(body?.contractEnd),
+                    contractRateStart: toDate(body?.contractRateStart),
+                    contractRateEnd:   toDate(body?.contractRateEnd),
                     contractDayGuardDesignation:   body?.contractDayGuardDesignation   ? String(body.contractDayGuardDesignation)   : null,
                     contractDayGuardExService:     body?.contractDayGuardExService     ? String(body.contractDayGuardExService)     : null,
                     contractNightGuardDesignation: body?.contractNightGuardDesignation ? String(body.contractNightGuardDesignation) : null,
                     contractNightGuardExService:   body?.contractNightGuardExService   ? String(body.contractNightGuardExService)   : null,
                     contractAdditionalDayGuards:   toInt(body?.contractAdditionalDayGuards),
                     contractAdditionalNightGuards: toInt(body?.contractAdditionalNightGuards),
-                    contractPrice:    toFloat(body?.contractPrice),
+                    // Location
+                    latitude:  toFloat(body?.latitude  ?? body?.latitudeManual),
+                    longitude: toFloat(body?.longitude ?? body?.longitudeManual),
+                    // Capacity
+                    dayGuardCapacity:         toInt(body?.dayGuardCapacity),
+                    nightGuardCapacity:       toInt(body?.nightGuardCapacity),
+                    daySupervisorCapacity:    toInt(body?.daySupervisorCapacity),
+                    nightSupervisorCapacity:  toInt(body?.nightSupervisorCapacity),
+                    cpoCapacity:              toInt(body?.cpoCapacity),
+                    dayCpoCapacity:           toInt(body?.dayCpoCapacity),
+                    nightCpoCapacity:         toInt(body?.nightCpoCapacity),
+                    daySoCapacity:            toInt(body?.daySoCapacity),
+                    nightSoCapacity:          toInt(body?.nightSoCapacity),
+                    dayAsoCapacity:           toInt(body?.dayAsoCapacity),
+                    nightAsoCapacity:         toInt(body?.nightAsoCapacity),
+                    dayLsoCapacity:           toInt(body?.dayLsoCapacity),
+                    nightLsoCapacity:         toInt(body?.nightLsoCapacity),
+                    dayCctvCapacity:          toInt(body?.dayCctvCapacity),
+                    nightCctvCapacity:        toInt(body?.nightCctvCapacity),
+                    dayReceptionistCapacity:  toInt(body?.dayReceptionistCapacity),
+                    nightReceptionistCapacity: toInt(body?.nightReceptionistCapacity),
+                    // Branch metadata
+                    enrollmentDate:     toDate(body?.enrollmentDate),
+                    isLockerBranch:     toBool(body?.isLockerBranch),
+                    // Extended contact
+                    contactPersonCnic:  body?.contactPersonCnic  ? String(body.contactPersonCnic)  : null,
+                    contactPersonPhone: body?.contactPersonPhone ? String(body.contactPersonPhone) : null,
+                    // Branch manager
+                    branchManagerName:    body?.branchManagerName    ? String(body.branchManagerName)    : null,
+                    branchManagerContact: body?.branchManagerContact ? String(body.branchManagerContact) : null,
+                    branchManagerEmail:   body?.branchManagerEmail   ? String(body.branchManagerEmail)   : null,
+                    // Operations manager
+                    operationsManagerId:      body?.operationsManagerId      ? String(body.operationsManagerId)      : null,
+                    operationsManagerContact: body?.operationsManagerContact ? String(body.operationsManagerContact) : null,
+                    // Supervisor contact
+                    supervisorContact: body?.supervisorContact ? String(body.supervisorContact) : null,
                 },
                 include: {
                     client: true,

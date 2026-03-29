@@ -698,6 +698,49 @@ model Branch {
   assignedManagerId   String?
   regionalOfficeId    String?
 
+  // Location coordinates
+  latitude               Float?
+  longitude              Float?
+
+  // Guard / staff capacity requirements
+  dayGuardCapacity         Int?
+  nightGuardCapacity       Int?
+  daySupervisorCapacity    Int?
+  nightSupervisorCapacity  Int?
+  cpoCapacity              Int?
+  dayCpoCapacity           Int?
+  nightCpoCapacity         Int?
+  daySoCapacity            Int?
+  nightSoCapacity          Int?
+  dayAsoCapacity           Int?
+  nightAsoCapacity         Int?
+  dayLsoCapacity           Int?
+  nightLsoCapacity         Int?
+  dayCctvCapacity          Int?
+  nightCctvCapacity        Int?
+  dayReceptionistCapacity  Int?
+  nightReceptionistCapacity Int?
+
+  // Branch metadata
+  enrollmentDate           DateTime?
+  isLockerBranch           Boolean   @default(false)
+
+  // Extended contact person info
+  contactPersonCnic        String?
+  contactPersonPhone       String?
+
+  // Branch manager info
+  branchManagerName        String?
+  branchManagerContact     String?
+  branchManagerEmail       String?
+
+  // Operations manager (separate from assignedManagerId)
+  operationsManagerId      String?
+  operationsManagerContact String?
+
+  // Supervisor contact
+  supervisorContact        String?
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
