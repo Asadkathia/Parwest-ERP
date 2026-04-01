@@ -6,7 +6,6 @@ import GeneralInformationTab from "@/components/guards/tabs/GeneralInformationTa
 import ProfileTab from "@/components/guards/tabs/ProfileTab"
 import AttachmentsTab from "@/components/guards/tabs/AttachmentsTab"
 import AttendanceTab from "@/components/guards/tabs/AttendanceTab"
-import InventoryTab from "@/components/guards/tabs/InventoryTab"
 import PaidSalariesTab from "@/components/guards/tabs/PaidSalariesTab"
 import DeploymentHistoryTab from "@/components/guards/tabs/DeploymentHistoryTab"
 import CoursesTab from "@/components/guards/tabs/CoursesTab"
@@ -26,7 +25,6 @@ import {
     FileText,
     Paperclip,
     Calendar,
-    Package,
     DollarSign,
     MapPin,
     BookOpen,
@@ -50,7 +48,6 @@ const tabs: Tab[] = [
     { id: "profile", label: "Profile", icon: FileText },
     { id: "attachments", label: "Attachments", icon: Paperclip },
     { id: "attendance", label: "Attendance", icon: Calendar },
-    { id: "inventory", label: "Inventory", icon: Package },
     { id: "salaries", label: "Paid Salaries", icon: DollarSign },
     { id: "deployments", label: "Deployment History", icon: MapPin },
     { id: "courses", label: "Courses", icon: BookOpen },
@@ -85,8 +82,6 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
                     deployments={(guard.deployments || []) as import("@/components/guards/tabs/types").DeploymentAuditRecord[]}
                     guardId={guard.id || ""}
                 />
-            case "inventory":
-                return <InventoryTab inventory={guard.inventory || []} />
             case "salaries":
                 return <PaidSalariesTab salaries={guard.salaries || []} />
             case "deployments":

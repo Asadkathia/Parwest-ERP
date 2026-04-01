@@ -9,6 +9,9 @@ const skipMigrations = TRUE_VALUES.has(
 const skipSchemaVerification = TRUE_VALUES.has(
   String(process.env.SKIP_DB_SCHEMA_VERIFY ?? "").trim().toLowerCase()
 )
+const allowMigrationLockBypass = TRUE_VALUES.has(
+  String(process.env.ALLOW_MIGRATION_LOCK_BYPASS ?? "").trim().toLowerCase()
+)
 
 const pooledUrl =
   process.env.DATABASE_URL
@@ -69,8 +72,10 @@ if (!pooledUrl && !skipMigrations) {
 }
 
 if (!skipMigrations) {
-  const maxAttempts = Number(process.env.PRISMA_MIGRATE_MAX_ATTEMPTS ?? 4)
+  const maxAttempts = Number(process.env.PRISMA_MIGRATE_MAX_ATTEMPTS ?? 8)
+  const baseDelayMs = Number(process.env.PRISMA_MIGRATE_BASE_DELAY_MS ?? 10000)
   let migrationSucceeded = false
+  let lastMigrationWasLockTimeout = false
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     console.log(`Running Prisma migrations (attempt ${attempt}/${maxAttempts})...`)
@@ -84,11 +89,13 @@ if (!skipMigrations) {
       break
     }
 
-    if (!isAdvisoryLockTimeout(result) || attempt === maxAttempts) {
+    lastMigrationWasLockTimeout = isAdvisoryLockTimeout(result)
+
+    if (!lastMigrationWasLockTimeout || attempt === maxAttempts) {
       process.exit(result.status ?? 1)
     }
 
-    const delayMs = attempt * 5000
+    const delayMs = attempt * baseDelayMs
     console.warn(
       `Prisma migration lock timeout detected. Retrying in ${delayMs / 1000}s...`
     )
@@ -96,7 +103,14 @@ if (!skipMigrations) {
   }
 
   if (!migrationSucceeded) {
-    process.exit(1)
+    if (lastMigrationWasLockTimeout && allowMigrationLockBypass) {
+      console.warn(
+        "Bypassing migration lock timeout because ALLOW_MIGRATION_LOCK_BYPASS=true. " +
+        "Ensure migrations are applied separately before runtime paths requiring new schema."
+      )
+    } else {
+      process.exit(1)
+    }
   }
 } else {
   console.log("Skipping Prisma migrations because SKIP_DB_MIGRATIONS=true")
@@ -110,6 +124,10 @@ if (!skipSchemaVerification) {
   })
 } else {
   console.log("Skipping DB schema verification because SKIP_DB_SCHEMA_VERIFY=true")
+}
+
+if (!skipMigrations && allowMigrationLockBypass) {
+  console.log("Migration lock bypass is enabled for this build.")
 }
 
 console.log("Building Next.js...")

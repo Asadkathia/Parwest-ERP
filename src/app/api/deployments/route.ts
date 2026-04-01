@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@prisma/client"
+import { Prisma, StoreInventoryAssignmentStatus } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
@@ -149,6 +149,53 @@ export async function POST(request: NextRequest) {
         if (branchId && !branch) return notFound("Branch not found.")
         if (branch && branch.clientId !== clientId) {
             return badRequest("Branch does not belong to the selected client.")
+        }
+
+        const ruleDelegate = (prisma as unknown as {
+            guardDeploymentInventoryRule?: {
+                findUnique: (args: unknown) => Promise<{
+                    isActive: boolean
+                    minimumAssignedItems: number
+                    allowedCategoryIds: unknown
+                } | null>
+            }
+        }).guardDeploymentInventoryRule
+
+        const deploymentInventoryRule = ruleDelegate
+            ? await ruleDelegate.findUnique({
+                where: { ruleKey: "default" },
+                select: { isActive: true, minimumAssignedItems: true, allowedCategoryIds: true },
+            })
+            : null
+
+        if (deploymentInventoryRule?.isActive) {
+            const requiredCount = Math.max(0, Number(deploymentInventoryRule.minimumAssignedItems ?? 0))
+            const allowedCategoryIds = Array.isArray(deploymentInventoryRule.allowedCategoryIds)
+                ? deploymentInventoryRule.allowedCategoryIds
+                    .map((entry) => String(entry ?? "").trim())
+                    .filter((entry) => entry.length > 0)
+                : []
+
+            const assignedInventoryCount = await prisma.storeInventoryAssignment.count({
+                where: {
+                    assignedToGuardId: guardId,
+                    status: StoreInventoryAssignmentStatus.ASSIGNED,
+                    ...(allowedCategoryIds.length > 0
+                        ? {
+                            product: {
+                                categoryId: { in: allowedCategoryIds },
+                            },
+                        }
+                        : {}),
+                },
+            })
+
+            if (assignedInventoryCount < requiredCount) {
+                return conflict(
+                    `Guard must have at least ${requiredCount} assigned inventory item(s) before deployment. ` +
+                    `Currently assigned: ${assignedInventoryCount}.`
+                )
+            }
         }
 
         // ── Shift-conflict check (replaces singleActivePerGuard with smarter logic) ──

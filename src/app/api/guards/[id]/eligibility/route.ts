@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { StoreInventoryAssignmentStatus } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { internalServerError, notFound, unauthorized } from "@/lib/api/response"
@@ -7,6 +8,13 @@ type EligibilityCheck = {
   pass: boolean
   label: string
   message: string
+}
+
+function parseAllowedCategoryIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry) => String(entry ?? "").trim())
+    .filter((entry) => entry.length > 0)
 }
 
 export async function GET(
@@ -19,7 +27,17 @@ export async function GET(
 
     const { id: guardId } = await params
 
-    const [guard, docTypes, prereqs, pledgedDocs, inventoryAssignments] = await Promise.all([
+    const ruleDelegate = (prisma as unknown as {
+      guardDeploymentInventoryRule?: {
+        findUnique: (args: unknown) => Promise<{
+          isActive: boolean
+          minimumAssignedItems: number
+          allowedCategoryIds: unknown
+        } | null>
+      }
+    }).guardDeploymentInventoryRule
+
+    const [guard, docTypes, prereqs, pledgedDocs, deploymentInventoryRule] = await Promise.all([
       prisma.guard.findUnique({
         where: { id: guardId },
         select: { id: true, status: true },
@@ -36,10 +54,12 @@ export async function GET(
         where: { guardId, status: "HELD" },
         select: { id: true },
       }),
-      prisma.storeInventoryAssignment.findMany({
-        where: { assignedToGuardId: guardId, status: "ASSIGNED" },
-        select: { id: true },
-      }),
+      ruleDelegate
+        ? ruleDelegate.findUnique({
+            where: { ruleKey: "default" },
+            select: { isActive: true, minimumAssignedItems: true, allowedCategoryIds: true },
+          })
+        : Promise.resolve(null),
     ])
 
     if (!guard) return notFound("Guard not found")
@@ -71,14 +91,33 @@ export async function GET(
     }
 
     // ── Check 3: Inventory Assigned ───────────────────────────────────────
-    const inventoryCount = inventoryAssignments.length
+    const inventoryRuleActive = deploymentInventoryRule?.isActive === true
+    const requiredInventoryCount = Math.max(0, Number(deploymentInventoryRule?.minimumAssignedItems ?? 0))
+    const allowedCategoryIds = parseAllowedCategoryIds(deploymentInventoryRule?.allowedCategoryIds)
+
+    const inventoryCount = inventoryRuleActive
+      ? await prisma.storeInventoryAssignment.count({
+          where: {
+            assignedToGuardId: guardId,
+            status: StoreInventoryAssignmentStatus.ASSIGNED,
+            ...(allowedCategoryIds.length > 0
+              ? {
+                  product: {
+                    categoryId: { in: allowedCategoryIds },
+                  },
+                }
+              : {}),
+          },
+        })
+      : 0
+
     const inventoryCheck: EligibilityCheck = {
-      pass: inventoryCount > 0,
+      pass: inventoryRuleActive ? inventoryCount >= requiredInventoryCount : true,
       label: "Inventory",
-      message:
-        inventoryCount > 0
-          ? `${inventoryCount} inventory item${inventoryCount > 1 ? "s" : ""} assigned`
-          : "No inventory assigned to this guard",
+      message: inventoryRuleActive
+        ? `${inventoryCount}/${requiredInventoryCount} required assigned item(s)` +
+          (allowedCategoryIds.length > 0 ? " in configured categories" : "")
+        : "Inventory prerequisite is disabled by admin",
     }
 
     // ── Check 4: Pledged Documents ────────────────────────────────────────
