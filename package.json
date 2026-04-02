@@ -42,7 +42,11 @@
     "inventory:v2:cleanup-test-data": "node scripts/cleanup-inventory-v2-test-data.mjs",
     "inventory:v2:backfill:legacy": "node scripts/backfill-inventory-v2-from-legacy.mjs",
     "inventory:v2:seed-demand-test-data": "node scripts/seed-store-inventory-v2-demand-test-data.mjs",
-    "inventory:v2:clear-data": "node scripts/clear-store-inventory-v2-data.mjs"
+    "inventory:v2:clear-data": "node scripts/clear-store-inventory-v2-data.mjs",
+    "db:dump:records": "node scripts/dump-db-records.mjs",
+    "db:reset:records": "node scripts/reset-db-records.mjs",
+    "seed:lifecycle:e2e": "node scripts/seed-guard-lifecycle-e2e.mjs",
+    "db:lifecycle:test:setup": "npm run db:dump:records && CLEAR_ALL_DB_EXECUTE=true npm run db:reset:records && LIFECYCLE_E2E_SEED_EXECUTE=true npm run seed:lifecycle:e2e"
   },
   "keywords": [],
   "author": "",

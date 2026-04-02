@@ -107,7 +107,6 @@ const LEGACY_RELIGION_OPTIONS = ["Islam", "Christianity", "Hinduism"]
 const LEGACY_STATUS_OPTIONS = ["present", "absent", "on-training", "default", "resigned", "Long Leave", "Inactive", "Pending"]
 const LEGACY_CLIENT_OPTIONS = ["National Bank of Pakistan", "Standard Chartered Bank Limited Pakistan", "United Bank Limited", "MCB Bank Ltd"]
 const LEGACY_EX_SERVICE_OPTIONS = ["other", "mujahid", "rangers", "police", "army"]
-const LEGACY_SUPERVISOR_OPTIONS = ["Fazal Mehdi", "Muhammad Aslam", "Haider Ali", "Imtiaz Hussain", "Sarfraz Ali"]
 const LEGACY_VERIFICATION_TYPE_OPTIONS = ["NADRA Verification", "Health Certificate", "Police Verification", "Character Verification", "Mental Health Check"]
 const LEGACY_VERIFICATION_STATUS_OPTIONS = ["pending", "verified", "rejected", "in-process"]
 const LEGACY_BANK_ACCOUNT_STATUS_OPTIONS = ["active", "pending", "blocked", "closed"]
@@ -159,7 +158,7 @@ export default function SearchGuardsManager() {
           paymentMode: guard.paymentMode || (index % 3 === 0 ? "CASH" : "BANK"),
           guardCategory: guard.guardCategory || (index % 4 === 0 ? "MUJAHID" : "REGULAR"),
           client: guard.client || LEGACY_CLIENT_OPTIONS[index % LEGACY_CLIENT_OPTIONS.length],
-          supervisor: guard.supervisor || guard.supervisorName || LEGACY_SUPERVISOR_OPTIONS[index % LEGACY_SUPERVISOR_OPTIONS.length],
+          supervisor: guard.supervisor || guard.supervisorName || "",
           exService: guard.exService || LEGACY_EX_SERVICE_OPTIONS[index % LEGACY_EX_SERVICE_OPTIONS.length],
           verificationType: guard.verificationType || LEGACY_VERIFICATION_TYPE_OPTIONS[index % LEGACY_VERIFICATION_TYPE_OPTIONS.length],
           verificationStatus: guard.verificationStatus || LEGACY_VERIFICATION_STATUS_OPTIONS[index % LEGACY_VERIFICATION_STATUS_OPTIONS.length],
@@ -263,6 +262,16 @@ export default function SearchGuardsManager() {
     })
   }, [guards, filters])
 
+  const supervisorOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        guards
+          .map((guard) => (guard.supervisor || guard.supervisorName || "").trim())
+          .filter((value) => value.length > 0)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [guards])
+
   const rowsPerPage = useMemo(() => {
     if (!filters.rowsPerPage) return 10
     if (filters.rowsPerPage === "All records") return Math.max(filteredRows.length, 1)
@@ -320,7 +329,7 @@ export default function SearchGuardsManager() {
             name="supervisor_id"
             value={filters.supervisor}
             onChange={(v) => setFilter("supervisor", v)}
-            options={LEGACY_SUPERVISOR_OPTIONS}
+            options={supervisorOptions}
             placeholder="--Select supervisor--"
           />
           <Select

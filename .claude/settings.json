@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/asad/Projects/Parwest-ERP/src/app -name \"page.tsx\" -exec grep -l \"use client\" {})"
+    ]
+  }
+}
