@@ -1,79 +1,57 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 import { internalServerError, unauthorized } from "@/lib/api/response"
 import type { Prisma } from "@prisma/client"
 
-function readStringField(row: unknown, key: string) {
-    const value = (row as Record<string, unknown>)[key]
-    return typeof value === "string" ? value : ""
-}
-
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
-        if (!session) {
-            return unauthorized()
-        }
+        if (!session) return unauthorized()
 
         const managerScope = deriveManagerScope(session)
-
         const { searchParams } = new URL(request.url)
-        const q = searchParams.get("q")?.trim()
-        const status = searchParams.get("status")
-        const education = searchParams.get("education")
-        const regionId = searchParams.get("regionId")
-        const paymentMode = searchParams.get("paymentMode")
-        const guardCategory = searchParams.get("guardCategory")
 
-        if (isRuntimeMockEnabled()) {
-            const rows = mockGuardsList.filter((guard) => {
-                if (status && guard.status !== status) return false
-                if (education && (guard.education || "").toLowerCase() !== education.toLowerCase()) return false
-                if (paymentMode && (readStringField(guard, "paymentMode").toUpperCase() !== paymentMode.toUpperCase())) return false
-                if (guardCategory && (readStringField(guard, "guardCategory").toUpperCase() !== guardCategory.toUpperCase())) return false
-                if (q) {
-                    const text = `${guard.name} ${guard.parwestId} ${guard.cnic} ${guard.phone || ""}`.toLowerCase()
-                    if (!text.includes(q.toLowerCase())) return false
-                }
-                return true
-            })
-            const scopedRows = applyManagerScope(rows, managerScope, {
-                regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
-                regionalOfficeId: (row) => (row as Record<string, unknown>).regionalOfficeId as string | null | undefined,
-            })
-            return NextResponse.json(
-                scopedRows.map((guard) => ({
-                    id: guard.id,
-                    parwestId: guard.parwestId,
-                    name: guard.name,
-                    cnic: guard.cnic,
-                    phone: guard.phone || null,
-                    status: guard.status,
-                    education: guard.education || null,
-                    paymentMode: readStringField(guard, "paymentMode") || "BANK",
-                    guardCategory: readStringField(guard, "guardCategory") || "REGULAR",
-                    region: null,
-                    regionalOffice: null,
-                }))
-            )
-        }
+        const q             = searchParams.get("q")?.trim()
+        const status        = searchParams.get("status")
+        const education     = searchParams.get("education")
+        const religion      = searchParams.get("religion")
+        const exServiceType = searchParams.get("exServiceType")
+        const officeId      = searchParams.get("officeId")
+        const clientId      = searchParams.get("clientId")
+        const createdFrom   = searchParams.get("createdFrom")
+        const createdTo     = searchParams.get("createdTo")
 
         const where: Prisma.GuardWhereInput = {
-            ...(status ? { status } : {}),
-            ...(education ? { education } : {}),
-            ...(regionId ? { regionId } : {}),
+            ...(status        ? { status } : {}),
+            ...(education     ? { education } : {}),
+            ...(religion      ? { religion } : {}),
+            ...(exServiceType ? { exServiceType } : {}),
+            ...(officeId      ? { regionalOfficeId: officeId } : {}),
+            ...(createdFrom || createdTo
+                ? {
+                      createdAt: {
+                          ...(createdFrom ? { gte: new Date(createdFrom) } : {}),
+                          ...(createdTo   ? { lte: new Date(`${createdTo}T23:59:59.999Z`) } : {}),
+                      },
+                  }
+                : {}),
+            ...(clientId
+                ? {
+                      deployments: {
+                          some: { clientId, status: "ACTIVE" },
+                      },
+                  }
+                : {}),
             ...buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
             ...(q
                 ? {
                       OR: [
-                          { name: { contains: q, mode: "insensitive" } },
+                          { name:      { contains: q, mode: "insensitive" } },
                           { parwestId: { contains: q, mode: "insensitive" } },
-                          { cnic: { contains: q, mode: "insensitive" } },
-                          { phone: { contains: q, mode: "insensitive" } },
+                          { cnic:      { contains: q, mode: "insensitive" } },
+                          { phone:     { contains: q, mode: "insensitive" } },
                       ],
                   }
                 : {}),
@@ -81,15 +59,62 @@ export async function GET(request: NextRequest) {
 
         const guards = await prisma.guard.findMany({
             where,
-            orderBy: { name: "asc" },
-            include: {
-                region: true,
-                regionalOffice: true,
+            orderBy: { createdAt: "desc" },
+            take: 500,
+            select: {
+                id:             true,
+                parwestId:      true,
+                name:           true,
+                cnic:           true,
+                phone:          true,
+                photoUrl:       true,
+                status:         true,
+                education:      true,
+                religion:       true,
+                exServiceType:  true,
+                createdAt:      true,
+                regionalOffice: { select: { id: true, name: true } },
+                supervisorAssignments: {
+                    where: { status: "ACTIVE" },
+                    take: 1,
+                    select: { supervisor: { select: { name: true } } },
+                },
+                deployments: {
+                    where: { status: "ACTIVE" },
+                    take: 1,
+                    orderBy: { deploymentDate: "desc" },
+                    select: { client: { select: { id: true, name: true } } },
+                },
+                prerequisites: {
+                    select: { docTypeName: true, status: true, verificationStatus: true },
+                },
             },
-            take: 200,
         })
 
-        return NextResponse.json(guards)
+        const scopedGuards = applyManagerScope(guards, managerScope, {
+            regionId:          () => null,
+            regionalOfficeId:  (g) => g.regionalOffice?.id ?? null,
+        })
+
+        return NextResponse.json(
+            scopedGuards.map((g) => ({
+                id:             g.id,
+                parwestId:      g.parwestId,
+                name:           g.name,
+                cnic:           g.cnic,
+                phone:          g.phone ?? null,
+                photoUrl:       g.photoUrl ?? null,
+                status:         g.status,
+                education:      g.education ?? null,
+                religion:       g.religion ?? null,
+                exServiceType:  g.exServiceType ?? null,
+                createdAt:      g.createdAt?.toISOString() ?? null,
+                officeName:     g.regionalOffice?.name ?? null,
+                supervisorName: g.supervisorAssignments?.[0]?.supervisor?.name ?? null,
+                clientName:     g.deployments?.[0]?.client?.name ?? null,
+                prerequisites:  g.prerequisites ?? [],
+            }))
+        )
     } catch (error: unknown) {
         console.error("Error searching guards:", error)
         return internalServerError("Failed to search guards")

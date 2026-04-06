@@ -1,64 +1,66 @@
 "use client"
 
-import { MapPin, Calendar } from "lucide-react"
+import { MapPin, Calendar, User, DollarSign } from "lucide-react"
 import type { GuardLooseRow } from "@/components/guards/tabs/types"
 
 type DeploymentRecord = {
     id: string
-    client?: string
-    branch?: string
     status?: string
     designation?: string
     shiftType?: string
-    startDate?: string
-    endDate?: string | null
+    deploymentDate?: string | Date | null
+    endDate?: string | Date | null
+    endReason?: string | null
+    deploymentType?: string | null
+    deploymentNature?: string | null
+    deployedByName?: string | null
+    revokedByName?: string | null
+    salary?: number | null
+    // flat name fields
+    clientName?: string | null
+    branchName?: string | null
+    branchCity?: string | null
+    regionalOfficeName?: string | null
 }
 
 interface DeploymentHistoryTabProps {
     deployments: GuardLooseRow[]
 }
 
+function fmtDate(value?: string | Date | null) {
+    if (!value) return null
+    const d = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+}
+
+function calcDuration(start?: string | Date | null, end?: string | Date | null) {
+    if (!start) return "—"
+    const s = start instanceof Date ? start : new Date(start)
+    const e = end ? (end instanceof Date ? end : new Date(end)) : new Date()
+    if (Number.isNaN(s.getTime())) return "—"
+    const days = Math.floor(Math.abs(e.getTime() - s.getTime()) / 86_400_000)
+    const months = Math.floor(days / 30)
+    const rem = days % 30
+    if (months === 0) return `${rem}d`
+    return `${months}mo ${rem}d`
+}
+
+const STATUS_COLORS: Record<string, string> = {
+    ACTIVE:   "bg-green-100 text-green-800",
+    INACTIVE: "bg-gray-100 text-gray-700",
+}
+
 export default function DeploymentHistoryTab({ deployments }: DeploymentHistoryTabProps) {
     const rows = deployments as DeploymentRecord[]
-
-    const formatDate = (date?: string | null) => {
-        if (!date) return "Present"
-        return new Date(date).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        })
-    }
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "ACTIVE":
-                return "bg-green-100 text-green-800"
-            case "INACTIVE":
-                return "bg-gray-100 text-gray-800"
-            default:
-                return "bg-gray-100 text-gray-800"
-        }
-    }
-
-    const calculateDuration = (startDate?: string, endDate?: string | null) => {
-        if (!startDate) return "—"
-        const start = new Date(startDate)
-        const end = endDate ? new Date(endDate) : new Date()
-        const diffTime = Math.abs(end.getTime() - start.getTime())
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        const months = Math.floor(diffDays / 30)
-        const days = diffDays % 30
-        return `${months} months, ${days} days`
-    }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Deployment History</h2>
-                <div className="text-sm text-gray-600">
-                    Total Deployments: <span className="font-semibold">{rows.length}</span>
-                </div>
+                <span className="text-sm text-gray-500">
+                    Total: <strong>{rows.length}</strong>
+                </span>
             </div>
 
             {rows.length === 0 ? (
@@ -68,43 +70,87 @@ export default function DeploymentHistoryTab({ deployments }: DeploymentHistoryT
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {rows.map((deployment) => (
-                        <div key={deployment.id} className="bg-white rounded-lg border p-6 hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-semibold">{deployment.client}</h3>
-                                    <p className="text-gray-600">{deployment.branch}</p>
+                    {rows.map((dep) => (
+                        <div key={dep.id} className="bg-white rounded-lg border p-5 hover:shadow-sm transition-shadow">
+                            {/* Header row */}
+                            <div className="flex items-start justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 className="text-base font-semibold leading-tight">
+                                        {dep.clientName || "—"}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        {[dep.branchName, dep.branchCity].filter(Boolean).join(", ") || "No branch"}
+                                    </p>
+                                    {dep.regionalOfficeName && (
+                                        <p className="text-xs text-gray-400 mt-0.5">{dep.regionalOfficeName}</p>
+                                    )}
                                 </div>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(deployment.status || "INACTIVE")}`}>
-                                    {deployment.status || "INACTIVE"}
+                                <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[dep.status ?? ""] ?? "bg-gray-100 text-gray-700"}`}>
+                                    {dep.status ?? "—"}
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Detail grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
                                 <div>
-                                    <p className="text-sm text-gray-600">Designation</p>
-                                    <p className="font-medium">{deployment.designation}</p>
+                                    <p className="text-xs text-gray-500">Designation</p>
+                                    <p className="font-medium">{dep.designation || "—"}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Shift Type</p>
-                                    <p className="font-medium">{deployment.shiftType}</p>
+                                    <p className="text-xs text-gray-500">Shift</p>
+                                    <p className="font-medium">{dep.shiftType || "—"}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Duration</p>
-                                    <p className="font-medium">{calculateDuration(deployment.startDate, deployment.endDate)}</p>
+                                    <p className="text-xs text-gray-500">Type</p>
+                                    <p className="font-medium">{dep.deploymentType || "—"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Nature</p>
+                                    <p className="font-medium">{dep.deploymentNature || "—"}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6 mt-4 pt-4 border-t">
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>Started: {formatDate(deployment.startDate)}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>Ended: {formatDate(deployment.endDate)}</span>
-                                </div>
+                            {/* Dates + duration */}
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 border-t pt-3">
+                                <span className="flex items-center gap-1">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    Started: <strong>{fmtDate(dep.deploymentDate) ?? "—"}</strong>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    Ended: <strong>{fmtDate(dep.endDate) ?? "Present"}</strong>
+                                </span>
+                                <span className="text-gray-400">
+                                    Duration: <strong>{calcDuration(dep.deploymentDate, dep.endDate)}</strong>
+                                </span>
+                                {dep.salary != null && (
+                                    <span className="flex items-center gap-1">
+                                        <DollarSign className="h-3.5 w-3.5" />
+                                        PKR {dep.salary.toLocaleString()}
+                                    </span>
+                                )}
                             </div>
+
+                            {/* Who deployed / revoked */}
+                            {(dep.deployedByName || dep.revokedByName || dep.endReason) && (
+                                <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-2 pt-2 border-t">
+                                    {dep.deployedByName && (
+                                        <span className="flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            Deployed by: <strong>{dep.deployedByName}</strong>
+                                        </span>
+                                    )}
+                                    {dep.revokedByName && (
+                                        <span className="flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            Revoked by: <strong>{dep.revokedByName}</strong>
+                                        </span>
+                                    )}
+                                    {dep.endReason && (
+                                        <span>End reason: <strong>{dep.endReason}</strong></span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

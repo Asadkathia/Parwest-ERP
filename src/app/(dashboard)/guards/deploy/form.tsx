@@ -330,7 +330,7 @@ export default function DeployGuardForm() {
 
   const loadGuards = async (regionalOfficeId: string) => {
     try {
-      const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}&status=ACTIVE`)
+      const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}&status=ACTIVE,DEFAULT`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
         setGuards(data.map((g: Guard & Record<string, unknown>) => ({

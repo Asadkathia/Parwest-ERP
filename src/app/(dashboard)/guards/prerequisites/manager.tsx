@@ -91,6 +91,18 @@ export default function PrerequisitesManager({ regions }: Props) {
   const [editDocTypeCategory, setEditDocTypeCategory] = useState<"VERIFICATION" | "ATTACHMENT">("ATTACHMENT")
   const [confirmDeleteDocType, setConfirmDeleteDocType] = useState<GuardDocumentType | null>(null)
 
+  // Guard Designation types
+  type DesignationType = { id: string; name: string; isActive: boolean; sortOrder: number }
+  const [designationTypes, setDesignationTypes] = useState<DesignationType[]>([])
+  const [designationTypesLoading, setDesignationTypesLoading] = useState(true)
+  const [designationTypesError, setDesignationTypesError] = useState("")
+  const [showAddDesignationType, setShowAddDesignationType] = useState(false)
+  const [newDesignationTypeName, setNewDesignationTypeName] = useState("")
+  const [savingDesignationType, setSavingDesignationType] = useState(false)
+  const [editingDesignationType, setEditingDesignationType] = useState<DesignationType | null>(null)
+  const [editDesignationTypeName, setEditDesignationTypeName] = useState("")
+  const [confirmDeleteDesignationType, setConfirmDeleteDesignationType] = useState<DesignationType | null>(null)
+
   // Ex-Service types
   type ExServiceType = { id: string; name: string; isActive: boolean; sortOrder: number }
   const [exServiceTypes, setExServiceTypes] = useState<ExServiceType[]>([])
@@ -172,6 +184,89 @@ export default function PrerequisitesManager({ regions }: Props) {
   }, [])
 
   useEffect(() => { loadPledgeTypes() }, [loadPledgeTypes])
+
+  const loadDesignationTypes = useCallback(async () => {
+    setDesignationTypesLoading(true)
+    setDesignationTypesError("")
+    try {
+      const res = await fetch("/api/guard-designation-types?activeOnly=false")
+      if (!res.ok) throw new Error()
+      setDesignationTypes(await res.json())
+    } catch {
+      setDesignationTypesError("Failed to load designation types")
+    } finally {
+      setDesignationTypesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadDesignationTypes() }, [loadDesignationTypes])
+
+  const handleAddDesignationType = async () => {
+    const name = newDesignationTypeName.trim()
+    if (!name) return
+    setSavingDesignationType(true)
+    setDesignationTypesError("")
+    try {
+      const res = await fetch("/api/guard-designation-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.error || "Failed"); return }
+      setNewDesignationTypeName("")
+      setShowAddDesignationType(false)
+      await loadDesignationTypes()
+    } catch {
+      setDesignationTypesError("Failed to add designation type")
+    } finally {
+      setSavingDesignationType(false)
+    }
+  }
+
+  const handleEditDesignationType = async () => {
+    if (!editingDesignationType) return
+    const name = editDesignationTypeName.trim()
+    if (!name) return
+    setSavingDesignationType(true)
+    try {
+      const res = await fetch(`/api/guard-designation-types/${editingDesignationType.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.error || "Failed"); return }
+      setEditingDesignationType(null)
+      setEditDesignationTypeName("")
+      await loadDesignationTypes()
+    } catch {
+      setDesignationTypesError("Failed to update designation type")
+    } finally {
+      setSavingDesignationType(false)
+    }
+  }
+
+  const handleToggleDesignationType = async (dt: DesignationType) => {
+    try {
+      await fetch(`/api/guard-designation-types/${dt.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !dt.isActive }),
+      })
+      await loadDesignationTypes()
+    } catch {
+      setDesignationTypesError("Failed to update designation type")
+    }
+  }
+
+  const handleDeleteDesignationType = async (dt: DesignationType) => {
+    try {
+      await fetch(`/api/guard-designation-types/${dt.id}`, { method: "DELETE" })
+      setConfirmDeleteDesignationType(null)
+      await loadDesignationTypes()
+    } catch {
+      setDesignationTypesError("Failed to delete designation type")
+    }
+  }
 
   const loadExServiceTypes = useCallback(async () => {
     setExServiceTypesLoading(true)
@@ -921,6 +1016,149 @@ export default function PrerequisitesManager({ regions }: Props) {
           />
         </CardBody>
       </Card>
+
+      {/* ── Guard Designation Types ── */}
+      <Card>
+        <CardBody className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <SectionTitle title="Guard Designation Types" subtitle="Configure the list of designations shown in the Branch Contract section when adding/editing clients and branches." />
+            </div>
+            <ActionButton onClick={() => { setShowAddDesignationType((p) => !p); setNewDesignationTypeName("") }} className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Type
+            </ActionButton>
+          </div>
+
+          {designationTypesError ? <InlineAlert type="error" message={designationTypesError} /> : null}
+
+          {showAddDesignationType && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Designation Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newDesignationTypeName}
+                  onChange={(e) => setNewDesignationTypeName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddDesignationType() }}
+                  placeholder="e.g., Armed Guard, Receptionist"
+                  className="ui-input"
+                />
+              </div>
+              <ActionButton onClick={handleAddDesignationType} disabled={savingDesignationType || !newDesignationTypeName.trim()}>
+                {savingDesignationType ? "Saving..." : "Save"}
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => { setShowAddDesignationType(false); setNewDesignationTypeName("") }}>Cancel</ActionButton>
+            </div>
+          )}
+
+          {designationTypesLoading ? (
+            <p className="text-center text-sm text-[var(--text-muted)] py-4">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    {["#", "DESIGNATION NAME", "STATUS", "ACTIONS"].map((h) => (
+                      <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {designationTypes.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-[var(--text-muted)]">No types yet — defaults will be created on first use</td></tr>
+                  ) : designationTypes.map((dt, idx) => (
+                    <tr key={dt.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-[var(--text)]">{dt.name}</td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${dt.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                          {dt.isActive ? "ACTIVE" : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setEditingDesignationType(dt); setEditDesignationTypeName(dt.name) }}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleToggleDesignationType(dt)}
+                            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${dt.isActive ? "text-orange-700 hover:bg-orange-50" : "text-green-700 hover:bg-green-50"}`}
+                          >
+                            {dt.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteDesignationType(dt)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Edit designation type modal */}
+      {editingDesignationType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-base font-semibold">Edit Designation Type</h3>
+              <button onClick={() => setEditingDesignationType(null)} className="text-gray-400 hover:text-gray-600"><XIcon className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Designation Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={editDesignationTypeName}
+                  onChange={(e) => setEditDesignationTypeName(e.target.value)}
+                  className="ui-input"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <ActionButton variant="secondary" onClick={() => setEditingDesignationType(null)}>Cancel</ActionButton>
+              <ActionButton onClick={handleEditDesignationType} disabled={savingDesignationType || !editDesignationTypeName.trim()}>
+                {savingDesignationType ? "Saving..." : "Save"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete designation type confirm */}
+      {confirmDeleteDesignationType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-base font-semibold text-red-700">Delete Designation Type</h3>
+              <button onClick={() => setConfirmDeleteDesignationType(null)} className="text-gray-400 hover:text-gray-600"><XIcon className="h-5 w-5" /></button>
+            </div>
+            <div className="px-6 py-5 text-sm text-[var(--text-muted)]">
+              Are you sure you want to delete <strong>{confirmDeleteDesignationType.name}</strong>? This cannot be undone.
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <ActionButton variant="secondary" onClick={() => setConfirmDeleteDesignationType(null)}>Cancel</ActionButton>
+              <button
+                onClick={() => handleDeleteDesignationType(confirmDeleteDesignationType)}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Ex-Service Types ── */}
       <Card>

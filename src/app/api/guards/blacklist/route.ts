@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { recordGuardServiceEvent } from "@/lib/guards/service-history"
+import { recordGuardStatusChange } from "@/lib/guards/status-history"
 
 function sanitizeCnic(value: string) {
     return value.trim()
@@ -94,16 +96,57 @@ export async function POST(request: NextRequest) {
             },
         })
 
+        // Fetch guard snapshot before updating
+        const guardSnap = await prisma.guard.findUnique({
+            where: { cnic },
+            select: {
+                id: true, parwestId: true, name: true, status: true,
+                region: { select: { name: true } },
+                regionalOffice: { select: { name: true } },
+            },
+        })
+
+        // Blacklisted guards are set to TERMINATED status
         await prisma.guard.updateMany({
             where: { cnic },
-            data: { status: "BLACKLISTED" },
+            data: { status: "TERMINATED" },
         })
+
+        void recordGuardServiceEvent({
+            cnic,
+            guardId: guardSnap?.id ?? null,
+            parwestId: guardSnap?.parwestId ?? null,
+            guardName: guardSnap?.name ?? null,
+            event: "BLACKLISTED",
+            fromStatus: guardSnap?.status ?? null,
+            toStatus: "TERMINATED",
+            description: reason ? `Blacklisted (Terminated). Reason: ${reason}` : "Blacklisted (Terminated)",
+            changedByName: session.user?.name ?? session.user?.email ?? null,
+            regionName: guardSnap?.region?.name ?? null,
+            officeName: guardSnap?.regionalOffice?.name ?? null,
+        })
+
+        if (guardSnap?.id) {
+            void recordGuardStatusChange({
+                guardId: guardSnap.id,
+                cnic,
+                parwestId: guardSnap.parwestId,
+                guardName: guardSnap.name,
+                fromStatus: guardSnap.status,
+                toStatus: "TERMINATED",
+                reason: reason ?? null,
+                changedByName: session.user?.name ?? session.user?.email ?? null,
+                changedByType: "BLACKLIST",
+                regionName: guardSnap.region?.name ?? null,
+                officeName: guardSnap.regionalOffice?.name ?? null,
+            })
+        }
 
         return NextResponse.json(
             {
                 id: blacklistEntry.id,
                 cnic: blacklistEntry.cnic,
-                status: "BLACKLISTED",
+                status: "TERMINATED",
                 reason: blacklistEntry.reason || null,
             },
             { status: 200 }
@@ -137,11 +180,52 @@ export async function DELETE(request: NextRequest) {
             return notFound("Blacklist record not found.")
         }
 
-        await prisma.blacklistedCnic.delete({ where: { id: record.id } })
-        await prisma.guard.updateMany({
-            where: { cnic: record.cnic, status: "BLACKLISTED" },
-            data: { status: "ACTIVE" },
+        // Fetch guard snapshot before updating
+        const guardSnapDel = await prisma.guard.findUnique({
+            where: { cnic: record.cnic },
+            select: {
+                id: true, parwestId: true, name: true,
+                region: { select: { name: true } },
+                regionalOffice: { select: { name: true } },
+            },
         })
+
+        await prisma.blacklistedCnic.delete({ where: { id: record.id } })
+        // Restore to DEFAULT (ready for redeployment) when un-blacklisted
+        await prisma.guard.updateMany({
+            where: { cnic: record.cnic, status: "TERMINATED" },
+            data: { status: "DEFAULT" },
+        })
+
+        void recordGuardServiceEvent({
+            cnic: record.cnic,
+            guardId: guardSnapDel?.id ?? null,
+            parwestId: guardSnapDel?.parwestId ?? null,
+            guardName: guardSnapDel?.name ?? null,
+            event: "UNBLACKLISTED",
+            fromStatus: "TERMINATED",
+            toStatus: "DEFAULT",
+            description: "Removed from blacklist — restored to DEFAULT",
+            changedByName: session.user?.name ?? session.user?.email ?? null,
+            regionName: guardSnapDel?.region?.name ?? null,
+            officeName: guardSnapDel?.regionalOffice?.name ?? null,
+        })
+
+        if (guardSnapDel?.id) {
+            void recordGuardStatusChange({
+                guardId: guardSnapDel.id,
+                cnic: record.cnic,
+                parwestId: guardSnapDel.parwestId,
+                guardName: guardSnapDel.name,
+                fromStatus: "TERMINATED",
+                toStatus: "DEFAULT",
+                reason: "Removed from blacklist",
+                changedByName: session.user?.name ?? session.user?.email ?? null,
+                changedByType: "BLACKLIST",
+                regionName: guardSnapDel.region?.name ?? null,
+                officeName: guardSnapDel.regionalOffice?.name ?? null,
+            })
+        }
 
         return NextResponse.json({ success: true, cnic: record.cnic })
     } catch (error: unknown) {

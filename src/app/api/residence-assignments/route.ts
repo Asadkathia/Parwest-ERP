@@ -6,32 +6,22 @@ import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/a
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
-        if (!session) {
-            return unauthorized()
-        }
+        if (!session) return unauthorized()
 
         const { searchParams } = new URL(request.url)
         const location = searchParams.get("location")?.trim()
+        const status = searchParams.get("status")?.trim()
+        const guardId = searchParams.get("guardId")?.trim()
 
         const assignments = await prisma.residenceAssignment.findMany({
             where: {
+                ...(status ? { status } : {}),
+                ...(guardId ? { guardId } : {}),
                 ...(location
                     ? {
                         OR: [
-                            {
-                                location: {
-                                    contains: location,
-                                    mode: "insensitive",
-                                },
-                            },
-                            {
-                                residence: {
-                                    address: {
-                                        contains: location,
-                                        mode: "insensitive",
-                                    },
-                                },
-                            },
+                            { location: { contains: location, mode: "insensitive" } },
+                            { residence: { address: { contains: location, mode: "insensitive" } } },
                         ],
                     }
                     : {}),
@@ -39,21 +29,10 @@ export async function GET(request: NextRequest) {
             orderBy: { assignedAt: "desc" },
             include: {
                 guard: {
-                    select: {
-                        id: true,
-                        parwestId: true,
-                        name: true,
-                        cnic: true,
-                    },
+                    select: { id: true, parwestId: true, name: true, cnic: true },
                 },
                 residence: {
-                    select: {
-                        id: true,
-                        address: true,
-                        ownerName: true,
-                        ownerPhone: true,
-                        supervisor: true,
-                    },
+                    select: { id: true, address: true, supervisor: true, city: true, state: true },
                 },
             },
             take: 500,
@@ -69,15 +48,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const session = await auth()
-        if (!session) {
-            return unauthorized()
-        }
+        if (!session) return unauthorized()
 
         const body = await request.json()
 
         if (!body.guardId || (!body.location && !body.residenceId)) {
             return badRequest("guardId and either location or residenceId are required")
         }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionUser = (session as any)?.user as { name?: string; email?: string } | undefined
+        const assignedByName = sessionUser?.name ?? sessionUser?.email ?? null
 
         const assignedAt = body.assignedAt ? new Date(body.assignedAt) : new Date()
         const selectedResidence = body.residenceId
@@ -96,37 +77,30 @@ export async function POST(request: NextRequest) {
             return badRequest("Valid location is required")
         }
 
-        const assignment = await prisma.residenceAssignment.upsert({
-            where: {
-                guardId: body.guardId,
+        // Vacate any existing active assignment for this guard
+        await prisma.residenceAssignment.updateMany({
+            where: { guardId: body.guardId, status: "ACTIVE" },
+            data: {
+                status: "VACATED",
+                vacatedAt: assignedAt,
+                vacatedByName: assignedByName,
+                vacatedReason: "Reassigned to new residence",
             },
-            update: {
+        })
+
+        const assignment = await prisma.residenceAssignment.create({
+            data: {
+                guardId: body.guardId,
                 residenceId: selectedResidence?.id || null,
                 location: finalLocation,
+                status: "ACTIVE",
                 assignedAt,
-                notes: body.notes || null,
-            },
-            create: {
-                guardId: body.guardId,
-                residenceId: selectedResidence?.id || null,
-                location: finalLocation,
-                assignedAt,
+                assignedByName,
                 notes: body.notes || null,
             },
             include: {
-                guard: {
-                    select: {
-                        id: true,
-                        parwestId: true,
-                        name: true,
-                    },
-                },
-                residence: {
-                    select: {
-                        id: true,
-                        address: true,
-                    },
-                },
+                guard: { select: { id: true, parwestId: true, name: true } },
+                residence: { select: { id: true, address: true } },
             },
         })
 

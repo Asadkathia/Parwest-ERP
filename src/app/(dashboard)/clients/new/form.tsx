@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Plus, X, Upload, CheckCircle2, ExternalLink, Paperclip
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
+import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 
 // Client types loaded dynamically from DB (see useEffect below)
@@ -26,19 +27,7 @@ const PROVINCE_OPTIONS = [
     { value: "All Pakistan", label: "All Pakistan" },
 ]
 
-const DESIGNATION_OPTIONS = [
-    { value: "Guard", label: "Guard" },
-    { value: "Supervisor", label: "Supervisor" },
-    { value: "CPO", label: "CPO" },
-    { value: "Armed Guard", label: "Armed Guard" },
-    { value: "Unarmed Guard", label: "Unarmed Guard" },
-]
-
-const EX_SERVICE_OPTIONS = [
-    { value: "Yes", label: "Yes" },
-    { value: "No", label: "No" },
-    { value: "Other", label: "Other" },
-]
+// These are now loaded dynamically from /api/guard-designation-types and /api/guard-ex-service-types
 
 type Region = {
     id: string
@@ -93,6 +82,27 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [branchOperationsManagerId, setBranchOperationsManagerId] = useState("")
     const [branchLatManual, setBranchLatManual] = useState("")
     const [branchLngManual, setBranchLngManual] = useState("")
+    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
+    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
+
+    useEffect(() => {
+        fetch("/api/guard-designation-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setDesignationOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                }
+            })
+            .catch(() => {})
+        fetch("/api/guard-ex-service-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setExServiceOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     useEffect(() => {
         fetch("/api/client-types")
@@ -534,65 +544,12 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                     </div>
                 </div>
 
-                {/* ── BRANCHLESS: Location Information ── */}
-                {isBranchless && (
-                    <div className="space-y-6">
-                        <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Location Information</h2>
-
-                        {/* Map picker */}
-                        <div>
-                            <label className="block text-sm font-medium text-[var(--text)] mb-2">
-                                Pick Location on Map
-                                <span className="ml-1 text-xs font-normal text-[var(--text-muted)]">(search or click to drop marker — or type coordinates manually below)</span>
-                            </label>
-                            <LocationPickerMap
-                                latName="latitude"
-                                lngName="longitude"
-                                label="Location"
-                                onLocationChange={(lat, lng) => { setLatManual(lat); setLngManual(lng) }}
-                            />
-                        </div>
-
-                        {/* Manual coordinate override + capacities */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Latitude <span className="text-xs">(manual)</span></label>
-                                <input type="text" name="latitudeManual" className="ui-input" placeholder="e.g. 31.5204" value={latManual} onChange={(e) => setLatManual(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Longitude <span className="text-xs">(manual)</span></label>
-                                <input type="text" name="longitudeManual" className="ui-input" placeholder="e.g. 74.3587" value={lngManual} onChange={(e) => setLngManual(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Day Guard Capacity</label>
-                                <input type="number" name="dayGuardCapacity" className="ui-input" placeholder="0" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Night Guard Capacity</label>
-                                <input type="number" name="nightGuardCapacity" className="ui-input" placeholder="0" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Day Supervisor Capacity</label>
-                                <input type="number" name="daySupervisorCapacity" className="ui-input" placeholder="0" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">Night Supervisor Capacity</label>
-                                <input type="number" name="nightSupervisorCapacity" className="ui-input" placeholder="0" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-[var(--text-muted)] mb-1">CPO Capacity</label>
-                                <input type="number" name="cpoCapacity" className="ui-input" placeholder="0" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {isBranchless && <input type="hidden" name="default_branch_name" value="" />}
-
-                {/* ── BRANCH CLIENT: Add Client's New Branch ── */}
-                {!isBranchless && (
-                    <div className="space-y-8">
-                        <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Add Client&apos;s New Branch</h2>
+                {/* ── BRANCH / DEFAULT BRANCH (both branchless and branch clients) ── */}
+                <input type="hidden" name="defaultBranchName" value={isBranchless ? "__branchless_default__" : defaultBranchName} />
+                <div className="space-y-8">
+                        <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">
+                            {isBranchless ? "Client Location & Capacity (Default Branch)" : "Add Client's New Branch"}
+                        </h2>
 
                         {/* Basic Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -860,23 +817,16 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         </div>
 
                     </div>
-                )}
 
-                {/* ── BRANCHLESS: Contract ── */}
-                {isBranchless && (
+                    {/* ── Contract (unified for both modes) ── */}
                     <div>
-                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branchless Client Contract</h2>
-                        <ContractFields regions={regions} prefix="" />
+                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">
+                            {isBranchless ? "Branchless Client Contract" : "Branch Client Contract"}
+                        </h2>
+                        <ContractFields regions={regions} prefix="" designationOptions={designationOptions} exServiceOptions={exServiceOptions} />
                     </div>
-                )}
 
-                {/* ── BRANCH CLIENT: Branch Contract ── */}
-                {!isBranchless && (
-                    <div>
-                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Client Contract</h2>
-                        <ContractFields regions={regions} prefix="" />
-                    </div>
-                )}
+                </div>
 
                 {/* ── CONTRACT PDF ATTACHMENT (both modes) ── */}
                 <div>
@@ -936,8 +886,6 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                     </div>
                 </div>
 
-            </div>
-
             {/* Form Actions */}
             <div className="flex items-center gap-4 mt-8 pt-6 border-t">
                 <Link href="/clients" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
@@ -958,7 +906,12 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
 }
 
 // ── Shared contract fields component ────────────────────────────────────────
-function ContractFields({ regions, prefix }: { regions: Region[]; prefix: string }) {
+function ContractFields({ regions, prefix, designationOptions, exServiceOptions }: {
+    regions: Region[]
+    prefix: string
+    designationOptions: { value: string; label: string }[]
+    exServiceOptions: { value: string; label: string }[]
+}) {
     const n = (name: string) => prefix ? `${prefix}_${name}` : name
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -995,11 +948,11 @@ function ContractFields({ regions, prefix }: { regions: Region[]; prefix: string
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                        <SearchSelect name={n("contractDayGuardDesignation")} options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                        <MultiSearchSelect name={n("contractDayGuardDesignation")} options={designationOptions} placeholder="Select designations" />
                     </div>
                     <div>
                         <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                        <SearchSelect name={n("contractDayGuardExService")} options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                        <MultiSearchSelect name={n("contractDayGuardExService")} options={exServiceOptions} placeholder="Select" />
                     </div>
                 </div>
             </div>
@@ -1010,11 +963,11 @@ function ContractFields({ regions, prefix }: { regions: Region[]; prefix: string
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                        <SearchSelect name={n("contractNightGuardDesignation")} options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                        <MultiSearchSelect name={n("contractNightGuardDesignation")} options={designationOptions} placeholder="Select designations" />
                     </div>
                     <div>
                         <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                        <SearchSelect name={n("contractNightGuardExService")} options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                        <MultiSearchSelect name={n("contractNightGuardExService")} options={exServiceOptions} placeholder="Select" />
                     </div>
                 </div>
             </div>

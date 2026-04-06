@@ -15,7 +15,6 @@ const CITY_OPTIONS = [
     "Rawalpindi","Sheikhupura","Sialkot","Toba Tek Singh","Vehari",
 ]
 
-const GUARD_TYPE_OPTIONS = ["GUARD", "SUPERVISOR", "CPO", "ARMED GUARD", "UNARMED GUARD"]
 const CONTRACT_TYPE_OPTIONS = ["GENERAL", "SPECIAL", "RENEWAL"]
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -191,16 +190,17 @@ function ContractFormModal({
 
 // ── Add Rate Modal ─────────────────────────────────────────────────────────────
 function AddRateModal({
-    clientId, contractId, exServiceTypes, onClose, onCreated,
+    clientId, contractId, guardTypes, exServiceTypes, onClose, onCreated,
 }: {
     clientId: string
     contractId: string
+    guardTypes: string[]
     exServiceTypes: string[]
     onClose: () => void
     onCreated: (r: ContractRate) => void
 }) {
     const [form, setForm] = useState({
-        province: "", city: "", guardType: "GUARD", exService: "",
+        province: "", city: "", guardType: guardTypes[0] ?? "", exService: "",
         rate: "", extraHourRate: "", isCurrentRate: false,
         rateStartDate: "", rateEndDate: "",
     })
@@ -277,7 +277,7 @@ function AddRateModal({
                     </Field>
                     <Field label="Guard Type *">
                         <select value={form.guardType} onChange={(e) => set("guardType", e.target.value)} className={inputCls}>
-                            {GUARD_TYPE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+                            {guardTypes.map((g) => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </Field>
                     <Field label="Ex-Service Type">
@@ -308,10 +308,11 @@ function AddRateModal({
 
 // ── Contract Card ──────────────────────────────────────────────────────────────
 function ContractCard({
-    contract, clientId, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
+    contract, clientId, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
 }: {
     contract: Contract
     clientId: string
+    guardTypes: string[]
     exServiceTypes: string[]
     onContractUpdated: (c: Contract) => void
     onRateAdded: (contractId: string, rate: ContractRate) => void
@@ -454,6 +455,7 @@ function ContractCard({
                 <AddRateModal
                     clientId={clientId}
                     contractId={contract.id}
+                    guardTypes={guardTypes}
                     exServiceTypes={exServiceTypes}
                     onClose={() => setShowAddRate(false)}
                     onCreated={(rate) => { onRateAdded(contract.id, rate); setShowAddRate(false) }}
@@ -479,16 +481,22 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
     const [loading, setLoading] = useState(true)
     const [showAddContract, setShowAddContract] = useState(false)
     const [filterBranchId, setFilterBranchId] = useState<string>("all")
+    const [guardTypes, setGuardTypes] = useState<string[]>(["GUARD", "SUPERVISOR", "CPO", "ARMED GUARD", "UNARMED GUARD"])
     const [exServiceTypes, setExServiceTypes] = useState<string[]>(["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"])
 
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [contractsRes, exRes] = await Promise.all([
+            const [contractsRes, guardRes, exRes] = await Promise.all([
                 fetch(`/api/clients/${clientId}/contracts`),
+                fetch("/api/guard-designation-types?activeOnly=true"),
                 fetch("/api/guard-ex-service-types?activeOnly=true"),
             ])
             if (contractsRes.ok) setContracts(await contractsRes.json())
+            if (guardRes.ok) {
+                const types = await guardRes.json() as { name: string }[]
+                if (types.length > 0) setGuardTypes(types.map((t) => t.name))
+            }
             if (exRes.ok) {
                 const types = await exRes.json() as { name: string }[]
                 if (types.length > 0) setExServiceTypes(types.map((t) => t.name))
@@ -586,6 +594,7 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                             key={contract.id}
                             contract={contract}
                             clientId={clientId}
+                            guardTypes={guardTypes}
                             exServiceTypes={exServiceTypes}
                             onContractUpdated={onContractUpdated}
                             onRateAdded={onRateAdded}

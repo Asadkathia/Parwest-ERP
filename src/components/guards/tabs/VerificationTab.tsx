@@ -15,8 +15,12 @@ type PrereqRow = {
   attachmentData: string | null
   attachmentName: string | null
   documentUrl: string | null
+  uploadedBy: string | null
+  uploadedAt: string | null
   verifiedAt: string | null
   verifiedBy: string | null
+  editedBy: string | null
+  editedAt: string | null
   expiryDate: string | null
   comments: string | null
   updatedAt: string | null
@@ -208,8 +212,11 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
               <th className="px-4 py-3 text-left">Document</th>
               <th className="px-4 py-3 text-left">Uploaded File</th>
               <th className="px-4 py-3 text-left">Verification Status</th>
+              <th className="px-4 py-3 text-left">Uploaded By</th>
+              <th className="px-4 py-3 text-left">Uploaded Date</th>
               <th className="px-4 py-3 text-left">Verified By</th>
               <th className="px-4 py-3 text-left">Verified Date</th>
+              <th className="px-4 py-3 text-left">Edited By</th>
               <th className="px-4 py-3 text-left">Expiry</th>
               <th className="px-4 py-3 text-left">Actions</th>
             </tr>
@@ -217,7 +224,7 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={11} className="px-4 py-10 text-center text-gray-400">
                   No verification document types configured. Go to <strong>Guards → Prerequisites</strong> and add document types with category <em>Verification Document</em>.
                 </td>
               </tr>
@@ -241,8 +248,18 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
                   <td className="px-4 py-3">
                     <VerifBadge status={row.status} verificationStatus={row.verificationStatus} hasFile={hasFile} />
                   </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">{row.uploadedBy || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.uploadedAt)}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">{row.verifiedBy || "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.verifiedAt)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    {row.editedBy ? (
+                      <span title={row.editedAt ? `Edited: ${formatDate(row.editedAt)}` : undefined}>
+                        {row.editedBy}
+                        {row.editedAt && <span className="block text-gray-400">{formatDate(row.editedAt)}</span>}
+                      </span>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.expiryDate)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">

@@ -84,8 +84,8 @@ export async function PATCH(
                 select: { id: true, status: true, regionalOfficeId: true },
             })
             if (!guard) return notFound("Guard not found.")
-            if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && String(guard.status) !== "ACTIVE") {
-                return conflict("Only ACTIVE guards can be deployed.")
+            if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.status !== "ACTIVE" && guard.status !== "DEFAULT") {
+                return conflict("Only ACTIVE or DEFAULT guards can be deployed.")
             }
 
             if (isWorkflowRuleEnabled("deployments.singleActivePerGuard")) {

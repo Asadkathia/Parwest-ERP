@@ -33,14 +33,18 @@ export async function PATCH(
       "FEEDBACK_PENDING",
     ]
 
-    const data: Record<string, unknown> = {}
+    const editorName = session.user?.name ?? session.user?.email ?? "Admin"
+    const data: Record<string, unknown> = {
+      editedBy: editorName,
+      editedAt: new Date(),
+    }
 
     if (body.status !== undefined) {
       if (!allowedStatuses.includes(body.status)) return badRequest("Invalid status")
       data.status = body.status
       if (body.status === "VERIFIED") {
         data.verifiedAt = new Date()
-        data.verifiedBy = session.user?.name ?? session.user?.email ?? "Admin"
+        data.verifiedBy = editorName
       }
     }
 

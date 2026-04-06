@@ -6,6 +6,8 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { recordGuardServiceEvent } from "@/lib/guards/service-history"
+import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
@@ -25,12 +27,17 @@ export async function GET(request: NextRequest) {
         const where: Prisma.GuardWhereInput = {}
         if (regionId) where.regionId = regionId
         if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
-        if (status) where.status = status
+        if (status) {
+            const statuses = status.split(",").map((s) => s.trim()).filter(Boolean)
+            if (statuses.length === 1) where.status = statuses[0]
+            else if (statuses.length > 1) where.status = { in: statuses }
+        }
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
 
         if (isRuntimeMockEnabled()) {
+            const statusFilter = status ? status.split(",").map((s) => s.trim()) : null
             const guards = mockGuardsList
-                .filter((guard) => (where.status ? guard.status === where.status : true))
+                .filter((guard) => (statusFilter ? statusFilter.includes(guard.status) : true))
                 .filter((guard) =>
                     applyManagerScope([guard], managerScope, {
                         regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
@@ -90,11 +97,15 @@ export async function POST(request: NextRequest) {
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
         let officeSeriesCode: string | null = null
+        let officeName: string | null = null
+        let regionName: string | null = null
         if (bodyRegionalOfficeId) {
             const office = await prisma.regionalOffice.findUnique({
                 where: { id: bodyRegionalOfficeId },
-                select: { id: true, regionId: true, seriesCode: true },
+                select: { id: true, regionId: true, seriesCode: true, name: true, region: { select: { name: true } } },
             })
+            officeName = office?.name ?? null
+            regionName = office?.region?.name ?? null
             if (!office) {
                 return badRequest("Selected regional office does not exist.")
             }
@@ -377,6 +388,35 @@ export async function POST(request: NextRequest) {
                         // Non-critical — guard is already created, supervisor can be assigned later
                     }
                 }
+
+                // Record service history event
+                void recordGuardServiceEvent({
+                    cnic: guard.cnic,
+                    guardId: guard.id,
+                    parwestId: guard.parwestId,
+                    guardName: guard.name,
+                    event: "ENROLLED",
+                    toStatus: guard.status,
+                    description: `Guard enrolled with Parwest ID ${guard.parwestId}`,
+                    changedByName: session.user?.name ?? session.user?.email ?? null,
+                    regionName,
+                    officeName,
+                })
+
+                // Record initial status in status history
+                void recordGuardStatusChange({
+                    guardId: guard.id,
+                    cnic: guard.cnic,
+                    parwestId: guard.parwestId,
+                    guardName: guard.name,
+                    fromStatus: null,
+                    toStatus: guard.status,
+                    reason: "Guard enrolled in the system",
+                    changedByName: session.user?.name ?? session.user?.email ?? null,
+                    changedByType: "ENROLLMENT",
+                    regionName,
+                    officeName,
+                })
 
                 return NextResponse.json(
                     { ...guard, ageApprovalRequired, ageApprovalReason },

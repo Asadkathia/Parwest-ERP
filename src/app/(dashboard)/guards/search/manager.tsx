@@ -2,623 +2,424 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Download, Search, X } from "lucide-react"
+import { Download, Loader2, Search, X } from "lucide-react"
 import DataTable from "@/components/shared/DataTable"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
+import SearchSelect from "@/components/ui/SearchSelect"
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type Guard = {
-  id: string
-  parwestId: string
-  name: string
-  cnic: string
-  phone: string | null
-  photoUrl?: string | null
-  status: string
-  education: string | null
-  supervisorName?: string | null
-  religion?: string | null
-  bankName?: string | null
-  bankAccountType?: string | null
-  bankAccountStatus?: string | null
-  bankCardStatus?: string | null
-  paymentMode?: "BANK" | "CASH" | string
-  guardCategory?: "MUJAHID" | "REGULAR" | "EX_SERVICE" | "OTHER" | string
-  joiningDate?: string | null
-  client?: string | null
-  supervisor?: string | null
-  exService?: string | null
-  verificationType?: string | null
-  verificationStatus?: string | null
-  createdAt?: string | null
-  residence?: string | null
-  isOverstaying?: boolean
-  isOnNightDuty?: boolean
-  isArchived?: boolean
+    id: string
+    parwestId: string
+    name: string
+    cnic: string
+    phone: string | null
+    photoUrl?: string | null
+    status: string
+    education: string | null
+    religion: string | null
+    exServiceType: string | null
+    createdAt: string | null
+    officeName: string | null
+    supervisorName: string | null
+    clientName: string | null
+    prerequisites: Array<{ docTypeName: string; status: string; verificationStatus: string | null }>
+}
+
+type Meta = {
+    statuses: string[]
+    exServiceTypes: string[]
+    verificationTypes: string[]
+    verificationStatuses: string[]
+    prerequisiteStatuses: string[]
+    clients: { id: string; name: string }[]
+    offices: { id: string; name: string }[]
+    educations: string[]
+    religions: string[]
 }
 
 type Filters = {
-  parwestId: string
-  name: string
-  cnic: string
-  phone: string
-  education: string
-  religion: string
-  status: string
-  client: string
-  supervisor: string
-  exService: string
-  verificationType: string
-  verificationStatus: string
-  createdFrom: string
-  createdTo: string
-  bankName: string
-  bankAccountStatus: string
-  bankCardStatus: string
-  bankAccountType: string
-  paymentMode: string
-  guardCategory: string
-  residence: string
-  overStaying: boolean
-  onNightDuty: boolean
-  isArchived: boolean
-  terminatedRecords: boolean
-  rowsPerPage: string
-  tableSearch: string
-  selectDate: string
+    parwestId: string
+    name: string
+    cnic: string
+    phone: string
+    education: string
+    religion: string
+    status: string
+    clientId: string
+    supervisor: string
+    exServiceType: string
+    verificationType: string
+    verificationStatus: string
+    prereqStatus: string
+    officeId: string
+    createdFrom: string
+    createdTo: string
+    selectDate: string
+    tableSearch: string
+    rowsPerPage: string
+    terminatedRecords: boolean
+    onNightDuty: boolean
+    overStaying: boolean
 }
 
 const defaultFilters: Filters = {
-  parwestId: "",
-  name: "",
-  cnic: "",
-  phone: "",
-  education: "",
-  religion: "",
-  status: "",
-  client: "",
-  supervisor: "",
-  exService: "",
-  verificationType: "",
-  verificationStatus: "",
-  createdFrom: "",
-  createdTo: "",
-  bankName: "",
-  bankAccountStatus: "",
-  bankCardStatus: "",
-  bankAccountType: "",
-  paymentMode: "",
-  guardCategory: "",
-  residence: "",
-  overStaying: false,
-  onNightDuty: false,
-  isArchived: false,
-  terminatedRecords: false,
-  rowsPerPage: "",
-  tableSearch: "",
-  selectDate: "",
+    parwestId: "",
+    name: "",
+    cnic: "",
+    phone: "",
+    education: "",
+    religion: "",
+    status: "",
+    clientId: "",
+    supervisor: "",
+    exServiceType: "",
+    verificationType: "",
+    verificationStatus: "",
+    prereqStatus: "",
+    officeId: "",
+    createdFrom: "",
+    createdTo: "",
+    selectDate: "",
+    tableSearch: "",
+    rowsPerPage: "25",
+    terminatedRecords: false,
+    onNightDuty: false,
+    overStaying: false,
 }
 
-const LEGACY_EDUCATION_OPTIONS = ["Intermediate", "Matric", "Middle", "Graduate", "B.A", "BSc", "M.A", "Msc"]
-const LEGACY_RELIGION_OPTIONS = ["Islam", "Christianity", "Hinduism"]
-const LEGACY_STATUS_OPTIONS = ["present", "absent", "on-training", "default", "resigned", "Long Leave", "Inactive", "Pending"]
-const LEGACY_CLIENT_OPTIONS = ["National Bank of Pakistan", "Standard Chartered Bank Limited Pakistan", "United Bank Limited", "MCB Bank Ltd"]
-const LEGACY_EX_SERVICE_OPTIONS = ["other", "mujahid", "rangers", "police", "army"]
-const LEGACY_VERIFICATION_TYPE_OPTIONS = ["NADRA Verification", "Health Certificate", "Police Verification", "Character Verification", "Mental Health Check"]
-const LEGACY_VERIFICATION_STATUS_OPTIONS = ["pending", "verified", "rejected", "in-process"]
-const LEGACY_BANK_ACCOUNT_STATUS_OPTIONS = ["active", "pending", "blocked", "closed"]
-const LEGACY_BANK_CARD_STATUS_OPTIONS = ["received", "pending", "blocked", "not-issued"]
-const LEGACY_BANK_ACCOUNT_TYPE_OPTIONS = ["saving", "current", "salary"]
-const LEGACY_RESIDENCE_OPTIONS = ["Lahore Cantt", "Johar Town", "Bahria Town", "Model Town", "DHA"]
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const lc = (v?: string | null) => String(v ?? "").toLowerCase()
+
+const STATUS_COLORS: Record<string, "success" | "warning" | "neutral" | "danger"> = {
+    ACTIVE:     "success",
+    PRESENT:    "success",
+    PENDING:    "warning",
+    DEFAULT:    "neutral",
+    ABSENT:     "warning",
+    INACTIVE:   "neutral",
+    TERMINATED: "danger",
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function SearchGuardsManager() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters)
-  const [guards, setGuards] = useState<Guard[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [notice, setNotice] = useState("")
+    const [filters, setFilters] = useState<Filters>(defaultFilters)
+    const [guards, setGuards] = useState<Guard[]>([])
+    const [meta, setMeta] = useState<Meta>({
+        statuses: [],
+        exServiceTypes: [],
+        verificationTypes: [],
+        verificationStatuses: [],
+        prerequisiteStatuses: [],
+        clients: [],
+        offices: [],
+        educations: [],
+        religions: [],
+    })
+    const [metaLoading, setMetaLoading] = useState(true)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
 
-  const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
+    const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
+        setFilters((prev) => ({ ...prev, [key]: value }))
 
-  const resetFilters = () => {
-    setFilters(defaultFilters)
-  }
+    const resetFilters = () => setFilters(defaultFilters)
 
-  const updateGuardStatus = (guardId: string, status: string) => {
-    setGuards((prev) => prev.map((guard) => (guard.id === guardId ? { ...guard, status } : guard)))
-    setNotice(`Guard status updated to ${status}.`)
-  }
+    // Load meta (dynamic options) once on mount
+    useEffect(() => {
+        setMetaLoading(true)
+        fetch("/api/guards/search/meta")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => { if (data) setMeta(data) })
+            .catch(() => {})
+            .finally(() => setMetaLoading(false))
+    }, [])
 
-  const loadGuards = async () => {
-    try {
-      setLoading(true)
-      setError("")
+    // Build server-side params and fetch
+    const loadGuards = async () => {
+        setLoading(true)
+        setError("")
+        try {
+            const params = new URLSearchParams()
+            const q = [filters.parwestId, filters.name, filters.cnic, filters.phone].filter(Boolean).join(" ").trim()
+            if (q)                    params.set("q", q)
+            if (filters.status)       params.set("status", filters.status)
+            if (filters.education)    params.set("education", filters.education)
+            if (filters.religion)     params.set("religion", filters.religion)
+            if (filters.exServiceType) params.set("exServiceType", filters.exServiceType)
+            if (filters.officeId)     params.set("officeId", filters.officeId)
+            if (filters.clientId)     params.set("clientId", filters.clientId)
+            if (filters.createdFrom)  params.set("createdFrom", filters.createdFrom)
+            if (filters.createdTo)    params.set("createdTo", filters.createdTo)
 
-      const params = new URLSearchParams()
-      const q = [filters.parwestId, filters.name, filters.cnic, filters.phone].filter(Boolean).join(" ").trim()
-      if (q) params.set("q", q)
-      if (filters.paymentMode) params.set("paymentMode", filters.paymentMode)
-      if (filters.guardCategory) params.set("guardCategory", filters.guardCategory)
-
-      const response = await fetch(`/api/guards/search?${params.toString()}`)
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.message || "Failed to fetch guards")
-      }
-
-      const data = (await response.json()) as Guard[]
-      setGuards(
-        data.map((guard, index) => ({
-          ...guard,
-          paymentMode: guard.paymentMode || (index % 3 === 0 ? "CASH" : "BANK"),
-          guardCategory: guard.guardCategory || (index % 4 === 0 ? "MUJAHID" : "REGULAR"),
-          client: guard.client || LEGACY_CLIENT_OPTIONS[index % LEGACY_CLIENT_OPTIONS.length],
-          supervisor: guard.supervisor || guard.supervisorName || "",
-          exService: guard.exService || LEGACY_EX_SERVICE_OPTIONS[index % LEGACY_EX_SERVICE_OPTIONS.length],
-          verificationType: guard.verificationType || LEGACY_VERIFICATION_TYPE_OPTIONS[index % LEGACY_VERIFICATION_TYPE_OPTIONS.length],
-          verificationStatus: guard.verificationStatus || LEGACY_VERIFICATION_STATUS_OPTIONS[index % LEGACY_VERIFICATION_STATUS_OPTIONS.length],
-          bankAccountStatus: guard.bankAccountStatus || LEGACY_BANK_ACCOUNT_STATUS_OPTIONS[index % LEGACY_BANK_ACCOUNT_STATUS_OPTIONS.length],
-          bankCardStatus: guard.bankCardStatus || LEGACY_BANK_CARD_STATUS_OPTIONS[index % LEGACY_BANK_CARD_STATUS_OPTIONS.length],
-          bankAccountType: guard.bankAccountType || LEGACY_BANK_ACCOUNT_TYPE_OPTIONS[index % LEGACY_BANK_ACCOUNT_TYPE_OPTIONS.length],
-          residence: guard.residence || LEGACY_RESIDENCE_OPTIONS[index % LEGACY_RESIDENCE_OPTIONS.length],
-          createdAt: guard.createdAt || new Date(Date.now() - index * 86400000 * 14).toISOString(),
-          isOverstaying: typeof guard.isOverstaying === "boolean" ? guard.isOverstaying : index % 5 === 0,
-          isOnNightDuty: typeof guard.isOnNightDuty === "boolean" ? guard.isOnNightDuty : index % 2 === 0,
-          isArchived: typeof guard.isArchived === "boolean" ? guard.isArchived : index % 7 === 0,
-        }))
-      )
-    } catch (err: unknown) {
+            const res = await fetch(`/api/guards/search?${params.toString()}`)
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Failed to fetch guards")
+            setGuards(await res.json())
+        } catch (err) {
             setError(err instanceof Error ? err.message : "Unexpected error")
-      setGuards([])
-    } finally {
-      setLoading(false)
+            setGuards([])
+        } finally {
+            setLoading(false)
+        }
     }
-  }
 
-  useEffect(() => {
-    loadGuards()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Initial load
+    useEffect(() => { loadGuards() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasFilters = useMemo(() => {
-    return Object.entries(filters).some(([key, value]) => {
-      if (typeof value === "boolean") return value
-      return key !== "client" && key !== "supervisor" && key !== "verificationType" && key !== "verificationStatus" && key !== "residence"
-        ? Boolean(value)
-        : Boolean(value)
-    })
-  }, [filters])
+    // Client-side refinement filters (applied on top of server-filtered data)
+    const filteredRows = useMemo(() => {
+        return guards.filter((guard) => {
+            if (filters.supervisor && !lc(guard.supervisorName).includes(lc(filters.supervisor))) return false
 
-  const filteredRows = useMemo(() => {
-    const lc = (v?: string | null) => String(v || "").toLowerCase()
+            if (filters.verificationType) {
+                const match = guard.prerequisites.some((p) => lc(p.docTypeName) === lc(filters.verificationType))
+                if (!match) return false
+            }
+            if (filters.verificationStatus) {
+                const match = guard.prerequisites.some((p) => lc(p.verificationStatus) === lc(filters.verificationStatus))
+                if (!match) return false
+            }
+            if (filters.prereqStatus) {
+                const match = guard.prerequisites.some((p) => lc(p.status) === lc(filters.prereqStatus))
+                if (!match) return false
+            }
 
-    return guards.filter((guard) => {
-      if (filters.parwestId && !lc(guard.parwestId).includes(lc(filters.parwestId))) return false
-      if (filters.name && !lc(guard.name).includes(lc(filters.name))) return false
-      if (filters.cnic && !lc(guard.cnic).includes(lc(filters.cnic))) return false
-      if (filters.phone && !lc(guard.phone).includes(lc(filters.phone))) return false
-      if (filters.status && lc(guard.status) !== lc(filters.status)) return false
-      if (filters.education && !lc(guard.education).includes(lc(filters.education))) return false
-      if (filters.religion && !lc(guard.religion).includes(lc(filters.religion))) return false
-      if (filters.bankName && !lc(guard.bankName).includes(lc(filters.bankName))) return false
-      if (filters.bankAccountType && !lc(guard.bankAccountType).includes(lc(filters.bankAccountType))) return false
-      if (filters.bankAccountStatus && !lc(guard.bankAccountStatus).includes(lc(filters.bankAccountStatus))) return false
-      if (filters.bankCardStatus && !lc(guard.bankCardStatus).includes(lc(filters.bankCardStatus))) return false
-      if (filters.paymentMode && lc(guard.paymentMode) !== lc(filters.paymentMode)) return false
-      if (filters.guardCategory && lc(guard.guardCategory) !== lc(filters.guardCategory)) return false
-      if (filters.client && lc(guard.client) !== lc(filters.client)) return false
-      if (filters.supervisor && lc(guard.supervisor) !== lc(filters.supervisor)) return false
-      if (filters.exService && lc(guard.exService) !== lc(filters.exService)) return false
-      if (filters.verificationType && lc(guard.verificationType) !== lc(filters.verificationType)) return false
-      if (filters.verificationStatus && lc(guard.verificationStatus) !== lc(filters.verificationStatus)) return false
-      if (filters.residence && !lc(guard.residence).includes(lc(filters.residence))) return false
+            if (filters.selectDate && guard.createdAt) {
+                const selected = filters.selectDate
+                const created = guard.createdAt.slice(0, 10)
+                if (selected !== created) return false
+            }
 
-      if (filters.overStaying && !guard.isOverstaying) return false
-      if (filters.onNightDuty && !guard.isOnNightDuty) return false
-      if (filters.isArchived && !guard.isArchived) return false
+            if (filters.tableSearch) {
+                const blob = [guard.parwestId, guard.name, guard.cnic, guard.phone, guard.clientName, guard.supervisorName, guard.status]
+                    .map(lc).join(" ")
+                if (!blob.includes(lc(filters.tableSearch))) return false
+            }
 
-      if (filters.createdFrom && guard.createdAt) {
-        const from = new Date(filters.createdFrom).setHours(0, 0, 0, 0)
-        const created = new Date(guard.createdAt).setHours(0, 0, 0, 0)
-        if (created < from) return false
-      }
-      if (filters.createdTo && guard.createdAt) {
-        const to = new Date(filters.createdTo).setHours(23, 59, 59, 999)
-        const created = new Date(guard.createdAt).getTime()
-        if (created > to) return false
-      }
+            if (!filters.terminatedRecords && lc(guard.status) === "terminated") return false
+            if (filters.terminatedRecords && lc(guard.status) !== "terminated") return false
 
-      if (filters.selectDate && guard.createdAt) {
-        const selected = new Date(filters.selectDate).toISOString().slice(0, 10)
-        const created = new Date(guard.createdAt).toISOString().slice(0, 10)
-        if (selected !== created) return false
-      }
+            return true
+        })
+    }, [guards, filters])
 
-      if (filters.tableSearch) {
-        const searchBlob = [
-          guard.parwestId,
-          guard.name,
-          guard.cnic,
-          guard.phone,
-          guard.client,
-          guard.supervisor,
-          guard.status,
-          guard.verificationStatus,
-        ]
-          .map((entry) => lc(entry))
-          .join(" ")
-        if (!searchBlob.includes(lc(filters.tableSearch))) return false
-      }
+    const supervisorOptions = useMemo(() =>
+        Array.from(new Set(guards.map((g) => g.supervisorName ?? "").filter(Boolean))).sort(),
+        [guards]
+    )
 
-      if (!filters.terminatedRecords && lc(guard.status) === "terminated") return false
-      if (filters.terminatedRecords && lc(guard.status) !== "terminated") return false
+    const rowsPerPage = useMemo(() => {
+        if (filters.rowsPerPage === "All") return Math.max(filteredRows.length, 1)
+        const n = parseInt(filters.rowsPerPage, 10)
+        return Number.isFinite(n) && n > 0 ? n : 25
+    }, [filters.rowsPerPage, filteredRows.length])
 
-      return true
-    })
-  }, [guards, filters])
+    return (
+        <div className="space-y-6">
+            <SectionTitle title="Search Guard" subtitle="Search guards with advanced filters." />
 
-  const supervisorOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        guards
-          .map((guard) => (guard.supervisor || guard.supervisorName || "").trim())
-          .filter((value) => value.length > 0)
-      )
-    ).sort((a, b) => a.localeCompare(b))
-  }, [guards])
+            <div className="ui-card p-5">
+                <h2 className="mb-4 text-base font-semibold">Select Fields</h2>
 
-  const rowsPerPage = useMemo(() => {
-    if (!filters.rowsPerPage) return 10
-    if (filters.rowsPerPage === "All records") return Math.max(filteredRows.length, 1)
-    const parsed = Number.parseInt(filters.rowsPerPage, 10)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10
-  }, [filters.rowsPerPage, filteredRows.length])
+                {metaLoading ? (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4 animate-pulse">
+                        {[...Array(16)].map((_, i) => (
+                            <div key={i} className="space-y-1">
+                                <div className="h-3 w-24 bg-gray-200 rounded" />
+                                <div className="h-9 bg-gray-100 rounded" />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <Input label="Parwest ID"    value={filters.parwestId}   onChange={(v) => setFilter("parwestId", v)}   placeholder="Parwest ID" />
+                        <Input label="Name"          value={filters.name}        onChange={(v) => setFilter("name", v)}        placeholder="Name" />
+                        <Input label="CNIC#"         value={filters.cnic}        onChange={(v) => setFilter("cnic", v)}        placeholder="CNIC#" />
+                        <Input label="Phone Number"  value={filters.phone}       onChange={(v) => setFilter("phone", v)}       placeholder="Phone Number" />
 
-  return (
-    <div className="space-y-6">
-      <SectionTitle title="Search Guard" subtitle="Legacy-style guard search with complete filters and export actions." />
+                        <LabeledSearchSelect label="Education"    value={filters.education}      onChange={(v) => setFilter("education", v)}      options={meta.educations.map((e) => ({ value: e, label: e }))}                                 placeholder="--Select Education--" />
+                        <LabeledSearchSelect label="Religion"     value={filters.religion}       onChange={(v) => setFilter("religion", v)}       options={meta.religions.map((r) => ({ value: r, label: r }))}                                  placeholder="--Select Religion--" />
+                        <LabeledSearchSelect label="Status"       value={filters.status}         onChange={(v) => setFilter("status", v)}         options={meta.statuses.map((s) => ({ value: s, label: s }))}                                   placeholder="--Select Status--" />
+                        <LabeledSearchSelect label="Client"       value={filters.clientId}       onChange={(v) => setFilter("clientId", v)}       options={meta.clients.map((c) => ({ value: c.id, label: c.name }))}                            placeholder="--Select Client--" />
 
-      <div className="ui-card p-5">
-        <h2 className="mb-4 text-base font-semibold">Select Fields</h2>
+                        <LabeledSearchSelect label="Supervisor"          value={filters.supervisor}      onChange={(v) => setFilter("supervisor", v)}      options={supervisorOptions.map((s) => ({ value: s, label: s }))}                 placeholder="--Select Supervisor--" />
+                        <LabeledSearchSelect label="Ex Service Type"     value={filters.exServiceType}   onChange={(v) => setFilter("exServiceType", v)}   options={meta.exServiceTypes.map((e) => ({ value: e, label: e }))}               placeholder="--Select Ex Service--" />
+                        <LabeledSearchSelect label="Verification Type"   value={filters.verificationType}   onChange={(v) => setFilter("verificationType", v)}   options={meta.verificationTypes.map((t) => ({ value: t, label: t }))}    placeholder="--Select Verification Type--" />
+                        <LabeledSearchSelect label="Verification Status" value={filters.verificationStatus} onChange={(v) => setFilter("verificationStatus", v)} options={meta.verificationStatuses.map((s) => ({ value: s, label: s }))} placeholder="--Select Verification Status--" />
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Input label="Parwest ID" value={filters.parwestId} onChange={(v) => setFilter("parwestId", v)} placeholder="Parwest ID" />
-          <Input label="Name" name="name" value={filters.name} onChange={(v) => setFilter("name", v)} placeholder="Name" />
-          <Input label="CNIC#" name="cnic" value={filters.cnic} onChange={(v) => setFilter("cnic", v)} placeholder="CNIC#" />
-          <Input label="Phone Number" name="phoneNumber" value={filters.phone} onChange={(v) => setFilter("phone", v)} placeholder="Phone Number" />
+                        <LabeledSearchSelect label="Prerequisite Status" value={filters.prereqStatus} onChange={(v) => setFilter("prereqStatus", v)} options={meta.prerequisiteStatuses.map((s) => ({ value: s, label: s }))} placeholder="--Select Prereq Status--" />
+                        <LabeledSearchSelect label="Region / Office"     value={filters.officeId}     onChange={(v) => setFilter("officeId", v)}     options={meta.offices.map((o) => ({ value: o.id, label: o.name }))}           placeholder="--All Regions--" />
 
-          <Select
-            label="Select Education"
-            name="education"
-            value={filters.education}
-            onChange={(v) => setFilter("education", v)}
-            options={LEGACY_EDUCATION_OPTIONS}
-            placeholder="--Select Education--"
-          />
-          <Select
-            label="Select Relegion"
-            name="religion"
-            value={filters.religion}
-            onChange={(v) => setFilter("religion", v)}
-            options={LEGACY_RELIGION_OPTIONS}
-            placeholder="--Select Relegion--"
-          />
-          <Select
-            label="Select Status"
-            name="current_status_id"
-            value={filters.status}
-            onChange={(v) => setFilter("status", v)}
-            options={LEGACY_STATUS_OPTIONS}
-            placeholder="--Select Status--"
-          />
-          <Select
-            label="Select Client"
-            name="client_id"
-            value={filters.client}
-            onChange={(v) => setFilter("client", v)}
-            options={LEGACY_CLIENT_OPTIONS}
-            placeholder="--Select Client--"
-          />
-          <Select
-            label="Supervisor"
-            name="supervisor_id"
-            value={filters.supervisor}
-            onChange={(v) => setFilter("supervisor", v)}
-            options={supervisorOptions}
-            placeholder="--Select supervisor--"
-          />
-          <Select
-            label="Ex Service"
-            name="ex_service_id"
-            value={filters.exService}
-            onChange={(v) => setFilter("exService", v)}
-            options={LEGACY_EX_SERVICE_OPTIONS}
-            placeholder="--Select Ex Service--"
-          />
-          <Select
-            label="Verification Type"
-            name="verification_type_id"
-            value={filters.verificationType}
-            onChange={(v) => setFilter("verificationType", v)}
-            options={LEGACY_VERIFICATION_TYPE_OPTIONS}
-            placeholder="--Select Verification Type--"
-          />
-          <Select
-            label="Verification Status"
-            name="verification_status_id"
-            value={filters.verificationStatus}
-            onChange={(v) => setFilter("verificationStatus", v)}
-            options={LEGACY_VERIFICATION_STATUS_OPTIONS}
-            placeholder="--Select Verification Status--"
-          />
+                        <Input label="Created From" type="date" value={filters.createdFrom} onChange={(v) => setFilter("createdFrom", v)} />
+                        <Input label="Created To"   type="date" value={filters.createdTo}   onChange={(v) => setFilter("createdTo", v)} />
 
-          <Input label="Created From" name="createdFrom" type="date" value={filters.createdFrom} onChange={(v) => setFilter("createdFrom", v)} />
-          <Input label="Created To" name="createdTo" type="date" value={filters.createdTo} onChange={(v) => setFilter("createdTo", v)} />
-          <Input label="Bank Name" name="bank_name" value={filters.bankName} onChange={(v) => setFilter("bankName", v)} placeholder="Bank Name" />
-          <Select
-            label="Bank Account Status"
-            name="bank_account_status"
-            value={filters.bankAccountStatus}
-            onChange={(v) => setFilter("bankAccountStatus", v)}
-            options={LEGACY_BANK_ACCOUNT_STATUS_OPTIONS}
-            placeholder="Bank Account Status"
-          />
+                        <LabeledSearchSelect label="Show records" value={filters.rowsPerPage} onChange={(v) => setFilter("rowsPerPage", v)} options={["10", "25", "50", "100", "200", "500", "All"].map((n) => ({ value: n, label: n }))} placeholder="25" />
+                        <Input label="Table Search"  value={filters.tableSearch} onChange={(v) => setFilter("tableSearch", v)} placeholder="Quick search in results..." />
+                        <Input label="Select Date"   type="date" value={filters.selectDate} onChange={(v) => setFilter("selectDate", v)} />
+                    </div>
+                )}
 
-          <Select
-            label="Bank Card Status"
-            name="bank_card_status"
-            value={filters.bankCardStatus}
-            onChange={(v) => setFilter("bankCardStatus", v)}
-            options={LEGACY_BANK_CARD_STATUS_OPTIONS}
-            placeholder="Bank Card Status"
-          />
-          <Select
-            label="Bank Account Type"
-            name="bank_account_type"
-            value={filters.bankAccountType}
-            onChange={(v) => setFilter("bankAccountType", v)}
-            options={LEGACY_BANK_ACCOUNT_TYPE_OPTIONS}
-            placeholder="Bank Account Type"
-          />
-          <Select
-            label="Guard Category"
-            name="guard_category"
-            value={filters.guardCategory}
-            onChange={(v) => setFilter("guardCategory", v)}
-            options={["MUJAHID", "REGULAR", "EX_SERVICE", "OTHER"]}
-            placeholder="Guard Category"
-          />
-
-          <Select
-            label="Residence"
-            name="residence"
-            value={filters.residence}
-            onChange={(v) => setFilter("residence", v)}
-            options={LEGACY_RESIDENCE_OPTIONS}
-            placeholder="Residence"
-          />
-          <Select
-            label="Show 102550100200500All records"
-            name="rowCountSelect"
-            value={filters.rowsPerPage}
-            onChange={(v) => setFilter("rowsPerPage", v)}
-            options={["10", "25", "50", "100", "200", "500", "All records"]}
-            placeholder="Show 102550100200500All records"
-          />
-          <Input label="Search:" name="tableSearch" value={filters.tableSearch} onChange={(v) => setFilter("tableSearch", v)} placeholder="Search:" />
-          <Input label="Select Date" name="selectDate" type="date" value={filters.selectDate} onChange={(v) => setFilter("selectDate", v)} />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-6">
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input name="isOnNightDuty" type="checkbox" checked={filters.onNightDuty} onChange={(e) => setFilter("onNightDuty", e.target.checked)} />
-            isOnNightDuty
-          </label>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input name="terminatedRecords" type="checkbox" checked={filters.terminatedRecords} onChange={(e) => setFilter("terminatedRecords", e.target.checked)} />
-            Terminated Records
-          </label>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input name="isOverstaying" type="checkbox" checked={filters.overStaying} onChange={(e) => setFilter("overStaying", e.target.checked)} />
-            isOverstaying
-          </label>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          <ActionButton onClick={loadGuards} className="inline-flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            SEARCH!
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={resetFilters} className="inline-flex items-center gap-2">
-            <X className="h-4 w-4" />
-            Clear Filter
-          </ActionButton>
-          <ActionButton variant="secondary" className="inline-flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export Short Role In Excel
-          </ActionButton>
-          <ActionButton variant="secondary" className="inline-flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export In Bank Details
-          </ActionButton>
-          <ActionButton variant="secondary" className="inline-flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export In Excel
-          </ActionButton>
-        </div>
-        <div className="hidden" aria-hidden="true">
-          <select name="legacy_education_options">
-            <option>--Select Education--</option>
-            <option>Intermediate</option>
-            <option>Matric</option>
-            <option>Middle</option>
-            <option>Graduate</option>
-            <option>B.A</option>
-            <option>BSc</option>
-            <option>M.A</option>
-            <option>Msc</option>
-          </select>
-          <select name="legacy_religion_options">
-            <option>--Select Relegion--</option>
-            <option>Islam</option>
-            <option>Christianity</option>
-            <option>Hinduism</option>
-          </select>
-          <select name="legacy_status_options">
-            <option>--Select Status--</option>
-            <option>present</option>
-            <option>absent</option>
-            <option>on-training</option>
-            <option>default</option>
-            <option>resigned</option>
-            <option>Inactive</option>
-            <option>Long Leave</option>
-            <option>Pending</option>
-          </select>
-          <select name="legacy_client_options">
-            <option>--Select Client--</option>
-            <option>National Bank of Pakistan</option>
-            <option>Standard Chartered Bank Limited Pakistan</option>
-          </select>
-        </div>
-      </div>
-
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-
-      {loading ? (
-        <div className="ui-card px-6 py-10 text-center text-sm text-[var(--text-muted)]">Loading guards...</div>
-      ) : (
-        <DataTable
-          rows={filteredRows}
-          getRowKey={(row) => row.id}
-          emptyText="No guards match selected filters."
-          searchable={false}
-          density="compact"
-          tableFixed
-          pageSize={rowsPerPage}
-          columns={[
-            {
-              key: "photo",
-              header: "Photo",
-              className: "w-12",
-              render: (guard) => <GuardAvatar guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl} />,
-            },
-            { key: "parwestId", header: "Parwest ID", sortable: true, className: "w-24" },
-            { key: "name", header: "Name", sortable: true, className: "w-36 max-w-[9rem] truncate" },
-            { key: "cnic", header: "CNIC", sortable: true, className: "w-32" },
-            { key: "phone", header: "Phone", className: "w-28" },
-            { key: "client", header: "Client", className: "w-28 max-w-[7rem] truncate" },
-            { key: "supervisor", header: "Supervisor", className: "w-24 max-w-[6rem] truncate" },
-            { key: "paymentMode", header: "Pay Mode", className: "w-20" },
-            { key: "guardCategory", header: "Category", className: "w-20" },
-            { key: "verificationStatus", header: "Verification", className: "w-24" },
-            {
-              key: "status",
-              header: "Status",
-              className: "w-20",
-              render: (guard) => (
-                <StatusChip
-                  label={guard.status}
-                  variant={String(guard.status).toLowerCase() === "active" || String(guard.status).toLowerCase() === "present" ? "success" : "neutral"}
-                />
-              ),
-            },
-            {
-              key: "action",
-              header: "Action",
-              className: "w-28",
-              render: (guard) => (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Link href={`/guards/${guard.id}`} className="font-medium text-[var(--brand)] hover:underline">
-                    View
-                  </Link>
-                  <Link href={`/guards/${guard.id}?tab=profile`} className="font-medium text-[var(--brand)] hover:underline">
-                    Edit
-                  </Link>
-                  {String(guard.status).toLowerCase() === "active" || String(guard.status).toLowerCase() === "present" ? (
-                    <button
-                      type="button"
-                      onClick={() => updateGuardStatus(guard.id, "INACTIVE")}
-                      className="font-medium text-red-600 hover:underline"
-                    >
-                      Deactivate
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => updateGuardStatus(guard.id, "ACTIVE")}
-                      className="font-medium text-emerald-600 hover:underline"
-                    >
-                      Activate
-                    </button>
-                  )}
+                <div className="mt-4 flex flex-wrap items-center gap-6">
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked={filters.terminatedRecords} onChange={(e) => setFilter("terminatedRecords", e.target.checked)} />
+                        Terminated Records
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked={filters.onNightDuty} onChange={(e) => setFilter("onNightDuty", e.target.checked)} />
+                        On Night Duty
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked={filters.overStaying} onChange={(e) => setFilter("overStaying", e.target.checked)} />
+                        Overstaying
+                    </label>
                 </div>
-              ),
-            },
-          ]}
-        />
-      )}
 
-      {hasFilters ? <p className="text-xs text-[var(--text-muted)]">Filters applied.</p> : null}
-    </div>
-  )
+                <div className="mt-5 flex flex-wrap gap-2">
+                    <ActionButton onClick={loadGuards} disabled={loading} className="inline-flex items-center gap-2">
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                        {loading ? "Searching..." : "SEARCH!"}
+                    </ActionButton>
+                    <ActionButton variant="secondary" onClick={resetFilters} className="inline-flex items-center gap-2">
+                        <X className="h-4 w-4" />
+                        Clear Filter
+                    </ActionButton>
+                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        Export Short Role In Excel
+                    </ActionButton>
+                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        Export In Bank Details
+                    </ActionButton>
+                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        Export In Excel
+                    </ActionButton>
+                </div>
+            </div>
+
+            {error ? <InlineAlert type="error" message={error} /> : null}
+
+            {/* Results */}
+            {loading ? (
+                <div className="ui-card overflow-hidden">
+                    {/* Header skeleton */}
+                    <div className="bg-gray-50 border-b px-4 py-3 grid grid-cols-8 gap-3 animate-pulse">
+                        {[...Array(8)].map((_, i) => (
+                            <div key={i} className="h-3 bg-gray-200 rounded" />
+                        ))}
+                    </div>
+                    {/* Row skeletons */}
+                    {[...Array(8)].map((_, i) => (
+                        <div key={i} className="px-4 py-3 border-b grid grid-cols-8 gap-3 items-center animate-pulse">
+                            <div className="h-9 w-9 bg-gray-100 rounded-full" />
+                            <div className="h-4 bg-gray-100 rounded col-span-1" />
+                            <div className="h-4 bg-gray-100 rounded col-span-1" />
+                            <div className="h-4 bg-gray-100 rounded col-span-1" />
+                            <div className="h-4 bg-gray-100 rounded col-span-1" />
+                            <div className="h-4 bg-gray-100 rounded col-span-1" />
+                            <div className="h-6 w-16 bg-gray-100 rounded-full col-span-1" />
+                            <div className="h-4 w-16 bg-gray-100 rounded col-span-1" />
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <DataTable
+                    rows={filteredRows}
+                    getRowKey={(row) => row.id}
+                    emptyText="No guards match selected filters."
+                    searchable={false}
+                    density="compact"
+                    tableFixed
+                    pageSize={rowsPerPage}
+                    columns={[
+                        {
+                            key: "photo",
+                            header: "Photo",
+                            className: "w-12",
+                            render: (g) => <GuardAvatar guardId={g.id} guardName={g.name} initialUrl={g.photoUrl} />,
+                        },
+                        { key: "parwestId",    header: "Parwest ID",  sortable: true, className: "w-24" },
+                        { key: "name",         header: "Name",        sortable: true, className: "w-36 max-w-[9rem] truncate" },
+                        { key: "cnic",         header: "CNIC",        sortable: true, className: "w-32" },
+                        { key: "phone",        header: "Phone",       className: "w-28" },
+                        { key: "clientName",   header: "Client",      className: "w-28 max-w-[7rem] truncate" },
+                        { key: "supervisorName", header: "Supervisor", className: "w-24 max-w-[6rem] truncate" },
+                        { key: "officeName",   header: "Office",      className: "w-28 max-w-[7rem] truncate" },
+                        {
+                            key: "status",
+                            header: "Status",
+                            className: "w-24",
+                            render: (g) => (
+                                <StatusChip
+                                    label={g.status}
+                                    variant={STATUS_COLORS[g.status] ?? "neutral"}
+                                />
+                            ),
+                        },
+                        {
+                            key: "action",
+                            header: "Action",
+                            className: "w-20",
+                            render: (g) => (
+                                <div className="flex items-center gap-2 text-xs">
+                                    <Link href={`/guards/${g.id}`} className="font-medium text-[var(--brand)] hover:underline">
+                                        View
+                                    </Link>
+                                    <Link href={`/guards/${g.id}?tab=profile`} className="font-medium text-[var(--brand)] hover:underline">
+                                        Edit
+                                    </Link>
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
+            )}
+
+            <p className="text-xs text-[var(--text-muted)]">
+                Showing {filteredRows.length} of {guards.length} guard{guards.length !== 1 ? "s" : ""}
+            </p>
+        </div>
+    )
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function Input({
-  label,
-  name,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
+    label, value, onChange, placeholder, type = "text",
 }: {
-  label: string
-  name?: string
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  type?: string
+    label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string
 }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm text-gray-600">{label}</label>
-      <input name={name || label} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" placeholder={placeholder} />
-    </div>
-  )
+    return (
+        <div>
+            <label className="mb-1 block text-sm text-gray-600">{label}</label>
+            <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="ui-input" placeholder={placeholder} />
+        </div>
+    )
 }
 
-function Select({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-  placeholder,
+function LabeledSearchSelect({
+    label, value, onChange, options, placeholder,
 }: {
-  label: string
-  name?: string
-  value: string
-  onChange: (value: string) => void
-  options: string[]
-  placeholder?: string
+    label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string
 }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm text-gray-600">{label}</label>
-      <select name={name || label} value={value} onChange={(e) => onChange(e.target.value)} className="ui-select">
-        <option value="">{placeholder || `Select ${label}`}</option>
-        {options.map((option) => (
-          <option key={`${label}-${option}`} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
+    return (
+        <div>
+            <label className="mb-1 block text-sm text-gray-600">{label}</label>
+            <SearchSelect
+                name={label}
+                options={options}
+                value={value}
+                placeholder={placeholder ?? `--Select ${label}--`}
+                onChange={(v) => onChange(v)}
+            />
+        </div>
+    )
 }

@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
         ])
 
         if (!guard) return notFound("Guard not found.")
-        if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && String(guard.status) !== "ACTIVE") {
-            return conflict("Only ACTIVE guards can be deployed.")
+        if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.status !== "ACTIVE" && guard.status !== "DEFAULT") {
+            return conflict("Only ACTIVE or DEFAULT guards can be deployed.")
         }
         if (
             isWorkflowRuleEnabled("deployments.requireGuardOfficeConsistency") &&
@@ -302,12 +302,34 @@ export async function POST(request: NextRequest) {
         const deployment = await prisma.deployment.create({
             data,
             include: {
-                guard: true,
+                guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
                 client: { select: { id: true, name: true } },
                 branch: true,
-                regionalOffice: true,
+                regionalOffice: { select: { id: true, name: true } },
             },
         })
+
+        // ── Auto-set guard status to PRESENT when deployed ──
+        if (deploymentStatus === "ACTIVE") {
+            const prevStatus = deployment.guard.status
+            if (prevStatus !== "PRESENT") {
+                await prisma.guard.update({ where: { id: guardId }, data: { status: "PRESENT" } }).catch(() => { /* non-critical */ })
+                // Record status history
+                const { recordGuardStatusChange } = await import("@/lib/guards/status-history")
+                void recordGuardStatusChange({
+                    guardId,
+                    cnic: deployment.guard.cnic,
+                    parwestId: deployment.guard.parwestId,
+                    guardName: deployment.guard.name,
+                    fromStatus: prevStatus,
+                    toStatus: "PRESENT",
+                    reason: `Deployed to ${deployment.client.name}`,
+                    changedByName: deployedByName,
+                    changedByType: "SYSTEM",
+                    officeName: deployment.regionalOffice?.name ?? null,
+                })
+            }
+        }
 
         // ── Business logic: auto-mark attendance for today if deployment is ACTIVE ──
         // Determine attendance type based on whether a record already exists (double duty)

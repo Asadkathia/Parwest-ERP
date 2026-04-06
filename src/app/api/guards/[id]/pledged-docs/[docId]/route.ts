@@ -23,6 +23,77 @@ export async function PATCH(
     const typedSession = session as unknown as { user?: { name?: string; email?: string } }
     const performedBy = typedSession.user?.name ?? typedSession.user?.email ?? null
 
+    // ── ACTION: REHOLD ────────────────────────────────────────────────────────
+    // Re-takes custody of a temporarily-returned document
+    if (body?.action === "REHOLD") {
+      const updated = await prisma.guardPledgedDocumentRecord.update({
+        where: { id: docId },
+        data: {
+          status: "HELD",
+          returnType: null,
+          returnedBy: null,
+          returnedAt: null,
+          returnConditionId: null,
+          returnReason: null,
+          expectedReturnDate: null,
+        },
+      })
+
+      await (prisma.guardPledgedDocumentHistory as unknown as {
+        create: (args: { data: Record<string, unknown> }) => Promise<unknown>
+      }).create({
+        data: {
+          recordId: docId,
+          guardId: id,
+          action: "REHOLD",
+          performedBy,
+          details: JSON.stringify({ note: "Document re-taken into custody" }),
+        },
+      }).catch(() => { /* non-critical */ })
+
+      return NextResponse.json(updated)
+    }
+
+    // ── ACTION: NEW_VERSION ───────────────────────────────────────────────────
+    // Uploads a new version of the document; archives the previous file in history
+    if (body?.action === "NEW_VERSION") {
+      const attachmentData = body?.attachmentData ? String(body.attachmentData) : null
+      const attachmentName = body?.attachmentName ? String(body.attachmentName) : null
+      if (!attachmentData) return badRequest("attachmentData is required for NEW_VERSION.")
+
+      // Archive the old file in history before replacing
+      if (existing.attachmentData || existing.attachmentName) {
+        await (prisma.guardPledgedDocumentHistory as unknown as {
+          create: (args: { data: Record<string, unknown> }) => Promise<unknown>
+        }).create({
+          data: {
+            recordId: docId,
+            guardId: id,
+            action: "VERSION_UPLOADED",
+            performedBy,
+            details: JSON.stringify({
+              previousAttachmentName: existing.attachmentName,
+              newAttachmentName: attachmentName,
+              note: "Previous version archived",
+            }),
+            attachmentData: existing.attachmentData,
+            attachmentName: existing.attachmentName,
+          },
+        }).catch(() => { /* non-critical */ })
+      }
+
+      const updated = await prisma.guardPledgedDocumentRecord.update({
+        where: { id: docId },
+        data: {
+          attachmentData,
+          attachmentName,
+        },
+      })
+
+      return NextResponse.json(updated)
+    }
+
+    // ── DEFAULT ACTION: RETURN ────────────────────────────────────────────────
     const returnType = body?.returnType ? String(body.returnType) : null
     if (returnType && !["CLEARANCE", "TEMPORARY"].includes(returnType)) {
       return badRequest("returnType must be CLEARANCE or TEMPORARY.")
@@ -52,8 +123,9 @@ export async function PATCH(
       },
     })
 
-    // Write audit history
-    await prisma.guardPledgedDocumentHistory.create({
+    await (prisma.guardPledgedDocumentHistory as unknown as {
+      create: (args: { data: Record<string, unknown> }) => Promise<unknown>
+    }).create({
       data: {
         recordId: docId,
         guardId: id,
@@ -94,7 +166,6 @@ export async function DELETE(
     const typedSession = session as unknown as { user?: { name?: string; email?: string } }
     const performedBy = typedSession.user?.name ?? typedSession.user?.email ?? null
 
-    // Write audit history before deleting (cascade will remove history too, so log to console)
     console.info(`[AUDIT] PledgedDoc DELETE: record=${docId} guard=${id} by=${performedBy} doc=${existing.documentTypeName}`)
 
     await prisma.guardPledgedDocumentRecord.delete({ where: { id: docId } })

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { FileCheck2, Plus, Eye, Download, Undo2, Trash2, X, FileText, Clock, History, AlertTriangle } from "lucide-react"
+import { FileCheck2, Plus, Eye, Download, Undo2, Trash2, X, FileText, Clock, History, AlertTriangle, FilePlus, LockKeyhole } from "lucide-react"
 
 type HistoryEntry = {
   id: string
@@ -9,6 +9,8 @@ type HistoryEntry = {
   performedBy: string | null
   performedAt: string
   details: string | null
+  attachmentData: string | null
+  attachmentName: string | null
 }
 
 type PledgedDocRecord = {
@@ -121,6 +123,18 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
   // Delete confirm
   const [deleteRec, setDeleteRec] = useState<PledgedDocRecord | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // New version modal
+  const [versionRec, setVersionRec] = useState<PledgedDocRecord | null>(null)
+  const [versionFile, setVersionFile] = useState<File | null>(null)
+  const [versionFileData, setVersionFileData] = useState<string | null>(null)
+  const [versionError, setVersionError] = useState("")
+  const [versioning, setVersioning] = useState(false)
+  const versionFileRef = useRef<HTMLInputElement>(null)
+
+  // Rehold confirm
+  const [reholdRec, setReholdRec] = useState<PledgedDocRecord | null>(null)
+  const [reholding, setReholding] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -247,6 +261,66 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
     }
   }
 
+  const handleRehold = async () => {
+    if (!reholdRec) return
+    setReholding(true)
+    try {
+      const res = await fetch(`/api/guards/${guardId}/pledged-docs/${reholdRec.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "REHOLD" }),
+      })
+      if (!res.ok) throw new Error()
+      setReholdRec(null)
+      await load()
+    } catch { /* silent */ } finally {
+      setReholding(false)
+    }
+  }
+
+  const openVersionModal = (rec: PledgedDocRecord) => {
+    setVersionRec(rec)
+    setVersionFile(null)
+    setVersionFileData(null)
+    setVersionError("")
+  }
+
+  const handleVersionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setVersionFile(file)
+    if (!file) { setVersionFileData(null); return }
+    const reader = new FileReader()
+    reader.onload = () => setVersionFileData(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const handleNewVersion = async () => {
+    if (!versionRec || !versionFileData) { setVersionError("Please select a file."); return }
+    setVersioning(true)
+    setVersionError("")
+    try {
+      const res = await fetch(`/api/guards/${guardId}/pledged-docs/${versionRec.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "NEW_VERSION",
+          attachmentData: versionFileData,
+          attachmentName: versionFile?.name ?? "document",
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || "Failed to upload new version")
+      }
+      setVersionRec(null)
+      await load()
+    } catch (err) {
+      setVersionError(err instanceof Error ? err.message : "Failed to upload new version")
+    } finally {
+      setVersioning(false)
+    }
+  }
+
   const overdueCount = records.filter(isOverdue).length
 
   return (
@@ -346,6 +420,7 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
+                          {/* Return: only while HELD */}
                           {isHeld && (
                             <button
                               onClick={() => openReturn(rec)}
@@ -354,6 +429,23 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                               <Undo2 className="h-3 w-3" /> Return
                             </button>
                           )}
+                          {/* Hold: only while RETURNED (especially after TEMPORARY) */}
+                          {!isHeld && (
+                            <button
+                              onClick={() => setReholdRec(rec)}
+                              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 border border-indigo-200 transition-colors"
+                            >
+                              <LockKeyhole className="h-3 w-3" /> Hold
+                            </button>
+                          )}
+                          {/* New Version: always available */}
+                          <button
+                            onClick={() => openVersionModal(rec)}
+                            className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 border border-teal-200 transition-colors"
+                          >
+                            <FilePlus className="h-3 w-3" /> New Ver.
+                          </button>
+                          {/* History */}
                           {rec.history.length > 0 && (
                             <button
                               onClick={() => setHistoryRec(rec)}
@@ -597,7 +689,7 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
       {/* ── History Modal ── */}
       {historyRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <div>
                 <h3 className="text-base font-semibold text-[var(--text)]">Document History</h3>
@@ -607,34 +699,68 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+            <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
               {historyRec.history.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">No history available.</p>
               ) : historyRec.history.map((h) => {
                 let details: Record<string, unknown> = {}
                 try { if (h.details) details = JSON.parse(h.details) } catch { /* ignore */ }
+                const actionColors: Record<string, string> = {
+                  CREATED:          "bg-blue-100 text-blue-800",
+                  RETURNED:         "bg-green-100 text-green-800",
+                  REHOLD:           "bg-indigo-100 text-indigo-800",
+                  VERSION_UPLOADED: "bg-teal-100 text-teal-800",
+                  UPDATED:          "bg-yellow-100 text-yellow-800",
+                  DELETED:          "bg-red-100 text-red-800",
+                }
+                const actionLabels: Record<string, string> = {
+                  CREATED:          "Created",
+                  RETURNED:         "Returned",
+                  REHOLD:           "Re-held",
+                  VERSION_UPLOADED: "New Version",
+                  UPDATED:          "Updated",
+                  DELETED:          "Deleted",
+                }
                 return (
-                  <div key={h.id} className="rounded-lg border border-[var(--border)] p-3 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        h.action === "CREATED" ? "bg-blue-100 text-blue-800" :
-                        h.action === "RETURNED" ? "bg-green-100 text-green-800" :
-                        "bg-gray-100 text-gray-800"
-                      }`}>
-                        {h.action}
+                  <div key={h.id} className="rounded-lg border border-[var(--border)] p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${actionColors[h.action] ?? "bg-gray-100 text-gray-800"}`}>
+                        {actionLabels[h.action] ?? h.action}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{fmtDateTime(h.performedAt)}</span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">By: <span className="font-medium text-[var(--text)]">{h.performedBy || "System"}</span></p>
                     {h.action === "RETURNED" && (
-                      <div className="text-xs text-[var(--text-muted)] space-y-0.5">
+                      <div className="text-xs text-[var(--text-muted)] space-y-0.5 pl-1 border-l-2 border-green-200">
                         {details.returnType != null && <p>Return Type: <span className="font-medium">{String(details.returnType)}</span></p>}
                         {details.returnReason != null && <p>Reason: <span className="font-medium">{String(details.returnReason)}</span></p>}
                         {details.expectedReturnDate != null && <p>Expected Return: <span className="font-medium">{fmt(String(details.expectedReturnDate))}</span></p>}
                       </div>
                     )}
                     {h.action === "CREATED" && details.notes != null && (
-                      <p className="text-xs text-[var(--text-muted)]">Notes: <span className="font-medium">{String(details.notes)}</span></p>
+                      <p className="text-xs text-[var(--text-muted)] pl-1 border-l-2 border-blue-200">Notes: <span className="font-medium">{String(details.notes)}</span></p>
+                    )}
+                    {h.action === "VERSION_UPLOADED" && (
+                      <div className="text-xs text-[var(--text-muted)] space-y-1 pl-1 border-l-2 border-teal-200">
+                        {details.previousAttachmentName != null && (
+                          <p>Previous file: <span className="font-medium">{String(details.previousAttachmentName)}</span></p>
+                        )}
+                        {details.newAttachmentName != null && (
+                          <p>New file: <span className="font-medium">{String(details.newAttachmentName)}</span></p>
+                        )}
+                        {/* Offer download of archived version */}
+                        {h.attachmentData && (
+                          <button
+                            onClick={() => downloadDoc(h.attachmentData!, h.attachmentName || "archived-document")}
+                            className="inline-flex items-center gap-1 mt-1 text-teal-700 hover:underline font-medium"
+                          >
+                            <Download className="h-3 w-3" /> Download archived version
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {h.action === "REHOLD" && (
+                      <p className="text-xs text-indigo-700 pl-1 border-l-2 border-indigo-200">Document re-taken into custody</p>
                     )}
                   </div>
                 )
@@ -646,6 +772,100 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)] transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rehold Confirm Modal ── */}
+      {reholdRec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+              <h3 className="text-base font-semibold text-indigo-700">Re-hold Document</h3>
+              <button onClick={() => setReholdRec(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-[var(--text)]">
+                Mark <strong>{reholdRec.documentTypeName}</strong> as back in custody?
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                This will set the status back to <strong>HELD</strong> and clear the return details. A log entry will be created.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+              <button
+                onClick={() => setReholdRec(null)}
+                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRehold}
+                disabled={reholding}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                <LockKeyhole className="h-4 w-4" />
+                {reholding ? "Processing..." : "Confirm Hold"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Version Modal ── */}
+      {versionRec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-teal-700">Upload New Version</h3>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">{versionRec.documentTypeName}</p>
+              </div>
+              <button onClick={() => setVersionRec(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              {versionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{versionError}</div>
+              )}
+              <p className="text-xs text-[var(--text-muted)]">
+                The existing file will be archived in the document history and can be downloaded later. The new file will become the current version.
+              </p>
+              <div>
+                <label className="ui-label">New Document File <span className="text-red-500">*</span></label>
+                <input
+                  ref={versionFileRef}
+                  type="file"
+                  accept="image/*,application/pdf,.doc,.docx"
+                  onChange={handleVersionFileChange}
+                  className="ui-input text-sm"
+                />
+                {versionFile && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-teal-700">
+                    <FileText className="h-3 w-3" /> {versionFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+              <button
+                onClick={() => setVersionRec(null)}
+                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNewVersion}
+                disabled={versioning || !versionFileData}
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
+              >
+                <FilePlus className="h-4 w-4" />
+                {versioning ? "Uploading..." : "Upload Version"}
               </button>
             </div>
           </div>

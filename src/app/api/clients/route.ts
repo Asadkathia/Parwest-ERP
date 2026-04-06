@@ -95,7 +95,12 @@ export async function POST(request: NextRequest) {
         }
 
         const isBranchless = body.isBranchless === "true"
-        const defaultBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""
+        // For branchless clients the form sends "__branchless_default__" as a sentinel;
+        // we store it as "Default Branch" so the record is identifiable but treated as branchless.
+        const rawBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""
+        const defaultBranchName = rawBranchName === "__branchless_default__"
+            ? "Default Branch"
+            : rawBranchName
 
         // Resolve city — form sends it as `clientLocation`
         const city = body.clientLocation || body.city || null
@@ -179,8 +184,8 @@ export async function POST(request: NextRequest) {
                 contractGuardExService:   body.contractGuardExService    || null,
                 contractPrice:            toFloat(body.contractPrice),
 
-                // Auto-create the first branch if a name was provided (branch clients only)
-                ...(!isBranchless && defaultBranchName ? {
+                // Auto-create a branch: full branch for branch clients, default branch for branchless clients
+                ...(defaultBranchName ? {
                     branches: {
                         create: {
                             name:          defaultBranchName,

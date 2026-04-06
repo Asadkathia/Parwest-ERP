@@ -159,6 +159,20 @@ function HistoryPanel({
   )
 }
 
+// ── Doc name → API slug mapping ───────────────────────────────────────────────
+const DOC_SLUG_MAP: Record<string, string> = {
+  "Form A (Without Sign)": "form-a",
+  "Form B (Without Sign and Thumb Impressions)": "form-b",
+  "Employee Card": "employee-card",
+  "Personal Verification Guard Guarantors": "personal-verification",
+  "Training Certificate": "training-certificate",
+  "Character Certificate": "character-certificate",
+  "Guard Documents Checklist": "checklist",
+  "Medical Certificate": "medical-certificate",
+  "Guard Antecedents Verification": "antecedents",
+  "Iqrar Nama": "iqrar-nama",
+}
+
 // ── System Document Row (separate template vs attached columns) ────────────────
 function SystemDocRow({
   row,
@@ -193,22 +207,32 @@ function SystemDocRow({
 
         {/* System Template actions */}
         <td className="px-4 py-3">
-          <div className="flex items-center gap-1">
-            <button
-              disabled
-              title="System template — coming soon"
-              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200 opacity-40 cursor-not-allowed"
-            >
-              <Eye className="h-3 w-3" /> View
-            </button>
-            <button
-              disabled
-              title="System template — coming soon"
-              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 opacity-40 cursor-not-allowed"
-            >
-              <Download className="h-3 w-3" /> Download
-            </button>
-          </div>
+          {(() => {
+            const slug = DOC_SLUG_MAP[row.docTypeName]
+            if (!slug) return (
+              <span className="text-xs text-[var(--text-muted)] opacity-50">—</span>
+            )
+            const url = `/api/guards/${guardId}/system-doc/${slug}`
+            return (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => window.open(url, "_blank")}
+                  title="View system-generated document"
+                  className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200 hover:bg-blue-50 transition-colors"
+                >
+                  <Eye className="h-3 w-3" /> View
+                </button>
+                <a
+                  href={url}
+                  download={`${row.docTypeName}.html`}
+                  title="Download system-generated document"
+                  className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-colors"
+                >
+                  <Download className="h-3 w-3" /> Download
+                </a>
+              </div>
+            )
+          })()}
         </td>
 
         {/* Attached By */}

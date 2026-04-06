@@ -101,11 +101,11 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "store-inventory":
                 return <StoreInventoryTab guardId={guard.id || ""} />
             case "service-history":
-                return <ServiceHistoryTab serviceHistory={guard.serviceHistory || []} />
+                return <ServiceHistoryTab guardId={guard.id || ""} />
             case "insurance":
                 return <InsuranceTab insurance={guard.insurance || []} />
             case "status-history":
-                return <StatusHistoryTab statusHistory={guard.statusHistory || []} />
+                return <StatusHistoryTab guardId={guard.id || ""} />
             case "pba-docs":
                 return <PBADocumentsTab guard={guard} />
             default:

@@ -78,12 +78,38 @@ export async function POST(
                 revokedByName,
             },
             include: {
-                guard: true,
-                client: true,
+                guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
+                client: { select: { id: true, name: true } },
                 branch: true,
-                regionalOffice: true,
+                regionalOffice: { select: { id: true, name: true } },
             },
         })
+
+        // ── Auto-set guard status to DEFAULT when last deployment ends ──
+        const guardId = deployment.guard.id
+        const remainingActive = await prisma.deployment.count({
+            where: { guardId, status: "ACTIVE" },
+        }).catch(() => 1) // if error, assume still active
+
+        if (remainingActive === 0) {
+            const prevStatus = deployment.guard.status
+            if (prevStatus !== "DEFAULT") {
+                await prisma.guard.update({ where: { id: guardId }, data: { status: "DEFAULT" } }).catch(() => { /* non-critical */ })
+                const { recordGuardStatusChange } = await import("@/lib/guards/status-history")
+                void recordGuardStatusChange({
+                    guardId,
+                    cnic: deployment.guard.cnic,
+                    parwestId: deployment.guard.parwestId,
+                    guardName: deployment.guard.name,
+                    fromStatus: prevStatus,
+                    toStatus: "DEFAULT",
+                    reason: `Deployment at ${deployment.client.name} ended`,
+                    changedByName: revokedByName,
+                    changedByType: "SYSTEM",
+                    officeName: deployment.regionalOffice?.name ?? null,
+                })
+            }
+        }
 
         return ok({ message: "Deployment ended successfully", deployment })
     } catch (error: unknown) {

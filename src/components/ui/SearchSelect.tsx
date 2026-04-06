@@ -13,6 +13,7 @@ type Props = {
     options: SearchSelectOption[]
     placeholder?: string
     defaultValue?: string
+    value?: string
     required?: boolean
     disabled?: boolean
     onChange?: (value: string) => void
@@ -23,6 +24,7 @@ export default function SearchSelect({
     options,
     placeholder = "Select…",
     defaultValue = "",
+    value,
     required = false,
     disabled = false,
     onChange,
@@ -30,8 +32,15 @@ export default function SearchSelect({
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState("")
     const [selected, setSelected] = useState<SearchSelectOption | null>(() =>
-        options.find((o) => o.value === defaultValue) ?? null
+        (options ?? []).find((o) => o.value === (value ?? defaultValue)) ?? null
     )
+
+    // Sync when controlled value changes
+    useEffect(() => {
+        if (value !== undefined) {
+            setSelected((options ?? []).find((o) => o.value === value) ?? null)
+        }
+    }, [value, options])
     const containerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -47,9 +56,10 @@ export default function SearchSelect({
         return () => document.removeEventListener("mousedown", handler)
     }, [])
 
+    const safeOptions = options ?? []
     const filtered = query.trim()
-        ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-        : options
+        ? safeOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+        : safeOptions
 
     const handleSelect = (opt: SearchSelectOption) => {
         setSelected(opt)

@@ -119,7 +119,25 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users User[]
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id             String   @id @default(cuid())
+  roleId         String
+  role           Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module         String
+  canCreate      Boolean  @default(false)
+  canView        Boolean  @default(false)
+  canUpdate      Boolean  @default(false)
+  canDelete      Boolean  @default(false)
+  canRequisition Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([roleId, module])
+  @@index([roleId])
 }
 
 model UserPermission {
@@ -216,7 +234,7 @@ model Guard {
   addressPermanent         String?
   addressCurrent           String?
   emergencyContact         String?
-  status                   String    @default("PENDING") // PENDING, ACTIVE, INACTIVE, TERMINATED, BLACKLISTED
+  status                   String    @default("PENDING") // PENDING | ACTIVE | PRESENT | DEFAULT | ABSENT | INACTIVE | TERMINATED | BLACKLISTED
   isExService              Boolean   @default(false)
   exServiceRank            String?
   exServiceRegiment        String?
@@ -304,7 +322,7 @@ model Guard {
   attendances           Attendance[]
   inventoryAssignments  InventoryAssignment[]
   storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentGuardAssignee")
-  residenceAssignment   ResidenceAssignment?
+  residenceAssignments  ResidenceAssignment[]
   trainings             Training[]
   supervisorAssignments GuardSupervisorAssignment[]
   ageApproval           GuardAgeApproval?
@@ -353,6 +371,49 @@ model BlacklistedCnic {
   updatedAt       DateTime @updatedAt
 
   @@index([cnic])
+}
+
+// Guard service history — keyed by CNIC so it survives re-registrations
+// across different guard IDs / regions / parwestIds
+model GuardServiceHistory {
+  id            String   @id @default(cuid())
+  cnic          String   // FK-less: guard may be deleted/re-created
+  guardId       String?  // null when guard no longer exists
+  parwestId     String?  // snapshot at time of event
+  guardName     String?  // snapshot at time of event
+  event         String   // ENROLLED | STATUS_CHANGED | BLACKLISTED | UNBLACKLISTED | REACTIVATED | DEPLOYMENT_STARTED | DEPLOYMENT_ENDED
+  fromStatus    String?  // previous guard status
+  toStatus      String?  // new guard status
+  description   String?
+  changedByName String?
+  regionName    String?  // snapshot at time of event
+  officeName    String?  // snapshot at time of event
+  createdAt     DateTime @default(now())
+
+  @@index([cnic])
+  @@index([guardId])
+  @@index([createdAt])
+}
+
+// Dedicated per-guard status change log (keyed by guardId)
+model GuardStatusHistory {
+  id            String   @id @default(cuid())
+  guardId       String
+  cnic          String?  // snapshot for cross-registration tracing
+  parwestId     String?  // snapshot at time of change
+  guardName     String?  // snapshot at time of change
+  fromStatus    String?  // previous status (null on first enrollment)
+  toStatus      String   // new status
+  reason        String?  // reason provided by the user
+  changedByName String?  // name of user who triggered the change
+  changedByType String?  // MANUAL | SYSTEM | BLACKLIST | ENROLLMENT
+  regionName    String?  // snapshot
+  officeName    String?  // snapshot
+  createdAt     DateTime @default(now())
+
+  @@index([guardId])
+  @@index([cnic])
+  @@index([createdAt])
 }
 
 model DeploymentRate {
@@ -409,8 +470,12 @@ model GuardPrerequisite {
   attachmentData     String? // base64 encoded file
   attachmentName     String? // original file name
   documentUrl        String?
+  uploadedBy         String?   // who uploaded the current attachment
+  uploadedAt         DateTime? // when the current attachment was uploaded
   verifiedAt         DateTime?
-  verifiedBy         String?
+  verifiedBy         String?   // who set status to VERIFIED
+  editedBy           String?   // who last edited this record
+  editedAt           DateTime? // when it was last edited
   expiryDate         DateTime?
   comments           String?
   notes              String?
@@ -521,16 +586,23 @@ model Attendance {
 }
 
 model ResidenceAssignment {
-  id          String     @id @default(cuid())
-  guardId     String     @unique
-  guard       Guard      @relation(fields: [guardId], references: [id])
-  residenceId String?
-  residence   Residence? @relation(fields: [residenceId], references: [id])
-  location    String
-  assignedAt  DateTime   @default(now())
-  notes       String?
+  id             String     @id @default(cuid())
+  guardId        String
+  guard          Guard      @relation(fields: [guardId], references: [id])
+  residenceId    String?
+  residence      Residence? @relation(fields: [residenceId], references: [id])
+  location       String
+  status         String     @default("ACTIVE") // ACTIVE | VACATED
+  assignedAt     DateTime   @default(now())
+  assignedByName String?
+  vacatedAt      DateTime?
+  vacatedByName  String?
+  vacatedReason  String?
+  notes          String?
 
+  @@index([guardId])
   @@index([residenceId])
+  @@index([status])
 }
 
 model Residence {
@@ -1719,20 +1791,31 @@ model PledgeDocReturnCondition {
 }
 
 model GuardPledgedDocumentHistory {
-  id          String   @id @default(cuid())
-  recordId    String
-  record      GuardPledgedDocumentRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  guardId     String
-  action      String   // CREATED | RETURNED | UPDATED | DELETED
-  performedBy String?
-  performedAt DateTime @default(now())
-  details     String?  // JSON string with snapshot
+  id             String   @id @default(cuid())
+  recordId       String
+  record         GuardPledgedDocumentRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  guardId        String
+  action         String   // CREATED | RETURNED | REHOLD | VERSION_UPLOADED | UPDATED | DELETED
+  performedBy    String?
+  performedAt    DateTime @default(now())
+  details        String?  // JSON string with snapshot
+  attachmentData String?  // archived file data (for version history)
+  attachmentName String?  // archived file name
 
   @@index([recordId])
   @@index([guardId])
 }
 
 model GuardExServiceType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GuardDesignationType {
   id        String   @id @default(cuid())
   name      String   @unique
   isActive  Boolean  @default(true)

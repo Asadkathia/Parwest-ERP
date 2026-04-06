@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
 
 type Residence = {
     id: string
@@ -22,6 +23,13 @@ type Residence = {
     contractAttachment: string | null
     createdAt?: string
     _count?: { assignments: number }
+}
+
+type User = {
+    id: string
+    name: string | null
+    email: string | null
+    role?: { id: string; name: string } | null
 }
 
 const defaultForm = {
@@ -49,11 +57,19 @@ export default function ResidencesManager() {
     const [filterState, setFilterState] = useState("")
     const [filterCity, setFilterCity] = useState("")
     const [rows, setRows] = useState<Residence[]>([])
+    const [users, setUsers] = useState<User[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState("")
     const [form, setForm] = useState(defaultForm)
     const fileRef = useRef<HTMLInputElement>(null)
+
+    const userOptions = useMemo<SearchSelectOption[]>(
+        () => users
+            .filter((u) => u.role?.name?.toLowerCase().includes("supervisor"))
+            .map((u) => ({ value: u.name || u.email || u.id, label: u.name || u.email || u.id })),
+        [users]
+    )
 
     const loadResidences = useCallback(async () => {
         try {
@@ -76,6 +92,13 @@ export default function ResidencesManager() {
     }, [query])
 
     useEffect(() => { void loadResidences() }, [loadResidences])
+
+    useEffect(() => {
+        fetch("/api/users?status=ACTIVE")
+            .then((r) => (r.ok ? r.json() : []))
+            .then(setUsers)
+            .catch(() => setUsers([]))
+    }, [])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -178,7 +201,14 @@ export default function ResidencesManager() {
 
                 {/* Row 2: Supervisor, Capacity, Rent */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input value={form.supervisor} onChange={f("supervisor")} className="ui-input" placeholder="Select Supervisor" />
+                    <SearchSelect
+                        key={form.id + "|" + form.supervisor}
+                        name="supervisor"
+                        options={userOptions}
+                        placeholder="Select Supervisor..."
+                        defaultValue={form.supervisor}
+                        onChange={(val) => setForm((prev) => ({ ...prev, supervisor: val }))}
+                    />
                     <input type="number" value={form.capacity} onChange={f("capacity")} className="ui-input" placeholder="Capacity" min={0} />
                     <input type="number" value={form.rentPayable} onChange={f("rentPayable")} className="ui-input" placeholder="Rent Payable (PKR)" min={0} />
                 </div>
@@ -311,7 +341,7 @@ export default function ResidencesManager() {
                                         <div>{row.ownerName || "—"}</div>
                                         {row.ownerPhone && <div className="text-xs text-gray-400">{row.ownerPhone}</div>}
                                     </td>
-                                    <td className="px-4 py-3 text-sm">{row.supervisor || "—"}</td>
+                                    <td className="px-4 py-3 text-sm">{row.supervisor ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{row.supervisor}</span> : <span className="text-gray-400 text-xs">Not assigned</span>}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">
                                         {[row.city, row.state].filter(Boolean).join(", ") || "—"}
                                     </td>

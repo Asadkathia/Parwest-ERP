@@ -66,11 +66,11 @@ export async function GET(
 
     // ── Check 1: Guard Status ─────────────────────────────────────────────
     const statusCheck: EligibilityCheck = {
-      pass: guard.status === "ACTIVE",
+      pass: guard.status === "ACTIVE" || guard.status === "DEFAULT",
       label: "Guard Status",
-      message: guard.status === "ACTIVE"
-        ? "Guard is Active"
-        : `Guard status is ${guard.status} — only Active guards can be deployed`,
+      message: guard.status === "ACTIVE" || guard.status === "DEFAULT"
+        ? `Guard is ${guard.status === "DEFAULT" ? "Default (available for redeployment)" : "Active"}`
+        : `Guard status is ${guard.status} — only Active or Default guards can be deployed`,
     }
 
     // ── Check 2: Verification ─────────────────────────────────────────────

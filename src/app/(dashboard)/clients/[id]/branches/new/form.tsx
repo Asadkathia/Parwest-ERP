@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Save, X, Plus } from "lucide-react"
 import Link from "next/link"
 import SearchSelect from "@/components/ui/SearchSelect"
+import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 
 type Region = { id: string; name: string }
@@ -44,19 +45,7 @@ const BRANCH_MODEL_OPTIONS = [
     { value: "ISLAMIC", label: "Islamic" },
 ]
 
-const DESIGNATION_OPTIONS = [
-    { value: "Guard", label: "Guard" },
-    { value: "Supervisor", label: "Supervisor" },
-    { value: "CPO", label: "CPO" },
-    { value: "Armed Guard", label: "Armed Guard" },
-    { value: "Unarmed Guard", label: "Unarmed Guard" },
-]
-
-const EX_SERVICE_OPTIONS = [
-    { value: "Yes", label: "Yes" },
-    { value: "No", label: "No" },
-    { value: "Other", label: "Other" },
-]
+// Loaded dynamically from /api/guard-designation-types and /api/guard-ex-service-types
 
 export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId }: Props) {
     const router = useRouter()
@@ -85,9 +74,31 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
     // Multiple contact phones
     const [contactPhones, setContactPhones] = useState<string[]>([""])
 
+    // Dynamic designation + ex-service options from prerequisites config
+    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
+    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
+
     // Additional file attachments (multi)
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
     const fileRef = useRef<HTMLInputElement>(null)
+
+    // Fetch designation types and ex-service types once on mount
+    useEffect(() => {
+        fetch("/api/guard-designation-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data))
+                    setDesignationOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+            })
+            .catch(() => {})
+        fetch("/api/guard-ex-service-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data))
+                    setExServiceOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+            })
+            .catch(() => {})
+    }, [])
 
     // Load regional offices when region changes
     useEffect(() => {
@@ -557,11 +568,11 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractDayGuardDesignation" options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                                    <MultiSearchSelect name="contractDayGuardDesignation" options={designationOptions} placeholder="Select designations" />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractDayGuardExService" options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                                    <MultiSearchSelect name="contractDayGuardExService" options={exServiceOptions} placeholder="Select" />
                                 </div>
                             </div>
                         </div>
@@ -572,11 +583,11 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractNightGuardDesignation" options={DESIGNATION_OPTIONS} placeholder="Select designation" />
+                                    <MultiSearchSelect name="contractNightGuardDesignation" options={designationOptions} placeholder="Select designations" />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractNightGuardExService" options={EX_SERVICE_OPTIONS} placeholder="Select" />
+                                    <MultiSearchSelect name="contractNightGuardExService" options={exServiceOptions} placeholder="Select" />
                                 </div>
                             </div>
                         </div>

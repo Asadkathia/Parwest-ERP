@@ -47,24 +47,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     return null
                 }
 
-                // Load permissions so they're stored in the JWT token.
-                // Only include modules where at least one permission is enabled.
+                // Load effective permissions = role permissions UNION user permissions.
+                // Any module with at least one true flag from either source is included.
                 let permissions: string[] = []
                 try {
-                    const perms = await prisma.userPermission.findMany({
-                        where: {
-                            userId: user.id,
-                            OR: [
-                                { canView: true },
-                                { canCreate: true },
-                                { canUpdate: true },
-                                { canDelete: true },
-                                { canRequisition: true },
-                            ],
-                        },
-                        select: { module: true },
-                    })
-                    permissions = perms.map((p) => p.module)
+                    const anyEnabled = [
+                        { canView: true }, { canCreate: true }, { canUpdate: true },
+                        { canDelete: true }, { canRequisition: true },
+                    ]
+                    const [userPerms, rolePerms] = await Promise.all([
+                        prisma.userPermission.findMany({
+                            where: { userId: user.id, OR: anyEnabled },
+                            select: { module: true },
+                        }),
+                        prisma.rolePermission.findMany({
+                            where: { roleId: user.roleId, OR: anyEnabled },
+                            select: { module: true },
+                        }).catch(() => [] as { module: string }[]),
+                    ])
+                    const moduleSet = new Set([
+                        ...userPerms.map((p) => p.module),
+                        ...rolePerms.map((p) => p.module),
+                    ])
+                    permissions = Array.from(moduleSet)
                 } catch {
                     permissions = []
                 }
@@ -98,24 +103,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.regionalOfficeId = user.regionalOfficeId ?? null
                 token.permissions = user.permissions ?? []
             } else if (token.id) {
-                // On subsequent requests, refresh permissions from DB so changes
-                // take effect without requiring the user to re-login.
-                // Only include modules where at least one permission is enabled.
+                // On subsequent requests, refresh effective permissions (role + user union)
                 try {
-                    const perms = await prisma.userPermission.findMany({
-                        where: {
-                            userId: token.id as string,
-                            OR: [
-                                { canView: true },
-                                { canCreate: true },
-                                { canUpdate: true },
-                                { canDelete: true },
-                                { canRequisition: true },
-                            ],
-                        },
-                        select: { module: true },
+                    const anyEnabled = [
+                        { canView: true }, { canCreate: true }, { canUpdate: true },
+                        { canDelete: true }, { canRequisition: true },
+                    ]
+                    const user = await prisma.user.findUnique({
+                        where: { id: token.id as string },
+                        select: { roleId: true },
                     })
-                    token.permissions = perms.map((p) => p.module)
+                    const [userPerms, rolePerms] = await Promise.all([
+                        prisma.userPermission.findMany({
+                            where: { userId: token.id as string, OR: anyEnabled },
+                            select: { module: true },
+                        }),
+                        user?.roleId
+                            ? prisma.rolePermission.findMany({
+                                  where: { roleId: user.roleId, OR: anyEnabled },
+                                  select: { module: true },
+                              })
+                            : Promise.resolve([] as { module: string }[]),
+                    ])
+                    const moduleSet = new Set([
+                        ...userPerms.map((p) => p.module),
+                        ...rolePerms.map((p) => p.module),
+                    ])
+                    token.permissions = Array.from(moduleSet)
                 } catch {
                     // Keep existing permissions on DB error
                 }

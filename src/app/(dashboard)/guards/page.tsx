@@ -8,14 +8,22 @@ import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
+import GuardsFilterBar from "@/components/guards/GuardsFilterBar"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
+import { Suspense } from "react"
 
-export default async function GuardsPage() {
+export default async function GuardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; officeId?: string }>
+}) {
   const session = await auth()
   if (!session) redirect("/login")
+
+  const { q = "", status = "", officeId = "" } = await searchParams
 
   let guards: Array<{
     id: string
@@ -35,11 +43,30 @@ export default async function GuardsPage() {
   const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
+  let offices: { id: string; name: string }[] = []
+
   try {
-    const [guardRows, total, active, pending, inactive] = await Promise.all([
+    // Build where clause from filters
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {}
+    if (q.trim()) {
+      where.OR = [
+        { name: { contains: q.trim(), mode: "insensitive" } },
+        { cnic: { contains: q.trim(), mode: "insensitive" } },
+        { parwestId: { contains: q.trim(), mode: "insensitive" } },
+      ]
+    }
+    if (status) where.status = status
+    if (officeId) where.regionalOfficeId = officeId
+    // Apply manager scope restrictions
+    if (scope?.regionId) where.regionId = scope.regionId
+    if (scope?.regionalOfficeId) where.regionalOfficeId = scope.regionalOfficeId
+
+    const [guardRows, total, active, pending, inactive, officeRows] = await Promise.all([
       prisma.guard.findMany({
-        take: 20,
+        where,
         orderBy: { createdAt: "desc" },
+        take: 200,
         include: {
           regionalOffice: { select: { name: true } },
           supervisorAssignments: {
@@ -53,7 +80,9 @@ export default async function GuardsPage() {
       prisma.guard.count({ where: { status: "ACTIVE" } }),
       prisma.guard.count({ where: { status: "PENDING" } }),
       prisma.guard.count({ where: { status: "INACTIVE" } }),
+      prisma.regionalOffice.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ])
+
     guards = guardRows.map((guard) => ({
       id: guard.id,
       parwestId: guard.parwestId,
@@ -67,6 +96,7 @@ export default async function GuardsPage() {
       regionalOfficeName: guard.regionalOffice?.name ?? null,
       photoUrl: guard.photoUrl ?? null,
     }))
+    offices = officeRows
     stats.total = total
     stats.active = active
     stats.pending = pending
@@ -100,6 +130,14 @@ export default async function GuardsPage() {
       : "Manager scope active: showing data for your region/regional office only."
   }
 
+  const statusColor = (s: string) => {
+    if (s === "ACTIVE") return "success"
+    if (s === "PRESENT") return "success"
+    if (s === "PENDING") return "warning"
+    if (s === "DEFAULT") return "brand"
+    return "neutral"
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle
@@ -123,20 +161,15 @@ export default async function GuardsPage() {
       </div>
 
       <FilterBar>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Search by name, CNIC, or Parwest ID..." className="ui-input" />
-          <select className="ui-select">
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="PENDING">Pending</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="TERMINATED">Terminated</option>
-          </select>
-          <select className="ui-select">
-            <option value="">All Regions</option>
-          </select>
-        </div>
+        <Suspense>
+          <GuardsFilterBar offices={offices} />
+        </Suspense>
       </FilterBar>
+
+      <div className="text-xs text-gray-500 -mt-4">
+        {guards.length} guard{guards.length !== 1 ? "s" : ""} found
+        {q || status || officeId ? " (filtered)" : ""}
+      </div>
 
       <section className="ui-card overflow-x-auto">
         <table className="w-full min-w-[980px]">
@@ -173,10 +206,7 @@ export default async function GuardsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.supervisorName || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{guard.regionalOfficeName || "—"}</td>
                   <td className="px-6 py-4 text-sm">
-                    <StatusChip
-                      label={guard.status}
-                      variant={guard.status === "ACTIVE" ? "success" : guard.status === "PENDING" ? "warning" : "neutral"}
-                    />
+                    <StatusChip label={guard.status} variant={statusColor(guard.status)} />
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <Link href={`/guards/${guard.id}`} className="text-[var(--brand)] hover:underline font-medium">

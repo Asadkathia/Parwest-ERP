@@ -8,6 +8,7 @@ import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import GuardProfileHealth from "@/components/guards/GuardProfileHealth"
 import MentalHealthBadge from "@/components/guards/MentalHealthBadge"
 import GuardLifecycleProgress from "@/components/guards/GuardLifecycleProgress"
+import GuardStatusSupervisorEditor from "@/components/guards/GuardStatusSupervisorEditor"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
@@ -45,6 +46,24 @@ type GuardDetailModel = GuardTabModel & {
     storeInventoryAssignments?: Array<Record<string, unknown>>
     verificationDocTypes?: Array<{ name: string }>
     verificationPrerequisites?: Array<{ docTypeName: string; status: string }>
+    residenceAssignments?: Array<{
+        id: string
+        location: string
+        status: string
+        assignedAt: Date | string
+        assignedByName: string | null
+        vacatedAt: Date | string | null
+        vacatedByName: string | null
+        vacatedReason: string | null
+        notes: string | null
+        residence: {
+            id: string
+            address: string
+            supervisor: string | null
+            city: string | null
+            state: string | null
+        } | null
+    }>
 }
 
 function toDateOrNull(value?: Date | string | null) {
@@ -90,6 +109,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
             storeInventoryAssignments,
             verificationDocTypes,
             verificationPrerequisites,
+            residenceAssignments,
         ] = await Promise.all([
             prisma.guard.findUnique({
                 where: { id },
@@ -135,6 +155,21 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                 where: { guardId: id },
                 select: { docTypeName: true, status: true },
             }).catch(() => []),
+            prisma.residenceAssignment.findMany({
+                where: { guardId: id },
+                orderBy: { assignedAt: "desc" },
+                include: {
+                    residence: {
+                        select: {
+                            id: true,
+                            address: true,
+                            supervisor: true,
+                            city: true,
+                            state: true,
+                        },
+                    },
+                },
+            }).catch(() => []),
         ])
         guard = guardData
             ? {
@@ -145,6 +180,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                 storeInventoryAssignments,
                 verificationDocTypes,
                 verificationPrerequisites,
+                residenceAssignments,
             }
             : null
     } catch (error) {
@@ -292,19 +328,21 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
             salary: d.salary ?? null,
             regionalOfficeName: d.regionalOffice.name,
         })),
-    }
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "ACTIVE":
-                return "bg-green-100 text-green-800"
-            case "INACTIVE":
-                return "bg-gray-100 text-gray-800"
-            case "PENDING":
-                return "bg-orange-100 text-orange-800"
-            default:
-                return "bg-gray-100 text-gray-800"
-        }
+        // Residence assignment history
+        residenceHistory: (g.residenceAssignments ?? []).map((ra) => ({
+            id: ra.id,
+            address: ra.residence?.address ?? ra.location,
+            status: ra.status === "ACTIVE" ? "CURRENT" : "VACATED",
+            supervisor: ra.residence?.supervisor ?? null,
+            city: ra.residence?.city ?? null,
+            state: ra.residence?.state ?? null,
+            assignDate: ra.assignedAt,
+            assignedByName: ra.assignedByName ?? null,
+            vacateDate: ra.vacatedAt ?? null,
+            vacatedByName: ra.vacatedByName ?? null,
+            vacatedReason: ra.vacatedReason ?? null,
+            notes: ra.notes ?? null,
+        })),
     }
 
     return (
@@ -338,7 +376,6 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                     <div>
                         <h1 className="text-3xl font-bold">{guard.name}</h1>
                         <p className="text-gray-600 mt-1">Parwest ID: {guard.parwestId}</p>
-                        <p className="text-gray-600 mt-1">Supervisor: {guardWithTabs.managerName || "—"}</p>
                         {/* Age approval flag */}
                         {!!(guard as Record<string, unknown>).ageApprovalRequired && (
                             <div className="mt-2">
@@ -396,9 +433,12 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                         />
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(guard.status)}`}>
-                            {guard.status}
-                        </span>
+                        <GuardStatusSupervisorEditor
+                            guardId={guard.id}
+                            currentStatus={guard.status}
+                            currentSupervisorName={guardWithTabs.managerName ?? null}
+                            isAdmin={(session.user as { role?: string })?.role?.toLowerCase() === "admin"}
+                        />
                         <MentalHealthBadge guardId={guard.id} />
                     </div>
                 </div>

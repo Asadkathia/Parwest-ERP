@@ -29,6 +29,7 @@ export async function GET(
 
     const result = docTypes.map((dt) => {
       const prereq = prereqMap.get(dt.name)
+      const p = prereq as Record<string, unknown> | undefined
       return {
         docTypeId: dt.id,
         docTypeName: dt.name,
@@ -41,8 +42,12 @@ export async function GET(
         attachmentData: prereq?.attachmentData ?? null,
         attachmentName: prereq?.attachmentName ?? null,
         documentUrl: prereq?.documentUrl ?? null,
+        uploadedBy: (p?.uploadedBy as string | null) ?? null,
+        uploadedAt: (p?.uploadedAt instanceof Date ? (p.uploadedAt as Date).toISOString() : (p?.uploadedAt as string | null)) ?? null,
         verifiedAt: prereq?.verifiedAt?.toISOString() ?? null,
         verifiedBy: prereq?.verifiedBy ?? null,
+        editedBy: (p?.editedBy as string | null) ?? null,
+        editedAt: (p?.editedAt instanceof Date ? (p.editedAt as Date).toISOString() : (p?.editedAt as string | null)) ?? null,
         expiryDate: prereq?.expiryDate?.toISOString() ?? null,
         comments: prereq?.comments ?? null,
         notes: prereq?.notes ?? null,
@@ -101,8 +106,9 @@ export async function POST(
       })
     }
 
+    const now = new Date()
     // Upsert: create or update the prerequisite record for this doc type
-    const prereq = await prisma.guardPrerequisite.upsert({
+    const prereq = await (prisma.guardPrerequisite.upsert as unknown as (args: Record<string, unknown>) => Promise<unknown>)({
       where: { guardId_docTypeName: { guardId, docTypeName } },
       create: {
         guardId,
@@ -112,18 +118,21 @@ export async function POST(
         attachmentName: body.attachmentName ?? null,
         documentUrl: body.documentUrl ?? null,
         notes: body.notes ?? null,
-        verifiedBy: uploaderName, // used as uploadedBy for attachments
+        uploadedBy: uploaderName,
+        uploadedAt: now,
       },
       update: {
         attachmentData: body.attachmentData ?? undefined,
         attachmentName: body.attachmentName ?? undefined,
         documentUrl: body.documentUrl ?? undefined,
         notes: body.notes ?? undefined,
-        verifiedBy: uploaderName,
+        uploadedBy: uploaderName,
+        uploadedAt: now,
         // Reset verification when doc is re-uploaded
         status: "PENDING",
         verificationStatus: null,
         verifiedAt: null,
+        verifiedBy: null,
       },
     })
 
