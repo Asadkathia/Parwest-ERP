@@ -60,7 +60,7 @@ export default async function GuardsPage({
     if (officeId) where.regionalOfficeId = officeId
     // Apply manager scope restrictions
     if (scope?.regionId) where.regionId = scope.regionId
-    if (scope?.regionalOfficeId) where.regionalOfficeId = scope.regionalOfficeId
+    if (scope?.regionalOfficeIds?.length) where.regionalOfficeId = scope.regionalOfficeIds[0]
 
     const [guardRows, total, active, pending, inactive, officeRows] = await Promise.all([
       prisma.guard.findMany({
@@ -130,11 +130,10 @@ export default async function GuardsPage({
       : "Manager scope active: showing data for your region/regional office only."
   }
 
-  const statusColor = (s: string) => {
+  const statusColor = (s: string): import("@/components/ui/status-chip").ChipVariant => {
     if (s === "ACTIVE") return "success"
     if (s === "PRESENT") return "success"
     if (s === "PENDING") return "warning"
-    if (s === "DEFAULT") return "brand"
     return "neutral"
   }
 

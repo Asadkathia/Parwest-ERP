@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { GuardBankAccount } from "@/lib/guards/bank-accounts"
 
 type AccountKind = "bank" | "wallet"
@@ -10,13 +10,13 @@ type Props = {
   defaultValue?: GuardBankAccount[]
 }
 
-const WALLET_TYPES = [
-  { value: "JAZZCASH", label: "JazzCash" },
-  { value: "EASYPAISA", label: "EasyPaisa" },
-  { value: "NAYAPAY", label: "NayaPay" },
-  { value: "SADAPAY", label: "SadaPay" },
-  { value: "UPAISA", label: "UPaisa" },
-  { value: "OTHER", label: "Other Wallet" },
+const FALLBACK_BANK_NAMES = ["HBL", "MCB", "UBL", "Allied Bank", "Bank Alfalah", "Meezan Bank", "National Bank"]
+const FALLBACK_WALLET_TYPES = [
+  { value: "JazzCash", label: "JazzCash" },
+  { value: "EasyPaisa", label: "EasyPaisa" },
+  { value: "NayaPay", label: "NayaPay" },
+  { value: "SadaPay", label: "SadaPay" },
+  { value: "UPaisa", label: "UPaisa" },
 ]
 
 const emptyAccount = (): GuardBankAccount => ({
@@ -26,6 +26,7 @@ const emptyAccount = (): GuardBankAccount => ({
   accountNumber: "",
   iban: "",
   branchCode: "",
+  branchLocation: "",
   accountType: "SAVINGS",
   accountStatus: "ACTIVE",
   walletType: "BANK",
@@ -40,6 +41,19 @@ export default function GuardAccountsEditor({ name = "bankAccounts", defaultValu
   const [accounts, setAccounts] = useState<GuardBankAccount[]>(
     defaultValue && defaultValue.length > 0 ? defaultValue : [{ ...emptyAccount(), isActive: true }]
   )
+  const [bankNames, setBankNames] = useState<string[]>(FALLBACK_BANK_NAMES)
+  const [walletTypes, setWalletTypes] = useState<{ value: string; label: string }[]>(FALLBACK_WALLET_TYPES)
+
+  useEffect(() => {
+    fetch("/api/guard-bank-names?activeOnly=true")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ name: string }>) => { if (data.length > 0) setBankNames(data.map((d) => d.name)) })
+      .catch(() => {})
+    fetch("/api/guard-wallet-types?activeOnly=true")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ name: string }>) => { if (data.length > 0) setWalletTypes(data.map((d) => ({ value: d.name, label: d.name }))) })
+      .catch(() => {})
+  }, [])
 
   const activeId = useMemo(() => accounts.find((a) => a.isActive)?.id || "", [accounts])
 
@@ -143,17 +157,21 @@ export default function GuardAccountsEditor({ name = "bankAccounts", defaultValu
                 {/* Bank Name OR Wallet Type selector */}
                 {kind === "bank" ? (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Bank Name</label>
-                    <input
-                      className="ui-input"
-                      placeholder="e.g. HBL, MCB, UBL"
+                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Bank Name <span className="text-red-500">*</span></label>
+                    <select
+                      className="ui-select"
                       value={account.bankName}
                       onChange={(e) => update(account.id, { bankName: e.target.value })}
-                    />
+                    >
+                      <option value="">-- Select Bank --</option>
+                      {bankNames.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
                   </div>
                 ) : (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Wallet Type</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Wallet Type <span className="text-red-500">*</span></label>
                     <select
                       className="ui-select"
                       value={account.walletType}
@@ -161,7 +179,8 @@ export default function GuardAccountsEditor({ name = "bankAccounts", defaultValu
                         update(account.id, { walletType: e.target.value as GuardBankAccount["walletType"] })
                       }
                     >
-                      {WALLET_TYPES.map((w) => (
+                      <option value="">-- Select Wallet --</option>
+                      {walletTypes.map((w) => (
                         <option key={w.value} value={w.value}>
                           {w.label}
                         </option>
@@ -183,7 +202,7 @@ export default function GuardAccountsEditor({ name = "bankAccounts", defaultValu
 
                 {/* Account Number */}
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Account Number *</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Account Number <span className="text-red-500">*</span></label>
                   <input
                     className="ui-input"
                     placeholder="Account number"
@@ -211,6 +230,15 @@ export default function GuardAccountsEditor({ name = "bankAccounts", defaultValu
                         placeholder="Branch code"
                         value={account.branchCode}
                         onChange={(e) => update(account.id, { branchCode: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Branch Location <span className="text-red-500">*</span></label>
+                      <input
+                        className="ui-input"
+                        placeholder="e.g. Main Branch, Lahore"
+                        value={account.branchLocation}
+                        onChange={(e) => update(account.id, { branchLocation: e.target.value })}
                       />
                     </div>
                     <div>

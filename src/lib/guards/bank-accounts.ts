@@ -5,6 +5,7 @@ export type GuardBankAccount = {
   accountNumber: string
   iban: string
   branchCode: string
+  branchLocation: string
   accountType: "SAVINGS" | "CURRENT"
   accountStatus: "ACTIVE" | "PENDING" | "INACTIVE" | "DORMANT" | "SUSPENDED"
   walletType: "BANK" | "JAZZCASH" | "EASYPAISA" | "NAYAPAY" | "SADAPAY" | "UPAISA" | "OTHER"

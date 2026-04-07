@@ -136,13 +136,30 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const contactCounterRef = useRef(2)
   const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
-  const [joiningDate, setJoiningDate] = useState("")
+  const [joiningDate, setJoiningDate] = useState(() => new Date().toISOString().split("T")[0])
   const [maritalStatus, setMaritalStatus] = useState("")
 
   // Dynamic ex-service types
   const [exServiceTypeOptions, setExServiceTypeOptions] = useState<string[]>([])
-  type PreviousEmp = { type: string; isExService: boolean; registrationNo: string; rank: string; unit: string; dateOfEnrollment: string; dateOfDischarge: string; years: string; months: string; remarks: string }
-  const emptyEmp = (): PreviousEmp => ({ type: "", isExService: false, registrationNo: "", rank: "", unit: "", dateOfEnrollment: "", dateOfDischarge: "", years: "", months: "", remarks: "" })
+  type PreviousEmp = {
+    type: string
+    isExService: boolean
+    // Ex-service fields
+    registrationNo: string
+    rank: string
+    unit: string
+    // Civilian fields
+    nameOfCompany: string
+    designation: string
+    reasonForLeaving: string
+    // Common fields
+    dateOfEnrollment: string
+    dateOfDischarge: string
+    years: string
+    months: string
+    remarks: string
+  }
+  const emptyEmp = (): PreviousEmp => ({ type: "", isExService: false, registrationNo: "", rank: "", unit: "", nameOfCompany: "", designation: "", reasonForLeaving: "", dateOfEnrollment: "", dateOfDischarge: "", years: "", months: "", remarks: "" })
   const [prevEmployments, setPrevEmployments] = useState<PreviousEmp[]>([])
   const empCounterRef = useRef(0)
 
@@ -260,6 +277,43 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
         setError("Please enter a valid age")
         setLoading(false)
         return
+      }
+    }
+
+    // Validate bank accounts
+    if (sections.bankAccount) {
+      let parsedAccounts: Array<Record<string, unknown>> = []
+      try {
+        const raw = String(data.bankAccounts || "[]")
+        parsedAccounts = JSON.parse(raw)
+      } catch { /* ignore */ }
+      if (parsedAccounts.length === 0) {
+        setError("At least one bank account is required.")
+        setLoading(false)
+        return
+      }
+      for (const acc of parsedAccounts) {
+        const kind = acc.walletType === "BANK" ? "bank" : "wallet"
+        if (!String(acc.bankName || "").trim()) {
+          setError(`Bank account: ${kind === "bank" ? "Bank Name" : "Wallet Type"} is required.`)
+          setLoading(false)
+          return
+        }
+        if (!String(acc.accountNumber || "").trim()) {
+          setError("Bank account: Account Number is required.")
+          setLoading(false)
+          return
+        }
+        if (!String(acc.accountTitle || "").trim()) {
+          setError("Bank account: Account Title is required.")
+          setLoading(false)
+          return
+        }
+        if (kind === "bank" && !String(acc.branchLocation || "").trim()) {
+          setError("Bank account: Branch Location is required.")
+          setLoading(false)
+          return
+        }
       }
     }
 
@@ -511,8 +565,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-[var(--text-muted)]">
-                If the guard is <strong>Civilian</strong>, leave this section empty.
-                Click &quot;Add Employment&quot; only for ex-servicemen.
+                Add all previous employment records — both <strong>Civilian</strong> and <strong>Ex-Service</strong>.
               </p>
               <button
                 type="button"
@@ -530,7 +583,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
 
             {prevEmployments.length === 0 && (
               <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-6 py-5 text-center text-sm text-[var(--text-muted)]">
-                No previous employment — guard will be treated as <strong>Civilian</strong>
+                No previous employment records added
               </div>
             )}
 
@@ -547,10 +600,19 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   </button>
                 </div>
 
-                {/* Type selection — only admin-configured ex-service types, no CIVILIAN */}
+                {/* Type selection — Civilian + all ex-service types */}
                 <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Service Type <span className="text-red-500">*</span></label>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Employment Type <span className="text-red-500">*</span></label>
                   <div className="flex flex-wrap gap-4">
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="radio"
+                        checked={emp.type === "CIVILIAN"}
+                        onChange={() => setPrevEmployments((prev) => prev.map((e, i) => i === idx ? { ...e, type: "CIVILIAN", isExService: false } : e))}
+                        className="h-4 w-4 accent-[var(--brand)]"
+                      />
+                      Civilian
+                    </label>
                     {exServiceTypeOptions.map((t) => (
                       <label key={t} className="inline-flex items-center gap-2 cursor-pointer text-sm">
                         <input
@@ -563,13 +625,53 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                       </label>
                     ))}
                     {exServiceTypeOptions.length === 0 && (
-                      <span className="text-xs text-[var(--text-muted)]">Loading types…</span>
+                      <span className="text-xs text-[var(--text-muted)]">Loading ex-service types…</span>
                     )}
                   </div>
                 </div>
 
-                {/* Fields — only show when a type is selected */}
-                {emp.type && (
+                {/* Civilian fields */}
+                {emp.type === "CIVILIAN" && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">COMPANY NAME <span className="text-red-500">*</span></label>
+                      <input type="text" className="ui-input" placeholder="Name of Company" value={emp.nameOfCompany} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, nameOfCompany: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DESIGNATION / POSITION</label>
+                      <input type="text" className="ui-input" placeholder="Designation" value={emp.designation} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, designation: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF JOINING</label>
+                      <input type="date" className="ui-input" value={emp.dateOfEnrollment} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfEnrollment: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF LEAVING</label>
+                      <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
+                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
+                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REASON FOR LEAVING</label>
+                      <input type="text" className="ui-input" placeholder="Reason for leaving" value={emp.reasonForLeaving} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, reasonForLeaving: e.target.value } : p))} />
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REMARKS</label>
+                      <input type="text" className="ui-input" placeholder="Remarks" value={emp.remarks} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, remarks: e.target.value } : p))} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Ex-service fields */}
+                {emp.type && emp.type !== "CIVILIAN" && (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REGISTRATION NO</label>

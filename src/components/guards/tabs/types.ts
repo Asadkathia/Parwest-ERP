@@ -145,9 +145,15 @@ export type GuardTabModel = {
   previousEmployments?: Array<{
     type?: string
     isExService?: boolean
+    // Ex-service fields
     rank?: string
     registrationNo?: string
     unit?: string
+    // Civilian fields
+    nameOfCompany?: string | null
+    designation?: string | null
+    reasonForLeaving?: string | null
+    // Common
     dateOfEnrollment?: string | null
     dateOfDischarge?: string | null
     years?: string | number | null

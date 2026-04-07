@@ -193,25 +193,39 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                                     ? `${enrollDate} → ${dischargeDate}`
                                     : null
 
+                                const isCivilian = emp.type === "CIVILIAN" || emp.isExService === false
+                                const empLoose = emp as Record<string, unknown>
+
                                 return (
                                     <div key={idx} className={entries.length > 1 ? "rounded-md border p-4" : ""}>
                                         {entries.length > 1 && (
                                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Employment {idx + 1}</p>
                                         )}
                                         <div className="flex items-center gap-2 mb-4">
-                                            <span className="text-sm font-medium text-gray-700">Service Type:</span>
-                                            <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">
+                                            <span className="text-sm font-medium text-gray-700">Employment Type:</span>
+                                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${isCivilian ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}`}>
                                                 {emp.type || "—"}
                                             </span>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <InfoField label="Registration No" value={emp.registrationNo} />
-                                            <InfoField label="Rank" value={emp.rank} />
-                                            <InfoField label="Unit / Regiment" value={emp.unit} />
-                                            <InfoField label="Service Period" value={servicePeriod} />
-                                            <InfoField label="Duration of Service" value={serviceDuration} />
-                                            <InfoField label="Remarks" value={emp.remarks} />
-                                        </div>
+                                        {isCivilian ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                <InfoField label="Company Name" value={empLoose.nameOfCompany as string | null | undefined} />
+                                                <InfoField label="Designation" value={empLoose.designation as string | null | undefined} />
+                                                <InfoField label="Service Period" value={servicePeriod} />
+                                                <InfoField label="Duration" value={serviceDuration} />
+                                                <InfoField label="Reason for Leaving" value={empLoose.reasonForLeaving as string | null | undefined} />
+                                                <InfoField label="Remarks" value={emp.remarks} />
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                <InfoField label="Registration No" value={emp.registrationNo} />
+                                                <InfoField label="Rank" value={emp.rank} />
+                                                <InfoField label="Unit / Regiment" value={emp.unit} />
+                                                <InfoField label="Service Period" value={servicePeriod} />
+                                                <InfoField label="Duration of Service" value={serviceDuration} />
+                                                <InfoField label="Remarks" value={emp.remarks} />
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}

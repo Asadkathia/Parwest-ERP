@@ -3,23 +3,19 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
-const DEFAULT_BANK_NAMES = [
-  "HBL", "MCB", "UBL", "Allied Bank", "Bank Alfalah", "Meezan Bank",
-  "National Bank", "Standard Chartered", "Askari Bank", "Faysal Bank",
-  "Bank Al-Habib", "Dubai Islamic Bank", "Silk Bank", "Soneri Bank",
-]
+const DEFAULT_WALLET_TYPES = ["JazzCash", "EasyPaisa", "NayaPay", "SadaPay", "UPaisa"]
 
 async function ensureDefaults() {
   try {
-    const count = await (prisma.guardBankName as unknown as { count: () => Promise<number> }).count()
+    const count = await (prisma.guardWalletType as unknown as { count: () => Promise<number> }).count()
     if (count === 0) {
-      for (let i = 0; i < DEFAULT_BANK_NAMES.length; i++) {
-        await (prisma.guardBankName as unknown as {
+      for (let i = 0; i < DEFAULT_WALLET_TYPES.length; i++) {
+        await (prisma.guardWalletType as unknown as {
           upsert: (args: unknown) => Promise<unknown>
         }).upsert({
-          where: { name: DEFAULT_BANK_NAMES[i] },
+          where: { name: DEFAULT_WALLET_TYPES[i] },
           update: {},
-          create: { name: DEFAULT_BANK_NAMES[i], isActive: true, sortOrder: i + 1 },
+          create: { name: DEFAULT_WALLET_TYPES[i], isActive: true, sortOrder: i + 1 },
         })
       }
     }
@@ -30,13 +26,13 @@ export async function GET(request: NextRequest) {
   try {
     await ensureDefaults()
     const activeOnly = request.nextUrl.searchParams.get("activeOnly") !== "false"
-    const banks = await (prisma.guardBankName as unknown as {
+    const wallets = await (prisma.guardWalletType as unknown as {
       findMany: (args: unknown) => Promise<unknown[]>
     }).findMany({
       where: activeOnly ? { isActive: true } : undefined,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     })
-    return NextResponse.json(banks)
+    return NextResponse.json(wallets)
   } catch {
     return NextResponse.json([], { status: 200 })
   }
@@ -51,15 +47,15 @@ export async function POST(request: NextRequest) {
     const name = String(body?.name || "").trim()
     if (!name) return badRequest("Name is required.")
 
-    const bank = await (prisma.guardBankName as unknown as {
+    const wallet = await (prisma.guardWalletType as unknown as {
       create: (args: unknown) => Promise<unknown>
     }).create({
       data: { name, isActive: true, sortOrder: body.sortOrder ?? 0 },
     })
-    return NextResponse.json(bank, { status: 201 })
+    return NextResponse.json(wallet, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : ""
-    if (msg.includes("Unique constraint")) return badRequest("A bank with this name already exists.")
-    return internalServerError("Failed to create bank name.")
+    if (msg.includes("Unique constraint")) return badRequest("A wallet type with this name already exists.")
+    return internalServerError("Failed to create wallet type.")
   }
 }

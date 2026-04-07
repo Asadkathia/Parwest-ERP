@@ -329,20 +329,23 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
             regionalOfficeName: d.regionalOffice.name,
         })),
         // Residence assignment history
-        residenceHistory: (g.residenceAssignments ?? []).map((ra) => ({
-            id: ra.id,
-            address: ra.residence?.address ?? ra.location,
-            status: ra.status === "ACTIVE" ? "CURRENT" : "VACATED",
-            supervisor: ra.residence?.supervisor ?? null,
-            city: ra.residence?.city ?? null,
-            state: ra.residence?.state ?? null,
-            assignDate: ra.assignedAt,
-            assignedByName: ra.assignedByName ?? null,
-            vacateDate: ra.vacatedAt ?? null,
-            vacatedByName: ra.vacatedByName ?? null,
-            vacatedReason: ra.vacatedReason ?? null,
-            notes: ra.notes ?? null,
-        })),
+        residenceHistory: ((g.residenceAssignments ?? []) as Array<Record<string, unknown>>).map((ra) => {
+            const residence = ra.residence as Record<string, unknown> | null | undefined
+            return {
+                id: ra.id,
+                address: (residence?.address as string | null | undefined) ?? (ra.location as string | null | undefined),
+                status: ra.status === "ACTIVE" ? "CURRENT" : "VACATED",
+                supervisor: (residence?.supervisor as string | null | undefined) ?? null,
+                city: (residence?.city as string | null | undefined) ?? null,
+                state: (residence?.state as string | null | undefined) ?? null,
+                assignDate: ra.assignedAt,
+                assignedByName: (ra.assignedByName as string | null | undefined) ?? null,
+                vacateDate: (ra.vacatedAt as string | Date | null | undefined) ?? null,
+                vacatedByName: (ra.vacatedByName as string | null | undefined) ?? null,
+                vacatedReason: (ra.vacatedReason as string | null | undefined) ?? null,
+                notes: (ra.notes as string | null | undefined) ?? null,
+            }
+        }),
     }
 
     return (
