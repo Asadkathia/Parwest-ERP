@@ -4,7 +4,7 @@ A comprehensive Enterprise Resource Planning (ERP) system built for Parwest Secu
 
 ## 🚀 Features
 
-### Guards Module ✅
+### Guards Module 
 - **Guard Management**: Complete CRUD operations for guard profiles
 - **18 Profile Tabs**: General Info, Attachments, Attendance, Salaries, Deployments, Verifications, Bank Details, and more
 - **Deployment Management**: Track guard deployments across client locations
