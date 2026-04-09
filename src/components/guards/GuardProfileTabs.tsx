@@ -103,7 +103,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "service-history":
                 return <ServiceHistoryTab guardId={guard.id || ""} />
             case "insurance":
-                return <InsuranceTab insurance={guard.insurance || []} />
+                return <InsuranceTab insurance={guard.insurance || []} guardId={guard.id || ""} parwestId={guard.parwestId} />
             case "status-history":
                 return <StatusHistoryTab guardId={guard.id || ""} />
             case "pba-docs":

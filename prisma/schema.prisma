@@ -95,6 +95,8 @@ model User {
   supervisorAssignments             ManagerSupervisorAssignment[]  @relation("SupervisorAssignments")
   clientAssignments                 ClientSupervisorAssignment[]
   guardAssignments                  GuardSupervisorAssignment[]
+  clientInsurancesCreated           ClientInsurance[]  @relation("ClientInsuranceCreatedBy")
+  guardInsurancesCreated            GuardInsurance[]   @relation("GuardInsuranceCreatedBy")
   requisitionsRequested             Requisition[]                  @relation("RequisitionRequester")
   requisitionsApproved              Requisition[]                  @relation("RequisitionApprover")
   storeInventoryPurchasesCreated    StoreInventoryPurchase[]       @relation("StoreInventoryPurchaseCreatedBy")
@@ -326,6 +328,7 @@ model Guard {
   trainings             Training[]
   supervisorAssignments GuardSupervisorAssignment[]
   ageApproval           GuardAgeApproval?
+  guardInsurances       GuardInsurance[]
 
   // Age approval flags
   ageApprovalRequired Boolean  @default(false)
@@ -737,6 +740,7 @@ model Client {
   deploymentRates       DeploymentRate[]
   supervisorAssignments ClientSupervisorAssignment[]
   contracts             ClientContract[]
+  insurances            ClientInsurance[]
 
   @@index([name])
   @@index([status])
@@ -1833,4 +1837,44 @@ model GuardWalletType {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// CLIENT INSURANCE MODULE
+// ============================================
+
+model ClientInsurance {
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  insuranceName String
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE
+  startDate     DateTime?
+  endDate       DateTime?
+  createdById   String?
+  createdBy     User?     @relation("ClientInsuranceCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  guardInsurances GuardInsurance[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model GuardInsurance {
+  id                String          @id @default(cuid())
+  guardId           String
+  guard             Guard           @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  clientInsuranceId String
+  clientInsurance   ClientInsurance @relation(fields: [clientInsuranceId], references: [id])
+  healthId          String?
+  status            String          @default("ACTIVE") // ACTIVE, INACTIVE
+  createdById       String?
+  createdBy         User?           @relation("GuardInsuranceCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([guardId])
+  @@index([clientInsuranceId])
 }

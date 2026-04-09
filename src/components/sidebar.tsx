@@ -93,6 +93,7 @@ const allNavItems: NavNode[] = [
             { title: "Branches", href: "/clients/branches", icon: MapPin },
             { title: "Pricing", href: "/clients/pricing", icon: DollarSign },
             { title: "Invoicing", href: "/clients/invoicing", icon: DollarSign },
+            { title: "Insurance by Clients", href: "/clients/clientInsuranceSettings", icon: ShieldAlert },
         ],
     },
     {
