@@ -87,7 +87,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "deployments":
                 return <DeploymentHistoryTab deployments={guard.deployments || []} />
             case "courses":
-                return <CoursesTab courses={guard.courses || []} />
+                return <CoursesTab courses={guard.courses || []} guardId={guard.id || ""} />
             case "verification":
                 return <VerificationTab guardId={guard.id || ""} />
             case "pledged-docs":

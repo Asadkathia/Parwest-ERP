@@ -97,6 +97,7 @@ model User {
   guardAssignments                  GuardSupervisorAssignment[]
   clientInsurancesCreated           ClientInsurance[]  @relation("ClientInsuranceCreatedBy")
   guardInsurancesCreated            GuardInsurance[]   @relation("GuardInsuranceCreatedBy")
+  guardCoursesCreated               GuardCourse[]      @relation("GuardCourseCreatedBy")
   requisitionsRequested             Requisition[]                  @relation("RequisitionRequester")
   requisitionsApproved              Requisition[]                  @relation("RequisitionApprover")
   storeInventoryPurchasesCreated    StoreInventoryPurchase[]       @relation("StoreInventoryPurchaseCreatedBy")
@@ -329,6 +330,7 @@ model Guard {
   supervisorAssignments GuardSupervisorAssignment[]
   ageApproval           GuardAgeApproval?
   guardInsurances       GuardInsurance[]
+  guardCourses          GuardCourse[]
 
   // Age approval flags
   ageApprovalRequired Boolean  @default(false)
@@ -1837,6 +1839,30 @@ model GuardWalletType {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// GUARD REFRESHER COURSES MODULE
+// ============================================
+
+model GuardCourse {
+  id           String    @id @default(cuid())
+  guardId      String
+  guard        Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  courseName   String
+  courseLevel  String
+  instructor   String
+  location     String
+  issueDate    DateTime?
+  description  String?
+  fileName     String?   // uploaded file name
+  fileData     String?   // base64 file data
+  createdById  String?
+  createdBy    User?     @relation("GuardCourseCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([guardId])
 }
 
 // ============================================
