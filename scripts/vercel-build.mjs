@@ -9,9 +9,12 @@ const skipMigrations = TRUE_VALUES.has(
 const skipSchemaVerification = TRUE_VALUES.has(
   String(process.env.SKIP_DB_SCHEMA_VERIFY ?? "").trim().toLowerCase()
 )
-const allowMigrationLockBypass = TRUE_VALUES.has(
-  String(process.env.ALLOW_MIGRATION_LOCK_BYPASS ?? "").trim().toLowerCase()
-)
+// Default true: schema is kept in sync via `prisma db push`.
+// Advisory lock timeouts on Neon should not fail the build.
+const allowMigrationLockBypass =
+  process.env.ALLOW_MIGRATION_LOCK_BYPASS === undefined
+    ? true
+    : TRUE_VALUES.has(String(process.env.ALLOW_MIGRATION_LOCK_BYPASS).trim().toLowerCase())
 
 const pooledUrl =
   process.env.DATABASE_URL
