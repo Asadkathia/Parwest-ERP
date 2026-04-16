@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { UserCircle2 } from "lucide-react"
+import { cacheGuardImageUrl, getCachedGuardImageUrl } from "@/lib/guardImageStorage"
 
 type Props = {
   guardId: string
@@ -20,23 +21,24 @@ const initialsFrom = (name: string) =>
     .join("")
 
 export default function GuardAvatar({ guardId, guardName, initialUrl, size = "sm" }: Props) {
-  const storageKey = `guard-profile-image:${guardId}`
   const [preview, setPreview] = useState<string | null>(initialUrl || null)
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
-    // If DB has a URL, always use it and keep localStorage in sync
+    // DB value is authoritative — update preview and opportunistically cache
+    // the URL (cacheGuardImageUrl silently skips base64 data: URLs).
     if (initialUrl) {
       const rafId = requestAnimationFrame(() => setPreview(initialUrl))
-      localStorage.setItem(storageKey, initialUrl)
+      cacheGuardImageUrl(guardId, initialUrl)
       return () => cancelAnimationFrame(rafId)
     }
-    // Fall back to localStorage for offline / cached display
-    const stored = localStorage.getItem(storageKey)
+    // No DB value — fall back to a previously cached lightweight URL.
+    // getCachedGuardImageUrl evicts stale/base64 entries automatically.
+    const stored = getCachedGuardImageUrl(guardId)
     if (!stored) return
     const rafId = requestAnimationFrame(() => setPreview(stored))
     return () => cancelAnimationFrame(rafId)
-  }, [storageKey, initialUrl])
+  }, [guardId, initialUrl])
   const initials = useMemo(() => initialsFrom(guardName), [guardName])
 
   const sizeClasses = size === "md" ? "h-12 w-12" : "h-10 w-10"

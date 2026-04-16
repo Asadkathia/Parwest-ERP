@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import Image from "next/image"
 import { UserCircle2, X } from "lucide-react"
+import { removeCachedGuardImageUrl } from "@/lib/guardImageStorage"
 
 type Props = {
   guardId: string
@@ -27,13 +28,9 @@ async function savePhotoToDb(guardId: string, photoUrl: string | null) {
 }
 
 export default function ProfileImageCard({ guardId, guardName, initialUrl }: Props) {
-  const storageKey = `guard-profile-image:${guardId}`
-  const [preview, setPreview] = useState<string | null>(() => {
-    // DB value takes priority over stale localStorage
-    if (initialUrl) return initialUrl
-    if (typeof window === "undefined") return null
-    return localStorage.getItem(storageKey) || null
-  })
+  // DB value is the source of truth; no localStorage fallback here because the
+  // payload is a base64 data URL (up to 2 MB) and would blow the storage quota.
+  const [preview, setPreview] = useState<string | null>(initialUrl ?? null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState("")
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -55,8 +52,9 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
     reader.onload = async () => {
       const value = typeof reader.result === "string" ? reader.result : null
       if (!value) return
+      // Optimistic preview via React state only — the base64 payload is too
+      // large for localStorage (2–3 MB) and would cause QuotaExceededError.
       setPreview(value)
-      localStorage.setItem(storageKey, value)
       setSaving(true)
       try {
         const res = await fetch(`/api/guards/${guardId}/photo`, {
@@ -69,7 +67,7 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
           setSaveError(err.message || "Failed to save photo")
         }
       } catch {
-        setSaveError("Network error — photo saved locally only")
+        setSaveError("Network error — please retry")
       } finally {
         setSaving(false)
       }
@@ -80,7 +78,7 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
   const removeImage = async () => {
     setPreview(null)
     setSaveError("")
-    if (typeof window !== "undefined") localStorage.removeItem(storageKey)
+    removeCachedGuardImageUrl(guardId)
     setSaving(true)
     try {
       await savePhotoToDb(guardId, null)
