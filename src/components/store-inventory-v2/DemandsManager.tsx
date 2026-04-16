@@ -10,7 +10,7 @@ import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 import { parseDemandResponseMeta, totalReceivedForMeta, type DemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 
 type Option = { id: string; name: string; type?: string | null }
-type Product = { id: string; sku: string; name: string; category?: { id: string; name: string } | null }
+type Product = { id: string; sku: string; name: string; category?: { id: string; name: string } | null; variation?: { id: string; name: string } | null }
 type DemandLine = { id: string; product: Product; requestedQty: number; approvedQty?: number | null; fulfilledQty: number }
 type DemandResponseRow = {
   id: string
@@ -517,16 +517,10 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
     [products]
   )
 
-  const demandProductOptions = useMemo(() => {
-    if (!form.toStoreId) return nonWeaponProducts
-    const productIdsWithStock = new Set(
-      balances
-        .filter((row) => row.storeId === form.toStoreId && (row.quantityOnHand > 0 || row.quantityHeld > 0))
-        .map((row) => row.productId)
-    )
-    const storeProducts = nonWeaponProducts.filter((product) => productIdsWithStock.has(product.id))
-    return storeProducts.length ? storeProducts : nonWeaponProducts
-  }, [balances, form.toStoreId, nonWeaponProducts])
+  // Show all eligible non-weapon/non-ammo products regardless of current stock —
+  // a store may demand items that are out of stock at the warehouse, and the
+  // warehouse responds with whatever it can fulfil.
+  const demandProductOptions = useMemo(() => nonWeaponProducts, [nonWeaponProducts])
 
   const totalRequestedQty = useMemo(
     () => form.lines.reduce((sum, line) => sum + Math.max(0, Number(line.requestedQty) || 0), 0),
@@ -592,6 +586,7 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
                 <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
                   <th className="p-2">Product Name</th>
                   <th className="p-2">Product Code</th>
+                  <th className="p-2">Variant</th>
                   <th className="p-2">Available New Stock</th>
                   <th className="p-2">Available Reusable Stock</th>
                   <th className="p-2">Required Quantity</th>
@@ -607,6 +602,7 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
                       <tr key={`${line.productId}-${index}`} className="border-b border-[var(--border)]">
                         <td className="p-2">{product?.name || "—"}</td>
                         <td className="p-2">{product?.sku || "—"}</td>
+                        <td className="p-2">{product?.variation?.name || "—"}</td>
                         <td className="p-2">{stock.available}</td>
                         <td className="p-2">{stock.reusable}</td>
                         <td className="p-2">
@@ -628,11 +624,12 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
                   })
                 ) : (
                   <tr>
-                    <td className="p-3 text-[var(--text-muted)]" colSpan={6}>No products added yet.</td>
+                    <td className="p-3 text-[var(--text-muted)]" colSpan={7}>No products added yet.</td>
                   </tr>
                 )}
                 <tr className="border-t border-[var(--border)] font-semibold">
                   <td className="p-2">Total Qty</td>
+                  <td className="p-2" />
                   <td className="p-2" />
                   <td className="p-2" />
                   <td className="p-2" />

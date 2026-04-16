@@ -19,6 +19,7 @@ type Product = {
   category?: { id: string; name: string } | null
   calibre?: { id: string; name: string } | null
   weaponType?: { id: string; name: string } | null
+  variation?: { id: string; name: string } | null
 }
 
 type InventoryBalance = {
@@ -252,8 +253,9 @@ export default function AdjustmentsManager({
                   </select>
                 </div>
                 <ReadOnlyCell className="md:col-span-2" label="Product Code" value={selectedProduct?.sku || "—"} />
-                <ReadOnlyCell className="md:col-span-1" label="Calibre" value={selectedProduct?.calibre?.name || "---"} />
-                <ReadOnlyCell className="md:col-span-1" label="Weapon Type" value={selectedProduct?.weaponType?.name || "---"} />
+                <ReadOnlyCell className="md:col-span-1" label="Calibre" value={selectedProduct?.calibre?.name || "—"} />
+                <ReadOnlyCell className="md:col-span-1" label="Weapon Type" value={selectedProduct?.weaponType?.name || "—"} />
+                <ReadOnlyCell className="md:col-span-1" label="Variant" value={selectedProduct?.variation?.name || "—"} />
                 <ReadOnlyCell className="md:col-span-1" label="New Stock" value={String(stock.available)} />
                 <ReadOnlyCell className="md:col-span-1" label="Reusable Stock" value={String(stock.reusable)} />
                 <div className="md:col-span-1">

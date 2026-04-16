@@ -32,6 +32,7 @@ type ProductOption = {
   category?: { id: string; name: string } | null
   calibre?: { id: string; name: string } | null
   weaponType?: { id: string; name: string } | null
+  variation?: { id: string; name: string } | null
 }
 
 type ProductScope = "NON_WEAPON" | "WEAPON"
@@ -479,6 +480,10 @@ export default function PurchasesManager({
                   <div className="md:col-span-2">
                     <label className="mb-1 block text-xs text-[var(--text-muted)]">Product Name</label>
                     <input className="ui-input" value={selected?.name || ""} readOnly />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="mb-1 block text-xs text-[var(--text-muted)]">Variant</label>
+                    <input className="ui-input" value={selected?.variation?.name || "—"} readOnly />
                   </div>
                   <div className="md:col-span-1">
                     <label className="mb-1 block text-xs text-[var(--text-muted)]">New Stock</label>
