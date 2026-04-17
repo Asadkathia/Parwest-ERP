@@ -571,6 +571,7 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
                 {demandProductOptions.map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.sku} - {row.name}
+                    {row.variation?.name ? ` (${row.variation.name})` : ""}
                   </option>
                 ))}
               </select>
