@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         const regionalOfficeId = searchParams.get("regionalOfficeId")?.trim() || undefined
 
         const managerScope = deriveManagerScope(session)
-        const scopeWhere = managerScope ? buildManagerScopeWhere(managerScope) : {}
+        const scopeWhere = managerScope ? buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }) : {}
 
         const where: Record<string, unknown> = { ...scopeWhere }
         if (parwestId) where.parwestId = { contains: parwestId, mode: "insensitive" }
