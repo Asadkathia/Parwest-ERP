@@ -1,161 +1,395 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 
-type Row = {
-  id: string
+type Region = { id: string; name: string }
+type Client = { id: string; name: string }
+type Office = { id: string; name: string }
+type BranchRow = {
+  sr: number
+  branchId: string | null
+  branchCode: string | null
+  branchName: string
+  clientId: string | null
+  clientName: string
+  region: string
+  deployGuards: number
+  extraGuards: number
+  totalSalary: number
+  managerId: string | null
+}
+type Summary = {
   month: string
-  baseSalary: number
-  extraHoursAmount: number
-  specialDutyAmount: number
-  otherDeductions: number
-  netSalary: number
-  paymentStatus: string
-  paymentMethod: string | null
-  guard: { id: string; name: string; parwestId: string }
+  summary: {
+    activeClients: number
+    totalLocations: number
+    totalGuards: number
+    totalSalary: number
+  }
+  guardsByType: { Civilian: number; Army: number; Other: number }
+  avgSalaryRates: { Civilian: number; Army: number }
+  attendanceStats: {
+    totalDays: number
+    regularDays: number
+    overtimeDays: number
+    extraDays: number
+  }
+  branches: BranchRow[]
 }
 
-export default function PayrollSalaryV2Manager() {
-  const [rows, setRows] = useState<Row[]>([])
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
-  const [calculating, setCalculating] = useState(false)
-  const [filters, setFilters] = useState({ month: "", paymentStatus: "", search: "" })
+const ALL_COLUMNS = [
+  { id: "sr", label: "Sr" },
+  { id: "branchCode", label: "Branch Code" },
+  { id: "branchName", label: "Branch Name" },
+  { id: "clientName", label: "Client" },
+  { id: "region", label: "Region" },
+  { id: "deployGuards", label: "Deploy Guards" },
+  { id: "extraGuards", label: "Extra Guards" },
+  { id: "totalSalary", label: "Total Salary" },
+] as const
 
-  const load = useCallback(async () => {
-    const params = new URLSearchParams()
-    if (filters.month) params.set("month", filters.month)
-    if (filters.paymentStatus) params.set("paymentStatus", filters.paymentStatus)
-    if (filters.search) params.set("search", filters.search)
-    const response = await fetch(`/api/payroll/salary?${params.toString()}`)
-    if (!response.ok) {
-      setRows([])
-      return
-    }
-    setRows(await response.json())
-  }, [filters.month, filters.paymentStatus, filters.search])
+export default function PayrollSalaryV2Manager() {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [regionalOfficeId, setRegionalOfficeId] = useState("")
+  const [clientId, setClientId] = useState("")
+  const [offices, setOffices] = useState<Office[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(ALL_COLUMNS.map((c) => c.id)))
 
   useEffect(() => {
-    void load()
-  }, [load])
+    fetch("/api/regional-offices")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.offices ?? data.rows ?? []
+        setOffices(list.map((o: { id: string; name: string }) => ({ id: o.id, name: o.name })))
+      })
+      .catch(() => {})
+    fetch("/api/clients")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
+        setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
+      })
+      .catch(() => {})
+  }, [])
 
-  const updateStatus = async (id: string, paymentStatus: string) => {
-    const response = await fetch(`/api/payroll/salary/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentStatus }),
-    })
-    if (!response.ok) {
-      const body = await response.json().catch(() => null)
-      setNotice({ type: "error", message: body?.message || "Failed to update salary row." })
-      return
-    }
-    setNotice({ type: "success", message: `Payment status set to ${paymentStatus}.` })
-    await load()
-  }
-
-  const calculateSalary = async (finalize: boolean) => {
-    if (!filters.month) {
-      setNotice({ type: "error", message: "Select a month before running salary calculation." })
-      return
-    }
-
-    setCalculating(true)
-    setNotice(null)
+  const generate = useCallback(async () => {
+    setLoading(true)
+    setMessage(null)
+    setFetchError(null)
+    const params = new URLSearchParams()
+    params.set("month", `${month}-01`)
+    if (regionalOfficeId) params.set("regionalOfficeId", regionalOfficeId)
+    if (clientId) params.set("clientId", clientId)
     try {
-      const response = await fetch("/api/payroll/salary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month: filters.month, finalize }),
-      })
-      const body = await response.json().catch(() => null)
-      if (!response.ok) {
-        setNotice({ type: "error", message: body?.message || "Failed to calculate salary rows." })
-        return
-      }
-      setNotice({
-        type: "success",
-        message: finalize
-          ? `Calculated ${body?.calculated || 0} rows and finalized ${body?.finalized || 0} as UNPAID.`
-          : `Calculated ${body?.calculated || 0} salary rows.`,
-      })
-      await load()
-    } catch {
-      setNotice({ type: "error", message: "Failed to calculate salary rows." })
+      const res = await fetch(`/api/payroll/salary-v2/summary?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setSummary(await res.json())
+    } catch (e) {
+      setFetchError((e as Error).message)
     } finally {
-      setCalculating(false)
+      setLoading(false)
+    }
+  }, [month, regionalOfficeId, clientId])
+
+  useEffect(() => {
+    generate()
+  }, [generate])
+
+  const calculateSalary = async () => {
+    setBusy(true)
+    setMessage(null)
+    const res = await fetch("/api/payroll/salary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        month: `${month}-01`,
+        regionalOfficeId: regionalOfficeId || undefined,
+        clientId: clientId || undefined,
+      }),
+    })
+    const data = await res.json()
+    setBusy(false)
+    if (res.ok) {
+      setMessage(
+        `Calculated ${data.calculated} rows.${data.warnings?.length ? ` ${data.warnings.length} zero-salary warning(s).` : ""}`
+      )
+      generate()
+    } else {
+      setMessage(`Error: ${data.error ?? "Failed."}`)
     }
   }
+
+  const exportIndex = () => {
+    if (!summary) return
+    const header = ALL_COLUMNS.map((c) => c.label)
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const csv = [header.join(",")]
+      .concat(
+        summary.branches.map((b) =>
+          [b.sr, b.branchCode, b.branchName, b.clientName, b.region, b.deployGuards, b.extraGuards, b.totalSalary]
+            .map(escape)
+            .join(",")
+        )
+      )
+      .join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `salary-v2-index-${month}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const toggleCol = (id: string) =>
+    setVisibleCols((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const visibleColumns = useMemo(() => ALL_COLUMNS.filter((c) => visibleCols.has(c.id)), [visibleCols])
 
   return (
-    <div className="space-y-6">
-      <SectionTitle title="Salary V2" subtitle="Backend-connected salary listing and payment status update." />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
-
-      <section className="ui-card p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <input className="ui-input" type="date" value={filters.month} onChange={(e) => setFilters((p) => ({ ...p, month: e.target.value }))} />
-          <select className="ui-select" value={filters.paymentStatus} onChange={(e) => setFilters((p) => ({ ...p, paymentStatus: e.target.value }))}>
-            <option value="">All statuses</option>
-            <option value="PENDING">PENDING</option>
-            <option value="PAID">PAID</option>
-            <option value="UNPAID">UNPAID</option>
-          </select>
-          <input className="ui-input" placeholder="Search guard" value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} />
-        </div>
-        <div className="mt-3 flex justify-end gap-2">
-          <ActionButton variant="secondary" onClick={() => calculateSalary(false)} disabled={calculating}>
-            {calculating ? "Calculating..." : "Calculate Salary"}
+    <PayrollPageShell
+      title="Payroll — Salary V2"
+      subtitle="Salary dashboard and per-branch rollup."
+    >
+      <section className="ui-card p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_1fr_auto_auto_auto] gap-3 items-end">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Salary Month *
+            </label>
+            <input
+              type="month"
+              className="ui-input"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Regional Office
+            </label>
+            <select
+              className="ui-select"
+              value={regionalOfficeId}
+              onChange={(e) => setRegionalOfficeId(e.target.value)}
+            >
+              <option value="">All Regions</option>
+              {offices.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Client
+            </label>
+            <select className="ui-select" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+              <option value="">All Clients</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <ActionButton onClick={generate} disabled={loading}>
+            {loading ? "Loading…" : "Generate"}
           </ActionButton>
-          <ActionButton variant="secondary" onClick={() => calculateSalary(true)} disabled={calculating}>
-            {calculating ? "Finalizing..." : "Finalize Payroll"}
+          <ActionButton onClick={calculateSalary} disabled={busy}>
+            {busy ? "Calculating…" : "Calculate Salary"}
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={exportIndex} disabled={!summary}>
+            Export Index
           </ActionButton>
         </div>
+        {message && <p className="text-sm">{message}</p>}
+        {fetchError && (
+          <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded px-3 py-2">
+            Failed to load summary: {fetchError}
+          </div>
+        )}
       </section>
 
-      <section className="ui-card overflow-x-auto p-0">
-        <table className="w-full min-w-[1100px]">
-          <thead className="bg-[var(--surface-muted)]">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Guard</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Month</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Base</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Extra</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Special</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Deductions</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Net</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Status</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No salary rows found.</td></tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3 text-sm">{row.guard?.parwestId} - {row.guard?.name}</td>
-                  <td className="px-4 py-3 text-sm">{new Date(row.month).toLocaleDateString("en-US")}</td>
-                  <td className="px-4 py-3 text-sm">{(row.baseSalary || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{(row.extraHoursAmount || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{(row.specialDutyAmount || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{(row.otherDeductions || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{(row.netSalary || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{row.paymentStatus}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-2">
-                      <ActionButton variant="secondary" onClick={() => updateStatus(row.id, "PAID")}>Mark Paid</ActionButton>
-                      <ActionButton variant="secondary" onClick={() => updateStatus(row.id, "UNPAID")}>Mark Unpaid</ActionButton>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+      {summary && (
+        <>
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg p-4 text-center font-semibold mt-6">
+            Salary Summary Dashboard — {summary.month}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <StatCard label="Active Clients" value={summary.summary.activeClients} />
+            <StatCard label="Total Locations" value={summary.summary.totalLocations} />
+            <StatCard label="Total Guards" value={summary.summary.totalGuards} />
+            <StatCard
+              label="Total Salary (PKR)"
+              value={summary.summary.totalSalary.toLocaleString()}
+              highlight
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <InfoCard title="Guards by Type">
+              <KV k="Civilian" v={summary.guardsByType.Civilian.toLocaleString()} />
+              <KV k="Army" v={summary.guardsByType.Army.toLocaleString()} />
+              {summary.guardsByType.Other > 0 && (
+                <KV k="Other" v={summary.guardsByType.Other.toLocaleString()} />
+              )}
+            </InfoCard>
+            <InfoCard title="Avg Salary Rates">
+              <KV k="Civilian" v={`PKR ${summary.avgSalaryRates.Civilian.toLocaleString()}`} />
+              <KV k="Army" v={`PKR ${summary.avgSalaryRates.Army.toLocaleString()}`} />
+            </InfoCard>
+            <InfoCard title="Attendance Stats">
+              <KV k="Total Days" v={summary.attendanceStats.totalDays.toLocaleString()} />
+              <KV k="Regular Days" v={summary.attendanceStats.regularDays.toLocaleString()} />
+              <KV k="Overtime Days" v={summary.attendanceStats.overtimeDays.toLocaleString()} />
+              <KV k="Extra Days" v={summary.attendanceStats.extraDays.toLocaleString()} />
+            </InfoCard>
+          </div>
+
+          <section className="ui-card p-4 mt-6 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-base font-semibold">Salary Report Data</h3>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-[var(--brand)]">
+                  Column Visibility
+                </summary>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ALL_COLUMNS.map((c) => (
+                    <label
+                      key={c.id}
+                      className={`px-2 py-1 rounded text-xs cursor-pointer border ${
+                        visibleCols.has(c.id)
+                          ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+                          : "bg-[var(--surface)] border-[var(--border)]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={visibleCols.has(c.id)}
+                        onChange={() => toggleCol(c.id)}
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              </details>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-[var(--surface-muted)]">
+                  <tr>
+                    {visibleColumns.map((c) => (
+                      <th key={c.id} className="px-3 py-2 text-left">
+                        {c.label}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.branches.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={visibleColumns.length + 1}
+                        className="px-3 py-6 text-center text-[var(--text-muted)]"
+                      >
+                        No branches for this selection.
+                      </td>
+                    </tr>
+                  )}
+                  {summary.branches.map((b) => (
+                    <tr key={b.branchId ?? b.sr} className="border-t border-[var(--border)]">
+                      {visibleColumns.map((c) => (
+                        <td
+                          key={c.id}
+                          className={`px-3 py-2 ${c.id === "totalSalary" ? "text-right font-semibold" : ""}`}
+                        >
+                          {c.id === "totalSalary"
+                            ? `PKR ${b.totalSalary.toLocaleString()}`
+                            : c.id === "sr"
+                              ? b.sr
+                              : String((b as unknown as Record<string, unknown>)[c.id] ?? "")}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2">
+                        {b.branchId ? (
+                          <Link
+                            href={`/payroll/salary-v2/branch/${b.branchId}?month=${month}`}
+                            className="text-[var(--brand)] hover:underline text-xs"
+                          >
+                            Details →
+                          </Link>
+                        ) : (
+                          <span className="text-[var(--text-muted)] text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+    </PayrollPageShell>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  highlight,
+}: {
+  label: string
+  value: number | string
+  highlight?: boolean
+}) {
+  return (
+    <div
+      className={`ui-card p-4 text-center ${highlight ? "bg-cyan-50 border-cyan-200" : ""}`}
+    >
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="text-xs text-[var(--text-muted)] mt-1">{label}</div>
+    </div>
+  )
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="ui-card p-4">
+      <div className="text-sm font-semibold text-indigo-700 mb-2">{title}</div>
+      <div className="space-y-1 text-sm">{children}</div>
+    </div>
+  )
+}
+
+function KV({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-[var(--text-muted)]">{k}:</span>
+      <span className="font-semibold">{v}</span>
     </div>
   )
 }

@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       return badRequest("Invalid month value.")
     }
 
+    const paymentDate = body.paymentDate ? new Date(String(body.paymentDate)) : null
     const created = await prisma.loan.create({
       data: {
         guardId: guard.id,
@@ -105,6 +106,16 @@ export async function POST(request: NextRequest) {
         deploymentDays: body.deploymentDays != null ? Number(body.deploymentDays) : null,
         supervisor: body.supervisor ? String(body.supervisor) : null,
         manager: body.manager ? String(body.manager) : null,
+        regionId: guard.regionId ?? null,
+        supervisorUserId: body.supervisorUserId ? String(body.supervisorUserId) : null,
+        managerUserId: body.managerUserId ? String(body.managerUserId) : null,
+        slipNumber: body.slipNumber ? String(body.slipNumber) : null,
+        paymentDate: paymentDate && !Number.isNaN(paymentDate.getTime()) ? paymentDate : null,
+        paymentMethod: body.paymentMethod ? String(body.paymentMethod).toUpperCase() : null,
+        bankName: body.bankName ? String(body.bankName) : null,
+        accountNumber: body.accountNumber ? String(body.accountNumber) : null,
+        imageBase64: body.imageBase64 ? String(body.imageBase64) : null,
+        issuerId: session.user?.id ?? null,
       },
       include: {
         guard: {

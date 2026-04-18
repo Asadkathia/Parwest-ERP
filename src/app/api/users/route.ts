@@ -7,6 +7,7 @@ import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const MOCK_USERS = [
   {
@@ -143,35 +144,29 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const actorId = session.user?.id || null
-    const created = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          roleId,
-          status,
-          contactNumber,
-          regionId,
-          regionalOfficeId,
-        },
-        include: {
-          role: { select: { id: true, name: true } },
-          region: { select: { id: true, name: true } },
-          regionalOffice: { select: { id: true, name: true } },
-        },
-      })
+    const created = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        roleId,
+        status,
+        contactNumber,
+        regionId,
+        regionalOfficeId,
+      },
+      include: {
+        role: { select: { id: true, name: true } },
+        region: { select: { id: true, name: true } },
+        regionalOffice: { select: { id: true, name: true } },
+      },
+    })
 
-      await tx.auditLog.create({
-        data: {
-          userId: actorId,
-          event: "USER_CREATED",
-          module: "USERS",
-          description: `Created user ${user.id} (${user.email})`,
-        },
-      })
-
-      return user
+    await safeAuditLog({
+      userId: actorId,
+      event: "USER_CREATED",
+      module: "USERS",
+      description: `Created user ${created.id} (${created.email})`,
     })
 
     return NextResponse.json(created, { status: 201 })

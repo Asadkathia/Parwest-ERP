@@ -9,211 +9,6 @@ export type ScreenConfig = {
   actions?: string[]
 }
 
-const payrollLoanSections: UiSection[] = [
-  {
-    title: "Add Loans",
-    fields: [
-      { label: "Month", type: "month", required: true },
-      { label: "Parwest ID", required: true },
-      { label: "Guard Name", required: true },
-      { label: "Phone" },
-      { label: "Client/Branch", type: "select" },
-      { label: "Select Supervisor", type: "select" },
-      { label: "Select Manager", type: "select" },
-      { label: "Date of Loan Passing", type: "date", required: true },
-      { label: "Deployment Days", type: "number" },
-      { label: "Current Supervisor/Manager" },
-      { label: "Amount Paid", type: "number", required: true },
-      { label: "Remarks", type: "textarea" },
-      { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-      { label: "Search:" },
-      { label: "Select Date", type: "date" },
-    ],
-  },
-]
-
-export const payrollOperationScreens: Record<string, ScreenConfig> = {
-  loan: {
-    title: "Loan",
-    description: "Loan operations with add/finalize/export tabs.",
-    tabs: ["Add Loans", "Finalize Loans", "Export Finalised History"],
-    sections: payrollLoanSections,
-    actions: ["Save Loan", "Finalize Loans", "Export Finalised History"],
-    table: {
-      title: "Loan Records",
-      columns: ["Month", "Parwest ID", "Guard", "Client/Branch", "Amount", "Status", "Action"],
-    },
-  },
-  "extra-hours": {
-    title: "Extra Hours",
-    sections: [
-      {
-        title: "Extra Hours",
-        fields: [
-          { label: "Parwest ID", required: true },
-          { label: "Select Client", type: "select" },
-          { label: "Select Branch", type: "select", required: true },
-          { label: "Hours", type: "number", required: true },
-          { label: "Creation Date", type: "date", required: true },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Submit", "Reset", "Export In Excel"],
-    table: { columns: ["Parwest ID", "Client", "Branch", "Hours", "Creation Date", "Action"] },
-  },
-  "other-deductions": {
-    title: "Other Deductions",
-    sections: [
-      {
-        title: "Other Deductions",
-        fields: [
-          { label: "Parwest ID", required: true },
-          { label: "Select Client", type: "select" },
-          { label: "Select Branch", type: "select" },
-          { label: "Month", type: "month", required: true },
-          { label: "Amount", type: "number", required: true },
-          { label: "Reason", type: "textarea", required: true },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Submit", "Reset", "Export In Excel"],
-    table: { columns: ["Parwest ID", "Client", "Branch", "Month", "Amount", "Reason", "Action"] },
-  },
-  "special-duty": {
-    title: "Special Duty",
-    sections: [
-      {
-        title: "Special Duty",
-        fields: [
-          { label: "Secure Ops ID", required: true },
-          { label: "Select Client", type: "select" },
-          { label: "Select Branch", type: "select" },
-          { label: "From Date", type: "date", required: true },
-          { label: "To Date", type: "date", required: true },
-          { label: "Hours", type: "number", required: true },
-          { label: "Cost Per Hour", type: "number", required: true },
-          { label: "Comments", type: "textarea" },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Submit", "Reset", "Export In Excel"],
-    table: { columns: ["Secure Ops ID", "Client", "Branch", "Date Range", "Hours", "Cost/Hour", "Comments", "Action"] },
-  },
-  holidays: {
-    title: "Holidays",
-    sections: [
-      {
-        title: "Holidays",
-        fields: [
-          { label: "Holiday Name", required: true },
-          { label: "Date", type: "date", required: true },
-          { label: "Notes", type: "textarea" },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Add", "Reset", "Submit", "Export In Excel"],
-    table: { columns: ["Holiday", "Date", "Notes", "Action"] },
-  },
-  salary: {
-    title: "Calculate Salary",
-    tabs: ["Calculate Salary", "Salary History"],
-    sections: [
-      {
-        title: "Calculate Salary Filters",
-        fields: [
-          { label: "Region", type: "select", required: true },
-          { label: "Select Client", type: "select" },
-          { label: "Branch", type: "select" },
-          { label: "Month", type: "month", required: true },
-        ],
-      },
-    ],
-    actions: ["CALCULATE SALARY"],
-    table: { columns: ["Parwest ID", "Guard", "Client/Branch", "Days", "Amount", "Status"] },
-  },
-  "salary-v2": {
-    title: "Salary V2",
-    sections: [{
-      title: "Salary V2 Filters",
-      fields: [
-        { label: "Month", type: "month", required: true },
-        { label: "Region", type: "select" },
-        { label: "Select Client", type: "select" },
-        { label: "Select Branch", type: "select" },
-        { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-        { label: "Search:" },
-        { label: "Select Date", type: "date" },
-      ],
-    }],
-    actions: ["Search", "Reset", "Submit", "Export Summary", "Export In Excel File"],
-    table: { columns: ["Parwest ID", "Guard", "Client", "Branch", "Base", "Deductions", "Net Salary", "Status"] },
-  },
-  "bulk-salary-slips": {
-    title: "Bulk Salary Slips",
-    sections: [{
-      title: "Bulk Salary Slips",
-      fields: [
-        { label: "Month", type: "month", required: true },
-        { label: "Region", type: "select" },
-        { label: "Select Client", type: "select" },
-        { label: "Select Branch", type: "select" },
-        { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-        { label: "Search:" },
-        { label: "Select Date", type: "date" },
-      ],
-    }],
-    actions: ["Search", "Reset", "Submit", "Generate Slips", "Download Zip", "Export In Excel File"],
-    table: { columns: ["Cycle", "Employees", "Generated At", "Generated By", "Action"] },
-  },
-  clearance: {
-    title: "Clearance",
-    sections: [{
-      title: "Clearance",
-      fields: [
-        { label: "Parwest ID" },
-        { label: "Select Client", type: "select" },
-        { label: "Select Branch", type: "select" },
-        { label: "Last Working Date", type: "date" },
-        { label: "Pending Dues", type: "number" },
-        { label: "Notes", type: "textarea" },
-        { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-        { label: "Search:" },
-        { label: "Select Date", type: "date" },
-      ],
-    }],
-    actions: ["Search", "Reset", "Submit", "Process Clearance", "Export In Excel File"],
-    table: { columns: ["Parwest ID", "Name", "Client", "Branch", "Final Amount", "Status", "Action"] },
-  },
-  "unpaid-salaries": {
-    title: "UnPaid Salaries",
-    sections: [{
-      title: "UnPaid Salaries",
-      fields: [
-        { label: "Month", type: "month" },
-        { label: "Region", type: "select" },
-        { label: "Select Client", type: "select" },
-        { label: "Select Branch", type: "select" },
-        { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-        { label: "Search:" },
-        { label: "Select Date", type: "date" },
-      ],
-    }],
-    actions: ["Search", "Reset", "Submit", "Export Unpaid Report", "Export In Excel File"],
-    table: { columns: ["Parwest ID", "Guard", "Client", "Branch", "Month", "Amount", "Reason", "Action"] },
-  },
-}
 
 export const inventoryScreens: Record<string, ScreenConfig> = {
   search: {
@@ -481,18 +276,6 @@ export const payrollReportExports = [
   "Unpaid Salary Report",
 ]
 
-export const payrollOperationLinks = [
-  { label: "Loan", href: "/payroll/operations/loan" },
-  { label: "Extra Hours", href: "/payroll/operations/extra-hours" },
-  { label: "Other Deductions", href: "/payroll/operations/other-deductions" },
-  { label: "Special Duty", href: "/payroll/operations/special-duty" },
-  { label: "Holidays", href: "/payroll/operations/holidays" },
-  { label: "Salary", href: "/payroll/operations/salary-v2" },
-  { label: "Bulk Slips", href: "/payroll/operations/bulk-salary-slips" },
-  { label: "Clearance", href: "/payroll/operations/clearance" },
-  { label: "UnPaid", href: "/payroll/operations/unpaid-salaries" },
-]
-
 export const inventoryLinks = [
   { label: "Dashboard", href: "/store-inventory" },
   { label: "Inventories", href: "/store-inventory/inventories" },
@@ -734,23 +517,6 @@ export const auditScreens: Record<string, ScreenConfig> = {
 }
 
 export const payrollScreens: Record<string, ScreenConfig> = {
-  operationsHub: {
-    title: "Operation",
-    description: "Frontend parity screen for payroll operational workflows from UI docs.",
-    sections: [
-      {
-        title: "Operation Overview",
-        fields: [
-          { label: "Month", type: "month" },
-          { label: "Region", type: "select" },
-          { label: "Select Client", type: "select" },
-          { label: "Branch", type: "select" },
-        ],
-      },
-    ],
-    actions: ["Search", "Clear", "Export In Excel"],
-    table: { columns: ["Operation", "Month", "Region", "Client", "Branch", "Action"] },
-  },
   reportsHub: {
     title: "Reports",
     description: "Export and analytics tools listed in payroll report submenu.",
@@ -774,42 +540,6 @@ export const payrollScreens: Record<string, ScreenConfig> = {
     ],
     actions: ["Search", "Reset", "Submit", "Run Selected Report", "Export", "Export In Excel File"],
     table: { columns: ["Report", "Frequency", "Last Run", "Status", "Action"] },
-  },
-  settingsHub: {
-    title: "Settings",
-    description: "Payroll defaults, month initialize, and limits from UI docs.",
-    tabs: ["Payroll Defaults", "Month Initialise", "Limits"],
-    sections: [
-      {
-        title: "Payroll Defaults",
-        fields: [
-          { label: "Training School Fees", type: "number" },
-          { label: "CWF", type: "number" },
-          { label: "Age Threshold", type: "number" },
-          { label: "Deployment Threshold", type: "number" },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-        ],
-      },
-      {
-        title: "Month Initialise",
-        fields: [
-          { label: "Current Month", type: "month" },
-          { label: "Next Month", type: "month" },
-          { label: "Unposted Regions", type: "select" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-      {
-        title: "Limits",
-        fields: [
-          { label: "Guard Age Limit", type: "number" },
-          { label: "Mental Health Limit", type: "number" },
-        ],
-      },
-    ],
-    actions: ["Reset", "Submit", "Save Defaults", "Initialize Month", "Save Limits"],
-    table: { columns: ["Setting Group", "Key", "Value", "Updated At"] },
   },
 }
 
@@ -870,23 +600,6 @@ export const moduleHubScreens: Record<string, ScreenConfig> = {
     ],
     actions: ["Submit", "Reset"],
     table: { columns: ["Subject", "Category", "Priority", "Assign To", "Status"] },
-  },
-  clientPricing: {
-    title: "Client Pricing",
-    description: "Contractual pricing and billing configurations.",
-    sections: [
-      {
-        title: "Pricing Configuration",
-        fields: [
-          { label: "Client", type: "select", required: true },
-          { label: "Guard Type", type: "select", required: true },
-          { label: "Rate", type: "number", required: true },
-          { label: "Effective From", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Save", "Update", "Clear"],
-    table: { columns: ["Client", "Guard Type", "Rate", "Effective From", "Action"] },
   },
   systemSettings: {
     title: "System Settings",

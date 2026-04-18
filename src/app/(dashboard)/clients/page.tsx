@@ -25,6 +25,8 @@ export default async function ClientsPage() {
     regionId: string | null
     regionName: string | null
     branchCount: number
+    contractCount: number
+    currentRates: { guardType: string; rate: number }[]
   }> = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
@@ -38,7 +40,16 @@ export default async function ClientsPage() {
         orderBy: { createdAt: "desc" },
         include: {
           region: { select: { name: true } },
-          _count: { select: { branches: true } },
+          _count: { select: { branches: true, contracts: true } },
+          contracts: {
+            where: { isActive: true },
+            select: {
+              rates: {
+                where: { isCurrentRate: true },
+                select: { guardType: true, rate: true },
+              },
+            },
+          },
         },
       }),
       prisma.client.count(),
@@ -46,16 +57,30 @@ export default async function ClientsPage() {
       prisma.client.count({ where: { status: "INACTIVE" } }),
       prisma.branch.count(),
     ])
-    clients = clientRows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: c.type,
-      city: c.city,
-      status: c.status,
-      regionId: c.regionId,
-      regionName: c.region?.name ?? null,
-      branchCount: c._count.branches,
-    }))
+    clients = clientRows.map((c) => {
+      const ratesByType = new Map<string, number>()
+      for (const contract of c.contracts) {
+        for (const r of contract.rates) {
+          const prev = ratesByType.get(r.guardType)
+          if (prev == null || Number(r.rate) > prev) ratesByType.set(r.guardType, Number(r.rate))
+        }
+      }
+      return {
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        city: c.city,
+        status: c.status,
+        regionId: c.regionId,
+        regionName: c.region?.name ?? null,
+        branchCount: c._count.branches,
+        contractCount: c._count.contracts,
+        currentRates: Array.from(ratesByType.entries()).map(([guardType, rate]) => ({
+          guardType,
+          rate,
+        })),
+      }
+    })
     stats.total = total
     stats.active = active
     stats.inactive = inactive
@@ -129,7 +154,7 @@ export default async function ClientsPage() {
       </FilterBar>
 
       <section className="ui-card overflow-x-auto">
-        <table className="w-full min-w-[980px]">
+        <table className="w-full min-w-[1200px]">
           <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
@@ -137,6 +162,8 @@ export default async function ClientsPage() {
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">City</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Branches</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Region</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Contracts</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Current Rates</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
             </tr>
@@ -144,7 +171,7 @@ export default async function ClientsPage() {
           <tbody className="divide-y divide-[var(--border)]">
             {clients.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={9} className="px-6 py-12 text-center text-[var(--text-muted)]">
                   <p className="text-base font-medium text-[var(--text)]">No clients found.</p>
                 </td>
               </tr>
@@ -156,6 +183,36 @@ export default async function ClientsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.city || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.branchCount}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionName || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">
+                    {client.contractCount === 0 ? (
+                      <span className="text-[var(--text-muted)]">None</span>
+                    ) : (
+                      client.contractCount
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {client.currentRates.length === 0 ? (
+                      <span className="text-[var(--text-muted)]">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {client.currentRates.slice(0, 3).map((r, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 bg-[var(--surface-muted)] rounded px-2 py-0.5 text-xs"
+                          >
+                            <span className="font-medium">{r.guardType}</span>
+                            <span className="text-[var(--text-muted)]">·</span>
+                            <span>PKR {r.rate.toLocaleString()}</span>
+                          </span>
+                        ))}
+                        {client.currentRates.length > 3 && (
+                          <span className="text-xs text-[var(--text-muted)]">
+                            +{client.currentRates.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />
                   </td>

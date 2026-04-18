@@ -8,16 +8,7 @@ import { badRequest, forbidden, internalServerError, notFound, unauthorized } fr
 
 const ALLOWED_PAYMENT_STATUSES = new Set(["PENDING", "UNPAID", "PAID"])
 
-function parseMonthRange(value: string | null) {
-  if (!value) return null
-  const normalized = /^\d{4}-\d{2}$/.test(value) ? `${value}-01` : value
-  const date = new Date(normalized)
-  if (Number.isNaN(date.getTime())) return null
-
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
-  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1))
-  return { start, end, year: start.getUTCFullYear() }
-}
+import { parseMonthRange } from "@/lib/payroll/date-helpers"
 
 export async function GET(request: NextRequest) {
   try {

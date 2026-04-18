@@ -1,6 +1,5 @@
-import ConfiguredInteractiveScreen from "@/components/parity/ConfiguredInteractiveScreen"
-import { payrollOperationLinks, payrollScreens } from "@/lib/parity/screenConfigs"
+import { redirect } from "next/navigation"
 
 export default function PayrollOperationsPage() {
-  return <ConfiguredInteractiveScreen config={payrollScreens.operationsHub} links={payrollOperationLinks} />
+  redirect("/payroll/loans")
 }

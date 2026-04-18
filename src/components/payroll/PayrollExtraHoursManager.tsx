@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
+import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
+import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
+import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
-type GuardOption = { id: string; name: string; parwestId: string }
-type GuardApiRow = { id: string; name: string; parwestId: string }
 type Row = {
   id: string
   month: string
@@ -15,168 +15,320 @@ type Row = {
   guard: { id: string; name: string; parwestId: string }
 }
 
-export default function PayrollExtraHoursManager() {
-  const [guards, setGuards] = useState<GuardOption[]>([])
-  const [rows, setRows] = useState<Row[]>([])
-  const [loading, setLoading] = useState(false)
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
-  const [form, setForm] = useState({ guardId: "", month: "", hours: "", rate: "" })
-  const [filters, setFilters] = useState({ guardId: "", month: "", search: "" })
+type Client = { id: string; name: string }
+type Branch = { id: string; name: string; clientId: string }
 
-  const loadGuards = useCallback(async () => {
-    const response = await fetch("/api/guards?status=ACTIVE")
-    if (!response.ok) throw new Error("Failed to load guards")
-    const data = await response.json()
-    setGuards((data as GuardApiRow[] || []).map((g) => ({ id: g.id, name: g.name, parwestId: g.parwestId })))
-  }, [])
+export default function PayrollExtraHoursManager() {
+  const [rows, setRows] = useState<Row[]>([])
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [search, setSearch] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  // Form state
+  const [formOpen, setFormOpen] = useState(false)
+  const [parwestIdInput, setParwestIdInput] = useState("")
+  const [context, setContext] = useState<GuardCurrentContext | null>(null)
+  const [hours, setHours] = useState("")
+  const [rate, setRate] = useState("")
+  const [selectClientId, setSelectClientId] = useState("")
+  const [selectBranchId, setSelectBranchId] = useState("")
+  const [clients, setClients] = useState<Client[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const loadRows = useCallback(async () => {
     setLoading(true)
+    setFetchError(null)
+    const params = new URLSearchParams()
+    params.set("month", `${month}-01`)
+    if (search) params.set("search", search)
     try {
-      const params = new URLSearchParams()
-      if (filters.guardId) params.set("guardId", filters.guardId)
-      if (filters.month) params.set("month", filters.month)
-      if (filters.search) params.set("search", filters.search)
-      const response = await fetch(`/api/payroll/extra-hours?${params.toString()}`)
-      if (!response.ok) throw new Error("Failed to load records")
-      const data = await response.json()
-      setRows(data || [])
-    } catch (error) {
-      console.error(error)
-      setNotice({ type: "error", message: "Unable to fetch extra hours records." })
+      const res = await fetch(`/api/payroll/extra-hours?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setRows(await res.json())
+    } catch (e) {
+      setFetchError((e as Error).message)
+      setRows([])
     } finally {
       setLoading(false)
     }
-  }, [filters.guardId, filters.month, filters.search])
+  }, [month, search])
 
   useEffect(() => {
-    loadGuards().catch((error) => {
-      console.error(error)
-      setNotice({ type: "error", message: "Unable to fetch guards." })
-    })
-  }, [loadGuards])
-
-  useEffect(() => {
-    loadRows().catch((error) => {
-      console.error(error)
-      setNotice({ type: "error", message: "Unable to fetch extra hours records." })
-    })
+    loadRows()
   }, [loadRows])
 
-  const submit = async () => {
-    if (!form.guardId || !form.month || !form.hours || !form.rate) {
-      setNotice({ type: "error", message: "Guard, month, hours and rate are required." })
+  useEffect(() => {
+    if (!formOpen) return
+    fetch("/api/clients")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
+        setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
+      })
+      .catch(() => {})
+  }, [formOpen])
+
+  useEffect(() => {
+    if (!selectClientId) {
+      setBranches([])
       return
     }
-    try {
-      const response = await fetch("/api/payroll/extra-hours", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guardId: form.guardId,
-          month: form.month,
-          hours: Number(form.hours),
-          rate: Number(form.rate),
-        }),
+    fetch(`/api/branches?clientId=${selectClientId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.branches ?? data.rows ?? []
+        setBranches(list)
       })
-      if (!response.ok) {
-        const body = await response.json().catch(() => null)
-        throw new Error(body?.message || "Failed to save")
-      }
-      setForm({ guardId: "", month: "", hours: "", rate: "" })
-      setNotice({ type: "success", message: "Extra hours saved." })
-      await loadRows()
-    } catch (error: unknown) {
-      setNotice({ type: "error", message: error instanceof Error ? error.message : "Unable to save extra hours." })
+      .catch(() => {})
+  }, [selectClientId])
+
+  const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
+    setParwestIdInput(opt.parwestId)
+    const res = await fetch(`/api/guards/${opt.id}/current-context?month=${month}`)
+    if (res.ok) setContext(await res.json())
+  }
+
+  const resetForm = () => {
+    setParwestIdInput("")
+    setContext(null)
+    setHours("")
+    setRate("")
+    setSelectClientId("")
+    setSelectBranchId("")
+    setResult(null)
+  }
+
+  const submit = async () => {
+    if (!context || !hours || !rate) return
+    setSaving(true)
+    setResult(null)
+    const res = await fetch("/api/payroll/extra-hours", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        guardId: context.guardId,
+        month: `${month}-01`,
+        hours: Number(hours),
+        rate: Number(rate),
+      }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (res.ok) {
+      setResult(`Saved for ${context.name}.`)
+      resetForm()
+      setFormOpen(false)
+      loadRows()
+    } else {
+      setResult(`Error: ${data.error ?? "Failed."}`)
     }
   }
 
   return (
-    <div className="space-y-6">
-      <SectionTitle title="Extra Hours" subtitle="Backend-connected extra-hours records." />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
-
+    <PayrollPageShell
+      title="Payroll — Extra Hours"
+      subtitle="Record monthly extra-hour adjustments per guard."
+      actions={<ActionButton onClick={() => setFormOpen(true)}>+ Add Extra Hours</ActionButton>}
+    >
       <section className="ui-card p-4 space-y-4">
-        <p className="text-sm font-semibold text-[var(--text)]">Add Extra Hours</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="space-y-1">
-            <span className="text-xs text-[var(--text-muted)]">Guard *</span>
-            <select className="ui-select" value={form.guardId} onChange={(e) => setForm((p) => ({ ...p, guardId: e.target.value }))}>
-              <option value="">-- Select Guard --</option>
-              {guards.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.parwestId} - {g.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs text-[var(--text-muted)]">Month *</span>
-            <input className="ui-input" type="date" value={form.month} onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs text-[var(--text-muted)]">Hours *</span>
-            <input className="ui-input" type="number" value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs text-[var(--text-muted)]">Rate *</span>
-            <input className="ui-input" type="number" value={form.rate} onChange={(e) => setForm((p) => ({ ...p, rate: e.target.value }))} />
-          </label>
+        <div className="flex gap-3 flex-wrap items-end">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Month
+            </label>
+            <input
+              type="month"
+              className="ui-input"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Search
+            </label>
+            <input
+              className="ui-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Parwest ID or name"
+            />
+          </div>
         </div>
-        <div className="flex justify-end">
-          <ActionButton onClick={submit}>Submit</ActionButton>
-        </div>
-      </section>
 
-      <section className="ui-card p-4 space-y-4">
-        <p className="text-sm font-semibold text-[var(--text)]">Filters</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <input
-            className="ui-input"
-            placeholder="Search guard"
-            value={filters.search}
-            onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
-          />
-          <select className="ui-select" value={filters.guardId} onChange={(e) => setFilters((p) => ({ ...p, guardId: e.target.value }))}>
-            <option value="">All guards</option>
-            {guards.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.parwestId} - {g.name}
-              </option>
-            ))}
-          </select>
-          <input className="ui-input" type="date" value={filters.month} onChange={(e) => setFilters((p) => ({ ...p, month: e.target.value }))} />
-        </div>
-      </section>
+        {fetchError && (
+          <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded px-3 py-2">
+            Failed to load extra-hours records: {fetchError}
+          </div>
+        )}
 
-      <section className="ui-card overflow-x-auto p-0">
-        <table className="w-full min-w-[860px]">
-          <thead className="bg-[var(--surface-muted)]">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Guard</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Month</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Hours</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">Loading...</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No records.</td></tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3 text-sm">{row.guard?.parwestId} - {row.guard?.name}</td>
-                  <td className="px-4 py-3 text-sm">{new Date(row.month).toLocaleDateString("en-US")}</td>
-                  <td className="px-4 py-3 text-sm">{row.extraHours || 0}</td>
-                  <td className="px-4 py-3 text-sm">{(row.extraHoursAmount || 0).toLocaleString()}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px] text-sm">
+            <thead className="bg-[var(--surface-muted)]">
+              <tr>
+                <th className="px-3 py-2 text-left">Parwest ID</th>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Month</th>
+                <th className="px-3 py-2 text-right">Hours</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    Loading…
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    No records.
+                  </td>
+                </tr>
+              )}
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
+                  <td className="px-3 py-2">{r.guard.name}</td>
+                  <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
+                  <td className="px-3 py-2 text-right">{r.extraHours}</td>
+                  <td className="px-3 py-2 text-right">{r.extraHoursAmount?.toFixed(0) ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
-    </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="ui-card w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Add Extra Hours</h2>
+              <button
+                type="button"
+                className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]"
+                onClick={() => {
+                  setFormOpen(false)
+                  resetForm()
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Secure Ops ID *
+                </label>
+                <GuardAutocomplete
+                  value={parwestIdInput}
+                  onChange={setParwestIdInput}
+                  onSelect={handleGuardSelect}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Hours *
+                </label>
+                <input
+                  type="number"
+                  className="ui-input"
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Rate *
+                </label>
+                <input
+                  type="number"
+                  className="ui-input"
+                  value={rate}
+                  onChange={(e) => setRate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <GuardContextFields
+              context={context}
+              showRows={["name", "status", "type", "location"]}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Select Client
+                </label>
+                <select
+                  className="ui-select"
+                  value={selectClientId}
+                  onChange={(e) => {
+                    setSelectClientId(e.target.value)
+                    setSelectBranchId("")
+                  }}
+                >
+                  <option value="">--Select Client--</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Select Branch
+                </label>
+                <select
+                  className="ui-select"
+                  value={selectBranchId}
+                  onChange={(e) => setSelectBranchId(e.target.value)}
+                  disabled={!selectClientId}
+                >
+                  <option value="">--Select Branch--</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Month
+                </label>
+                <input type="month" className="ui-input" value={month} readOnly />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              {result && <span className="text-sm">{result}</span>}
+              <div className="ml-auto flex gap-2">
+                <ActionButton
+                  variant="secondary"
+                  onClick={() => {
+                    setFormOpen(false)
+                    resetForm()
+                  }}
+                >
+                  Cancel
+                </ActionButton>
+                <ActionButton onClick={submit} disabled={!context || !hours || !rate || saving}>
+                  {saving ? "Saving…" : "Save"}
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </PayrollPageShell>
   )
 }

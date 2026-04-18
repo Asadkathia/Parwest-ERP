@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
 const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
@@ -117,22 +118,19 @@ export async function PUT(
                 }).catch(() => { /* ignore if user not found */ })
             }
 
-            // Build audit diff against existing client
-            const changeSummary = buildChangeSummary(
-                existingClient as unknown as Record<string, unknown>,
-                updated as unknown as Record<string, unknown>
-            )
-
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "CLIENT_UPDATED",
-                    module: "CLIENTS",
-                    description: `Client ${id} updated by ${actorName}. Changes: ${changeSummary}`,
-                },
-            })
-
             return updated
+        })
+
+        // Build audit diff against existing client and log (non-critical, outside tx)
+        const changeSummary = buildChangeSummary(
+            existingClient as unknown as Record<string, unknown>,
+            client as unknown as Record<string, unknown>
+        )
+        await safeAuditLog({
+            userId: actorId,
+            event: "CLIENT_UPDATED",
+            module: "CLIENTS",
+            description: `Client ${id} updated by ${actorName}. Changes: ${changeSummary}`,
         })
 
         return NextResponse.json(client, { status: 200 })
@@ -170,17 +168,12 @@ export async function PATCH(
             return badRequest("Status must be ACTIVE or INACTIVE.")
         }
 
-        const updated = await prisma.$transaction(async (tx) => {
-            const client = await tx.client.update({ where: { id }, data: { status } })
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "CLIENT_STATUS_UPDATED",
-                    module: "CLIENTS",
-                    description: `Client ${id} status changed to ${status} by ${actorName}.`,
-                },
-            })
-            return client
+        const updated = await prisma.client.update({ where: { id }, data: { status } })
+        await safeAuditLog({
+            userId: actorId,
+            event: "CLIENT_STATUS_UPDATED",
+            module: "CLIENTS",
+            description: `Client ${id} status changed to ${status} by ${actorName}.`,
         })
 
         return NextResponse.json(updated)

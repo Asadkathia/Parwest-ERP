@@ -59,29 +59,36 @@ export async function POST(
         if (scope === "not_found") return notFound("Client not found.")
         if (scope === "forbidden") return forbidden("Access denied.")
 
-        const actorId = session.user?.id || null
-        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+        const rawActorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
+
+        // Verify actor exists in User table — FK will fail otherwise (stale sessions, mock users)
+        const actorId = rawActorId
+            ? (await prisma.user.findUnique({ where: { id: rawActorId }, select: { id: true } }))?.id ?? null
+            : null
 
         const name = String(body?.name || "").trim()
         if (!name) return badRequest("Contract name is required.")
 
-        const contract = await prisma.$transaction(async (tx) => {
-            const created = await tx.clientContract.create({
-                data: {
-                    clientId,
-                    branchId: body?.branchId ? String(body.branchId) : null,
-                    name,
-                    type: body?.type ? String(body.type).toUpperCase() : "GENERAL",
-                    startDate: body?.startDate ? new Date(body.startDate) : null,
-                    endDate: body?.endDate ? new Date(body.endDate) : null,
-                    isActive: true,
-                },
-                include: {
-                    branch: { select: { id: true, name: true } },
-                    rates: true,
-                },
-            })
-            await tx.auditLog.create({
+        const contract = await prisma.clientContract.create({
+            data: {
+                clientId,
+                branchId: body?.branchId ? String(body.branchId) : null,
+                name,
+                type: body?.type ? String(body.type).toUpperCase() : "GENERAL",
+                startDate: body?.startDate ? new Date(body.startDate) : null,
+                endDate: body?.endDate ? new Date(body.endDate) : null,
+                isActive: true,
+            },
+            include: {
+                branch: { select: { id: true, name: true } },
+                rates: true,
+            },
+        })
+
+        // Audit log is non-critical — never fail the main operation on log errors
+        await prisma.auditLog
+            .create({
                 data: {
                     userId: actorId,
                     event: "CONTRACT_CREATED",
@@ -89,8 +96,8 @@ export async function POST(
                     description: `Contract "${name}" created for client ${clientId}${body?.branchId ? ` (branch ${body.branchId})` : ""}. By: ${actorName}`,
                 },
             })
-            return created
-        })
+            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
+
         return NextResponse.json(contract, { status: 201 })
     } catch (error) {
         console.error("Error creating contract:", error)

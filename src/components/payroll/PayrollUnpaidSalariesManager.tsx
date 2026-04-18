@@ -1,67 +1,262 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
+import { useCallback, useEffect, useState } from "react"
+import ActionButton from "@/components/ui/action-button"
+import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
+import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 
 type Row = {
   id: string
   month: string
   netSalary: number
   paymentStatus: string
-  guard: { id: string; name: string; parwestId: string }
+  paymentRemarks: string | null
+  paymentUpdatedAt: string | null
+  guard: { id: string; parwestId: string; name: string }
 }
 
 export default function PayrollUnpaidSalariesManager() {
   const [rows, setRows] = useState<Row[]>([])
-  const [filters, setFilters] = useState({ month: "", search: "" })
+  const [loading, setLoading] = useState(false)
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [search, setSearch] = useState("")
+
+  const [parwestIdInput, setParwestIdInput] = useState("")
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null)
+  const [date, setDate] = useState("")
+  const [newStatus, setNewStatus] = useState("")
+  const [remarks, setRemarks] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const loadRows = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    params.set("month", `${month}-01`)
+    if (search) params.set("search", search)
+    const res = await fetch(`/api/payroll/unpaid?${params}`)
+    if (res.ok) setRows(await res.json())
+    setLoading(false)
+  }, [month, search])
 
   useEffect(() => {
+    loadRows()
+  }, [loadRows])
+
+  const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
+    setParwestIdInput(opt.parwestId)
+    // Look up unpaid row for this guard in current month
     const params = new URLSearchParams()
-    if (filters.month) params.set("month", filters.month)
-    if (filters.search) params.set("search", filters.search)
-    fetch(`/api/payroll/unpaid?${params.toString()}`)
-      .then((r) => r.json())
-      .then((d) => setRows(d || []))
-      .catch(() => setRows([]))
-  }, [filters.month, filters.search])
+    params.set("month", `${month}-01`)
+    params.set("guardId", opt.id)
+    const res = await fetch(`/api/payroll/salary?${params}`)
+    if (res.ok) {
+      const all: Row[] = await res.json()
+      const row = all.find((r) => r.paymentStatus !== "PAID") ?? all[0] ?? null
+      setSelectedRow(row)
+    }
+  }
+
+  const submit = async () => {
+    if (!selectedRow || !newStatus || !remarks) return
+    setSaving(true)
+    setResult(null)
+    const res = await fetch(`/api/payroll/salary/${selectedRow.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paymentStatus: newStatus.toUpperCase(),
+        paymentRemarks: remarks,
+      }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (res.ok) {
+      setResult("Updated.")
+      setParwestIdInput("")
+      setSelectedRow(null)
+      setDate("")
+      setNewStatus("")
+      setRemarks("")
+      loadRows()
+    } else {
+      setResult(`Error: ${data.error ?? "Failed."}`)
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      <SectionTitle title="UnPaid Salaries" subtitle="Backend-connected unpaid salary rows." />
+    <PayrollPageShell
+      title="Payroll — Unpaid Salaries"
+      subtitle="Update unpaid salary status for a guard and record remarks."
+    >
+      <section className="ui-card p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Parwest ID *
+            </label>
+            <GuardAutocomplete
+              value={parwestIdInput}
+              onChange={setParwestIdInput}
+              onSelect={handleGuardSelect}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Name
+            </label>
+            <input
+              className="ui-input bg-[var(--surface-muted)]"
+              value={selectedRow?.guard.name ?? ""}
+              readOnly
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Salary Status
+            </label>
+            <input
+              className="ui-input bg-[var(--surface-muted)]"
+              value={selectedRow?.paymentStatus ?? ""}
+              readOnly
+            />
+          </div>
+        </div>
 
-      <section className="ui-card p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <input className="ui-input" type="date" value={filters.month} onChange={(e) => setFilters((p) => ({ ...p, month: e.target.value }))} />
-          <input className="ui-input" placeholder="Search guard" value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Date *
+            </label>
+            <input
+              type="date"
+              className="ui-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Change Status *
+            </label>
+            <select
+              className="ui-select"
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
+              <option value="">Select Status</option>
+              <option value="PAID">Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Remarks *
+            </label>
+            <input
+              className="ui-input"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          {result && <span className="text-sm">{result}</span>}
+          <div className="ml-auto">
+            <ActionButton
+              onClick={submit}
+              disabled={!selectedRow || !newStatus || !remarks || saving}
+            >
+              {saving ? "Updating…" : "Update"}
+            </ActionButton>
+          </div>
         </div>
       </section>
 
-      <section className="ui-card overflow-x-auto p-0">
-        <table className="w-full min-w-[900px]">
-          <thead className="bg-[var(--surface-muted)]">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Guard</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Month</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Amount</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No unpaid salary rows found.</td></tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3 text-sm">{row.guard?.parwestId} - {row.guard?.name}</td>
-                  <td className="px-4 py-3 text-sm">{new Date(row.month).toLocaleDateString("en-US")}</td>
-                  <td className="px-4 py-3 text-sm">{(row.netSalary || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm">{row.paymentStatus}</td>
+      <section className="ui-card p-4 mt-6 space-y-4">
+        <div className="flex gap-3 items-end flex-wrap">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Month
+            </label>
+            <input
+              type="month"
+              className="ui-input"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Search
+            </label>
+            <input
+              className="ui-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Parwest ID or name"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="bg-[var(--surface-muted)]">
+              <tr>
+                <th className="px-3 py-2 text-left">Secure Ops ID</th>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Salary Month</th>
+                <th className="px-3 py-2 text-right">Net</th>
+                <th className="px-3 py-2 text-left">Dated</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    Loading…
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    No unpaid salaries.
+                  </td>
+                </tr>
+              )}
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
+                  <td className="px-3 py-2">{r.guard.name}</td>
+                  <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
+                  <td className="px-3 py-2 text-right">{r.netSalary?.toFixed(0) ?? 0}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {r.paymentUpdatedAt ? r.paymentUpdatedAt.slice(0, 10) : ""}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={
+                        r.paymentStatus === "PAID"
+                          ? "text-green-600 font-medium"
+                          : r.paymentStatus === "UNPAID"
+                            ? "text-red-500"
+                            : "text-[var(--text-muted)]"
+                      }
+                    >
+                      {r.paymentStatus}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs">{r.paymentRemarks ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
-    </div>
+    </PayrollPageShell>
   )
 }

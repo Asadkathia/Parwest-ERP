@@ -322,6 +322,8 @@ model Guard {
   deployments           Deployment[]
   payrolls              Payroll[]
   loans                 Loan[]
+  specialDuties         PayrollSpecialDuty[]
+  salarySlips           PayrollSalarySlip[]
   attendances           Attendance[]
   inventoryAssignments  InventoryAssignment[]
   storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentGuardAssignee")
@@ -933,6 +935,8 @@ model Payroll {
   netSalary          Float    @default(0)
   paymentStatus      String   @default("PENDING") // PENDING, PAID, UNPAID
   paymentMethod      String? // BANK, CASH, MOBILE
+  paymentRemarks     String?
+  paymentUpdatedAt   DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -943,31 +947,126 @@ model Payroll {
 }
 
 model PayrollHoliday {
-  id        String   @id @default(cuid())
-  name      String
-  date      DateTime
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  date             DateTime
+  dateFrom         DateTime?
+  dateTo           DateTime?
+  regionalOfficeId String?
+  valueType        String?   // FIXED_PER_DAY | MULTIPLE_OF_RATE
+  value            Float?
+  status           String?   @default("active")
+  comments         String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([date])
+  @@index([regionalOfficeId])
 }
 
 model Loan {
-  id             String   @id @default(cuid())
-  guardId        String
-  guard          Guard    @relation(fields: [guardId], references: [id])
-  month          DateTime
-  amount         Float
-  status         String   @default("PENDING") // PENDING, FINALIZED
-  deploymentDays Int?
-  supervisor     String?
-  manager        String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String    @id @default(cuid())
+  guardId           String
+  guard             Guard     @relation(fields: [guardId], references: [id])
+  month             DateTime
+  amount            Float
+  status            String    @default("PENDING") // PENDING, FINALIZED
+  deploymentDays    Int?
+  supervisor        String?
+  manager           String?
+  // Extended fields — legacy ERP parity
+  regionId          String?
+  supervisorUserId  String?
+  managerUserId     String?
+  slipNumber        String?
+  paymentDate       DateTime?
+  paymentMethod     String?   // BANK | CASH | MOBILE
+  bankName          String?
+  accountNumber     String?
+  imageBase64       String?
+  issuerId          String?
+  finalizedAt       DateTime?
+  finalizedById     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([guardId])
   @@index([status])
+  @@index([regionId])
+  @@index([month])
+}
+
+model PayrollSpecialDuty {
+  id                String   @id @default(cuid())
+  guardId           String
+  guard             Guard    @relation(fields: [guardId], references: [id])
+  dateFrom          DateTime
+  dateTo            DateTime
+  hours             Float
+  hourRate          Float
+  amount            Float
+  comments          String?
+  attachmentBase64  String?
+  status            String   @default("ACTIVE") // ACTIVE | CANCELLED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([guardId])
+  @@index([dateFrom])
+}
+
+model PayrollLoanFinalizationHistory {
+  id              String   @id @default(cuid())
+  finalizedAt     DateTime @default(now())
+  finalizedById   String
+  finalizedByName String
+  regionId        String?
+  regionName      String?
+  month           DateTime
+  loanCount       Int
+  totalAmount     Float
+  loanIdsJson     String   // JSON array of loan IDs included in this batch
+  createdAt       DateTime @default(now())
+
+  @@index([finalizedAt])
+  @@index([month])
+}
+
+model PayrollSalarySlip {
+  id              String   @id @default(cuid())
+  guardId         String
+  guard           Guard    @relation(fields: [guardId], references: [id])
+  month           DateTime
+  year            Int
+  earningsJson    String   // { basicSalary, workingDays, paidWorkingDays, overtime, gazettedHolidays, arrears, ... }
+  deductionsJson  String   // { advanceSalary, eobi, mess, specialBranch, apsaaTraining, absencePenalty, ... }
+  grossPay        Float
+  netPayable      Float
+  payslipBase64   String?  // generated PDF/HTML as base64
+  generatedById   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([guardId, month, year])
+  @@index([month])
+}
+
+model PayrollDefault {
+  id                         String   @id @default(cuid())
+  regionalOfficeId           String?
+  trainingSchoolFeeTotal     Float    @default(0)
+  trainingSchoolFeeMonthly   Float    @default(0)
+  cwfDeduction               Float    @default(0)
+  spBrVerAgeLimit            Int?
+  spBrVerDays                Int?
+  spBrVerAmount              Float?
+  createdById                String?
+  createdByName              String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([regionalOfficeId])
 }
 
 // ============================================

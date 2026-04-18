@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 type PreviewRow = {
   id: string
@@ -196,15 +197,13 @@ export async function POST(request: NextRequest) {
           assignedAt: new Date(),
         })),
       })
+    })
 
-      await tx.auditLog.create({
-        data: {
-          userId: session.user.id,
-          event: "SUPERVISOR_SWITCH",
-          module: "USERS",
-          description: `Switched ${activeAssignments.length} guards from ${fromSupervisorId} to ${toSupervisorId}${reason ? ` (${reason})` : ""}`,
-        },
-      })
+    await safeAuditLog({
+      userId: session.user.id,
+      event: "SUPERVISOR_SWITCH",
+      module: "USERS",
+      description: `Switched ${activeAssignments.length} guards from ${fromSupervisorId} to ${toSupervisorId}${reason ? ` (${reason})` : ""}`,
     })
 
     return NextResponse.json({ switchedCount: activeAssignments.length, reason, switchedBy: session.user.id })

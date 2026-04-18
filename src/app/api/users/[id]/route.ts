@@ -5,6 +5,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
@@ -61,26 +62,21 @@ export async function PATCH(
     }
 
     const actorId = session.user?.id || null
-    const updated = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.update({
-        where: { id },
-        data,
-        include: {
-          role: { select: { id: true, name: true } },
-          region: { select: { id: true, name: true } },
-          regionalOffice: { select: { id: true, name: true } },
-        },
-      })
+    const updated = await prisma.user.update({
+      where: { id },
+      data,
+      include: {
+        role: { select: { id: true, name: true } },
+        region: { select: { id: true, name: true } },
+        regionalOffice: { select: { id: true, name: true } },
+      },
+    })
 
-      await tx.auditLog.create({
-        data: {
-          userId: actorId,
-          event: "USER_UPDATED",
-          module: "USERS",
-          description: `Updated user ${id}; fields: ${Object.keys(data).join(", ")}`,
-        },
-      })
-      return user
+    await safeAuditLog({
+      userId: actorId,
+      event: "USER_UPDATED",
+      module: "USERS",
+      description: `Updated user ${id}; fields: ${Object.keys(data).join(", ")}`,
     })
 
     return NextResponse.json(updated)
@@ -122,16 +118,12 @@ export async function DELETE(
     })
     if (!user) return notFound("User not found.")
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.delete({ where: { id } })
-      await tx.auditLog.create({
-        data: {
-          userId: actorId ?? null,
-          event: "USER_DELETED",
-          module: "USERS",
-          description: `Deleted user ${user.id} (${user.email} — ${user.name})`,
-        },
-      })
+    await prisma.user.delete({ where: { id } })
+    await safeAuditLog({
+      userId: actorId ?? null,
+      event: "USER_DELETED",
+      module: "USERS",
+      description: `Deleted user ${user.id} (${user.email} — ${user.name})`,
     })
 
     return NextResponse.json({ success: true })

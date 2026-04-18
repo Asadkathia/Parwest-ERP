@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import type { Prisma } from "@prisma/client"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function GET(request: NextRequest) {
     try {
@@ -169,16 +170,14 @@ export async function POST(request: NextRequest) {
                 }).catch(() => { /* ignore if user not found */ })
             }
 
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "BRANCH_CREATED",
-                    module: "CLIENTS",
-                    description: `Created branch ${created.id} for client ${clientId}`,
-                },
-            })
-
             return created
+        })
+
+        await safeAuditLog({
+            userId: actorId,
+            event: "BRANCH_CREATED",
+            module: "CLIENTS",
+            description: `Created branch ${branch.id} for client ${clientId}`,
         })
 
         return NextResponse.json(branch, { status: 201 })

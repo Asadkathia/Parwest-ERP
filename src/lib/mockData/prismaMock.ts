@@ -284,6 +284,11 @@ const stores: Record<string, AnyRecord[]> = {
   deploymentRate: [],
   loan: [],
   payroll: [],
+  payrollSpecialDuty: [],
+  payrollLoanFinalizationHistory: [],
+  payrollSalarySlip: [],
+  payrollDefault: [],
+  payrollHoliday: [],
   auditLog: [],
 }
 

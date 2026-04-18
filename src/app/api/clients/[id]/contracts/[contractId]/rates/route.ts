@@ -30,8 +30,11 @@ export async function POST(
         if (scope === "not_found") return notFound("Client not found.")
         if (scope === "forbidden") return forbidden("Access denied.")
 
-        const actorId = session.user?.id || null
-        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+        const rawActorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
+        const actorId = rawActorId
+            ? (await prisma.user.findUnique({ where: { id: rawActorId }, select: { id: true } }))?.id ?? null
+            : null
 
         const body = await request.json()
         const guardType = String(body?.guardType || "").trim()
@@ -61,7 +64,6 @@ export async function POST(
                 },
             })
 
-            // If marked as current, deactivate other current rates for same guardType+exService in this contract
             if (body?.isCurrentRate === true) {
                 await tx.clientContractRate.updateMany({
                     where: {
@@ -75,7 +77,11 @@ export async function POST(
                 })
             }
 
-            await tx.auditLog.create({
+            return created
+        })
+
+        await prisma.auditLog
+            .create({
                 data: {
                     userId: actorId,
                     event: "CONTRACT_RATE_ADDED",
@@ -83,9 +89,7 @@ export async function POST(
                     description: `Rate added to contract "${contract.name}" (${contractId}) for client ${clientId} — ${guardType} / ${body?.exService || "any"} @ PKR ${rate}. By: ${actorName}`,
                 },
             })
-
-            return created
-        })
+            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
 
         return NextResponse.json(newRate, { status: 201 })
     } catch (error) {
@@ -108,8 +112,11 @@ export async function PATCH(
         if (scope === "not_found") return notFound("Client not found.")
         if (scope === "forbidden") return forbidden("Access denied.")
 
-        const actorId = session.user?.id || null
-        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+        const rawActorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
+        const actorId = rawActorId
+            ? (await prisma.user.findUnique({ where: { id: rawActorId }, select: { id: true } }))?.id ?? null
+            : null
 
         const body = await request.json()
         const rateId = body?.rateId ? String(body.rateId) : null
@@ -126,7 +133,6 @@ export async function PATCH(
         })
 
         await prisma.$transaction(async (tx) => {
-            // Deactivate other current rates for same guardType+exService in this contract
             await tx.clientContractRate.updateMany({
                 where: {
                     contractId,
@@ -136,13 +142,14 @@ export async function PATCH(
                 },
                 data: { isCurrentRate: false },
             })
-            // Activate this rate
             await tx.clientContractRate.update({
                 where: { id: rateId },
                 data: { isCurrentRate: true },
             })
+        })
 
-            await tx.auditLog.create({
+        await prisma.auditLog
+            .create({
                 data: {
                     userId: actorId,
                     event: "CONTRACT_RATE_MARKED_CURRENT",
@@ -150,7 +157,7 @@ export async function PATCH(
                     description: `Rate ${rateId} marked as current in contract "${contract?.name}" (${contractId}) for client ${clientId} — ${rate.guardType} / ${rate.exService || "any"} @ PKR ${rate.rate}. By: ${actorName}`,
                 },
             })
-        })
+            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
 
         // Return updated rates for this contract
         const updatedRates = await prisma.clientContractRate.findMany({

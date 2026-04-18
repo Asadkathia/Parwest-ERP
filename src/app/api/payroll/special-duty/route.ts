@@ -6,11 +6,7 @@ import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
-function parseMonth(input: string) {
-  const date = new Date(input)
-  if (Number.isNaN(date.getTime())) return null
-  return date
-}
+import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 
 export async function GET(request: NextRequest) {
   try {

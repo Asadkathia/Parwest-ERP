@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function GET(
     request: NextRequest,
@@ -111,16 +112,14 @@ export async function POST(
                 },
             })
 
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "BRANCH_CREATED",
-                    module: "CLIENTS",
-                    description: `Created branch ${created.id} for client ${id}`,
-                },
-            })
-
             return created
+        })
+
+        await safeAuditLog({
+            userId: actorId,
+            event: "BRANCH_CREATED",
+            module: "CLIENTS",
+            description: `Created branch ${branch.id} for client ${id}`,
         })
 
         return NextResponse.json(branch, { status: 201 })

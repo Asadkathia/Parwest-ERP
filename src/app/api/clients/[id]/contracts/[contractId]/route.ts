@@ -25,8 +25,11 @@ export async function PATCH(
             }
         }
 
-        const actorId = session.user?.id || null
-        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+        const rawActorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
+        const actorId = rawActorId
+            ? (await prisma.user.findUnique({ where: { id: rawActorId }, select: { id: true } }))?.id ?? null
+            : null
 
         const body = await request.json()
         const contract = await prisma.clientContract.findUnique({ where: { id: contractId } })
@@ -35,23 +38,23 @@ export async function PATCH(
         const name = body?.name ? String(body.name).trim() : contract.name
         if (!name) return badRequest("Contract name is required.")
 
-        const updated = await prisma.$transaction(async (tx) => {
-            const result = await tx.clientContract.update({
-                where: { id: contractId },
-                data: {
-                    name,
-                    type: body?.type ? String(body.type).toUpperCase() : contract.type,
-                    startDate: body?.startDate ? new Date(body.startDate) : contract.startDate,
-                    endDate: body?.endDate ? new Date(body.endDate) : contract.endDate,
-                    isActive: body?.isActive !== undefined ? Boolean(body.isActive) : contract.isActive,
-                },
-                include: {
-                    branch: { select: { id: true, name: true } },
-                    rates: { orderBy: [{ guardType: "asc" }, { createdAt: "asc" }] },
-                },
-            })
+        const updated = await prisma.clientContract.update({
+            where: { id: contractId },
+            data: {
+                name,
+                type: body?.type ? String(body.type).toUpperCase() : contract.type,
+                startDate: body?.startDate ? new Date(body.startDate) : contract.startDate,
+                endDate: body?.endDate ? new Date(body.endDate) : contract.endDate,
+                isActive: body?.isActive !== undefined ? Boolean(body.isActive) : contract.isActive,
+            },
+            include: {
+                branch: { select: { id: true, name: true } },
+                rates: { orderBy: [{ guardType: "asc" }, { createdAt: "asc" }] },
+            },
+        })
 
-            await tx.auditLog.create({
+        await prisma.auditLog
+            .create({
                 data: {
                     userId: actorId,
                     event: "CONTRACT_UPDATED",
@@ -59,9 +62,7 @@ export async function PATCH(
                     description: `Contract "${name}" (${contractId}) updated for client ${clientId}. By: ${actorName}`,
                 },
             })
-
-            return result
-        })
+            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
 
         return NextResponse.json(updated)
     } catch (error) {

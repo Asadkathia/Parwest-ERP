@@ -6,6 +6,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const MOCK_ROWS = [
   {
@@ -140,33 +141,28 @@ export async function POST(request: NextRequest) {
     }
 
     const actorId = session.user?.id || null
-    const created = await prisma.$transaction(async (tx) => {
-      const assignment = await tx.managerSupervisorAssignment.create({
-        data: {
-          managerId,
-          supervisorId,
-          regionalOfficeId,
-          effectiveDate,
-          notes,
-          status: "ACTIVE",
-        },
-        include: {
-          manager: { select: { id: true, name: true } },
-          supervisor: { select: { id: true, name: true } },
-        },
-      })
-
-      await tx.auditLog.create({
-        data: {
-          userId: actorId,
-          event: "MANAGER_SUPERVISOR_ASSIGNED",
-          module: "USERS",
-          description: `Assigned supervisor ${supervisorId} to manager ${managerId} (relationship ${assignment.id})`,
-        },
-      })
-
-      return assignment
+    const created = await prisma.managerSupervisorAssignment.create({
+      data: {
+        managerId,
+        supervisorId,
+        regionalOfficeId,
+        effectiveDate,
+        notes,
+        status: "ACTIVE",
+      },
+      include: {
+        manager: { select: { id: true, name: true } },
+        supervisor: { select: { id: true, name: true } },
+      },
     })
+
+    await safeAuditLog({
+      userId: actorId,
+      event: "MANAGER_SUPERVISOR_ASSIGNED",
+      module: "USERS",
+      description: `Assigned supervisor ${supervisorId} to manager ${managerId} (relationship ${created.id})`,
+    })
+
     return NextResponse.json(created, { status: 201 })
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {

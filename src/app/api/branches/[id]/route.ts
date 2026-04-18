@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function PATCH(
     request: NextRequest,
@@ -50,36 +51,30 @@ export async function PATCH(
         }
 
         const targetClientId = body?.clientId ? String(body.clientId) : undefined
-        const branch = await prisma.$transaction(async (tx) => {
-            const updated = await tx.branch.update({
-                where: { id },
-                data: {
-                    clientId: targetClientId || undefined,
-                    name,
-                    code: body?.code ? String(body.code).trim() : null,
-                    address: body?.address ? String(body.address) : null,
-                    city: body?.city ? String(body.city) : null,
-                    province: body?.province ? String(body.province) : null,
-                    contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
-                    contactPhone: body?.contactPhone ? String(body.contactPhone) : null,
-                    contactEmail: body?.contactEmail ? String(body.contactEmail) : null,
-                    isHeadOffice: body?.isHeadOffice === true,
-                },
-                include: {
-                    client: true,
-                },
-            })
+        const branch = await prisma.branch.update({
+            where: { id },
+            data: {
+                clientId: targetClientId || undefined,
+                name,
+                code: body?.code ? String(body.code).trim() : null,
+                address: body?.address ? String(body.address) : null,
+                city: body?.city ? String(body.city) : null,
+                province: body?.province ? String(body.province) : null,
+                contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
+                contactPhone: body?.contactPhone ? String(body.contactPhone) : null,
+                contactEmail: body?.contactEmail ? String(body.contactEmail) : null,
+                isHeadOffice: body?.isHeadOffice === true,
+            },
+            include: {
+                client: true,
+            },
+        })
 
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "BRANCH_UPDATED",
-                    module: "CLIENTS",
-                    description: `Updated branch ${id}`,
-                },
-            })
-
-            return updated
+        await safeAuditLog({
+            userId: actorId,
+            event: "BRANCH_UPDATED",
+            module: "CLIENTS",
+            description: `Updated branch ${id}`,
         })
 
         return NextResponse.json(branch, { status: 200 })
@@ -127,18 +122,12 @@ export async function DELETE(
             return badRequest("Cannot delete branch with active deployments")
         }
 
-        await prisma.$transaction(async (tx) => {
-            await tx.branch.delete({
-                where: { id },
-            })
-            await tx.auditLog.create({
-                data: {
-                    userId: actorId,
-                    event: "BRANCH_DELETED",
-                    module: "CLIENTS",
-                    description: `Deleted branch ${id}`,
-                },
-            })
+        await prisma.branch.delete({ where: { id } })
+        await safeAuditLog({
+            userId: actorId,
+            event: "BRANCH_DELETED",
+            module: "CLIENTS",
+            description: `Deleted branch ${id}`,
         })
 
         return ok({ message: "Branch deleted successfully" })

@@ -59,6 +59,9 @@ export async function PATCH(
       return forbidden("Forbidden: payroll row is outside your scope.")
     }
 
+    const paymentRemarks =
+      body.paymentRemarks !== undefined ? String(body.paymentRemarks || "") : undefined
+
     const updated = await prisma.payroll.update({
       where: { id },
       data: {
@@ -69,6 +72,8 @@ export async function PATCH(
               ? null
               : paymentMethod
             : undefined,
+        paymentRemarks: paymentRemarks === undefined ? undefined : paymentRemarks || null,
+        paymentUpdatedAt: paymentStatus || paymentRemarks !== undefined ? new Date() : undefined,
       },
       include: {
         guard: { select: { id: true, name: true, parwestId: true } },

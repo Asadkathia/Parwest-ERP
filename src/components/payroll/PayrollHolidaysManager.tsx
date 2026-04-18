@@ -1,167 +1,378 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
-import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
+import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 
-type HolidayRow = {
+type Row = {
   id: string
   name: string
   date: string
-  notes?: string | null
-  createdAt?: string
+  dateFrom: string | null
+  dateTo: string | null
+  regionalOfficeId: string | null
+  valueType: "FIXED_PER_DAY" | "MULTIPLE_OF_RATE" | null
+  value: number | null
+  status: string | null
+  comments: string | null
+  notes: string | null
 }
 
+type Office = { id: string; name: string }
+
+const VALUE_TYPES = [
+  { id: "FIXED_PER_DAY", label: "Fixed per day amount" },
+  { id: "MULTIPLE_OF_RATE", label: "Multiple of location Rate" },
+] as const
+
 export default function PayrollHolidaysManager() {
-  const getErrorMessage = (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : fallback
-  const [rows, setRows] = useState<HolidayRow[]>([])
-  const [name, setName] = useState("")
-  const [date, setDate] = useState("")
-  const [notes, setNotes] = useState("")
-  const [search, setSearch] = useState("")
+  const [rows, setRows] = useState<Row[]>([])
+  const [offices, setOffices] = useState<Office[]>([])
   const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [name, setName] = useState("")
+  const [regionalOfficeId, setRegionalOfficeId] = useState("")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [valueType, setValueType] = useState<"FIXED_PER_DAY" | "MULTIPLE_OF_RATE">("MULTIPLE_OF_RATE")
+  const [value, setValue] = useState("")
+  const [status, setStatus] = useState("active")
+  const [comments, setComments] = useState("")
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [result, setResult] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setNotice(null)
-    try {
-      const response = await fetch("/api/payroll/holidays", { cache: "no-store" })
-      const payload = await response.json().catch(() => [])
-      if (!response.ok) throw new Error(payload?.message || "Failed to load holidays.")
-      setRows(Array.isArray(payload) ? payload : [])
-    } catch (error: unknown) {
-      setRows([])
-      setNotice({ type: "error", message: getErrorMessage(error, "Failed to load holidays.") })
-    } finally {
-      setLoading(false)
-    }
+    const res = await fetch("/api/payroll/holidays")
+    if (res.ok) setRows(await res.json())
+    setLoading(false)
   }, [])
 
   useEffect(() => {
-    void load()
+    load()
+    fetch("/api/regional-offices")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.offices ?? data.rows ?? []
+        setOffices(list.map((o: { id: string; name: string }) => ({ id: o.id, name: o.name })))
+      })
+      .catch(() => {})
   }, [load])
 
-  const create = async () => {
-    setNotice(null)
-    if (!name.trim() || !date) {
-      setNotice({ type: "error", message: "Holiday name and date are required." })
-      return
-    }
+  const filteredRows = rows.filter((r) => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return (
+      r.name.toLowerCase().includes(s) ||
+      (r.comments ?? "").toLowerCase().includes(s)
+    )
+  })
+
+  const openCreate = () => {
+    setEditingId(null)
+    setName("")
+    setRegionalOfficeId("")
+    setDateFrom("")
+    setDateTo("")
+    setValueType("MULTIPLE_OF_RATE")
+    setValue("")
+    setStatus("active")
+    setComments("")
+    setResult(null)
+    setFormOpen(true)
+  }
+
+  const openEdit = (row: Row) => {
+    setEditingId(row.id)
+    setName(row.name ?? "")
+    setRegionalOfficeId(row.regionalOfficeId ?? "")
+    setDateFrom((row.dateFrom ?? row.date).slice(0, 10))
+    setDateTo((row.dateTo ?? row.date).slice(0, 10))
+    setValueType(row.valueType ?? "MULTIPLE_OF_RATE")
+    setValue(row.value != null ? String(row.value) : "")
+    setStatus(row.status ?? "active")
+    setComments(row.comments ?? "")
+    setResult(null)
+    setFormOpen(true)
+  }
+
+  const submit = async () => {
+    if (!dateFrom) return
     setSaving(true)
-    try {
-      const response = await fetch("/api/payroll/holidays", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          date,
-          notes: notes.trim() || null,
-        }),
-      })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload?.message || "Failed to create holiday.")
-      setName("")
-      setDate("")
-      setNotes("")
-      setNotice({ type: "success", message: "Holiday created." })
-      await load()
-    } catch (error: unknown) {
-      setNotice({ type: "error", message: getErrorMessage(error, "Failed to create holiday.") })
-    } finally {
-      setSaving(false)
+    setResult(null)
+    const payload = {
+      name: name || "Holiday",
+      regionalOfficeId: regionalOfficeId || null,
+      dateFrom,
+      dateTo: dateTo || dateFrom,
+      valueType,
+      value: value === "" ? null : Number(value),
+      status,
+      comments: comments || null,
+    }
+    const url = editingId ? `/api/payroll/holidays/${editingId}` : "/api/payroll/holidays"
+    const res = await fetch(url, {
+      method: editingId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (res.ok) {
+      setResult("Saved.")
+      setFormOpen(false)
+      load()
+    } else {
+      setResult(`Error: ${data.error ?? "Failed."}`)
     }
   }
 
   const remove = async (id: string) => {
-    setNotice(null)
-    try {
-      const response = await fetch(`/api/payroll/holidays/${id}`, { method: "DELETE" })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload?.message || "Failed to delete holiday.")
-      setNotice({ type: "success", message: "Holiday deleted." })
-      await load()
-    } catch (error: unknown) {
-      setNotice({ type: "error", message: getErrorMessage(error, "Failed to delete holiday.") })
-    }
+    if (!confirm("Delete this holiday?")) return
+    const res = await fetch(`/api/payroll/holidays/${id}`, { method: "DELETE" })
+    if (res.ok) load()
   }
 
-  const filteredRows = useMemo(() => {
-    if (!search.trim()) return rows
-    const q = search.toLowerCase()
-    return rows.filter((row) => `${row.name} ${row.notes || ""}`.toLowerCase().includes(q))
-  }, [rows, search])
-
   return (
-    <div className="space-y-6">
-      <SectionTitle title="Holidays" subtitle="Create and manage payroll holidays." />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+    <PayrollPageShell
+      title="Payroll — Holidays"
+      subtitle="Regional holidays with fixed or rate-multiple payouts."
+      actions={<ActionButton onClick={openCreate}>+ Add Holiday</ActionButton>}
+    >
+      <section className="ui-card p-4 space-y-4">
+        <input
+          className="ui-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or comments"
+        />
 
-      <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Holiday Name *" value={name} onChange={setName} placeholder="Holiday name" />
-          <Input label="Date *" value={date} onChange={setDate} placeholder="" type="date" />
-          <Input label="Notes" value={notes} onChange={setNotes} placeholder="Notes" />
-          <Input label="Search" value={search} onChange={setSearch} placeholder="Search holidays" />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1000px] text-sm">
+            <thead className="bg-[var(--surface-muted)]">
+              <tr>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Regional Office</th>
+                <th className="px-3 py-2 text-left">Type</th>
+                <th className="px-3 py-2 text-right">Value</th>
+                <th className="px-3 py-2 text-left">From</th>
+                <th className="px-3 py-2 text-left">To</th>
+                <th className="px-3 py-2 text-left">Comments</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                    No holidays.
+                  </td>
+                </tr>
+              )}
+              {filteredRows.map((r) => {
+                const office = offices.find((o) => o.id === r.regionalOfficeId)
+                return (
+                  <tr key={r.id} className="border-t border-[var(--border)]">
+                    <td className="px-3 py-2">{r.name}</td>
+                    <td className="px-3 py-2">{office?.name ?? "—"}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.valueType === "FIXED_PER_DAY"
+                        ? "Fixed"
+                        : r.valueType === "MULTIPLE_OF_RATE"
+                          ? "Multiple of Rate"
+                          : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">{r.value ?? ""}</td>
+                    <td className="px-3 py-2">{(r.dateFrom ?? r.date).slice(0, 10)}</td>
+                    <td className="px-3 py-2">{(r.dateTo ?? r.date).slice(0, 10)}</td>
+                    <td className="px-3 py-2 text-xs">{r.comments ?? r.notes ?? ""}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          r.status === "active"
+                            ? "text-green-600 font-medium"
+                            : "text-[var(--text-muted)]"
+                        }
+                      >
+                        {r.status ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(r)}
+                        className="text-[var(--brand)] hover:underline text-xs"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(r.id)}
+                        className="text-red-500 hover:underline text-xs"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-        <div className="flex gap-2">
-          <ActionButton onClick={create} disabled={saving}>{saving ? "Saving..." : "Create"}</ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</ActionButton>
-        </div>
-      </FilterBar>
+      </section>
 
-      <DataTable
-        rows={filteredRows}
-        columns={[
-          { key: "name", header: "Holiday", sortable: true },
-          { key: "date", header: "Date", sortable: true, render: (row) => new Date(row.date).toLocaleDateString("en-US") },
-          { key: "notes", header: "Notes", render: (row) => row.notes || "—" },
-          {
-            key: "action",
-            header: "Action",
-            render: (row) => (
-              <button className="text-red-600 hover:underline" onClick={() => void remove(row.id)}>
-                Delete
+      {formOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="ui-card w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{editingId ? "Edit Holiday" : "Add Holidays"}</h2>
+              <button
+                type="button"
+                className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]"
+                onClick={() => setFormOpen(false)}
+              >
+                ×
               </button>
-            ),
-          },
-        ]}
-        rowKey="id"
-        searchable={false}
-        emptyText={loading ? "Loading holidays..." : "No holidays found."}
-      />
-    </div>
-  )
-}
+            </div>
 
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  type?: "text" | "date"
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
-      <input
-        className="ui-input"
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Regional Office
+                </label>
+                <select
+                  className="ui-select"
+                  value={regionalOfficeId}
+                  onChange={(e) => setRegionalOfficeId(e.target.value)}
+                >
+                  <option value="">All / None</option>
+                  {offices.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  From *
+                </label>
+                <input
+                  type="date"
+                  className="ui-input"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  To
+                </label>
+                <input
+                  type="date"
+                  className="ui-input"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-2">
+                Value Type *
+              </label>
+              <div className="flex gap-6">
+                {VALUE_TYPES.map((vt) => (
+                  <label key={vt.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="valueType"
+                      value={vt.id}
+                      checked={valueType === vt.id}
+                      onChange={() => setValueType(vt.id)}
+                      className="accent-[var(--brand)]"
+                    />
+                    {vt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Value
+                </label>
+                <input
+                  type="number"
+                  className="ui-input"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Status
+                </label>
+                <select
+                  className="ui-select"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Name
+                </label>
+                <input
+                  className="ui-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Holiday name"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                Comments
+              </label>
+              <textarea
+                className="ui-textarea"
+                rows={2}
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              {result && <span className="text-sm">{result}</span>}
+              <div className="ml-auto flex gap-2">
+                <ActionButton variant="secondary" onClick={() => setFormOpen(false)}>
+                  Cancel
+                </ActionButton>
+                <ActionButton onClick={submit} disabled={!dateFrom || saving}>
+                  {saving ? "Saving…" : "Save"}
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </PayrollPageShell>
   )
 }

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function DELETE(
   _request: NextRequest,
@@ -19,44 +20,37 @@ export async function DELETE(
     if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })
 
     const actorId = session.user?.id || null
-    await prisma.$transaction(async (tx) => {
-      const existing = await tx.clientSupervisorAssignment.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          clientId: true,
-          branchId: true,
-          supervisorId: true,
-          client: { select: { regionId: true } },
-          supervisor: { select: { regionId: true, regionalOfficeId: true } },
-        },
-      })
-      if (!existing) {
-        throw new Error("REL_NOT_FOUND")
-      }
-      if (
-        managerScope &&
-        (
-          managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null }) ||
-          managerScopeDenied(managerScope, {
-            regionId: existing.supervisor?.regionId || null,
-            regionalOfficeId: existing.supervisor?.regionalOfficeId || null,
-          })
-        )
-      ) {
-        throw new Error("SCOPE_FORBIDDEN")
-      }
-
-      await tx.clientSupervisorAssignment.delete({ where: { id } })
-      await tx.auditLog.create({
-        data: {
-          userId: actorId,
-          event: "CLIENT_SUPERVISOR_UNASSIGNED",
-          module: "USERS",
-          description: `Removed client/supervisor relationship ${id} (client ${existing.clientId}, supervisor ${existing.supervisorId}${existing.branchId ? `, branch ${existing.branchId}` : ""})`,
-        },
-      })
+    const existing = await prisma.clientSupervisorAssignment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        clientId: true,
+        branchId: true,
+        supervisorId: true,
+        client: { select: { regionId: true } },
+        supervisor: { select: { regionId: true, regionalOfficeId: true } },
+      },
     })
+    if (!existing) throw new Error("REL_NOT_FOUND")
+    if (
+      managerScope &&
+      (managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null }) ||
+        managerScopeDenied(managerScope, {
+          regionId: existing.supervisor?.regionId || null,
+          regionalOfficeId: existing.supervisor?.regionalOfficeId || null,
+        }))
+    ) {
+      throw new Error("SCOPE_FORBIDDEN")
+    }
+
+    await prisma.clientSupervisorAssignment.delete({ where: { id } })
+    await safeAuditLog({
+      userId: actorId,
+      event: "CLIENT_SUPERVISOR_UNASSIGNED",
+      module: "USERS",
+      description: `Removed client/supervisor relationship ${id} (client ${existing.clientId}, supervisor ${existing.supervisorId}${existing.branchId ? `, branch ${existing.branchId}` : ""})`,
+    })
+
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "REL_NOT_FOUND") return notFound("Relationship not found.")
