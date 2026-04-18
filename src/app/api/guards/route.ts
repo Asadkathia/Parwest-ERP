@@ -6,6 +6,7 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import type { Prisma } from "@prisma/client"
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
 
@@ -23,6 +25,8 @@ export async function GET(request: NextRequest) {
         const regionId = searchParams.get("regionId")
         const regionalOfficeId = searchParams.get("regionalOfficeId")
         const status = searchParams.get("status")
+        const take = Math.min(parseInt(searchParams.get("take") || "200", 10) || 200, 200)
+        const skip = Math.max(parseInt(searchParams.get("skip") || "0", 10) || 0, 0)
 
         const where: Prisma.GuardWhereInput = {}
         if (regionId) where.regionId = regionId
@@ -63,6 +67,8 @@ export async function GET(request: NextRequest) {
         const guards = await prisma.guard.findMany({
             where,
             orderBy: { name: "asc" },
+            take,
+            skip,
             include: {
                 region: true,
                 regionalOffice: true,
@@ -83,6 +89,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
 
@@ -354,40 +361,35 @@ export async function POST(request: NextRequest) {
                     ageApprovalRequired,
                     ageApprovalStatus: ageApprovalRequired ? "PENDING" : null,
                 }
-                const guard = await prisma.guard.create({ data: payload })
+                const supervisorId = str(body.supervisorId)
 
-                // Create approval request if age is outside limits
-                if (ageApprovalRequired && ageApprovalReason && guardAge !== null) {
-                    try {
-                        await prisma.guardAgeApproval.create({
+                const guard = await prisma.$transaction(async (tx) => {
+                    const newGuard = await tx.guard.create({ data: payload })
+
+                    if (ageApprovalRequired && ageApprovalReason && guardAge !== null) {
+                        await tx.guardAgeApproval.create({
                             data: {
-                                guardId: guard.id,
+                                guardId: newGuard.id,
                                 guardAge,
                                 reason: ageApprovalReason,
                                 status: "PENDING",
                                 requestedBy: session.user?.name ?? session.user?.email ?? "System",
                             },
                         })
-                    } catch {
-                        // Non-critical — guard is already created
                     }
-                }
 
-                // Assign supervisor if provided during enrollment
-                const supervisorId = str(body.supervisorId)
-                if (supervisorId) {
-                    try {
-                        await prisma.guardSupervisorAssignment.create({
+                    if (supervisorId) {
+                        await tx.guardSupervisorAssignment.create({
                             data: {
-                                guardId: guard.id,
+                                guardId: newGuard.id,
                                 supervisorId,
                                 status: "ACTIVE",
                             },
                         })
-                    } catch {
-                        // Non-critical — guard is already created, supervisor can be assigned later
                     }
-                }
+
+                    return newGuard
+                })
 
                 // Record service history event
                 void recordGuardServiceEvent({

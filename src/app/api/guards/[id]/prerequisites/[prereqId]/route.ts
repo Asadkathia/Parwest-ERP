@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 // PATCH /api/guards/[id]/prerequisites/[prereqId]
 // Admin verifies / updates a prerequisite record
@@ -12,6 +13,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId, prereqId } = await params
     const body = await request.json()
@@ -111,6 +113,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId, prereqId } = await params
 

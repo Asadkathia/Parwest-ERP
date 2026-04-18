@@ -23,6 +23,7 @@ export default async function ClientsPage() {
     city: string | null
     status: string
     regionId: string | null
+    regionName: string | null
     branchCount: number
   }> = []
   let dbWarning = ""
@@ -35,6 +36,10 @@ export default async function ClientsPage() {
       prisma.client.findMany({
         take: 20,
         orderBy: { createdAt: "desc" },
+        include: {
+          region: { select: { name: true } },
+          _count: { select: { branches: true } },
+        },
       }),
       prisma.client.count(),
       prisma.client.count({ where: { status: "ACTIVE" } }),
@@ -48,7 +53,8 @@ export default async function ClientsPage() {
       city: c.city,
       status: c.status,
       regionId: c.regionId,
-      branchCount: 0,
+      regionName: c.region?.name ?? null,
+      branchCount: c._count.branches,
     }))
     stats.total = total
     stats.active = active
@@ -149,7 +155,7 @@ export default async function ClientsPage() {
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.type}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.city || "—"}</td>
                   <td className="px-6 py-4 text-sm text-[var(--text)]">{client.branchCount}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionId || "—"}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionName || "—"}</td>
                   <td className="px-6 py-4 text-sm">
                     <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />
                   </td>

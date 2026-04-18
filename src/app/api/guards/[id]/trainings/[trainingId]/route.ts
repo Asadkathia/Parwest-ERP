@@ -6,30 +6,30 @@ import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function DELETE(
   _request: NextRequest,
-  context: { params: Promise<{ id: string; courseId: string }> }
+  context: { params: Promise<{ id: string; trainingId: string }> }
 ) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
-    const { id: guardId, courseId } = await context.params
+    const { id: guardId, trainingId } = await context.params
 
-    await prisma.guardCourse.delete({ where: { id: courseId, guardId } })
+    await prisma.training.delete({ where: { id: trainingId, guardId } })
 
     await prisma.auditLog.create({
       data: {
         userId: session.user?.id,
-        event: "GUARD_COURSE_DELETED",
+        event: "GUARD_TRAINING_DELETED",
         module: "GUARDS",
-        description: `Guard course ${courseId} deleted by ${session.user?.name || session.user?.email || "Unknown"}.`,
+        description: `Training ${trainingId} deleted by ${session.user?.name || session.user?.email || "Unknown"}.`,
       },
     })
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    if (String((error as { code?: string }).code) === "P2025") return notFound("Course not found.")
-    console.error("Error deleting guard course:", error)
-    return internalServerError("Failed to delete course.")
+    if (String((error as { code?: string }).code) === "P2025") return notFound("Training not found.")
+    console.error("Error deleting guard training:", error)
+    return internalServerError("Failed to delete training.")
   }
 }

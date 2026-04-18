@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session) return unauthorized()
+
+    const managerScope = deriveManagerScope(session)
     const { searchParams } = request.nextUrl
-    const regionId = searchParams.get("regionId") || undefined
-    const regionalOfficeId = searchParams.get("regionalOfficeId") || undefined
     const clientId = searchParams.get("clientId") || undefined
     const status = searchParams.get("status") || undefined
 
@@ -15,18 +18,18 @@ export async function GET(request: NextRequest) {
     if (clientId) where.clientId = clientId
     if (status) where.status = status
 
-    // Filter by region/regionalOffice via client relation
-    const clientWhere: Record<string, unknown> = {}
-    if (regionId) clientWhere.regionId = regionId
-    if (regionalOfficeId) clientWhere.regionalOfficeId = regionalOfficeId
+    // Apply manager scope via client relation
+    const scopeWhere = managerScope
+      ? buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
+      : {}
+    if (Object.keys(scopeWhere).length > 0) {
+      where.client = scopeWhere
+    }
 
     const insurances = await (prisma.clientInsurance as unknown as {
       findMany: (args: unknown) => Promise<unknown[]>
     }).findMany({
-      where: {
-        ...where,
-        ...(Object.keys(clientWhere).length > 0 ? { client: clientWhere } : {}),
-      },
+      where,
       include: {
         client: {
           select: {
@@ -43,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(insurances)
   } catch {
-    return NextResponse.json([], { status: 200 })
+    return internalServerError("Failed to fetch insurances.")
   }
 }
 
@@ -52,6 +55,7 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     if (!session) return unauthorized()
 
+    const managerScope = deriveManagerScope(session)
     const body = await request.json()
     const clientId = String(body?.clientId || "").trim()
     const insuranceName = String(body?.insuranceName || "").trim()
@@ -61,6 +65,19 @@ export async function POST(request: NextRequest) {
 
     if (!clientId) return badRequest("Client is required.")
     if (!insuranceName) return badRequest("Insurance name is required.")
+
+    // Scope check: verify the target client is within the manager's scope
+    if (managerScope) {
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: { regionId: true, regionalOfficeId: true },
+      })
+      if (!client) return notFound("Client not found.")
+      const { managerScopeDenied } = await import("@/lib/access/scope")
+      if (managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
+        return forbidden("Access denied: client is outside your scope.")
+      }
+    }
 
     const insurance = await (prisma.clientInsurance as unknown as {
       create: (args: unknown) => Promise<unknown>
@@ -86,7 +103,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         userId: session.user?.id,

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
@@ -96,6 +97,7 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     if (!session) redirect("/login")
 
     const { id } = await params
+    const managerScope = deriveManagerScope(session)
 
     let dbWarning = ""
     let guard: GuardDetailModel | null = null
@@ -171,6 +173,13 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                 },
             }).catch(() => []),
         ])
+        if (guardData && managerScope && managerScopeDenied(managerScope, {
+            regionId: guardData.regionId,
+            regionalOfficeId: guardData.regionalOfficeId,
+        })) {
+            notFound()
+        }
+
         guard = guardData
             ? {
                 ...guardData,

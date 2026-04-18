@@ -1,9 +1,11 @@
 import { type ReactNode } from "react"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Image from "next/image"
 import { prisma } from "@/lib/db"
 import PricingManager from "@/components/clients/PricingManager"
+import ClientStatusToggle from "@/components/clients/ClientStatusToggle"
 import Link from "next/link"
 import { ArrowLeft, Edit, FileText, Plus, Paperclip, Building2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
@@ -154,6 +156,11 @@ export default async function ClientDetailPage({
   })
 
   if (!client) notFound()
+
+  const managerScope = deriveManagerScope(session)
+  if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
+    notFound()
+  }
 
   // Resolve assigned manager name (stored as plain ID, no relation)
   const assignedManager = client.assignedManagerId
@@ -306,6 +313,13 @@ export default async function ClientDetailPage({
               <ArrowLeft className="h-4 w-4" />
               Back
             </Link>
+            {!client.isBranchless && (
+              <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Branch
+              </Link>
+            )}
+            <ClientStatusToggle clientId={client.id} currentStatus={client.status} />
             <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
               <Edit className="h-4 w-4" />
               Edit

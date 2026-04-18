@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET(
     _req: Request,
@@ -9,6 +10,7 @@ export async function GET(
 ) {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id } = await params
 
@@ -70,6 +72,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const { id: guardId } = await params
         const body = await request.json()
@@ -84,20 +87,20 @@ export async function PATCH(
         if (!guard) return notFound("Guard not found")
         if (!supervisor) return notFound("Supervisor user not found")
 
-        // End all active supervisor assignments for this guard
-        await prisma.guardSupervisorAssignment.updateMany({
-            where: { guardId, status: "ACTIVE" },
-            data: { status: "ENDED", endedAt: new Date() },
-        })
-
-        // Create the new assignment
-        const assignment = await prisma.guardSupervisorAssignment.create({
-            data: {
-                guardId,
-                supervisorId,
-                status: "ACTIVE",
-                assignedAt: new Date(),
-            },
+        // End all active assignments and create new one atomically
+        const assignment = await prisma.$transaction(async (tx) => {
+            await tx.guardSupervisorAssignment.updateMany({
+                where: { guardId, status: "ACTIVE" },
+                data: { status: "ENDED", endedAt: new Date() },
+            })
+            return tx.guardSupervisorAssignment.create({
+                data: {
+                    guardId,
+                    supervisorId,
+                    status: "ACTIVE",
+                    assignedAt: new Date(),
+                },
+            })
         })
 
         // Audit log (non-critical)

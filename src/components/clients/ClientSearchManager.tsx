@@ -76,6 +76,26 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
   const [rowsPerPage, setRowsPerPage] = useState("10")
   const [tableSearch, setTableSearch] = useState("")
   const [selectDate, setSelectDate] = useState("")
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
+
+  const handleStatusUpdate = async (row: ClientRow) => {
+    const next = row.status.toUpperCase() === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+    if (!confirm(`Change status of "${row.name}" to ${next}?`)) return
+    setStatusUpdating(row.id)
+    try {
+      const res = await fetch(`/api/clients/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      })
+      if (!res.ok) throw new Error("Failed to update status")
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: next } : r))
+    } catch {
+      alert("Failed to update client status. Please try again.")
+    } finally {
+      setStatusUpdating(null)
+    }
+  }
 
   const loadRows = async () => {
     try {
@@ -309,8 +329,13 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
                   Edit
                 </Link>
                 {variant === "v2" ? (
-                  <button type="button" className="text-amber-700 hover:underline">
-                    Update Status
+                  <button
+                    type="button"
+                    disabled={statusUpdating === row.id}
+                    onClick={() => handleStatusUpdate(row)}
+                    className="text-amber-700 hover:underline disabled:opacity-50"
+                  >
+                    {statusUpdating === row.id ? "Updating..." : "Update Status"}
                   </button>
                 ) : null}
               </div>

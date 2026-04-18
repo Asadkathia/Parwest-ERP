@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
 const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
@@ -139,5 +139,53 @@ export async function PUT(
     } catch (error: unknown) {
         console.error("Error updating client:", error)
         return internalServerError("Failed to update client")
+    }
+}
+
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const session = await auth()
+        if (!session) return unauthorized()
+        const managerScope = deriveManagerScope(session)
+        const actorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
+
+        const { id } = await params
+        const body = await request.json()
+
+        const existingClient = await prisma.client.findUnique({
+            where: { id },
+            select: { regionId: true, regionalOfficeId: true },
+        })
+        if (!existingClient) return notFound("Client not found")
+        if (managerScope && managerScopeDenied(managerScope, { regionId: existingClient.regionId, regionalOfficeId: existingClient.regionalOfficeId })) {
+            return forbidden("Forbidden: client is outside your scope.")
+        }
+
+        const status = body?.status ? String(body.status) : null
+        if (!status || !["ACTIVE", "INACTIVE"].includes(status)) {
+            return badRequest("Status must be ACTIVE or INACTIVE.")
+        }
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const client = await tx.client.update({ where: { id }, data: { status } })
+            await tx.auditLog.create({
+                data: {
+                    userId: actorId,
+                    event: "CLIENT_STATUS_UPDATED",
+                    module: "CLIENTS",
+                    description: `Client ${id} status changed to ${status} by ${actorName}.`,
+                },
+            })
+            return client
+        })
+
+        return NextResponse.json(updated)
+    } catch (error: unknown) {
+        console.error("Error updating client status:", error)
+        return internalServerError("Failed to update client status")
     }
 }

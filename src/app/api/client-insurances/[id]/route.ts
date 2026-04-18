@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import type { Session } from "next-auth"
+
+async function resolveScope(id: string, session: Session) {
+  const managerScope = deriveManagerScope(session)
+  if (!managerScope) return null
+
+  const insurance = await (prisma.clientInsurance as unknown as {
+    findUnique: (args: unknown) => Promise<{ client: { regionId: string | null; regionalOfficeId: string | null } } | null>
+  }).findUnique({
+    where: { id },
+    select: { client: { select: { regionId: true, regionalOfficeId: true } } },
+  })
+
+  if (!insurance) return "not_found"
+  if (managerScopeDenied(managerScope, {
+    regionId: insurance.client.regionId,
+    regionalOfficeId: insurance.client.regionalOfficeId,
+  })) return "forbidden"
+
+  return null
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -12,8 +34,11 @@ export async function PATCH(
     if (!session) return unauthorized()
 
     const { id } = await context.params
-    const body = await request.json()
+    const scopeResult = await resolveScope(id, session)
+    if (scopeResult === "not_found") return notFound("Insurance not found.")
+    if (scopeResult === "forbidden") return forbidden("Access denied: client is outside your scope.")
 
+    const body = await request.json()
     const data: Record<string, unknown> = {}
     if (body.insuranceName !== undefined) {
       const name = String(body.insuranceName || "").trim()
@@ -63,6 +88,9 @@ export async function DELETE(
     if (!session) return unauthorized()
 
     const { id } = await context.params
+    const scopeResult = await resolveScope(id, session)
+    if (scopeResult === "not_found") return notFound("Insurance not found.")
+    if (scopeResult === "forbidden") return forbidden("Access denied: client is outside your scope.")
 
     await (prisma.clientInsurance as unknown as {
       delete: (args: unknown) => Promise<unknown>

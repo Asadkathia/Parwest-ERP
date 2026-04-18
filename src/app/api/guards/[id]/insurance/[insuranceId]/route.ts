@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -10,6 +11,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId, insuranceId } = await context.params
     const body = await request.json()
@@ -20,9 +22,7 @@ export async function PATCH(
 
     if (Object.keys(data).length === 0) return badRequest("No fields provided.")
 
-    const updated = await (prisma.guardInsurance as unknown as {
-      update: (args: unknown) => Promise<unknown>
-    }).update({
+    const updated = await prisma.guardInsurance.update({
       where: { id: insuranceId, guardId },
       data,
       include: {
@@ -57,12 +57,11 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId, insuranceId } = await context.params
 
-    await (prisma.guardInsurance as unknown as {
-      delete: (args: unknown) => Promise<unknown>
-    }).delete({ where: { id: insuranceId, guardId } })
+    await prisma.guardInsurance.delete({ where: { id: insuranceId, guardId } })
 
     await prisma.auditLog.create({
       data: {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { unauthorized } from "@/lib/api/response"
+import { forbidden, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 // Static options derived from schema definitions
 const GUARD_STATUSES = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "ABSENT", "INACTIVE", "TERMINATED"]
@@ -22,6 +23,7 @@ export async function GET() {
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const [docTypes, clients, offices, educations, religions] = await Promise.all([
             // Verification types — only VERIFICATION category doc types

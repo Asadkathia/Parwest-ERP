@@ -989,10 +989,10 @@ export default function PrerequisitesManager({ regions }: Props) {
 
       <Card>
         <CardBody className="space-y-4">
-          <HeaderWithAdd title="Salary Categories" />
+          <SectionTitle title="Salary Categories" subtitle="Reference values — configurable via system settings." />
           <SimpleTable
-            headers={["ID#", "NAME", "LIMIT", "ACTION"]}
-            rows={salaryCategories.map((row) => [row.id, row.name, row.limit, "✎"])}
+            headers={["ID#", "NAME", "LIMIT"]}
+            rows={salaryCategories.map((row) => [row.id, row.name, row.limit])}
           />
         </CardBody>
       </Card>
@@ -1009,10 +1009,10 @@ export default function PrerequisitesManager({ regions }: Props) {
 
       <Card>
         <CardBody className="space-y-4">
-          <HeaderWithAdd title="Allowances &amp; Deduction" />
+          <SectionTitle title="Allowances &amp; Deductions" subtitle="Reference values — configurable via system settings." />
           <SimpleTable
-            headers={["FACTOR NAME", "AMOUNT", "ACTION"]}
-            rows={allowancesAndDeductions.map((row) => [row.factorName, row.amount, "✎"])}
+            headers={["FACTOR NAME", "AMOUNT"]}
+            rows={allowancesAndDeductions.map((row) => [row.factorName, row.amount])}
           />
         </CardBody>
       </Card>

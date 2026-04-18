@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+
     const { id: guardId } = await context.params
 
-    const insurances = await (prisma.guardInsurance as unknown as {
-      findMany: (args: unknown) => Promise<unknown[]>
-    }).findMany({
+    const insurances = await prisma.guardInsurance.findMany({
       where: { guardId },
       include: {
         clientInsurance: {
@@ -38,6 +41,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId } = await context.params
     const body = await request.json()
@@ -53,9 +57,7 @@ export async function POST(
     })
     if (!guard) return badRequest("Guard not found.")
 
-    const assignment = await (prisma.guardInsurance as unknown as {
-      create: (args: unknown) => Promise<unknown>
-    }).create({
+    const assignment = await prisma.guardInsurance.create({
       data: {
         guardId,
         clientInsuranceId,

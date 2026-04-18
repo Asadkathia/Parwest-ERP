@@ -34,52 +34,7 @@ type ParsedNotes = {
     remarks?: string
 }
 
-const LEGACY_REGIONAL_OFFICES = [
-    "head office lahore",
-    "islamabad",
-    "quetta",
-    "peshawar",
-    "karachi",
-    "multan",
-    "sahiwal",
-    "gujranwala",
-    "faisalabad",
-    "sub office kasur",
-    "sub office sheikhupura",
-    "test office",
-    "hyderabad",
-    "sukkur",
-    "qadir pur ghotki",
-    "jand",
-]
-
-const LEGACY_CLIENTS = [
-    "National Bank of Pakistan",
-    "Standard Chartered Bank Limited Pakistan",
-    "United Bank Limited",
-    "MCB Bank Ltd",
-    "Faysal Bank Limited",
-    "Summit Bank Limited",
-    "Meezan Bank Limited",
-    "Bank Al Habib Limited",
-    "Samba Bank Limited",
-    "Habib Bank Limited",
-]
-
-const LEGACY_BRANCHES = [
-    "Crystalline Chemicals Industries Pvt Ltd",
-    "Parsi Grave Yard",
-    "FGA of Pakistan",
-    "Ghalib Assocoates",
-    "Saudi Pak BA Rajpot",
-    "AM Gill Pvt Ltd",
-    "Trans Fab",
-    "Mr Atif Murad",
-    "21 5 Cantt Lahore Qalnadr",
-    "239 FF DHA",
-    "Mr Basit Rehman Malik",
-    "HOUSE#96 U, PHASE III, DHA",
-]
+type RegionalOffice = { id: string; name: string }
 
 function parseNotes(raw: string | null): ParsedNotes {
     if (!raw) return {}
@@ -111,10 +66,46 @@ function parseNotes(raw: string | null): ParsedNotes {
     return parsed
 }
 
+function exportCsv(rows: TrainingRow[], filename: string) {
+    const headers = ["Date", "Date of OJT", "Regional Office", "Client", "Branch", "Guard", "Branch Supervisor", "Supervisor Uniform", "Branch Manager", "Armorer", "Conducted By", "Due Date", "Remarks"]
+    const csvRows = [headers.join(",")]
+    for (const row of rows) {
+        const notes = parseNotes(row.notes)
+        const created = new Date(row.completedAt)
+        const due = new Date(created)
+        due.setMonth(due.getMonth() + 1)
+        const guardRegionalOffice = row.guard?.regionalOffice?.name || ""
+        const cells = [
+            created.toLocaleDateString("en-US"),
+            created.toLocaleDateString("en-US"),
+            notes.regionalOffice || guardRegionalOffice || "",
+            notes.client || "",
+            notes.branch || "",
+            row.guard?.name || "",
+            notes.branchSupervisor || "",
+            notes.supervisorWithUniform || "",
+            notes.branchManager || "",
+            notes.armorer || "",
+            notes.conductedBy || row.instructor || "",
+            notes.dueDate || due.toLocaleDateString("en-US"),
+            notes.remarks || "",
+        ].map(c => `"${String(c).replace(/"/g, '""')}"`)
+        csvRows.push(cells.join(","))
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+}
+
 export default function TrainingsManager() {
     const [rows, setRows] = useState<TrainingRow[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
 
     const [regionalOfficeFilter, setRegionalOfficeFilter] = useState("")
     const [clientFilter, setClientFilter] = useState("")
@@ -147,7 +138,29 @@ export default function TrainingsManager() {
 
     useEffect(() => {
         loadTrainings()
+        fetch("/api/regional-offices")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: RegionalOffice[]) => setRegionalOffices(data))
+            .catch(() => {})
     }, [])
+
+    const uniqueClients = useMemo(() => {
+        const seen = new Set<string>()
+        for (const row of rows) {
+            const client = parseNotes(row.notes).client
+            if (client) seen.add(client)
+        }
+        return Array.from(seen).sort()
+    }, [rows])
+
+    const uniqueBranches = useMemo(() => {
+        const seen = new Set<string>()
+        for (const row of rows) {
+            const branch = parseNotes(row.notes).branch
+            if (branch) seen.add(branch)
+        }
+        return Array.from(seen).sort()
+    }, [rows])
 
     const filteredRows = useMemo(() => {
         return rows.filter((row) => {
@@ -211,8 +224,8 @@ export default function TrainingsManager() {
                         <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
                         <select name="regional_office_id" value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Regional Office--</option>
-                            {LEGACY_REGIONAL_OFFICES.map((office) => (
-                                <option key={office} value={office}>{office}</option>
+                            {regionalOffices.map((office) => (
+                                <option key={office.id} value={office.name}>{office.name}</option>
                             ))}
                         </select>
                     </div>
@@ -220,7 +233,7 @@ export default function TrainingsManager() {
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
                         <select name="client_id" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Client--</option>
-                            {LEGACY_CLIENTS.map((client) => (
+                            {uniqueClients.map((client) => (
                                 <option key={client} value={client}>{client}</option>
                             ))}
                         </select>
@@ -229,7 +242,7 @@ export default function TrainingsManager() {
                         <label className="block text-sm text-gray-600 mb-1">Branch</label>
                         <select name="branch_id" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="ui-select">
                             <option value="">--Select Branch--</option>
-                            {LEGACY_BRANCHES.map((branch) => (
+                            {uniqueBranches.map((branch) => (
                                 <option key={branch} value={branch}>{branch}</option>
                             ))}
                         </select>
@@ -297,12 +310,15 @@ export default function TrainingsManager() {
                 <div className="flex flex-wrap gap-2">
                     <ActionButton>Filter</ActionButton>
                     <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
-                    <ActionButton>Export All OJT Report</ActionButton>
-                    <ActionButton>Export Filtered OJT Report</ActionButton>
-                    <ActionButton>Branch Training Report</ActionButton>
-                    <ActionButton>Export Branch Report</ActionButton>
-                    <ActionButton>Export Summary</ActionButton>
-                    <ActionButton variant="danger">Missing Training Report</ActionButton>
+                    <ActionButton onClick={() => exportCsv(rows, "ojt-all.csv")}>Export All OJT Report</ActionButton>
+                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-filtered.csv")}>Export Filtered OJT Report</ActionButton>
+                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-branch-report.csv")}>Branch Training Report</ActionButton>
+                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-branch-export.csv")}>Export Branch Report</ActionButton>
+                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-summary.csv")}>Export Summary</ActionButton>
+                    <ActionButton variant="danger" onClick={() => {
+                        const missing = rows.filter(r => !r.trainingType || !r.completedAt)
+                        exportCsv(missing, "ojt-missing.csv")
+                    }}>Missing Training Report</ActionButton>
                 </div>
             </FilterBar>
 

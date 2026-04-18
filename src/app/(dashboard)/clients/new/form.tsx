@@ -492,7 +492,6 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Row 1: Region → Regional Office */}
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
                             <select
@@ -524,29 +523,40 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 ))}
                             </select>
                         </div>
-                        {/* Row 2: Manager → Supervisor (manager first) */}
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
-                            <SearchSelect
-                                name="assignedManagerId"
-                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
-                            <SearchSelect
-                                name="assignedSupervisorId"
-                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
-                            />
-                        </div>
+
+                        {/* Manager & Supervisor — only for branchless clients */}
+                        {isBranchless && (
+                            <>
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
+                                    <SearchSelect
+                                        name="assignedManagerId"
+                                        options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                        placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
+                                    <SearchSelect
+                                        name="assignedSupervisorId"
+                                        options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                        placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        {!isBranchless && (
+                            <p className="md:col-span-2 text-sm text-[var(--text-muted)] bg-[var(--surface-muted)] rounded-[var(--radius-md)] px-4 py-3 border border-[var(--border)]">
+                                Manager and supervisor will be assigned per branch. Use the branch form below or the branch wizard after saving.
+                            </p>
+                        )}
                     </div>
                 </div>
 
-                {/* ── BRANCH / DEFAULT BRANCH (both branchless and branch clients) ── */}
+                {/* ── DEFAULT BRANCH (branchless clients only) ── */}
                 <input type="hidden" name="defaultBranchName" value={isBranchless ? "__branchless_default__" : defaultBranchName} />
-                <div className="space-y-8">
+                {isBranchless && <div className="space-y-8">
                         <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">
                             {isBranchless ? "Client Location & Capacity (Default Branch)" : "Add Client's New Branch"}
                         </h2>
@@ -769,54 +779,57 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                             </div>
                         </div>
 
-                        {/* Operations Manager */}
-                        <div>
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 pb-1 border-b border-[var(--border)]">Operations Manager&apos;s Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Operations Manager & Supervisor — branchful only; branchless assigns at client level */}
+                        {!isBranchless && (
+                            <>
                                 <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                        Manager <span className="text-red-500">*</span>
-                                    </label>
-                                    <SearchSelect
-                                        name="_branchOpsManagerSelect"
-                                        options={branchManagerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                        placeholder={branchRegionId ? "— Select Manager —" : "— Select Region First —"}
-                                        onChange={(val) => setBranchOperationsManagerId(val)}
-                                    />
+                                    <h3 className="text-sm font-semibold text-[var(--text)] mb-3 pb-1 border-b border-[var(--border)]">Operations Manager&apos;s Information</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                                Manager <span className="text-red-500">*</span>
+                                            </label>
+                                            <SearchSelect
+                                                name="_branchOpsManagerSelect"
+                                                options={branchManagerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                                placeholder={branchRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                                onChange={(val) => setBranchOperationsManagerId(val)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                                Manager Contact Number
+                                            </label>
+                                            <input type="tel" name="branchOperationsManagerContact" placeholder="0300-1234567" className="ui-input" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                        Manager Contact Number <span className="text-red-500">*</span>
-                                    </label>
-                                    <input type="tel" name="branchOperationsManagerContact" placeholder="0300-1234567" className="ui-input" />
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Supervisor's Information */}
-                        <div>
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 pb-1 border-b border-[var(--border)]">Supervisor&apos;s Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                        Supervisor <span className="text-red-500">*</span>
-                                    </label>
-                                    <SearchSelect
-                                        name="branchAssignedSupervisorId"
-                                        options={branchSupervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                        placeholder={branchRegionId ? "— Select Supervisor —" : "— Select Region First —"}
-                                    />
+                                    <h3 className="text-sm font-semibold text-[var(--text)] mb-3 pb-1 border-b border-[var(--border)]">Supervisor&apos;s Information</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                                Supervisor <span className="text-red-500">*</span>
+                                            </label>
+                                            <SearchSelect
+                                                name="branchAssignedSupervisorId"
+                                                options={branchSupervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                                placeholder={branchRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-[var(--text-muted)] mb-1">
+                                                Supervisor Contact Number
+                                            </label>
+                                            <input type="tel" name="branchSupervisorContact" placeholder="0300-1234567" className="ui-input" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                        Supervisor Contact Number <span className="text-red-500">*</span>
-                                    </label>
-                                    <input type="tel" name="branchSupervisorContact" placeholder="0300-1234567" className="ui-input" />
-                                </div>
-                            </div>
-                        </div>
+                            </>
+                        )}
 
-                    </div>
+                    </div>}
 
                     {/* ── Contract (unified for both modes) ── */}
                     <div>

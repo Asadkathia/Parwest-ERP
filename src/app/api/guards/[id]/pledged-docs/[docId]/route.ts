@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -11,6 +12,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id, docId } = await context.params
 
@@ -39,9 +41,7 @@ export async function PATCH(
         },
       })
 
-      await (prisma.guardPledgedDocumentHistory as unknown as {
-        create: (args: { data: Record<string, unknown> }) => Promise<unknown>
-      }).create({
+      await prisma.guardPledgedDocumentHistory.create({
         data: {
           recordId: docId,
           guardId: id,
@@ -63,9 +63,7 @@ export async function PATCH(
 
       // Archive the old file in history before replacing
       if (existing.attachmentData || existing.attachmentName) {
-        await (prisma.guardPledgedDocumentHistory as unknown as {
-          create: (args: { data: Record<string, unknown> }) => Promise<unknown>
-        }).create({
+        await prisma.guardPledgedDocumentHistory.create({
           data: {
             recordId: docId,
             guardId: id,
@@ -123,9 +121,7 @@ export async function PATCH(
       },
     })
 
-    await (prisma.guardPledgedDocumentHistory as unknown as {
-      create: (args: { data: Record<string, unknown> }) => Promise<unknown>
-    }).create({
+    await prisma.guardPledgedDocumentHistory.create({
       data: {
         recordId: docId,
         guardId: id,
@@ -155,6 +151,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id, docId } = await context.params
 

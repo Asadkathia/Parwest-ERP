@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PUT(
     request: NextRequest,
@@ -14,6 +15,7 @@ export async function PUT(
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params

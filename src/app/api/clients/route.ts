@@ -237,11 +237,20 @@ export async function POST(request: NextRequest) {
             include: { branches: true },
         })
 
-        // Create supervisor assignment if provided
+        // Create client-level supervisor assignment
         const supervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
         if (supervisorId) {
             await prisma.clientSupervisorAssignment.create({
                 data: { clientId: client.id, supervisorId },
+            }).catch(() => { /* ignore if user not found */ })
+        }
+
+        // Create branch-level supervisor assignment
+        const branchSupervisorId = body.branchAssignedSupervisorId ? String(body.branchAssignedSupervisorId).trim() : ""
+        const createdBranchId = client.branches?.[0]?.id
+        if (branchSupervisorId && createdBranchId) {
+            await prisma.clientSupervisorAssignment.create({
+                data: { clientId: client.id, branchId: createdBranchId, supervisorId: branchSupervisorId },
             }).catch(() => { /* ignore if user not found */ })
         }
 

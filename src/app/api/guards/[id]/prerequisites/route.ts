@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 // GET /api/guards/[id]/prerequisites
 // Returns all doc types with the guard's prerequisite record (if any) merged in
@@ -12,6 +13,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId } = await params
 
@@ -71,6 +73,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId } = await params
     const body = await request.json()
@@ -92,9 +95,7 @@ export async function POST(
     })
 
     if (existing && (existing.attachmentData || existing.documentUrl)) {
-      await (prisma.guardPrerequisiteHistory as unknown as {
-        create: (args: { data: Record<string, unknown> }) => Promise<unknown>
-      }).create({
+      await prisma.guardPrerequisiteHistory.create({
         data: {
           prereqId: existing.id,
           attachmentData: existing.attachmentData,
@@ -108,7 +109,7 @@ export async function POST(
 
     const now = new Date()
     // Upsert: create or update the prerequisite record for this doc type
-    const prereq = await (prisma.guardPrerequisite.upsert as unknown as (args: Record<string, unknown>) => Promise<unknown>)({
+    const prereq = await prisma.guardPrerequisite.upsert({
       where: { guardId_docTypeName: { guardId, docTypeName } },
       create: {
         guardId,

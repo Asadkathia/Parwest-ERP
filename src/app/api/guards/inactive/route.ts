@@ -4,7 +4,9 @@ import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockInactiveGuards } from "@/lib/mockData/guards"
-import { internalServerError, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
+import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
 export async function GET() {
     try {
@@ -12,13 +14,17 @@ export async function GET() {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+
+        const managerScope = deriveManagerScope(session)
 
         if (isRuntimeMockEnabled()) {
             return NextResponse.json(mockInactiveGuards)
         }
 
+        const scopeWhere = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
         const guards = await prisma.guard.findMany({
-            where: { status: "INACTIVE" },
+            where: { status: "INACTIVE", ...scopeWhere },
             orderBy: { updatedAt: "desc" },
             select: {
                 id: true,

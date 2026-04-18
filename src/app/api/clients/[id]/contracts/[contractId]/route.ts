@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function PATCH(
     request: NextRequest,
@@ -11,6 +12,19 @@ export async function PATCH(
         const session = await auth()
         if (!session) return unauthorized()
         const { id: clientId, contractId } = await params
+
+        const managerScope = deriveManagerScope(session)
+        if (managerScope) {
+            const client = await prisma.client.findUnique({
+                where: { id: clientId },
+                select: { regionId: true, regionalOfficeId: true },
+            })
+            if (!client) return notFound("Client not found.")
+            if (managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
+                return forbidden("Access denied.")
+            }
+        }
+
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
 

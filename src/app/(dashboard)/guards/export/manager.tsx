@@ -7,36 +7,12 @@ import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
-const LEGACY_STATUS_OPTIONS = ["present", "absent", "on-training", "default", "resigned", "Inactive", "Long Leave", "Pending"]
-const LEGACY_EX_SERVICE_OPTIONS = ["other", "mujahid", "rangers", "police", "army"]
-const LEGACY_SUPERVISOR_OPTIONS = [
-  "ABDUL FATEH Khi Zone I",
-  "ahtisham",
-  "Akhtar Mehmood FSD",
-  "Akhter Ali",
-  "ALI MADAD KHI Z III",
-  "ALLAH YAR KHI Z III",
-  "Altaf Hussain LHR",
-  "Arshad Mehmood ICT",
-  "AYUB HUSSAIN KHI Z II",
-  "AZHAR ALI KHI Z II",
-  "Bilal Ahmad",
-  "FAREED Ahmad fsld",
-  "Fazal Ahmad",
-  "Fazal Mehdi",
-  "grw M Arshad",
-  "Hafeezullah gwa",
-  "Haider Ali",
-  "Ijaz Ahmad MT",
-  "IKHLAQ HUSSAIN KHI IS Z II",
-  "Imtiaz Hussain",
-  "Irshad Ullah",
-  "Ishaq Ahmed",
-  "Javeed Akhter",
-]
-const LEGACY_VERIFICATION_STATUS_OPTIONS = ["Pending", "Verified", "Rejected", "In Process"]
+const STATUS_OPTIONS = ["ACTIVE", "PENDING", "INACTIVE", "TERMINATED", "BLACKLISTED", "PRESENT", "ABSENT", "DEFAULT"]
+const EX_SERVICE_OPTIONS = ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER", "CIVILIAN"]
+const VERIFICATION_STATUS_OPTIONS = ["PENDING", "VERIFIED", "REJECTED", "IN_PROCESS"]
 
 type RegionalOffice = { id: string; name: string; region: { id: string; name: string } }
+type Supervisor = { id: string; name: string | null }
 
 export default function ExportGuardsManager() {
   const [parwestId, setParwestId] = useState("")
@@ -44,20 +20,66 @@ export default function ExportGuardsManager() {
   const [cnic, setCnic] = useState("")
   const [status, setStatus] = useState("")
   const [exService, setExService] = useState("")
-  const [supervisor, setSupervisor] = useState("")
+  const [supervisorId, setSupervisorId] = useState("")
   const [verificationStatus, setVerificationStatus] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [regionalOfficeId, setRegionalOfficeId] = useState("")
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([])
   const [notice, setNotice] = useState("")
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetch("/api/regional-offices")
       .then((r) => r.ok ? r.json() : [])
       .then((data: RegionalOffice[]) => setRegionalOffices(data))
       .catch(() => {})
+    fetch("/api/users?take=200")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: { users?: Supervisor[]; items?: Supervisor[] } | Supervisor[]) => {
+        const list = Array.isArray(data) ? data : (data.users ?? data.items ?? [])
+        setSupervisors(list.filter((u) => u.name))
+      })
+      .catch(() => {})
   }, [])
+
+  const buildParams = () => {
+    const params = new URLSearchParams()
+    if (parwestId) params.set("parwestId", parwestId)
+    if (name) params.set("name", name)
+    if (cnic) params.set("cnic", cnic)
+    if (status) params.set("status", status)
+    if (exService) params.set("exService", exService)
+    if (supervisorId) params.set("supervisorId", supervisorId)
+    if (verificationStatus) params.set("verificationStatus", verificationStatus)
+    if (dateFrom) params.set("dateFrom", dateFrom)
+    if (dateTo) params.set("dateTo", dateTo)
+    if (regionalOfficeId) params.set("regionalOfficeId", regionalOfficeId)
+    return params.toString()
+  }
+
+  const handleExport = async () => {
+    try {
+      setExporting(true)
+      setNotice("")
+      const qs = buildParams()
+      const res = await fetch(`/api/guards/export${qs ? `?${qs}` : ""}`)
+      if (!res.ok) throw new Error("Export failed")
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `guards-export-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      setNotice("Export downloaded successfully.")
+    } catch {
+      setNotice("Export failed. Please try again.")
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const clearFilter = () => {
     setParwestId("")
@@ -65,7 +87,7 @@ export default function ExportGuardsManager() {
     setCnic("")
     setStatus("")
     setExService("")
-    setSupervisor("")
+    setSupervisorId("")
     setVerificationStatus("")
     setDateFrom("")
     setDateTo("")
@@ -89,7 +111,7 @@ export default function ExportGuardsManager() {
             placeholder="--Select Status--"
             value={status}
             onChange={setStatus}
-            options={LEGACY_STATUS_OPTIONS}
+            options={STATUS_OPTIONS}
           />
           <SelectField
             label="Ex Service"
@@ -97,16 +119,19 @@ export default function ExportGuardsManager() {
             placeholder="--Select Ex Service--"
             value={exService}
             onChange={setExService}
-            options={LEGACY_EX_SERVICE_OPTIONS}
+            options={EX_SERVICE_OPTIONS}
           />
-          <SelectField
-            label="Supervisor"
-            name="supervisor_id"
-            placeholder="--Select Supervisor--"
-            value={supervisor}
-            onChange={setSupervisor}
-            options={LEGACY_SUPERVISOR_OPTIONS}
-          />
+
+          {/* Supervisor — fetched from DB */}
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Supervisor</label>
+            <select name="supervisor_id" value={supervisorId} onChange={(e) => setSupervisorId(e.target.value)} className="ui-select">
+              <option value="">--Select Supervisor--</option>
+              {supervisors.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
 
           <SelectField
             label="Verification Status"
@@ -114,7 +139,7 @@ export default function ExportGuardsManager() {
             placeholder="--Select Verification Status--"
             value={verificationStatus}
             onChange={setVerificationStatus}
-            options={LEGACY_VERIFICATION_STATUS_OPTIONS}
+            options={VERIFICATION_STATUS_OPTIONS}
           />
 
           {/* Regional Office */}
@@ -163,47 +188,13 @@ export default function ExportGuardsManager() {
             <X className="h-4 w-4" />
             Clear Filter
           </ActionButton>
-          <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+          <ActionButton variant="secondary" onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
             Submit
           </ActionButton>
-          <ActionButton className="inline-flex items-center gap-2">
+          <ActionButton onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Export to Excel
+            {exporting ? "Exporting..." : "Export to CSV"}
           </ActionButton>
-        </div>
-
-        <div className="hidden" aria-hidden="true">
-          <select name="legacy_export_status_options">
-            <option>--Select Status--</option>
-            <option>present</option>
-            <option>absent</option>
-            <option>on-training</option>
-            <option>default</option>
-            <option>resigned</option>
-            <option>Inactive</option>
-            <option>Long Leave</option>
-            <option>Pending</option>
-          </select>
-          <select name="legacy_export_ex_service_options">
-            <option>--Select Ex Service--</option>
-            <option>other</option>
-            <option>mujahid</option>
-            <option>rangers</option>
-            <option>police</option>
-            <option>army</option>
-          </select>
-          <select name="legacy_export_supervisor_options">
-            <option>--Select Supervisor--</option>
-            <option>ABDUL FATEH Khi Zone I</option>
-            <option>ahtisham</option>
-            <option>Akhtar Mehmood FSD</option>
-            <option>Akhter Ali</option>
-            <option>ALI MADAD KHI Z III</option>
-            <option>ALLAH YAR KHI Z III</option>
-            <option>Altaf Hussain LHR</option>
-            <option>Arshad Mehmood ICT</option>
-            <option>AYUB HUSSAIN KHI Z II</option>
-          </select>
         </div>
       </FilterBar>
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { forbidden } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,8 +22,13 @@ function parseJson<T>(s: string | null | undefined): T[] {
     try { return JSON.parse(s) as T[] } catch { return [] }
 }
 
+function escHtml(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+}
+
 function v(val: string | null | undefined, fallback = "—"): string {
-    return val && val.trim() ? val.trim() : fallback
+    const s = val && val.trim() ? val.trim() : fallback
+    return escHtml(s)
 }
 
 const LOGO = "/pps_logo.png"
@@ -155,7 +162,7 @@ function generateFormA(g: Record<string, unknown>, baseUrl: string): string {
         : `<div style="width:100%;height:135px;display:flex;align-items:center;justify-content:center;font-size:55px;color:#aaa;">&#10005;</div>`
 
     return `<!doctype html><html><head><meta charset="utf-8">
-<title>Form A – ${v(g.parwestId as string)}</title>
+<title>Form A – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:#fff;font-family:Arial,Helvetica,sans-serif;padding:8px 10px;}
@@ -234,7 +241,7 @@ ${printBtn()}
           <td style="${LBx}width:14%;">Date Of Birth</td>
           <td style="${VLx}width:18%;">${fmtDate(g.dateOfBirth as string, "short")}</td>
           <td style="${LBx}width:8%;">Age</td>
-          <td style="${VLx}width:14%;">${g.age ? `${g.age} Years` : "—"}</td>
+          <td style="${VLx}width:14%;">${g.age ? `${escHtml(String(g.age))} Years` : "—"}</td>
           <td style="${LBx}width:11%;">Contact #</td>
           <td style="${VLx}">${v(g.phone as string)}</td>
         </tr>
@@ -301,7 +308,7 @@ ${printBtn()}
     <td style="${LBx}width:23%;">Contact No (Permanent)</td>
     <td style="${VLx}">${v(g.permanentAddressContact as string)}</td>
     <td style="${LBx}width:8%;">Salary</td>
-    <td style="${VLx}width:8%;">${g.salary ? String(g.salary) : "—"}</td>
+    <td style="${VLx}width:8%;">${g.salary ? escHtml(String(g.salary)) : "—"}</td>
   </tr>
 </table>
 
@@ -417,7 +424,7 @@ function generateFormB(g: Record<string, unknown>, baseUrl: string): string {
     const tdStyle = `font-size:12px;padding:4px 6px;${border}`
     const td2Style = `font-size:12px;font-weight:600;padding:4px 6px;${border}`
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Form B – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Form B – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:16px;}
@@ -461,7 +468,7 @@ ${printBtn()}
   </tr>
   <tr>
     <td style="${thStyle}">Age</td>
-    <td style="${td2Style}">${v(String(g.age ?? ""), "—")} Years</td>
+    <td style="${td2Style}">${escHtml(String(g.age ?? "") || "—")} Years</td>
   </tr>
   <tr>
     <td style="${thStyle}">Designation</td>
@@ -491,7 +498,7 @@ ${printBtn()}
     <td style="${thStyle}">Service Period</td>
     <td style="${td2Style}">${v(g.exServicePeriod as string)}</td>
     <td style="${thStyle}">Years / Months</td>
-    <td style="${td2Style}">${g.exServiceYears ?? "—"} Yrs / ${g.exServiceMonths ?? "—"} Mos</td>
+    <td style="${td2Style}">${escHtml(String(g.exServiceYears ?? "—"))} Yrs / ${escHtml(String(g.exServiceMonths ?? "—"))} Mos</td>
   </tr>
   <tr>
     <td style="${thStyle}">Date of Enrollment</td>
@@ -541,7 +548,7 @@ function generateEmployeeCard(g: Record<string, unknown>, baseUrl: string): stri
     const cnic = v(g.cnic as string, "")
     const digits = cnic.replace(/-/g, "")
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Employee Card – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Employee Card – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{display:flex;justify-content:center;align-items:center;min-height:100vh;background:#e5e7eb;padding:20px;}
@@ -597,7 +604,7 @@ ${printBtn()}
       <p style="margin:0;">176, Street #4, Cavalry Ground, Lahore Cantt - Pakistan</p>
       <p style="margin:4px 0 0;">Tel: +92 (042) 36655166 &nbsp; E-mail: parwest@gmail.com</p>
     </div>
-    <div class="back-field"><label>Age</label><div class="val">${g.age ? `${g.age} Years` : "—"}</div></div>
+    <div class="back-field"><label>Age</label><div class="val">${g.age ? `${escHtml(String(g.age))} Years` : "—"}</div></div>
     <div class="back-field"><label>Blood Group</label><div class="val">${v(g.bloodGroup as string)}</div></div>
     <div class="back-field"><label>Permanent Address</label><div class="val">${v(g.addressPermanent as string)}</div></div>
     <div class="back-field"><label>Mark of Identification</label><div class="val">${v(g.identificationMark as string)}</div></div>
@@ -646,7 +653,7 @@ function generatePersonalVerification(g: Record<string, unknown>, _baseUrl: stri
         </td>
       </tr>`).join("") : `<tr><td colspan="2" style="border:1px solid #000;padding:12px;text-align:center;color:#999;">No relatives recorded</td></tr>`
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Personal Verification – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Personal Verification – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:20px;max-width:900px;margin:0 auto;}
@@ -692,7 +699,7 @@ ${printBtn()}
 // ─── Training Certificate ─────────────────────────────────────────────────────
 
 function generateTrainingCertificate(g: Record<string, unknown>, _baseUrl: string): string {
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Training Certificate – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Training Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:20px;max-width:900px;margin:0 auto;}
@@ -763,7 +770,7 @@ ${printBtn()}
 // ─── Character Certificate ────────────────────────────────────────────────────
 
 function generateCharacterCertificate(g: Record<string, unknown>, baseUrl: string): string {
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Character Certificate – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Character Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:30px;max-width:800px;margin:0 auto;}
@@ -846,7 +853,7 @@ function generateChecklist(g: Record<string, unknown>, baseUrl: string): string 
         <td style="border:0.5px solid #000;padding:5px 8px;font-size:12px;">&nbsp;</td>
       </tr>`).join("")
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Guard Documents Checklist – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Guard Documents Checklist – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:20px;max-width:900px;margin:0 auto;}
@@ -900,7 +907,7 @@ ${printBtn()}
 // ─── Medical Certificate ──────────────────────────────────────────────────────
 
 function generateMedicalCertificate(g: Record<string, unknown>, baseUrl: string): string {
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Medical Certificate – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Medical Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:30px;max-width:800px;margin:0 auto;}
@@ -964,7 +971,7 @@ ${printBtn()}
 // ─── Guard Antecedents Verification ──────────────────────────────────────────
 
 function generateAntecedents(g: Record<string, unknown>, baseUrl: string): string {
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Guard Antecedents Verification – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Guard Antecedents Verification – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:30px;max-width:800px;margin:0 auto;}
@@ -1047,7 +1054,7 @@ ${printBtn()}
 // ─── Iqrar Nama ───────────────────────────────────────────────────────────────
 
 function generateIqrarNama(g: Record<string, unknown>, _baseUrl: string): string {
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Iqrar Nama – ${g.parwestId}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Iqrar Nama – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:20px;max-width:900px;margin:0 auto;}
@@ -1090,6 +1097,7 @@ export async function GET(
 ) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id, docType } = await params
     const generator = DOC_GENERATORS[docType]

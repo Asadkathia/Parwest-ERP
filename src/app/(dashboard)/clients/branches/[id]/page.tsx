@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -28,6 +29,11 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
   })
 
   if (!branch) notFound()
+
+  const managerScope = deriveManagerScope(session)
+  if (managerScope && managerScopeDenied(managerScope, { regionId: branch.client?.regionId ?? null })) {
+    notFound()
+  }
 
   const formatDate = (date: Date | null) => {
     if (!date) return "—"

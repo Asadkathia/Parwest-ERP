@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
-import { internalServerError, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
         const { searchParams } = new URL(request.url)

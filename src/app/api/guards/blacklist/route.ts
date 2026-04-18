@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const { searchParams } = new URL(request.url)
         const cnicQuery = sanitizeCnic(searchParams.get("cnic") || "")
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const body = await request.json()
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
@@ -163,6 +166,7 @@ export async function DELETE(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const body = await request.json().catch(() => ({}))
         const id = typeof body.id === "string" ? body.id.trim() : ""
@@ -190,11 +194,23 @@ export async function DELETE(request: NextRequest) {
             },
         })
 
+        // Look up the pre-blacklist status from status history
+        let restoreStatus = "PENDING"
+        if (guardSnapDel?.id) {
+            const blacklistHistory = await prisma.guardStatusHistory.findFirst({
+                where: { guardId: guardSnapDel.id, changedByType: "BLACKLIST" },
+                orderBy: { createdAt: "desc" },
+                select: { fromStatus: true },
+            })
+            if (blacklistHistory?.fromStatus) {
+                restoreStatus = blacklistHistory.fromStatus
+            }
+        }
+
         await prisma.blacklistedCnic.delete({ where: { id: record.id } })
-        // Restore to DEFAULT (ready for redeployment) when un-blacklisted
         await prisma.guard.updateMany({
             where: { cnic: record.cnic, status: "TERMINATED" },
-            data: { status: "DEFAULT" },
+            data: { status: restoreStatus },
         })
 
         void recordGuardServiceEvent({
@@ -204,8 +220,8 @@ export async function DELETE(request: NextRequest) {
             guardName: guardSnapDel?.name ?? null,
             event: "UNBLACKLISTED",
             fromStatus: "TERMINATED",
-            toStatus: "DEFAULT",
-            description: "Removed from blacklist — restored to DEFAULT",
+            toStatus: restoreStatus,
+            description: `Removed from blacklist — restored to ${restoreStatus}`,
             changedByName: session.user?.name ?? session.user?.email ?? null,
             regionName: guardSnapDel?.region?.name ?? null,
             officeName: guardSnapDel?.regionalOffice?.name ?? null,
@@ -218,7 +234,7 @@ export async function DELETE(request: NextRequest) {
                 parwestId: guardSnapDel.parwestId,
                 guardName: guardSnapDel.name,
                 fromStatus: "TERMINATED",
-                toStatus: "DEFAULT",
+                toStatus: restoreStatus,
                 reason: "Removed from blacklist",
                 changedByName: session.user?.name ?? session.user?.email ?? null,
                 changedByType: "BLACKLIST",

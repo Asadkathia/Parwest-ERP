@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const MAX_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB base64 limit
 
@@ -12,6 +13,7 @@ export async function POST(
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const { id } = await params
         const body = await request.json()

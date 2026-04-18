@@ -76,10 +76,10 @@ export default async function GuardsPage({
           },
         },
       }),
-      prisma.guard.count(),
-      prisma.guard.count({ where: { status: "ACTIVE" } }),
-      prisma.guard.count({ where: { status: "PENDING" } }),
-      prisma.guard.count({ where: { status: "INACTIVE" } }),
+      prisma.guard.count({ where: scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {} }),
+      prisma.guard.count({ where: { status: "ACTIVE", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
+      prisma.guard.count({ where: { status: "PENDING", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
+      prisma.guard.count({ where: { status: "INACTIVE", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
       prisma.regionalOffice.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ])
 

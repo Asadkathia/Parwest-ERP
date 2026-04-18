@@ -234,10 +234,12 @@ export async function POST(request: NextRequest) {
     const existingByGuard = new Map(existingRows.map((row) => [row.guardId, row]))
     const rows = []
     let finalizedCount = 0
+    const zeroSalaryGuardIds: string[] = []
 
     for (const currentGuardId of guardIds) {
       const existing = existingByGuard.get(currentGuardId)
       const baseSalary = Number((deploymentAgg[currentGuardId]?.baseSalary || 0).toFixed(2))
+      if (baseSalary === 0) zeroSalaryGuardIds.push(currentGuardId)
       const deploymentDays = deploymentAgg[currentGuardId]?.days.size || 0
       const loans = Number((loanByGuard[currentGuardId] || 0).toFixed(2))
       const extraHoursAmount = Number(existing?.extraHoursAmount || 0)
@@ -313,12 +315,27 @@ export async function POST(request: NextRequest) {
       rows.push(saved)
     }
 
+    let warnings: { guardId: string; name: string; parwestId: string | null; guardSalary: number | null }[] = []
+    if (zeroSalaryGuardIds.length > 0) {
+      const zeroGuards = await prisma.guard.findMany({
+        where: { id: { in: zeroSalaryGuardIds } },
+        select: { id: true, name: true, parwestId: true, salary: true },
+      })
+      warnings = zeroGuards.map((g) => ({
+        guardId: g.id,
+        name: g.name,
+        parwestId: g.parwestId,
+        guardSalary: g.salary,
+      }))
+    }
+
     return NextResponse.json(
       {
         calculated: rows.length,
         finalized: finalizedCount,
         month: month.start.toISOString(),
         rows,
+        ...(warnings.length > 0 ? { warnings } : {}),
       },
       { status: 200 }
     )

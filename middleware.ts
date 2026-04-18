@@ -24,6 +24,7 @@ const MODULE_ROUTES: [string, string][] = [
     ["/imports", "IMPORTS"],
     ["/requisitions", "REQUISITIONS"],
     ["/audit", "AUDIT"],
+    ["/admin-approvals", "ADMIN_APPROVALS"],
 ]
 
 export async function middleware(req: NextRequest) {
@@ -77,9 +78,10 @@ export const config = {
         "/tickets/:path*",
         "/settings/:path*",
         "/reports/:path*",
-        "/imports",
-        "/requisitions",
-        "/audit",
+        "/imports/:path*",
+        "/requisitions/:path*",
+        "/audit/:path*",
+        "/admin-approvals/:path*",
         "/dashboard/:path*",
     ],
 }

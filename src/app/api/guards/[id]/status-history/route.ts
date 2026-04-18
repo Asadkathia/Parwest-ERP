@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET(
     _request: NextRequest,
@@ -10,6 +11,7 @@ export async function GET(
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
         const { id } = await params
 
