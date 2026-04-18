@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
                     take: 1,
                     select: { supervisor: { select: { name: true } } },
                 },
-                verification: { select: { status: true } },
+                ageApprovalStatus: true,
             },
         })
 
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
                 g.regionalOffice?.name || "",
                 g.region?.name || "",
                 g.supervisorAssignments[0]?.supervisor?.name || "",
-                g.verification?.status || "",
+                g.ageApprovalStatus || "",
                 new Date(g.createdAt).toLocaleDateString("en-US"),
             ]
             csvRows.push(cells.map(csvEscape).join(","))
