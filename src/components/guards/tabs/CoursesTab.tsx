@@ -59,6 +59,7 @@ export default function CoursesTab({ guardId }: CoursesTabProps) {
       .catch(() => { setRecords([]); setLoading(false) })
   }, [guardId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId via callback
   useEffect(() => { fetchCourses() }, [fetchCourses])
 
   function openModal() {

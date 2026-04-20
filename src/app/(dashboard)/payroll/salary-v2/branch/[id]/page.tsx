@@ -44,6 +44,7 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
   const [typeFilter, setTypeFilter] = useState("")
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch keyed by route/month params
     setLoading(true)
     fetch(`/api/payroll/salary-v2/branch/${branchId}?month=${monthParam}-01`)
       .then((r) => (r.ok ? r.json() : null))

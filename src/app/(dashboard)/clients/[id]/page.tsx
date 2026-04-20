@@ -48,12 +48,6 @@ function formatDate(date: Date | null | undefined) {
   })
 }
 
-function getZipCode(address: string | null | undefined) {
-  if (!address) return "—"
-  const match = address.match(/\b\d{5}\b/)
-  return match ? match[0] : "—"
-}
-
 function normalizeShift(shift: string | null | undefined) {
   const value = (shift || "").toUpperCase()
   if (value === "DAY" || value === "NIGHT" || value === "BOTH") return value
@@ -93,8 +87,6 @@ export default async function ClientDetailPage({
     branch?: string
     startDate?: string
     endDate?: string
-    supervisor?: string
-    manager?: string
     guardStatus?: string
   }>
 }) {
@@ -111,8 +103,6 @@ export default async function ClientDetailPage({
     branch = "",
     startDate = "",
     endDate = "",
-    supervisor = "",
-    manager = "",
     guardStatus = "All",
   } = await searchParams
   const activeTab: TabKey = isTab(tabParam) ? tabParam : "general-information"
@@ -179,25 +169,6 @@ export default async function ClientDetailPage({
 
   const normalizedSearch = listSearch.trim().toLowerCase()
   const normalizedBranch = branch.trim().toLowerCase()
-  const normalizedSupervisor = supervisor.trim().toLowerCase()
-  const normalizedManager = manager.trim().toLowerCase()
-
-  const filteredAssignedRows = activeDeploymentRows
-    .filter(({ deployment, branch: deploymentBranch }) => {
-      const guardName = deployment.guard?.name?.toLowerCase() || ""
-      const guardParwest = deployment.guard?.parwestId?.toLowerCase() || ""
-      const branchName = deploymentBranch.name?.toLowerCase() || ""
-      const branchContact = deploymentBranch.contactPerson?.toLowerCase() || ""
-      const branchManagerValue = deploymentBranch.contactPerson?.toLowerCase() || ""
-
-      if (normalizedSearch && !guardName.includes(normalizedSearch) && !guardParwest.includes(normalizedSearch) && !branchName.includes(normalizedSearch)) return false
-      if (normalizedBranch && !branchName.includes(normalizedBranch)) return false
-      if (normalizedSupervisor && !branchContact.includes(normalizedSupervisor) && !guardName.includes(normalizedSupervisor)) return false
-      if (normalizedManager && !branchManagerValue.includes(normalizedManager)) return false
-      if (selectDate && toIsoDate(deployment.deploymentDate) !== selectDate) return false
-      return true
-    })
-    .slice(0, showCount)
 
   const filteredExtraRows = extraDeploymentRows
     .filter(({ deployment, branch: deploymentBranch }) => {
@@ -243,16 +214,6 @@ export default async function ClientDetailPage({
     })
     .slice(0, showCount)
 
-  const filteredPricingConfigs = client.pricingConfigs
-    .filter((pricingRow) => {
-      const type = pricingRow.guardType?.toLowerCase() || ""
-      const rate = String(pricingRow.rate)
-      if (normalizedSearch && !type.includes(normalizedSearch) && !rate.includes(normalizedSearch)) return false
-      if (selectDate && toIsoDate(pricingRow.updatedAt) !== selectDate) return false
-      return true
-    })
-    .slice(0, showCount)
-
   const uniqueDayGuardIds = new Set(
     activeDeploymentRows
       .filter((row) => {
@@ -282,9 +243,6 @@ export default async function ClientDetailPage({
   const guardLessBranches = client.branches.filter(
     (branch) => !(branch.deployments || []).some((deployment) => deployment.status === "ACTIVE")
   ).length
-
-  const headAddress = client.headOfficeAddress || client.branches[0]?.address || "—"
-  const primaryBranch = client.branches[0]
 
   // Build attachment data for the Attachments tab
   type AttachmentItem = { name: string; dataUrl: string }

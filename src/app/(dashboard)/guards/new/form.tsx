@@ -39,17 +39,6 @@ const SECTION_CONFIG: SectionConfig[] = [
   { id: "nearestRelative", label: "ADD NEAREST RELATIVE DETAIL" },
 ]
 
-const LEGACY_GUARD_TYPES = [
-  "Guard",
-  "location supervisor",
-  "cpo",
-  "SO",
-  "ASO",
-  "LSO",
-  "Receptionist",
-  "CCTV Operator",
-  "Complaint Receiver",
-]
 
 const EDUCATION_LEVELS = ["Primary", "Middle", "Matric", "Intermediate", "Graduate", "B.A", "BSc", "M.A", "Msc"]
 const BLOOD_GROUPS = ["O+ve", "A+ve", "B+ve", "AB+ve", "O-ve", "A-ve", "B-ve", "AB-ve"]
@@ -1033,6 +1022,7 @@ function SupervisorSelector({ regionalOfficeId }: { regionalOfficeId: string }) 
 
   // Reset and refetch when regional office changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent async-loaded fields when RO changes
     setSelected(null)
     setQuery("")
     setUsers([])

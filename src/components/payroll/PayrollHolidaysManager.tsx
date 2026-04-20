@@ -52,6 +52,7 @@ export default function PayrollHolidaysManager() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time data fetch populates holidays + regional offices
     load()
     fetch("/api/regional-offices")
       .then((r) => (r.ok ? r.json() : []))

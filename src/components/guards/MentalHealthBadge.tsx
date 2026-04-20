@@ -20,8 +20,11 @@ export default function MentalHealthBadge({ guardId }: MentalHealthBadgeProps) {
   const [expiry, setExpiry] = useState<string | null>(null)
   const [expiryRaw, setExpiryRaw] = useState<Date | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  // Capture `now` once per load cycle so render stays pure (no `Date.now()` during render).
+  const [now, setNow] = useState<number>(() => Date.now())
 
   const load = useCallback(() => {
+    setNow(Date.now())
     fetch(`/api/guards/${guardId}/prerequisites`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Array<Record<string, unknown>>) => {
@@ -51,6 +54,7 @@ export default function MentalHealthBadge({ guardId }: MentalHealthBadgeProps) {
       .catch(() => setStatus("not_uploaded"))
   }, [guardId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount/prop-driven fetch of prerequisites for the badge
   useEffect(() => { load() }, [load])
 
   const config: Record<Status, {
@@ -93,7 +97,7 @@ export default function MentalHealthBadge({ guardId }: MentalHealthBadgeProps) {
   const { Icon, color, bg, border, label } = config[status]
 
   const daysUntilExpiry = expiryRaw
-    ? Math.ceil((expiryRaw.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    ? Math.ceil((expiryRaw.getTime() - now) / (1000 * 60 * 60 * 24))
     : null
 
   return (

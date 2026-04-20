@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
   const take = Math.min(Number(searchParams.get("take") ?? "100") || 100, 500)
 
   try {
-    const where: any = {
+    const where: Prisma.StoreInventoryPurchaseWhereInput = {
       storeId,
       status: status ? (status as StoreInventoryPurchaseStatus) : undefined,
       ...(categoryScope === "WEAPON"
@@ -166,14 +166,14 @@ export async function GET(request: NextRequest) {
           },
           orderBy: { createdAt: "desc" },
           take,
-        } as any)
+        } as Prisma.StoreInventoryPurchaseFindManyArgs)
       } else {
         throw error
       }
     }
 
-    const normalizedRows = rows.map((row: any) => {
-      const decoded = parsePurchaseNotes(row.notes)
+    const normalizedRows = (rows as Array<Record<string, unknown>>).map((row) => {
+      const decoded = parsePurchaseNotes(row.notes as string | null | undefined)
       return {
         ...row,
         notes: decoded.note,
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      const baseData: any = {
+      const baseData: Prisma.StoreInventoryPurchaseUncheckedCreateInput = {
         referenceNo: asText(body.referenceNo),
         invoiceNo: asText(body.invoiceNo ?? body.invoiceNumber),
         attachmentUrl: asText(body.attachmentUrl),
@@ -275,12 +275,13 @@ export async function POST(request: NextRequest) {
           })),
         },
       }
-      let createdPurchase: any
+      type CreatedPurchase = Prisma.StoreInventoryPurchaseGetPayload<{ include: typeof purchaseInclude }>
+      let createdPurchase: CreatedPurchase
       try {
-        createdPurchase = await tx.storeInventoryPurchase.create({
+        createdPurchase = (await tx.storeInventoryPurchase.create({
           data: baseData,
-          include: purchaseInclude as any,
-        })
+          include: purchaseInclude as Prisma.StoreInventoryPurchaseInclude,
+        })) as unknown as CreatedPurchase
       } catch (error) {
         const message = error instanceof Error ? error.message : ""
         if (
@@ -290,13 +291,13 @@ export async function POST(request: NextRequest) {
         ) {
           throw error
         }
-        const fallbackData: any = { ...baseData }
+        const fallbackData: Record<string, unknown> = { ...baseData }
         delete fallbackData.vendorId
         delete fallbackData.attachmentUrl
-        createdPurchase = await tx.storeInventoryPurchase.create({
-          data: fallbackData,
-          include: legacyPurchaseInclude as any,
-        })
+        createdPurchase = (await tx.storeInventoryPurchase.create({
+          data: fallbackData as Prisma.StoreInventoryPurchaseUncheckedCreateInput,
+          include: legacyPurchaseInclude as Prisma.StoreInventoryPurchaseInclude,
+        })) as unknown as CreatedPurchase
       }
 
       if (status === StoreInventoryPurchaseStatus.RECEIVED) {

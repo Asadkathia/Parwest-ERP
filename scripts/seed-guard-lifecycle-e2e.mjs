@@ -265,9 +265,9 @@ async function main() {
 
     // Optional permissions for clean admin testing
     const modules = ["GUARDS", "CLIENTS", "INVENTORY", "DEPLOYMENTS", "ATTENDANCE", "REPORTS", "SETTINGS"]
-    for (const module of modules) {
+    for (const moduleName of modules) {
       await tx.userPermission.upsert({
-        where: { userId_module: { userId: adminUser.id, module } },
+        where: { userId_module: { userId: adminUser.id, module: moduleName } },
         update: {
           canCreate: true,
           canView: true,
@@ -277,7 +277,7 @@ async function main() {
         },
         create: {
           userId: adminUser.id,
-          module,
+          module: moduleName,
           canCreate: true,
           canView: true,
           canUpdate: true,

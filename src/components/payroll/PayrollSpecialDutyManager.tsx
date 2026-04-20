@@ -48,6 +48,7 @@ export default function PayrollSpecialDutyManager() {
   }, [search])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
     loadRows()
   }, [loadRows])
 

@@ -157,7 +157,7 @@ export default function AssignmentsManager({
   const [activeClientDeployments, setActiveClientDeployments] = useState<Deployment[]>([])
   const [clientManagerName, setClientManagerName] = useState("")
   const [showPreviousAssignments, setShowPreviousAssignments] = useState(false)
-  const [guardDeployment, setGuardDeployment] = useState<Deployment | null>(null)
+  const [, setGuardDeployment] = useState<Deployment | null>(null)
   const [guardSupervisorName, setGuardSupervisorName] = useState("")
   const [form, setForm] = useState(INITIAL_FORM)
   const [search, setSearch] = useState("")

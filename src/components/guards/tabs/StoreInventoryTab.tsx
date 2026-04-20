@@ -54,6 +54,7 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
 
   useEffect(() => {
     if (!guardId) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId
     setLoading(true)
     setError(null)
     fetch(`/api/guards/${encodeURIComponent(guardId)}/store-inventory`)

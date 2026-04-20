@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Ticket, Send } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -125,7 +126,7 @@ export default function TicketNewManager() {
                 {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {categories.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">No categories configured. <a href="/tickets/prerequisites" className="underline">Add categories →</a></p>
+                <p className="text-xs text-amber-600 mt-1">No categories configured. <Link href="/tickets/prerequisites" className="underline">Add categories →</Link></p>
               )}
             </div>
             <div>

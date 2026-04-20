@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
 type BulkLoanInput = {
   guardId: string

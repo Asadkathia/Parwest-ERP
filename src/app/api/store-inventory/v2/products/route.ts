@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
   const includeBalances = searchParams.get("includeBalances") === "true"
 
   try {
-    const where: any = search
+    const where: Prisma.StoreInventoryProductWhereInput | undefined = search
       ? {
           OR: [
             { name: { contains: search, mode: "insensitive" } },
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
           },
           orderBy: { createdAt: "desc" },
           take: 500,
-        } as any)
+        } as Prisma.StoreInventoryProductFindManyArgs)
       } else {
         throw error
       }
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const baseData: any = {
+    const baseData: Prisma.StoreInventoryProductUncheckedCreateInput = {
       sku,
       name,
       description: asText(body.description),
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
     try {
       created = await prisma.storeInventoryProduct.create({
         data: baseData,
-        include: productInclude as any,
+        include: productInclude as Prisma.StoreInventoryProductInclude,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : ""
@@ -179,12 +180,12 @@ export async function POST(request: NextRequest) {
       ) {
         throw error
       }
-      const fallbackData: any = { ...baseData }
+      const fallbackData: Record<string, unknown> = { ...baseData }
       delete fallbackData.categoryId
       delete fallbackData.imageUrl
       created = await prisma.storeInventoryProduct.create({
-        data: fallbackData,
-        include: legacyProductInclude as any,
+        data: fallbackData as Prisma.StoreInventoryProductUncheckedCreateInput,
+        include: legacyProductInclude as Prisma.StoreInventoryProductInclude,
       })
     }
 

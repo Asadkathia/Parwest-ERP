@@ -68,8 +68,8 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const attachFileRef = useRef<HTMLInputElement>(null)
     const [savedClient, setSavedClient] = useState<{ id: string; name: string; branchCreated: boolean } | null>(null)
     const [clientTypes, setClientTypes] = useState<{ value: string; label: string }[]>([])
-    const [latManual, setLatManual] = useState("")
-    const [lngManual, setLngManual] = useState("")
+    const [, setLatManual] = useState("")
+    const [, setLngManual] = useState("")
 
     // Branch-specific state (branch section in branch-client mode)
     const [branchRegionId, setBranchRegionId] = useState("")

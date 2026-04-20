@@ -69,8 +69,10 @@ export default function ClientInsuranceSettingsPage() {
       .catch(() => setAllRegionalOffices([]))
   }, [])
 
-  // Load clients when form regional office changes
+  // Load clients when form regional office changes — resetting selected client + loading list
+  // are the whole point of this effect (synchronising external fetch with filter change).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent form fields when RO filter changes
     setFormClientId("")
     setFormClients([])
     if (!formRoId) return
@@ -83,6 +85,7 @@ export default function ClientInsuranceSettingsPage() {
 
   // Load clients when filter regional office changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent filter fields on RO change
     setFilterClientId("")
     setFilterClients([])
     if (!filterRoId) return
@@ -104,6 +107,7 @@ export default function ClientInsuranceSettingsPage() {
       .catch(() => { setInsurances([]); setLoading(false) })
   }, [filterRoId, filterClientId, filterStatus])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- kick-off data fetch when filters change
   useEffect(() => { fetchInsurances() }, [fetchInsurances])
 
   async function handleSubmit(e: React.SyntheticEvent) {

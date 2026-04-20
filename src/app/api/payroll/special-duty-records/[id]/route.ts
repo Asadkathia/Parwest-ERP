@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { internalServerError, notFound, unauthorized } from "@/lib/api/response"
 
 export async function PATCH(
   request: NextRequest,

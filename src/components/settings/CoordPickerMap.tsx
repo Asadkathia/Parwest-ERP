@@ -44,6 +44,7 @@ export default function CoordPickerMap({
   const [ready, setReady] = useState(false)
   useEffect(() => {
     fixLeafletIcons()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- defer client-only leaflet init until after hydration
     setReady(true)
   }, [])
 

@@ -10,7 +10,7 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
 
     const { id } = await params
 
-    const [deployment, guards, clients, regionalOffices] = await Promise.all([
+    const [deployment, clients, regionalOffices] = await Promise.all([
         prisma.deployment.findUnique({
             where: { id },
             include: {
@@ -22,16 +22,6 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
                 },
                 branch: true,
                 regionalOffice: true,
-            },
-        }),
-        prisma.guard.findMany({
-            where: { status: "ACTIVE" },
-            orderBy: { name: "asc" },
-            select: {
-                id: true,
-                parwestId: true,
-                name: true,
-                cnic: true,
             },
         }),
         prisma.client.findMany({

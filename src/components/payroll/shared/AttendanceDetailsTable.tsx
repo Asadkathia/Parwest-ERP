@@ -38,6 +38,7 @@ export default function AttendanceDetailsTable({
 
   useEffect(() => {
     if (!guardId || !month) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear rows when deps become invalid
       setRows([])
       return
     }

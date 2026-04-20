@@ -53,6 +53,7 @@ export default function ServiceHistoryTab({ guardId }: ServiceHistoryTabProps) {
 
     useEffect(() => {
         if (!guardId) return
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId
         setLoading(true)
         fetch(`/api/guards/${guardId}/service-history`)
             .then((r) => (r.ok ? r.json() : []))

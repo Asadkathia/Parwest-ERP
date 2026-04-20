@@ -189,6 +189,7 @@ function PayrollDefaultsTab() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time data fetch populates settings state
     load()
     fetch("/api/regional-offices")
       .then((r) => (r.ok ? r.json() : []))

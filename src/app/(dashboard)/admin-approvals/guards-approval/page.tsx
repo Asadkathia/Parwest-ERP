@@ -24,7 +24,7 @@ type AgeApproval = {
 
 export default function GuardsApprovalPage() {
   // Age config state
-  const [ageConfig, setAgeConfig] = useState<AgeConfig | null>(null)
+  const [, setAgeConfig] = useState<AgeConfig | null>(null)
   const [ageConfigLoading, setAgeConfigLoading] = useState(true)
   const [ageConfigSaving, setAgeConfigSaving] = useState(false)
   const [ageConfigError, setAgeConfigError] = useState("")

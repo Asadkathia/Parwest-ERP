@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 
-type Region = { id: string; name: string }
 type Client = { id: string; name: string }
 type Office = { id: string; name: string }
 type BranchRow = {

@@ -116,11 +116,6 @@ async function getIdByName(client, tableName, name) {
   return result.rowCount > 0 ? result.rows[0].id : null
 }
 
-async function getStoreIdByCode(client, code) {
-  const result = await client.query(`SELECT id FROM "Store" WHERE "code" = $1 LIMIT 1`, [code])
-  return result.rowCount > 0 ? result.rows[0].id : null
-}
-
 async function upsertProduct(client, product) {
   await client.query(
     `

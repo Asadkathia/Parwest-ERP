@@ -217,7 +217,7 @@ function ActiveDeploymentBanner({ dep }: { dep: DeploymentAuditRecord }) {
 }
 
 // ── deployment audit log ──────────────────────────────────────────────────────
-function DeploymentAuditLog({ deployments, guardId }: { deployments: DeploymentAuditRecord[]; guardId?: string }) {
+function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecord[]; guardId?: string }) {
   const sorted = [...deployments].sort(
     (a, b) => new Date(b.deploymentDate).getTime() - new Date(a.deploymentDate).getTime()
   )
@@ -336,7 +336,7 @@ function DeploymentAuditLog({ deployments, guardId }: { deployments: DeploymentA
                     </span>
                   )}
                   {!isActive && endReasonDisplay && (
-                    <span className="italic text-[var(--text-muted)]">"{endReasonDisplay}"</span>
+                    <span className="italic text-[var(--text-muted)]">&quot;{endReasonDisplay}&quot;</span>
                   )}
                 </div>
 

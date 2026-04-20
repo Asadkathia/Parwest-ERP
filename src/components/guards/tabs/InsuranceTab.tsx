@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Shield, Plus, X, Loader2, RefreshCw } from "lucide-react"
+import { Plus, X, Loader2, RefreshCw } from "lucide-react"
 import type { GuardLooseRow } from "@/components/guards/tabs/types"
 
 type ClientInsuranceOption = {
@@ -59,6 +59,7 @@ export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) 
       .catch(() => { setRecords([]); setLoading(false) })
   }, [guardId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId via callback
   useEffect(() => { fetchRecords() }, [fetchRecords])
 
   function openAddModal() {
@@ -119,12 +120,6 @@ export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) 
       }
     } catch { setStatusError("Network error.") }
     setStatusSaving(false)
-  }
-
-  function formatDate(val: string | null | undefined) {
-    if (!val) return "—"
-    const d = new Date(val)
-    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
   }
 
   return (

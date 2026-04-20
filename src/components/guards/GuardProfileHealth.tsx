@@ -121,6 +121,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
         let t1: ReturnType<typeof setTimeout>
         let t2: ReturnType<typeof setTimeout>
         if (show) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- animation phase orchestration driven by `show` prop
             setPhase(1)                           // panel expands right
             t1 = setTimeout(() => setPhase(2), 200) // items slide in
             t2 = setTimeout(() => setPhase(3), 640) // bar fills

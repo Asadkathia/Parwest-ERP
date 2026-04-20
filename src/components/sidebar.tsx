@@ -313,6 +313,7 @@ export function Sidebar() {
     useEffect(() => {
         const active = getActiveSectionTitle(pathname)
         if (active) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- open the nav section that matches the current pathname
             setOpenSections((prev) => (prev.includes(active) ? prev : [...prev, active]))
         }
     }, [pathname])

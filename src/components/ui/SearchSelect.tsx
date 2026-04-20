@@ -31,16 +31,16 @@ export default function SearchSelect({
 }: Props) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState("")
-    const [selected, setSelected] = useState<SearchSelectOption | null>(() =>
+    const [uncontrolledSelected, setUncontrolledSelected] = useState<SearchSelectOption | null>(() =>
         (options ?? []).find((o) => o.value === (value ?? defaultValue)) ?? null
     )
-
-    // Sync when controlled value changes
-    useEffect(() => {
-        if (value !== undefined) {
-            setSelected((options ?? []).find((o) => o.value === value) ?? null)
-        }
-    }, [value, options])
+    // When `value` is provided, derive `selected` from props during render (controlled);
+    // otherwise fall back to internal state (uncontrolled).
+    const selected: SearchSelectOption | null =
+        value !== undefined
+            ? (options ?? []).find((o) => o.value === value) ?? null
+            : uncontrolledSelected
+    const setSelected = setUncontrolledSelected
     const containerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 

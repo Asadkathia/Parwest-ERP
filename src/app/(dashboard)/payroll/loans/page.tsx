@@ -579,6 +579,7 @@ function FinalizeLoansTab() {
   }, [month, regionId, search])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps; sets loading/rows from server state
     loadLoans()
   }, [loadLoans])
 
@@ -796,6 +797,7 @@ function HistoryTab() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time data fetch; loading flag + rows reflect server state
     setLoading(true)
     fetch("/api/payroll/loans/finalize-history")
       .then((r) => (r.ok ? r.json() : []))
