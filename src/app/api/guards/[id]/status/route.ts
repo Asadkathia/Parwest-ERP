@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
@@ -44,6 +44,15 @@ export async function PATCH(
         })
         if (!existingGuard) {
             return notFound("Guard not found")
+        }
+        const activeDeployment = await prisma.deployment.findFirst({
+            where: { guardId: id, status: "ACTIVE" },
+            select: { id: true, client: { select: { name: true } } },
+        })
+        if (activeDeployment) {
+            return conflict(
+                `Cannot change status of an actively deployed guard. Guard is currently deployed at ${activeDeployment.client.name}. Revoke the deployment first, then change the status.`
+            )
         }
         if (managerScope && managerScopeDenied(managerScope, { regionId: existingGuard.regionId, regionalOfficeId: existingGuard.regionalOfficeId })) {
             return forbidden("Forbidden: guard is outside your scope.")

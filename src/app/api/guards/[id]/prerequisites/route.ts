@@ -7,7 +7,7 @@ import { hasModuleAccess } from "@/lib/api/permissions"
 // GET /api/guards/[id]/prerequisites
 // Returns all doc types with the guard's prerequisite record (if any) merged in
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -16,6 +16,8 @@ export async function GET(
     if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id: guardId } = await params
+    const { searchParams } = new URL(request.url)
+    const withAttachments = searchParams.get("withAttachments") === "true"
 
     const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true } })
     if (!guard) return notFound("Guard not found")
@@ -41,7 +43,7 @@ export async function GET(
         prereqId: prereq?.id ?? null,
         status: prereq?.status ?? "PENDING",
         verificationStatus: prereq?.verificationStatus ?? null,
-        attachmentData: prereq?.attachmentData ?? null,
+        attachmentData: withAttachments ? (prereq?.attachmentData ?? null) : null,
         attachmentName: prereq?.attachmentName ?? null,
         documentUrl: prereq?.documentUrl ?? null,
         uploadedBy: (p?.uploadedBy as string | null) ?? null,

@@ -97,12 +97,6 @@ const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
 ]
 
 
-const LEGACY_GUARDS: Guard[] = [
-  { id: "legacy-guard-1", name: "Muhammad Usman", cnic: "35202-7833617-5", phone: "+92-300-1111111", regionalOfficeId: "legacy-head-office-lahore" },
-  { id: "legacy-guard-2", name: "Muhammad Junaid", cnic: "37201-2345678-9", phone: "+92-300-2222222", regionalOfficeId: "legacy-faisalabad" },
-  { id: "legacy-guard-3", name: "Akbar Ali", cnic: "38403-0948145-3", phone: "+92-300-3333333", regionalOfficeId: "legacy-gujranwala" },
-]
-
 // ── Static option lists ────────────────────────────────────────────────────
 const DESIGNATION_OPTIONS = [
   { id: "Guard", name: "Guard" },
@@ -202,6 +196,8 @@ export default function DeployGuardForm() {
   // All deployments listing
   const [allDeployments, setAllDeployments] = useState<AllDeploymentRow[]>([])
   const [allDeploymentsLoading, setAllDeploymentsLoading] = useState(true)
+  const [guardIdSearch, setGuardIdSearch] = useState("")
+  const [guardLayoutView, setGuardLayoutView] = useState<"card" | "list">("card")
 
   useEffect(() => {
     loadRegionalOffices()
@@ -330,9 +326,9 @@ export default function DeployGuardForm() {
 
   const loadGuards = async (regionalOfficeId: string) => {
     try {
-      const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}&status=ACTIVE,DEFAULT`)
+      const res = await fetch(`/api/guards?regionalOfficeId=${regionalOfficeId}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setGuards(data.map((g: Guard & Record<string, unknown>) => ({
           id: g.id,
           parwestId: (g.parwestId as string | null) ?? null,
@@ -346,12 +342,13 @@ export default function DeployGuardForm() {
           isExService: (g.isExService as boolean | null) ?? null,
           exServiceType: (g.exServiceType as string | null) ?? null,
           status: (g.status as string | null) ?? null,
+          supervisorName: (g.supervisorName as string | null) ?? null,
         })))
       } else {
-        setGuards(LEGACY_GUARDS)
+        setGuards([])
       }
     } catch {
-      setGuards(LEGACY_GUARDS)
+      setGuards([])
     }
   }
 
@@ -380,11 +377,9 @@ export default function DeployGuardForm() {
 
     // Guard must pass all eligibility checks
     if (eligibility && !eligibility.eligible) {
-      const failed = Object.values(eligibility.checks)
-        .filter((c) => !c.pass)
-        .map((c) => c.label)
-        .join(", ")
-      setError(`Guard is not eligible for deployment. Failed checks: ${failed}.`)
+      const failedChecks = Object.values(eligibility.checks).filter((c) => !c.pass)
+      const details = failedChecks.map((c) => `${c.label}: ${c.message}`).join(" • ")
+      setError(`Guard is not eligible for deployment — ${details}`)
       setLoading(false)
       return
     }
@@ -416,7 +411,7 @@ export default function DeployGuardForm() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || "Failed to deploy guard")
+        throw new Error(data.message || "Failed to deploy guard")
       }
 
       const deployment = await res.json()
@@ -441,10 +436,16 @@ export default function DeployGuardForm() {
   const regionalOfficeOptions = regionalOffices.map((o) => ({ id: o.id, name: `${o.name} (${o.seriesCode})` }))
   const clientOptions = clients.map((c) => ({ id: c.id, name: `${c.name} (${c.type})` }))
   const branchOptions = branches.map((b) => ({ id: b.id, name: b.city ? `${b.name} - ${b.city}` : b.name }))
-  const guardOptions = guards.map((g) => ({
-    id: g.id,
-    name: g.parwestId ? `${g.parwestId} — ${g.name}` : g.name,
-  }))
+  const guardOptions = guards
+    .filter((g) => {
+      if (!guardIdSearch.trim()) return true
+      const q = guardIdSearch.trim().toLowerCase()
+      return (g.parwestId ?? "").toLowerCase().includes(q) || g.name.toLowerCase().includes(q)
+    })
+    .map((g) => ({
+      id: g.id,
+      name: g.parwestId ? `${g.parwestId} — ${g.name}` : g.name,
+    }))
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -554,6 +555,17 @@ export default function DeployGuardForm() {
               Deploy Guards
             </h2>
 
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Filter by Guard ID / Name</label>
+              <input
+                type="text"
+                value={guardIdSearch}
+                onChange={(e) => setGuardIdSearch(e.target.value)}
+                placeholder="e.g. PW-00123 or type a name..."
+                className="ui-input"
+              />
+            </div>
+
             <SearchableCombobox
               label="Select Guard"
               required
@@ -577,6 +589,12 @@ export default function DeployGuardForm() {
                       <span className="font-medium">{d.client.name}</span>
                       {d.branch && <span className="text-amber-600">· {d.branch.name}{d.branch.city ? `, ${d.branch.city}` : ""}</span>}
                       <span className="ml-auto text-xs text-amber-500">Since {formatDate(d.deploymentDate)}</span>
+                      <Link
+                        href={`/deployments/${d.id}/end`}
+                        className="ml-2 text-xs font-semibold text-red-600 hover:text-red-800 underline shrink-0"
+                      >
+                        Revoke
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -644,13 +662,24 @@ export default function DeployGuardForm() {
               </>
             ) : null}
 
-            <SearchableCombobox
-              label="Deployment"
-              value={deploymentType}
-              onChange={setDeploymentType}
-              options={DEPLOYMENT_TYPE_OPTIONS}
-              placeholder="Select deployment type..."
-            />
+            {activeDeployments.length > 0 ? (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Type</label>
+                <div className="ui-input bg-amber-50 text-amber-800 text-sm flex items-center gap-2 cursor-not-allowed border-amber-200">
+                  <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 110 18A9 9 0 0112 3z" /></svg>
+                  Overtime / Double Duty
+                  <span className="ml-auto text-xs text-amber-600 font-medium">Locked — already deployed</span>
+                </div>
+              </div>
+            ) : (
+              <SearchableCombobox
+                label="Deployment"
+                value={deploymentType}
+                onChange={setDeploymentType}
+                options={DEPLOYMENT_TYPE_OPTIONS}
+                placeholder="Select deployment type..."
+              />
+            )}
 
             {/* Deployment Nature — locked to Temporary when Extra Guard is checked */}
             {isExtraGuard ? (
@@ -717,24 +746,84 @@ export default function DeployGuardForm() {
             <Shield className="w-5 h-5 text-[var(--brand)]" />
             Guard Deployments
           </h2>
-          <Link href="/deployments" className="text-sm text-[var(--brand)] hover:underline font-medium">
-            View All
-          </Link>
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-md border border-[var(--border)] overflow-hidden text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setGuardLayoutView("card")}
+                className={`px-3 py-1.5 flex items-center gap-1 transition-colors ${guardLayoutView === "card" ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}
+              >
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setGuardLayoutView("list")}
+                className={`px-3 py-1.5 flex items-center gap-1 transition-colors ${guardLayoutView === "list" ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}
+              >
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                List
+              </button>
+            </div>
+            <Link href="/deployments" className="text-sm text-[var(--brand)] hover:underline font-medium">
+              View All
+            </Link>
+          </div>
         </div>
 
         {allDeploymentsLoading ? (
-          <div className="ui-card p-8 text-center text-[var(--text-muted)]">
-            Loading deployments...
-          </div>
+          <div className="ui-card p-8 text-center text-[var(--text-muted)]">Loading deployments...</div>
         ) : allDeployments.length === 0 ? (
-          <div className="ui-card p-8 text-center text-[var(--text-muted)]">
-            No deployments found.
-          </div>
-        ) : (
+          <div className="ui-card p-8 text-center text-[var(--text-muted)]">No deployments found.</div>
+        ) : guardLayoutView === "card" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {allDeployments.map((dep) => (
               <DeploymentCard key={dep.id} deployment={dep} />
             ))}
+          </div>
+        ) : (
+          <div className="ui-card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Guard</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Client / Branch</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Shift</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Type</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {allDeployments.map((dep) => (
+                  <tr key={dep.id} className="hover:bg-[var(--surface-muted)] transition-colors">
+                    <td className="px-4 py-3">
+                      <Link href={`/deployments/${dep.id}`} className="hover:text-[var(--brand)]">
+                        <div className="font-medium text-[var(--text)]">{dep.guard.name}</div>
+                        <div className="text-xs text-[var(--text-muted)]">{dep.guard.parwestId}</div>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-[var(--text)]">{dep.client.name}</div>
+                      {dep.branch && <div className="text-xs text-[var(--text-muted)]">{dep.branch.name}{dep.branch.city ? ` · ${dep.branch.city}` : ""}</div>}
+                    </td>
+                    <td className="px-4 py-3"><ShiftBadge shift={dep.shiftType} /></td>
+                    <td className="px-4 py-3 text-[var(--text-muted)]">{dep.deploymentType === "OVERTIME" ? "Overtime" : "Regular"}</td>
+                    <td className="px-4 py-3 text-[var(--text-muted)]">{formatDate(dep.deploymentDate)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        dep.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
+                        dep.status === "PENDING" ? "bg-amber-100 text-amber-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>
+                        <StatusDot status={dep.status} />
+                        {dep.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
@@ -793,8 +882,16 @@ function GuardProfileCard({
           {guard.parwestId && (
             <p className="text-xs text-[var(--text-muted)]">{guard.parwestId}</p>
           )}
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-            ACTIVE
+          <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+            guard.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" :
+            guard.status === "PRESENT" ? "bg-blue-100 text-blue-700" :
+            guard.status === "DEFAULT" ? "bg-gray-100 text-gray-600" :
+            guard.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
+            guard.status === "INACTIVE" || guard.status === "TERMINATED" ? "bg-red-100 text-red-700" :
+            guard.status === "BLACKLISTED" ? "bg-red-200 text-red-900" :
+            "bg-gray-100 text-gray-600"
+          }`}>
+            {guard.status ?? "UNKNOWN"}
           </span>
         </div>
       </div>

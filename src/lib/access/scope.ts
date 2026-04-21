@@ -59,10 +59,12 @@ export function buildManagerScopeWhere(
 ) {
   if (!scope) return {}
 
-  const where: Record<string, string> = {}
+  const where: Record<string, string | { in: string[] }> = {}
   if (keys.regionId && scope.regionId) where[keys.regionId] = scope.regionId
   if (keys.regionalOfficeId && scope.regionalOfficeIds.length > 0) {
-    where[keys.regionalOfficeId] = scope.regionalOfficeIds[0]
+    where[keys.regionalOfficeId] = scope.regionalOfficeIds.length === 1
+      ? scope.regionalOfficeIds[0]
+      : { in: scope.regionalOfficeIds }
   }
   return where
 }

@@ -122,20 +122,28 @@ export async function POST(request: NextRequest) {
         }
 
         const [guard, client, office, branch] = await Promise.all([
-            prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true, regionalOfficeId: true } }),
+            prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true, regionalOfficeId: true, joiningDate: true } }),
             prisma.client.findUnique({ where: { id: clientId }, select: { id: true } }),
             prisma.regionalOffice.findUnique({ where: { id: regionalOfficeId }, select: { id: true } }),
             branchId
                 ? prisma.branch.findUnique({
                     where: { id: branchId },
-                    select: { id: true, clientId: true },
+                    select: { id: true, clientId: true, address: true, city: true, contactPerson: true },
                 })
                 : Promise.resolve(null),
         ])
 
         if (!guard) return notFound("Guard not found.")
+        if (guard.joiningDate) {
+            const joinMs = new Date(guard.joiningDate).setHours(0, 0, 0, 0)
+            const depMs  = new Date(deploymentDate).setHours(0, 0, 0, 0)
+            if (depMs < joinMs) {
+                const fmt = new Date(guard.joiningDate).toISOString().split("T")[0]
+                return badRequest(`Deployment date cannot be before the guard's joining date (${fmt}).`)
+            }
+        }
         if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.status !== "ACTIVE" && guard.status !== "DEFAULT") {
-            return conflict("Only ACTIVE or DEFAULT guards can be deployed.")
+            return conflict(`Guard cannot be deployed — current status is "${guard.status}". Only ACTIVE or DEFAULT guards are eligible for deployment.`)
         }
         if (
             isWorkflowRuleEnabled("deployments.requireGuardOfficeConsistency") &&
@@ -149,6 +157,11 @@ export async function POST(request: NextRequest) {
         if (branchId && !branch) return notFound("Branch not found.")
         if (branch && branch.clientId !== clientId) {
             return badRequest("Branch does not belong to the selected client.")
+        }
+        if (branch && !branch.address && !branch.city) {
+            return badRequest(
+                "Branch is incomplete — address or city is required before deploying. Please complete the branch details first."
+            )
         }
 
         const ruleDelegate = (prisma as unknown as {
@@ -249,6 +262,31 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Parse deployment type early for validation
+        const deploymentType = body.deploymentType ? String(body.deploymentType).toUpperCase() : "REGULAR"
+
+        if (deploymentType === "OVERTIME") {
+            const hasRegular = await prisma.deployment.findFirst({
+                where: { guardId, status: "ACTIVE", deploymentType: "REGULAR" },
+                select: { id: true },
+            })
+            if (!hasRegular) {
+                return conflict(
+                    "Overtime deployment requires an existing active regular deployment for this guard. Deploy the guard as a regular shift first."
+                )
+            }
+        }
+
+        const hasSupervisor = await prisma.guardSupervisorAssignment.findFirst({
+            where: { guardId, status: "ACTIVE" },
+            select: { id: true },
+        })
+        if (!hasSupervisor) {
+            return conflict(
+                "Guard must have an active supervisor assigned before deployment. Please assign a supervisor to this guard first."
+            )
+        }
+
         // ── Numeric field parsing — treat missing/empty as null (not an error) ──
         const numericRate         = body?.rate         != null && body.rate         !== "" ? parseOptionalNumber(body.rate)         : null
         const numericSalary       = body?.salary       != null && body.salary       !== "" ? parseOptionalNumber(body.salary)       : null
@@ -292,7 +330,7 @@ export async function POST(request: NextRequest) {
             dayShiftEnd: body.dayShiftEnd ? String(body.dayShiftEnd) : null,
             nightShiftStart: body.nightShiftStart ? String(body.nightShiftStart) : null,
             nightShiftEnd: body.nightShiftEnd ? String(body.nightShiftEnd) : null,
-            deploymentType: body.deploymentType ? String(body.deploymentType) : "REGULAR",
+            deploymentType: deploymentType,
             deploymentNature: body.deploymentNature ? String(body.deploymentNature) : "PERMANENT",
             isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
             comment: body.comment ? String(body.comment) : null,

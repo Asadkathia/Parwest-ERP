@@ -112,7 +112,8 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
     if (!selectedCategory) return false
     const categoryName = selectedCategory.name.toLowerCase()
     const parentName = (selectedCategory.parent?.name || "").toLowerCase()
-    return categoryName.includes("weapon") || parentName.includes("weapon")
+    const matches = (n: string) => n.includes("weapon") || n.includes("ammo") || n.includes("ammunition")
+    return matches(categoryName) || matches(parentName)
   }, [selectedCategory])
 
   const generateCode = () => {

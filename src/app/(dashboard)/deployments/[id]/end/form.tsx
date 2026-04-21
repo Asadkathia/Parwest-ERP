@@ -259,6 +259,7 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
                 required
                 value={revokeDate}
                 onChange={(e) => setRevokeDate(e.target.value)}
+                onKeyDown={(e) => e.preventDefault()}
                 max={todayStr}
                 min={new Date(deployment.deploymentDate).toISOString().split("T")[0]}
                 className="ui-input"

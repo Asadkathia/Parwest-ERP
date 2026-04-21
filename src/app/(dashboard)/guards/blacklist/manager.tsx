@@ -41,6 +41,8 @@ export default function BlacklistManager() {
 
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
+    const [directCnicInput, setDirectCnicInput] = useState("")
+    const [directCnicError, setDirectCnicError] = useState("")
 
     // ── Fetch guard options once ────────────────────────────────────────────────
     const fetchGuardOptions = async () => {
@@ -84,6 +86,24 @@ export default function BlacklistManager() {
 
     const removeFromPending = (id: string) => {
         setPendingList((prev) => prev.filter((p) => p.id !== id))
+    }
+
+    const addDirectCnic = () => {
+        const trimmed = directCnicInput.trim()
+        if (!/^\d{5}-\d{7}-\d$/.test(trimmed)) {
+            setDirectCnicError("Invalid CNIC format. Use XXXXX-XXXXXXX-X")
+            return
+        }
+        if (pendingList.some((p) => p.cnic === trimmed)) {
+            setDirectCnicError("This CNIC is already in the list")
+            return
+        }
+        setPendingList((prev) => [
+            ...prev,
+            { id: `direct-${trimmed}`, name: "(No enrolled guard)", cnic: trimmed, parwestId: "" },
+        ])
+        setDirectCnicInput("")
+        setDirectCnicError("")
     }
 
     // ── Load blacklisted records ─────────────────────────────────────────────────
@@ -228,6 +248,34 @@ export default function BlacklistManager() {
                             </button>
                         </div>
                     </div>
+                </div>
+                {/* Direct CNIC input */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 mb-2">— or blacklist a CNIC directly (without enrolling a guard) —</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm text-gray-600 mb-1">CNIC (format: XXXXX-XXXXXXX-X)</label>
+                      <input
+                        value={directCnicInput}
+                        onChange={(e) => { setDirectCnicInput(e.target.value); setDirectCnicError("") }}
+                        onKeyDown={(e) => e.key === "Enter" && addDirectCnic()}
+                        className="w-full border rounded-md px-3 py-2"
+                        placeholder="e.g. 35202-7833617-5"
+                        autoComplete="off"
+                      />
+                      {directCnicError && <p className="mt-1 text-xs text-red-600">{directCnicError}</p>}
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        className="w-full rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-40"
+                        disabled={!directCnicInput.trim()}
+                        onClick={addDirectCnic}
+                      >
+                        Add CNIC
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Pending list */}

@@ -176,7 +176,44 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                 updateJob(id, { preview: imageDataUrl })
             }
 
-            // ── Step 2: Tesseract OCR ─────────────────────────────────────────
+            // ── Step 2: Try Gemini Vision (primary) ──────────────────────────
+            try {
+                updateJob(id, { progress: 35, progressLabel: "Analysing with AI vision…" })
+                const llmRes = await fetch("/api/ocr/extract", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ imageBase64: imageDataUrl }),
+                })
+                if (llmRes.ok) {
+                    const llm = await llmRes.json() as {
+                        docType: string
+                        overallConfidence: number
+                        fields: ParsedField[]
+                    }
+                    if (Array.isArray(llm.fields) && llm.fields.length > 0) {
+                        updateJob(id, {
+                            progress: 100,
+                            progressLabel: "Done",
+                            status: "done",
+                            fields: llm.fields,
+                            classification: {
+                                docType: llm.docType as ClassificationResult["docType"],
+                                label: llm.docType.replace(/_/g, " ").toUpperCase(),
+                                confidence: llm.overallConfidence,
+                            } as ClassificationResult,
+                        })
+                        return llm.fields
+                    }
+                } else {
+                    // Non-ok — log and fall back
+                    console.warn("Gemini OCR failed, falling back to Tesseract")
+                }
+            } catch (err) {
+                console.warn("Gemini OCR error, falling back to Tesseract:", err)
+            }
+
+            // ── Step 2b: Tesseract OCR (fallback) ────────────────────────────
+            updateJob(id, { progress: 36, progressLabel: "Falling back to local OCR…" })
             const { createWorker } = await import("tesseract.js")
             const worker = await createWorker("eng", 1, {
                 logger: (m: { status: string; progress: number }) => {
@@ -253,7 +290,9 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         }
         const merged = mergeFields(allResults)
         setMergedFields(merged)
-        setSelected(Object.fromEntries(merged.map((f) => [f.field, true])))
+        // ── Confidence gate: only auto-check fields ≥ 75% confidence ─────────
+        // Lower-confidence fields are shown but require explicit user check
+        setSelected(Object.fromEntries(merged.map((f) => [f.field, f.confidence >= 0.75])))
         setAllDone(true)
     }, [processFile])
 
@@ -447,28 +486,39 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                             </div>
 
                             <div className="grid gap-1.5 sm:grid-cols-2">
-                                {mergedFields.map((f) => (
-                                    <label
-                                        key={f.field}
-                                        className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
-                                            selected[f.field]
-                                                ? "border-violet-300 bg-violet-50"
-                                                : "border-gray-200 bg-white opacity-60"
-                                        }`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={!!selected[f.field]}
-                                            onChange={() => toggleField(f.field)}
-                                            className="accent-violet-600 shrink-0"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-semibold text-gray-600 truncate">{f.label}</div>
-                                            <div className="text-gray-500 truncate">{f.value}</div>
-                                        </div>
-                                        <ConfidencePill value={f.confidence} />
-                                    </label>
-                                ))}
+                                {mergedFields.map((f) => {
+                                    const lowConf = f.confidence < 0.75
+                                    return (
+                                        <label
+                                            key={f.field}
+                                            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                                                selected[f.field]
+                                                    ? lowConf
+                                                        ? "border-amber-300 bg-amber-50"
+                                                        : "border-violet-300 bg-violet-50"
+                                                    : lowConf
+                                                        ? "border-amber-200 bg-white"
+                                                        : "border-gray-200 bg-white opacity-60"
+                                            }`}
+                                            title={lowConf ? "Low confidence — please verify before applying" : undefined}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={!!selected[f.field]}
+                                                onChange={() => toggleField(f.field)}
+                                                className="accent-violet-600 shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-semibold text-gray-600 truncate flex items-center gap-1">
+                                                    {f.label}
+                                                    {lowConf && <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
+                                                </div>
+                                                <div className="text-gray-500 truncate">{f.value}</div>
+                                            </div>
+                                            <ConfidencePill value={f.confidence} />
+                                        </label>
+                                    )
+                                })}
                             </div>
 
                             <button

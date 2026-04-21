@@ -255,6 +255,17 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       }
     }
 
+    // Validate CNIC dates
+    const cnicIssueDate = formData.get("cnicIssueDate") as string
+    const cnicExpiryDate = formData.get("cnicExpiryDate") as string
+    if (cnicIssueDate && cnicExpiryDate) {
+      if (new Date(cnicIssueDate) >= new Date(cnicExpiryDate)) {
+        setError("CNIC Issue Date must be before the CNIC Expiry Date.")
+        setLoading(false)
+        return
+      }
+    }
+
     if (ageValue && (!Number.isFinite(Number(ageValue)) || Number(ageValue) < 0)) {
       setError("Please enter a valid age")
       setLoading(false)
@@ -452,6 +463,11 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">AGE</label>
               <input type="number" name="age" readOnly value={ageValue} className="ui-input bg-slate-50" placeholder="AGE" />
+              {ageValue && (Number(ageValue) < 18 || Number(ageValue) > 60) && (
+                <p className="mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  ⚠ Guard age ({ageValue} years) is outside the typical range (18–60). An age approval may be required.
+                </p>
+              )}
             </div>
             <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X) *" name="cnic" required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
             <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />

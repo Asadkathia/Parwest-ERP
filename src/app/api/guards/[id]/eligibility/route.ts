@@ -68,20 +68,31 @@ export async function GET(
     }
 
     // ── Check 2: Verification ─────────────────────────────────────────────
-    const totalVerifications = docTypes.length
-    const prereqMap = new Map(prereqs.map((p) => [p.docTypeName, p.status]))
-    const verifiedCount = docTypes.filter(
-      (dt) => prereqMap.get(dt.name) === "VERIFIED"
-    ).length
+    const prereqMap = new Map(prereqs.map((p) => [p.docTypeName, p]))
+
+    // Police Verification is always mandatory
+    const policeDocType = docTypes.find(
+      (dt) => dt.name.toLowerCase().includes("police")
+    )
+    const policePrereq = policeDocType ? prereqMap.get(policeDocType.name) : null
+    const policeVerified = !policeDocType || policePrereq?.status === "VERIFIED"
+
+    // All verification doc types the guard has submitted must be verified
+    const submittedVerDocs = docTypes.filter((dt) => prereqMap.has(dt.name))
+    const allSubmittedVerified = submittedVerDocs.every(
+      (dt) => prereqMap.get(dt.name)?.status === "VERIFIED"
+    )
+
     const verificationCheck: EligibilityCheck = {
-      pass: totalVerifications > 0 && verifiedCount === totalVerifications,
+      pass: policeVerified && allSubmittedVerified,
       label: "Verification",
-      message:
-        totalVerifications === 0
-          ? "No verification documents configured"
-          : verifiedCount === totalVerifications
-          ? `All ${totalVerifications} verification documents verified`
-          : `${verifiedCount} of ${totalVerifications} verification documents verified`,
+      message: !policeDocType
+        ? "No Police Verification document type configured"
+        : !policeVerified
+        ? "Police Verification is mandatory — must be attached and verified"
+        : !allSubmittedVerified
+        ? `${submittedVerDocs.filter((dt) => prereqMap.get(dt.name)?.status !== "VERIFIED").length} submitted verification document(s) not yet verified`
+        : `Police Verification verified${submittedVerDocs.length > 1 ? ` + ${submittedVerDocs.length - 1} other verified` : ""}`,
     }
 
     // ── Check 3: Inventory Assigned ───────────────────────────────────────

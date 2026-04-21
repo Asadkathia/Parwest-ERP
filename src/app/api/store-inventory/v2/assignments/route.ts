@@ -180,6 +180,31 @@ export async function POST(request: NextRequest) {
       return badRequest("assignedToClientId is required for client assignments.")
     }
 
+    if (assignedToType === StoreInventoryAssignmentTargetType.GUARD && assignedToGuardId) {
+      const [assignStore, assignGuard] = await Promise.all([
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { regionalOfficeId: true, name: true },
+        }),
+        prisma.guard.findUnique({
+          where: { id: assignedToGuardId },
+          select: { regionalOfficeId: true, name: true },
+        }),
+      ])
+      if (!assignGuard) {
+        return badRequest("Guard not found.")
+      }
+      if (
+        assignStore?.regionalOfficeId &&
+        assignGuard.regionalOfficeId &&
+        assignStore.regionalOfficeId !== assignGuard.regionalOfficeId
+      ) {
+        return badRequest(
+          `Cross-region assignment not allowed: store belongs to a different regional office than guard "${assignGuard.name}". Inventory can only be assigned to guards within the same regional office.`
+        )
+      }
+    }
+
     const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
     const selectedProducts = await prisma.storeInventoryProduct.findMany({
       where: { id: { in: lineProductIds } },
