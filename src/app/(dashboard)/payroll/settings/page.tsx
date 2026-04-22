@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
+import DeductionsManager from "./deductions-manager"
 
 type Office = { id: string; name: string }
 type DefaultRow = {
@@ -18,7 +19,14 @@ type DefaultRow = {
   createdAt: string
 }
 
-type TabId = "defaults" | "month-init" | "age-limit" | "mental-health" | "ojt" | "status-update"
+type TabId =
+  | "defaults"
+  | "deductions"
+  | "month-init"
+  | "age-limit"
+  | "mental-health"
+  | "ojt"
+  | "status-update"
 
 export default function PayrollSettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("defaults")
@@ -29,6 +37,7 @@ export default function PayrollSettingsPage() {
       subtitle="Regional payroll defaults, month init, limits."
       tabs={[
         { id: "defaults", label: "Payroll Defaults" },
+        { id: "deductions", label: "Default Deductions" },
         { id: "month-init", label: "Month Initialise" },
         { id: "age-limit", label: "Guard Age Limit" },
         { id: "mental-health", label: "Mental Health Limit" },
@@ -39,6 +48,7 @@ export default function PayrollSettingsPage() {
       onTabChange={(t) => setActiveTab(t as TabId)}
     >
       {activeTab === "defaults" && <PayrollDefaultsTab />}
+      {activeTab === "deductions" && <DeductionsManager />}
       {activeTab === "age-limit" && <GuardAgeLimitTab />}
       {activeTab === "month-init" && (
         <PlaceholderTab
