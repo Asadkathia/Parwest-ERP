@@ -19,22 +19,19 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.PayrollSpecialDutyWhereInput = { status: "ACTIVE" }
     if (guardId) where.guardId = guardId
+
+    const guardFilter: Record<string, unknown> = {}
     if (search) {
-      where.guard = {
-        is: {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { parwestId: { contains: search, mode: "insensitive" } },
-          ],
-        },
-      }
+      guardFilter.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { parwestId: { contains: search, mode: "insensitive" } },
+      ]
     }
-    if (scope) {
-      const isFilter: Record<string, unknown> = {}
-      if (scope.regionId) isFilter.regionId = scope.regionId
-      if (scope.regionalOfficeIds.length > 0) isFilter.regionalOfficeId = { in: scope.regionalOfficeIds }
-      if (Object.keys(isFilter).length > 0) where.guard = { is: isFilter }
+    if (scope?.regionId) guardFilter.regionId = scope.regionId
+    if (scope && scope.regionalOfficeIds.length > 0) {
+      guardFilter.regionalOfficeId = { in: scope.regionalOfficeIds }
     }
+    if (Object.keys(guardFilter).length > 0) where.guard = { is: guardFilter }
 
     const rows = await prisma.payrollSpecialDuty.findMany({
       where,

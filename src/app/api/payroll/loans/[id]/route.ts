@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
@@ -46,10 +46,13 @@ export async function PATCH(
       return forbidden("Forbidden: loan is outside your scope.")
     }
 
+    if (body.status !== undefined) {
+      return badRequest("status changes must use /api/payroll/loans/finalize or /unfinalize.")
+    }
+
     const updated = await prisma.loan.update({
       where: { id },
       data: {
-        status: body.status ? String(body.status) : undefined,
         amount: body.amount != null ? Number(body.amount) : undefined,
         deploymentDays: body.deploymentDays != null ? Number(body.deploymentDays) : undefined,
         supervisor: body.supervisor !== undefined ? String(body.supervisor || "") : undefined,

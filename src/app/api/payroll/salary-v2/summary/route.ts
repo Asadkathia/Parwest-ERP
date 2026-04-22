@@ -93,7 +93,10 @@ export async function GET(request: NextRequest) {
     const uniqueBranches = new Set<string>()
     const uniqueGuards = new Set<string>()
     const uniqueDays = new Map<string, Set<string>>() // guardId → dates
-    let overtimeDays = 0
+
+    // Per-(branch, guard) base pay accumulator. Used after the main loop to compute
+    // per-branch totalSalary correctly (using netSalary if a Payroll row exists).
+    const branchGuards = new Map<string, Map<string, number>>() // branchKey → guardId → branchBasePay
 
     const payrollByGuard = new Map(payrollRows.map((p) => [p.guardId, p]))
 
@@ -118,34 +121,60 @@ export async function GET(request: NextRequest) {
       row.deployGuards.add(dep.guardId)
       if (dep.isExtraGuard) row.extraGuards += 1
 
-      const type = dep.guardType ?? "Other"
-      const bucket: keyof typeof guardByType =
-        type.toLowerCase() === "civilian"
-          ? "Civilian"
-          : type.toLowerCase() === "army" || type.toLowerCase().includes("army")
-            ? "Army"
-            : "Other"
-      guardByType[bucket] = (guardByType[bucket] ?? 0) + 1
-
-      if (bucket === "Civilian" || bucket === "Army") {
-        guardRateSum[bucket].total += Number(dep.salary ?? dep.rate ?? 0)
-        guardRateSum[bucket].count += 1
-      }
-
       if (dep.clientId) uniqueClients.add(dep.clientId)
       if (dep.branchId) uniqueBranches.add(dep.branchId)
       uniqueGuards.add(dep.guardId)
 
       if (!uniqueDays.has(dep.guardId)) uniqueDays.set(dep.guardId, new Set())
       uniqueDays.get(dep.guardId)!.add(dep.deploymentDate.toISOString().slice(0, 10))
-      if (dep.deploymentType === "OVERTIME") overtimeDays += 1
 
-      const payroll = payrollByGuard.get(dep.guardId)
-      row.totalSalary += payroll ? Number(payroll.netSalary || 0) : Number(dep.salary ?? dep.rate ?? 0)
+      // Track per (branch, guard) base pay
+      if (!branchGuards.has(key)) branchGuards.set(key, new Map())
+      const guardMap = branchGuards.get(key)!
+      guardMap.set(dep.guardId, (guardMap.get(dep.guardId) ?? 0) + Number(dep.salary ?? dep.rate ?? 0))
+    }
+
+    // Aggregate guard-level metadata once per unique guard (avoid double-counting
+    // guards that appear in multiple deployment rows).
+    const seenGuards = new Set<string>()
+    const guardTypeByGuard = new Map<string, string>()
+    const guardRateByGuard = new Map<string, number>()
+    for (const dep of deployments) {
+      if (!seenGuards.has(dep.guardId)) {
+        seenGuards.add(dep.guardId)
+        guardTypeByGuard.set(dep.guardId, dep.guardType ?? "Other")
+        guardRateByGuard.set(dep.guardId, Number(dep.salary ?? dep.rate ?? 0))
+      }
+    }
+    for (const [gId, type] of guardTypeByGuard) {
+      const bucket: keyof typeof guardByType =
+        type.toLowerCase() === "civilian"
+          ? "Civilian"
+          : type.toLowerCase().includes("army")
+            ? "Army"
+            : "Other"
+      guardByType[bucket] += 1
+      if (bucket === "Civilian" || bucket === "Army") {
+        guardRateSum[bucket].total += guardRateByGuard.get(gId) ?? 0
+        guardRateSum[bucket].count += 1
+      }
+    }
+
+    // After loop: compute per-branch totalSalary from the (branch, guard) accumulator.
+    // NOTE: per-branch totalSalary uses guard's full netSalary when row exists; for cross-region
+    // totals see summary.totalSalary which de-dupes by guard.
+    for (const [key, row] of branchMap) {
+      const guardMap = branchGuards.get(key)
+      if (!guardMap) continue
+      let total = 0
+      for (const [gId, branchBase] of guardMap) {
+        const payroll = payrollByGuard.get(gId)
+        total += payroll ? Number(payroll.netSalary || 0) : branchBase
+      }
+      row.totalSalary = total
     }
 
     const totalDays = Array.from(uniqueDays.values()).reduce((sum, set) => sum + set.size, 0)
-    const regularDays = totalDays - overtimeDays
 
     const branches = Array.from(branchMap.values()).map((b, i) => ({
       sr: i + 1,
@@ -161,7 +190,21 @@ export async function GET(request: NextRequest) {
       managerId: b.managerId,
     }))
 
-    const totalSalary = branches.reduce((sum, b) => sum + b.totalSalary, 0)
+    // Company-wide totalSalary de-duped by guard: use Payroll.netSalary when present,
+    // else sum of basePay across all branches that guard worked at.
+    let totalSalary = 0
+    for (const gId of uniqueGuards) {
+      const payroll = payrollByGuard.get(gId)
+      if (payroll) {
+        totalSalary += Number(payroll.netSalary || 0)
+      } else {
+        let guardBase = 0
+        for (const guardMap of branchGuards.values()) {
+          guardBase += guardMap.get(gId) ?? 0
+        }
+        totalSalary += guardBase
+      }
+    }
 
     return NextResponse.json({
       month: month.start.toISOString().slice(0, 7),
@@ -182,8 +225,9 @@ export async function GET(request: NextRequest) {
       },
       attendanceStats: {
         totalDays,
-        regularDays,
-        overtimeDays,
+        // regular/overtime/extra day breakdown removed - meaningless under additive deployment-row model
+        regularDays: 0,
+        overtimeDays: 0,
         extraDays: 0,
       },
       branches,

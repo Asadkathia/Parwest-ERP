@@ -59,18 +59,17 @@ export async function GET(
       },
     })
 
-    // Aggregate per guard
+    // Aggregate per guard. Every deployment row contributes its rate to basePay
+    // regardless of deploymentType. Overtime is a separate hourly mechanism
+    // (Wave 2) and does not affect this calculation.
     type GuardRow = {
       guardId: string
       parwestId: string
       guardName: string
       guardType: string | null
       isExtraGuard: boolean
-      salaryRate: number
-      overtimeRate: number
-      regularDays: number
-      overtimeDays: number
-      uniqueDays: Set<string>
+      basePay: number          // sum of dep.salary ?? dep.rate over all deployment rows
+      uniqueDays: Set<string>  // for display only
     }
     const byGuard = new Map<string, GuardRow>()
 
@@ -82,17 +81,13 @@ export async function GET(
           guardName: dep.guard.name,
           guardType: dep.guardType,
           isExtraGuard: dep.isExtraGuard,
-          salaryRate: Number(dep.salary ?? dep.rate ?? 0),
-          overtimeRate: Number(dep.overtime ?? 0),
-          regularDays: 0,
-          overtimeDays: 0,
+          basePay: 0,
           uniqueDays: new Set(),
         })
       }
       const row = byGuard.get(dep.guardId)!
+      row.basePay += Number(dep.salary ?? dep.rate ?? 0)
       row.uniqueDays.add(dep.deploymentDate.toISOString().slice(0, 10))
-      if (dep.deploymentType === "OVERTIME") row.overtimeDays += 1
-      else row.regularDays += 1
     }
 
     const guardIds = Array.from(byGuard.keys())
@@ -112,15 +107,10 @@ export async function GET(
 
     const guards = Array.from(byGuard.values()).map((g, i) => {
       const totalDays = g.uniqueDays.size
-      const regularDays = Math.min(g.regularDays, totalDays)
-      const regularWage = g.salaryRate * regularDays
-      const overtimeWage = g.overtimeRate * g.overtimeDays
-      const postAllowance = 0
-      const grossPay = regularWage + overtimeWage + postAllowance
+      const grossPay = g.basePay  // overtime/extras come from Payroll row in Wave 2
       const payroll = payrollByGuard.get(g.guardId)
       const loanDeduction = Number(payroll?.loans ?? 0)
       const netPayable = Number(payroll?.netSalary ?? grossPay - loanDeduction)
-
       return {
         sr: i + 1,
         guardId: g.guardId,
@@ -128,12 +118,8 @@ export async function GET(
         guardName: g.guardName,
         guardType: g.guardType,
         extraGuard: g.isExtraGuard,
-        salaryRate: g.salaryRate,
         totalDays,
-        overtimeDays: g.overtimeDays,
-        regularWage: Number(regularWage.toFixed(0)),
-        overtimeWage: Number(overtimeWage.toFixed(0)),
-        postAllowance,
+        basePay: Number(g.basePay.toFixed(0)),
         grossPay: Number(grossPay.toFixed(0)),
         loanDeduction: Number(loanDeduction.toFixed(0)),
         netPayable: Number(netPayable.toFixed(0)),

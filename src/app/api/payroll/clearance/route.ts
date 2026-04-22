@@ -46,71 +46,77 @@ export async function POST(request: NextRequest) {
     const monthNormalized = /^\d{4}-\d{2}$/.test(monthInput) ? `${monthInput}-01` : monthInput
     const month = new Date(monthNormalized)
 
-    const steps: { step: string; ok: boolean; count?: number; message?: string }[] = []
+    const { deployResult, invResult, pledgeResult } = await prisma.$transaction(async (tx) => {
+      // Step 1: Revoke active deployment(s)
+      const deployResult = await tx.deployment.updateMany({
+        where: { guardId, status: "ACTIVE" },
+        data: {
+          status: "INACTIVE",
+          endDate: now,
+          endReason: "CLEARANCE",
+          revokedByName: userName,
+        },
+      })
 
-    // Step 1: Revoke active deployment(s)
-    const deployResult = await prisma.deployment.updateMany({
-      where: { guardId, status: "ACTIVE" },
-      data: {
-        status: "INACTIVE",
-        endDate: now,
-        endReason: "CLEARANCE",
-        revokedByName: userName,
-      },
-    })
-    steps.push({ step: "Revoke Deployment", ok: true, count: deployResult.count })
+      // Step 2: Revoke inventory assignments
+      const invResult = await tx.storeInventoryAssignment.updateMany({
+        where: { assignedToGuardId: guardId, status: "ASSIGNED" },
+        data: {
+          status: "RETURNED",
+          returnedAt: now,
+          returnedByUserId: session.user?.id ?? null,
+        },
+      })
 
-    // Step 2: Revoke inventory assignments
-    const invResult = await prisma.storeInventoryAssignment.updateMany({
-      where: { assignedToGuardId: guardId, status: "ASSIGNED" },
-      data: {
-        status: "RETURNED",
-        returnedAt: now,
-        returnedByUserId: session.user?.id ?? null,
-      },
-    })
-    steps.push({ step: "Revoke Inventory", ok: true, count: invResult.count })
+      // Step 3: Return pledged documents
+      const pledgeResult = await tx.guardPledgedDocumentRecord.updateMany({
+        where: { guardId, status: "HELD" },
+        data: {
+          status: "RETURNED",
+          returnedAt: now,
+          returnedBy: userName,
+          returnType: "CLEARANCE",
+        },
+      })
 
-    // Step 3: Return pledged documents
-    const pledgeResult = await prisma.guardPledgedDocumentRecord.updateMany({
-      where: { guardId, status: "HELD" },
-      data: {
-        status: "RETURNED",
-        returnedAt: now,
-        returnedBy: userName,
-        returnType: "CLEARANCE",
-      },
-    })
-    steps.push({ step: "Return Pledged Documents", ok: true, count: pledgeResult.count })
+      // Step 4: Mark guard INACTIVE + record payroll clearance row
+      await tx.guard.update({
+        where: { id: guardId },
+        data: { status: "INACTIVE" },
+      })
 
-    // Step 4: Mark guard INACTIVE + record payroll clearance row
-    await prisma.guard.update({
-      where: { id: guardId },
-      data: { status: "INACTIVE" },
-    })
-    // Upsert a payroll row marked as clearance settlement
-    await prisma.payroll.upsert({
-      where: {
-        guardId_month_year: {
+      // Upsert a payroll row marked as clearance settlement
+      await tx.payroll.upsert({
+        where: {
+          guardId_month_year: {
+            guardId,
+            month,
+            year: month.getUTCFullYear(),
+          },
+        },
+        create: {
           guardId,
           month,
           year: month.getUTCFullYear(),
+          otherDeductions: otherDeduction,
+          paymentStatus: "PAID",
+          paymentMethod: "CASH",
         },
-      },
-      create: {
-        guardId,
-        month,
-        year: month.getUTCFullYear(),
-        otherDeductions: otherDeduction,
-        paymentStatus: "PAID",
-        paymentMethod: "CASH",
-      },
-      update: {
-        otherDeductions: otherDeduction,
-        paymentStatus: "PAID",
-      },
+        update: {
+          otherDeductions: otherDeduction,
+          paymentStatus: "PAID",
+        },
+      })
+
+      return { deployResult, invResult, pledgeResult }
     })
-    steps.push({ step: "Clearance Done", ok: true, message: `Slip ${slipNumber}` })
+
+    const steps: { step: string; ok: boolean; count?: number; message?: string }[] = [
+      { step: "Revoke Deployment", ok: true, count: deployResult.count },
+      { step: "Revoke Inventory", ok: true, count: invResult.count },
+      { step: "Return Pledged Documents", ok: true, count: pledgeResult.count },
+      { step: "Clearance Done", ok: true, message: `Slip ${slipNumber}` },
+    ]
 
     // Audit log
     await prisma.auditLog

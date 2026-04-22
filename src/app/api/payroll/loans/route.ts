@@ -5,6 +5,9 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { parseMonthRange, parseMonthStart } from "@/lib/payroll/date-helpers"
+
+const ALLOWED_LOAN_STATUSES = new Set(["PENDING", "FINALIZED"])
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,13 +25,15 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || undefined
 
     const where: Prisma.LoanWhereInput = {}
+    if (status && !ALLOWED_LOAN_STATUSES.has(status)) {
+      return badRequest("status must be PENDING or FINALIZED.")
+    }
     if (status) where.status = status
     if (guardId) where.guardId = guardId
     if (month) {
-      const parsedMonth = new Date(month)
-      if (!Number.isNaN(parsedMonth.getTime())) {
-        where.month = parsedMonth
-      }
+      const range = parseMonthRange(month)
+      if (!range) return badRequest("Invalid month value.")
+      where.month = { gte: range.start, lt: range.end }
     }
     if (search) {
       where.OR = [
@@ -94,8 +99,8 @@ export async function POST(request: NextRequest) {
       return forbidden("Forbidden: guard is outside your scope.")
     }
 
-    const month = new Date(String(body.month))
-    if (Number.isNaN(month.getTime())) {
+    const month = parseMonthStart(String(body.month))
+    if (!month) {
       return badRequest("Invalid month value.")
     }
 

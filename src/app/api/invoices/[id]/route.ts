@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
+
+const ALLOWED_INVOICE_STATUSES = new Set([
+  "DRAFT", "PENDING", "ADVANCE_PAID", "PARTIAL_PAID", "PAID", "UNPAID", "OVERDUE",
+])
 
 export async function PATCH(
   request: NextRequest,
@@ -11,6 +16,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params
@@ -33,6 +39,9 @@ export async function PATCH(
     }
 
     const status = body?.status ? String(body.status).toUpperCase() : undefined
+    if (status && !ALLOWED_INVOICE_STATUSES.has(status)) {
+      return badRequest("Invalid invoice status.")
+    }
     const paidAt = body?.paidAt ? new Date(body.paidAt) : undefined
     const dueDate = body?.dueDate ? new Date(body.dueDate) : undefined
     const amount = body?.amount != null ? Number(body.amount) : undefined

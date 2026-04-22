@@ -41,12 +41,24 @@ export async function POST(request: NextRequest) {
       ]
     }
 
-    const reverted = await prisma.loan.updateMany({
-      where,
-      data: { status: "PENDING", finalizedAt: null, finalizedById: null },
+    const result = await prisma.$transaction(async (tx) => {
+      const reverted = await tx.loan.updateMany({
+        where,
+        data: { status: "PENDING", finalizedAt: null, finalizedById: null },
+      })
+      return reverted
     })
 
-    return NextResponse.json({ reverted: reverted.count })
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user?.id ?? "system",
+        event: "PAYROLL_LOAN_UNFINALIZE",
+        module: "PAYROLL",
+        description: `Unfinalized ${result.count} loans for month ${month.start.toISOString().slice(0, 7)}${regionId ? ` region ${regionId}` : ""}.`,
+      },
+    }).catch(() => {})
+
+    return NextResponse.json({ reverted: result.count })
   } catch (error) {
     console.error("Error unfinalizing loans:", error)
     return internalServerError("Failed to unfinalize loans.")
