@@ -24,11 +24,6 @@ import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { getActorIdentity } from "@/lib/payroll/state-permissions"
 
 const VALID_PAYMENT_METHODS = new Set(["BANK", "CASH", "MOBILE"])
-const PAYABLE_STATES = new Set([
-  "REGIONAL_LOCKED",
-  "GLOBAL_FINALIZED",
-  "EMERGENCY_RELEASED",
-])
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,17 +66,17 @@ export async function POST(request: NextRequest) {
       return forbidden("This payroll is outside your scope.")
     }
 
-    if (!PAYABLE_STATES.has(payroll.state)) {
-      return conflict(
-        `Cannot mark PAID from state ${payroll.state}; require REGIONAL_LOCKED, GLOBAL_FINALIZED, or EMERGENCY_RELEASED.`
-      )
-    }
-
     const actor = getActorIdentity(session)
     const now = new Date()
 
-    await prisma.payroll.update({
-      where: { id: payrollId },
+    // Atomic conditional update: only flip rows still in a payable state.
+    // Two concurrent mark-paid calls cannot both win — the loser sees count=0
+    // and we report the precise reason after a fresh lookup.
+    const result = await prisma.payroll.updateMany({
+      where: {
+        id: payrollId,
+        state: { in: ["REGIONAL_LOCKED", "GLOBAL_FINALIZED", "EMERGENCY_RELEASED"] },
+      },
       data: {
         state: "PAID",
         paymentStatus: "PAID",
@@ -90,6 +85,20 @@ export async function POST(request: NextRequest) {
         paymentUpdatedAt: now,
       },
     })
+
+    if (result.count === 0) {
+      const existing = await prisma.payroll.findUnique({
+        where: { id: payrollId },
+        select: { state: true },
+      })
+      if (!existing) return notFound("Payroll not found.")
+      if (existing.state === "PAID") {
+        return conflict("Payroll is already marked as PAID.")
+      }
+      return conflict(
+        `Cannot mark PAID from state ${existing.state}; require REGIONAL_LOCKED, GLOBAL_FINALIZED, or EMERGENCY_RELEASED.`
+      )
+    }
 
     await safeAuditLog({
       userId: actor.id,

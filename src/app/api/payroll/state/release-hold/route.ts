@@ -74,8 +74,10 @@ export async function POST(request: NextRequest) {
 
     const target = payroll.regionalLockedAt ? "REGIONAL_LOCKED" : "CALCULATED"
 
-    await prisma.payroll.update({
-      where: { id: payrollId },
+    // Atomic conditional update: only release rows still in HOLD. A concurrent
+    // release-hold call cannot race past this — the loser sees count=0.
+    const result = await prisma.payroll.updateMany({
+      where: { id: payrollId, state: "HOLD" },
       data: {
         state: target,
         holdReason: null,
@@ -83,6 +85,10 @@ export async function POST(request: NextRequest) {
         holdSetById: null,
       },
     })
+
+    if (result.count === 0) {
+      return conflict("Payroll is no longer on hold.")
+    }
 
     await safeAuditLog({
       userId: actor.id,

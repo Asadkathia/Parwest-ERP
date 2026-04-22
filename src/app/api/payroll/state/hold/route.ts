@@ -26,12 +26,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { getActorIdentity } from "@/lib/payroll/state-permissions"
 
-const HOLDABLE_STATES = new Set([
-  "DRAFT",
-  "CALCULATED",
-  "REGIONAL_LOCKED",
-  "EMERGENCY_RELEASED",
-])
+const NON_HOLDABLE_STATES = ["HOLD", "PAID", "GLOBAL_FINALIZED"] as const
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +43,8 @@ export async function POST(request: NextRequest) {
     if (!payrollId) return badRequest("payrollId is required.")
     if (!reason) return badRequest("A reason is required to place a HOLD.")
 
+    // Read the row once for scope validation only — the state read here is
+    // not trusted for the transition decision (see updateMany below).
     const payroll = await prisma.payroll.findUnique({
       where: { id: payrollId },
       select: {
@@ -69,17 +66,16 @@ export async function POST(request: NextRequest) {
       return forbidden("This payroll is outside your scope.")
     }
 
-    if (!HOLDABLE_STATES.has(payroll.state)) {
-      return conflict(
-        `Cannot place HOLD on payroll in state ${payroll.state}.`
-      )
-    }
-
     const actor = getActorIdentity(session)
     const now = new Date()
 
-    await prisma.payroll.update({
-      where: { id: payrollId },
+    // Atomic conditional update: only flip rows not already in a non-holdable
+    // state. Two concurrent calls cannot both win — the second sees count=0.
+    const result = await prisma.payroll.updateMany({
+      where: {
+        id: payrollId,
+        state: { notIn: [...NON_HOLDABLE_STATES] },
+      },
       data: {
         state: "HOLD",
         holdReason: reason,
@@ -87,6 +83,24 @@ export async function POST(request: NextRequest) {
         holdSetById: actor.id,
       },
     })
+
+    if (result.count === 0) {
+      const existing = await prisma.payroll.findUnique({
+        where: { id: payrollId },
+        select: { state: true },
+      })
+      if (!existing) return notFound("Payroll not found.")
+      if (existing.state === "HOLD") {
+        return conflict("Payroll is already on hold.")
+      }
+      if (existing.state === "PAID") {
+        return conflict("Cannot hold a paid payroll.")
+      }
+      if (existing.state === "GLOBAL_FINALIZED") {
+        return conflict("Cannot hold a globally finalized payroll.")
+      }
+      return conflict(`Cannot hold from state: ${existing.state}.`)
+    }
 
     await safeAuditLog({
       userId: actor.id,

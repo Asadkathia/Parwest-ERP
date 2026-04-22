@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
     if (!payrollId) return badRequest("payrollId is required.")
     if (!reason) return badRequest("A reason is required for emergency release.")
 
+    // Read once for audit-log context (previous state). State value here is
+    // not trusted for the transition decision — see updateMany below.
     const payroll = await prisma.payroll.findUnique({
       where: { id: payrollId },
       select: { id: true, state: true },
@@ -53,8 +55,14 @@ export async function POST(request: NextRequest) {
     const actor = getActorIdentity(session)
     const now = new Date()
 
-    await prisma.payroll.update({
-      where: { id: payrollId },
+    // Atomic conditional update: exclude PAID and EMERGENCY_RELEASED so a
+    // second concurrent emergency-release on the same row can't silently
+    // overwrite the first caller's reason / actor / timestamp.
+    const result = await prisma.payroll.updateMany({
+      where: {
+        id: payrollId,
+        state: { notIn: ["PAID", "EMERGENCY_RELEASED"] },
+      },
       data: {
         state: "EMERGENCY_RELEASED",
         emergencyReleasedAt: now,
@@ -62,6 +70,21 @@ export async function POST(request: NextRequest) {
         emergencyReleaseReason: reason,
       },
     })
+
+    if (result.count === 0) {
+      const existing = await prisma.payroll.findUnique({
+        where: { id: payrollId },
+        select: { state: true },
+      })
+      if (!existing) return notFound("Payroll not found.")
+      if (existing.state === "PAID") {
+        return conflict("Cannot emergency-release a PAID payroll.")
+      }
+      if (existing.state === "EMERGENCY_RELEASED") {
+        return conflict("Payroll has already been emergency-released.")
+      }
+      return conflict(`Cannot emergency-release from state: ${existing.state}.`)
+    }
 
     await safeAuditLog({
       userId: actor.id,
