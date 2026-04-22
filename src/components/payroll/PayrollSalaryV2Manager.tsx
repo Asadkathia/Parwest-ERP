@@ -32,8 +32,6 @@ type Summary = {
   avgSalaryRates: { Civilian: number; Army: number }
   attendanceStats: {
     totalDays: number
-    regularDays: number
-    overtimeDays: number
     extraDays: number
   }
   branches: BranchRow[]
@@ -259,8 +257,6 @@ export default function PayrollSalaryV2Manager() {
             </InfoCard>
             <InfoCard title="Attendance Stats">
               <KV k="Total Days" v={summary.attendanceStats.totalDays.toLocaleString()} />
-              <KV k="Regular Days" v={summary.attendanceStats.regularDays.toLocaleString()} />
-              <KV k="Overtime Days" v={summary.attendanceStats.overtimeDays.toLocaleString()} />
               <KV k="Extra Days" v={summary.attendanceStats.extraDays.toLocaleString()} />
             </InfoCard>
           </div>

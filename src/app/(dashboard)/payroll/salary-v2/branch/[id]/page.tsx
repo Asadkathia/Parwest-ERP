@@ -13,12 +13,8 @@ type GuardRow = {
   guardName: string
   guardType: string | null
   extraGuard: boolean
-  salaryRate: number
   totalDays: number
-  overtimeDays: number
-  regularWage: number
-  overtimeWage: number
-  postAllowance: number
+  basePay: number
   grossPay: number
   loanDeduction: number
   netPayable: number
@@ -66,6 +62,8 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
     return true
   }) ?? []
 
+  const totalBasePay = filteredGuards.reduce((sum, g) => sum + g.basePay, 0)
+
   const exportExcel = () => {
     if (!detail) return
     const header = [
@@ -74,12 +72,8 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
       "Guard Name",
       "Guard Type",
       "Extra Guard",
-      "Salary Rate",
-      "Total Days",
-      "Overtime Days",
-      "Regular Wage",
-      "Overtime Wage",
-      "Post Allowance",
+      "Total Days (incl. double duty)",
+      "Base Pay",
       "Gross Pay",
       "Loan Deduction",
       "Net Payable",
@@ -97,12 +91,8 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
             g.guardName,
             g.guardType ?? "",
             g.extraGuard ? "Yes" : "No",
-            g.salaryRate,
             g.totalDays,
-            g.overtimeDays,
-            g.regularWage,
-            g.overtimeWage,
-            g.postAllowance,
+            g.basePay,
             g.grossPay,
             g.loanDeduction,
             g.netPayable,
@@ -163,6 +153,11 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
+          <div className="mt-6 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <span className="font-semibold">Pay model:</span> each deployment row pays one day at the
+            deployment&apos;s daily rate. Double duty = two deployment rows on the same date — both pay.
+          </div>
+
           <section className="ui-card p-4 mt-6 space-y-3">
             <div className="flex gap-3 flex-wrap items-end">
               <input
@@ -183,7 +178,7 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1400px] text-sm">
+              <table className="w-full min-w-[1100px] text-sm">
                 <thead className="bg-[var(--surface-muted)]">
                   <tr>
                     <th className="px-3 py-2 text-left">Sr#</th>
@@ -191,12 +186,13 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
                     <th className="px-3 py-2 text-left">Guard Name</th>
                     <th className="px-3 py-2 text-left">Type</th>
                     <th className="px-3 py-2 text-left">Extra Guard</th>
-                    <th className="px-3 py-2 text-right">Salary Rate</th>
-                    <th className="px-3 py-2 text-right">Total Days</th>
-                    <th className="px-3 py-2 text-right">Overtime Days</th>
-                    <th className="px-3 py-2 text-right">Regular Wage</th>
-                    <th className="px-3 py-2 text-right">Overtime Wage</th>
-                    <th className="px-3 py-2 text-right">Post Allowance</th>
+                    <th className="px-3 py-2 text-right">
+                      Total Days{" "}
+                      <span className="text-[10px] font-normal text-[var(--text-muted)]">
+                        (includes double duty)
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right">Base Pay</th>
                     <th className="px-3 py-2 text-right">Gross Pay</th>
                     <th className="px-3 py-2 text-right">Loan Deduction</th>
                     <th className="px-3 py-2 text-right">Net Payable</th>
@@ -205,7 +201,7 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
                 <tbody>
                   {filteredGuards.length === 0 && (
                     <tr>
-                      <td colSpan={14} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                      <td colSpan={10} className="px-3 py-6 text-center text-[var(--text-muted)]">
                         No guards for this branch/month.
                       </td>
                     </tr>
@@ -227,18 +223,8 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
                           {g.extraGuard ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">PKR {g.salaryRate.toLocaleString()}</td>
                       <td className="px-3 py-2 text-right">{g.totalDays}</td>
-                      <td className="px-3 py-2 text-right">{g.overtimeDays}</td>
-                      <td className="px-3 py-2 text-right">
-                        PKR {g.regularWage.toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        PKR {g.overtimeWage.toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        PKR {g.postAllowance.toLocaleString()}
-                      </td>
+                      <td className="px-3 py-2 text-right">PKR {g.basePay.toLocaleString()}</td>
                       <td className="px-3 py-2 text-right">PKR {g.grossPay.toLocaleString()}</td>
                       <td className="px-3 py-2 text-right">
                         PKR {g.loanDeduction.toLocaleString()}
@@ -249,6 +235,19 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
                     </tr>
                   ))}
                 </tbody>
+                {filteredGuards.length > 0 && (
+                  <tfoot className="bg-[var(--surface-muted)] font-semibold">
+                    <tr className="border-t border-[var(--border)]">
+                      <td className="px-3 py-2" colSpan={6}>
+                        Total Base Pay
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        PKR {totalBasePay.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2" colSpan={3} />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </section>
