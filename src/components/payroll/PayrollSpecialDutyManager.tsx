@@ -63,7 +63,6 @@ export default function PayrollSpecialDutyManager() {
   }, [loadRows])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time load of clients for invoice linking
     fetch("/api/clients")
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
@@ -77,6 +76,7 @@ export default function PayrollSpecialDutyManager() {
 
   useEffect(() => {
     if (!clientId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing dependent dropdown when parent cleared
       setBranches([])
       setBranchId("")
       return

@@ -85,6 +85,39 @@ type AllDeploymentRow = {
   client: { id: string; name: string }
   branch: { id: string; name: string; city: string | null } | null
   regionalOffice: { id: string; name: string }
+  salary: number | null
+  rate: number | null
+  overtime: number | null
+}
+
+// Shared rate display — used by both list and cards. Returns either the
+// main "PKR n/day" line with an optional "+ PKR n/hr OT" subline, or an
+// amber "No rate" warning chip when neither salary nor rate is set.
+function DeploymentRateDisplay({
+  salary,
+  rate,
+  overtime,
+}: {
+  salary: number | null
+  rate: number | null
+  overtime: number | null
+}) {
+  const effective = salary != null ? salary : rate
+  if (effective == null) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+        No rate
+      </span>
+    )
+  }
+  return (
+    <div className="leading-tight">
+      <div className="text-[var(--text)] font-medium">PKR {effective.toLocaleString()}/day</div>
+      {overtime != null && overtime > 0 ? (
+        <div className="text-xs text-[var(--text-muted)]">+ PKR {overtime.toLocaleString()}/hr OT</div>
+      ) : null}
+    </div>
+  )
 }
 
 // ── Static option lists ────────────────────────────────────────────────────
@@ -858,6 +891,7 @@ export default function DeployGuardForm() {
                   <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Client / Branch</th>
                   <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Shift</th>
                   <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Type</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Rate</th>
                   <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Date</th>
                   <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Status</th>
                 </tr>
@@ -877,6 +911,7 @@ export default function DeployGuardForm() {
                     </td>
                     <td className="px-4 py-3"><ShiftBadge shift={dep.shiftType} /></td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{dep.deploymentType === "OVERTIME" ? "Overtime" : "Regular"}</td>
+                    <td className="px-4 py-3"><DeploymentRateDisplay salary={dep.salary} rate={dep.rate} overtime={dep.overtime} /></td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{formatDate(dep.deploymentDate)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1155,6 +1190,10 @@ function DeploymentCard({ deployment: dep }: { deployment: AllDeploymentRow }) {
               <Calendar className="h-3 w-3" />
               {formatDate(dep.deploymentDate)}
             </span>
+          </div>
+
+          <div className="pt-1">
+            <DeploymentRateDisplay salary={dep.salary} rate={dep.rate} overtime={dep.overtime} />
           </div>
         </div>
 

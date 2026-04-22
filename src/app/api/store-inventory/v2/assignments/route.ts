@@ -9,7 +9,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
-import { CategoryScope, isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
+import { isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const assignmentInclude: any = {

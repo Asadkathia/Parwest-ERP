@@ -5,7 +5,7 @@ import { badRequest, conflict, internalServerError, ok } from "@/lib/api/respons
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
-import { CategoryScope, isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
+import { isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
 const purchaseInclude = {
   store: true,

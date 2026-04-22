@@ -33,14 +33,12 @@ async function main() {
         isActive: true,
       },
     })
-    // eslint-disable-next-line no-console
     console.log(`✓ ${seed.code}`)
   }
 }
 
 main()
   .catch((err) => {
-    // eslint-disable-next-line no-console
     console.error(err)
     process.exitCode = 1
   })
