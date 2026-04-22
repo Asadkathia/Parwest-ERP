@@ -66,9 +66,9 @@ enum StoreInventoryPurchaseStatus {
 // ============================================
 
 model User {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
-  email         String   @unique
+  email         String    @unique
   password      String
   contactNumber String?
   photoUrl      String?
@@ -95,9 +95,9 @@ model User {
   supervisorAssignments             ManagerSupervisorAssignment[]  @relation("SupervisorAssignments")
   clientAssignments                 ClientSupervisorAssignment[]
   guardAssignments                  GuardSupervisorAssignment[]
-  clientInsurancesCreated           ClientInsurance[]  @relation("ClientInsuranceCreatedBy")
-  guardInsurancesCreated            GuardInsurance[]   @relation("GuardInsuranceCreatedBy")
-  guardCoursesCreated               GuardCourse[]      @relation("GuardCourseCreatedBy")
+  clientInsurancesCreated           ClientInsurance[]              @relation("ClientInsuranceCreatedBy")
+  guardInsurancesCreated            GuardInsurance[]               @relation("GuardInsuranceCreatedBy")
+  guardCoursesCreated               GuardCourse[]                  @relation("GuardCourseCreatedBy")
   requisitionsRequested             Requisition[]                  @relation("RequisitionRequester")
   requisitionsApproved              Requisition[]                  @relation("RequisitionApprover")
   storeInventoryPurchasesCreated    StoreInventoryPurchase[]       @relation("StoreInventoryPurchaseCreatedBy")
@@ -214,6 +214,9 @@ model RegionalOffice {
   managerSupervisorAssignments ManagerSupervisorAssignment[]
   clients                      Client[]
 
+  // Reserve % override: null = use global default 30%; client override takes precedence
+  reservePct Float?
+
   @@index([regionId])
 }
 
@@ -257,59 +260,59 @@ model Guard {
   photoUrl                 String? // base64 data URL or external image URL
 
   // General info extras
-  sect                     String?
-  cast                     String?
-  bloodGroup               String?
-  policeStation            String?
-  cnicIssueDate            DateTime?
-  cnicExpiryDate           DateTime?
-  salary                   Float?
-  designation              String?
-  joiningAge               Int?
-  enrolledBy               String?
+  sect           String?
+  cast           String?
+  bloodGroup     String?
+  policeStation  String?
+  cnicIssueDate  DateTime?
+  cnicExpiryDate DateTime?
+  salary         Float?
+  designation    String?
+  joiningAge     Int?
+  enrolledBy     String?
 
   // Previous employment details
-  exServiceType            String?   // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
-  exServiceRegistrationNo  String?
-  exServiceUnit            String?
-  exServicePeriod          String?
-  exServiceYears           Int?
-  exServiceMonths          Int?
-  exServiceOtherLabel      String?
-  dateOfEnrollment         DateTime?
-  dateOfDischarge          DateTime?
-  exServiceRemarks         String?
+  exServiceType           String? // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
+  exServiceRegistrationNo String?
+  exServiceUnit           String?
+  exServicePeriod         String?
+  exServiceYears          Int?
+  exServiceMonths         Int?
+  exServiceOtherLabel     String?
+  dateOfEnrollment        DateTime?
+  dateOfDischarge         DateTime?
+  exServiceRemarks        String?
 
   // Address contacts
-  currentAddressContact    String?
-  permanentAddressContact  String?
+  currentAddressContact   String?
+  permanentAddressContact String?
 
   // Education extras
-  passingYear              String?
-  educationInstitute       String?
+  passingYear        String?
+  educationInstitute String?
 
   // Introducer
-  introducerName           String?
-  introducerCnic           String?
-  introducerAddress        String?
-  introducerContact        String?
+  introducerName    String?
+  introducerCnic    String?
+  introducerAddress String?
+  introducerContact String?
 
   // Physical details
-  height                   String?
-  weight                   String?
-  eyeColor                 String?
-  hairColor                String?
-  disability               String?
-  identificationMark       String?
+  height             String?
+  weight             String?
+  eyeColor           String?
+  hairColor          String?
+  disability         String?
+  identificationMark String?
 
   // Family members
-  familyMembersJson        String? // JSON array of family member objects
+  familyMembersJson String? // JSON array of family member objects
 
   // Previous employment (multiple entries)
-  previousEmploymentsJson  String? // JSON array of PreviousEmployment objects
+  previousEmploymentsJson String? // JSON array of PreviousEmployment objects
 
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   regionalOfficeId String?
@@ -317,26 +320,27 @@ model Guard {
   regionId         String?
   region           Region?         @relation(fields: [regionId], references: [id])
 
-  prerequisites              GuardPrerequisite[]
-  pledgedDocumentRecords     GuardPledgedDocumentRecord[]
-  deployments           Deployment[]
-  payrolls              Payroll[]
-  loans                 Loan[]
-  specialDuties         PayrollSpecialDuty[]
-  salarySlips           PayrollSalarySlip[]
-  attendances           Attendance[]
-  inventoryAssignments  InventoryAssignment[]
-  storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentGuardAssignee")
-  residenceAssignments  ResidenceAssignment[]
-  trainings             Training[]
-  supervisorAssignments GuardSupervisorAssignment[]
-  ageApproval           GuardAgeApproval?
-  guardInsurances       GuardInsurance[]
-  guardCourses          GuardCourse[]
+  prerequisites             GuardPrerequisite[]
+  pledgedDocumentRecords    GuardPledgedDocumentRecord[]
+  deployments               Deployment[]
+  payrolls                  Payroll[]
+  loans                     Loan[]
+  specialDuties             PayrollSpecialDuty[]
+  salarySlips               PayrollSalarySlip[]
+  attendances               Attendance[]
+  inventoryAssignments      InventoryAssignment[]
+  storeInventoryAssignments StoreInventoryAssignment[]   @relation("StoreInventoryAssignmentGuardAssignee")
+  residenceAssignments      ResidenceAssignment[]
+  trainings                 Training[]
+  supervisorAssignments     GuardSupervisorAssignment[]
+  ageApproval               GuardAgeApproval?
+  guardInsurances           GuardInsurance[]
+  guardCourses              GuardCourse[]
+  reserveLedger             PayrollReserveLedger[]
 
   // Age approval flags
-  ageApprovalRequired Boolean  @default(false)
-  ageApprovalStatus   String?  // PENDING | APPROVED | REJECTED
+  ageApprovalRequired Boolean @default(false)
+  ageApprovalStatus   String? // PENDING | APPROVED | REJECTED
 
   @@index([parwestId])
   @@index([cnic])
@@ -356,7 +360,7 @@ model GuardAgeApproval {
   guardId     String    @unique
   guard       Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
   guardAge    Int
-  reason      String    // OVERAGE | UNDERAGE
+  reason      String // OVERAGE | UNDERAGE
   status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
   requestedBy String?
   reviewedBy  String?
@@ -384,17 +388,17 @@ model BlacklistedCnic {
 // across different guard IDs / regions / parwestIds
 model GuardServiceHistory {
   id            String   @id @default(cuid())
-  cnic          String   // FK-less: guard may be deleted/re-created
-  guardId       String?  // null when guard no longer exists
-  parwestId     String?  // snapshot at time of event
-  guardName     String?  // snapshot at time of event
-  event         String   // ENROLLED | STATUS_CHANGED | BLACKLISTED | UNBLACKLISTED | REACTIVATED | DEPLOYMENT_STARTED | DEPLOYMENT_ENDED
-  fromStatus    String?  // previous guard status
-  toStatus      String?  // new guard status
+  cnic          String // FK-less: guard may be deleted/re-created
+  guardId       String? // null when guard no longer exists
+  parwestId     String? // snapshot at time of event
+  guardName     String? // snapshot at time of event
+  event         String // ENROLLED | STATUS_CHANGED | BLACKLISTED | UNBLACKLISTED | REACTIVATED | DEPLOYMENT_STARTED | DEPLOYMENT_ENDED
+  fromStatus    String? // previous guard status
+  toStatus      String? // new guard status
   description   String?
   changedByName String?
-  regionName    String?  // snapshot at time of event
-  officeName    String?  // snapshot at time of event
+  regionName    String? // snapshot at time of event
+  officeName    String? // snapshot at time of event
   createdAt     DateTime @default(now())
 
   @@index([cnic])
@@ -406,16 +410,16 @@ model GuardServiceHistory {
 model GuardStatusHistory {
   id            String   @id @default(cuid())
   guardId       String
-  cnic          String?  // snapshot for cross-registration tracing
-  parwestId     String?  // snapshot at time of change
-  guardName     String?  // snapshot at time of change
-  fromStatus    String?  // previous status (null on first enrollment)
-  toStatus      String   // new status
-  reason        String?  // reason provided by the user
-  changedByName String?  // name of user who triggered the change
-  changedByType String?  // MANUAL | SYSTEM | BLACKLIST | ENROLLMENT
-  regionName    String?  // snapshot
-  officeName    String?  // snapshot
+  cnic          String? // snapshot for cross-registration tracing
+  parwestId     String? // snapshot at time of change
+  guardName     String? // snapshot at time of change
+  fromStatus    String? // previous status (null on first enrollment)
+  toStatus      String // new status
+  reason        String? // reason provided by the user
+  changedByName String? // name of user who triggered the change
+  changedByType String? // MANUAL | SYSTEM | BLACKLIST | ENROLLMENT
+  regionName    String? // snapshot
+  officeName    String? // snapshot
   createdAt     DateTime @default(now())
 
   @@index([guardId])
@@ -447,24 +451,24 @@ model DeploymentRate {
 }
 
 model GuardDocumentType {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  docCategory      String   @default("VERIFICATION") // VERIFICATION | ATTACHMENT
-  isSystemGenerated Boolean @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String   @unique
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  docCategory       String   @default("VERIFICATION") // VERIFICATION | ATTACHMENT
+  isSystemGenerated Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model GuardDeploymentInventoryRule {
-  id                String   @id @default(cuid())
-  ruleKey           String   @unique @default("default")
-  isActive          Boolean  @default(false)
-  minimumAssignedItems Int  @default(1)
-  allowedCategoryIds Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  ruleKey              String   @unique @default("default")
+  isActive             Boolean  @default(false)
+  minimumAssignedItems Int      @default(1)
+  allowedCategoryIds   Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model GuardPrerequisite {
@@ -477,11 +481,11 @@ model GuardPrerequisite {
   attachmentData     String? // base64 encoded file
   attachmentName     String? // original file name
   documentUrl        String?
-  uploadedBy         String?   // who uploaded the current attachment
+  uploadedBy         String? // who uploaded the current attachment
   uploadedAt         DateTime? // when the current attachment was uploaded
   verifiedAt         DateTime?
-  verifiedBy         String?   // who set status to VERIFIED
-  editedBy           String?   // who last edited this record
+  verifiedBy         String? // who set status to VERIFIED
+  editedBy           String? // who last edited this record
   editedAt           DateTime? // when it was last edited
   expiryDate         DateTime?
   comments           String?
@@ -489,7 +493,7 @@ model GuardPrerequisite {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  history            GuardPrerequisiteHistory[]
+  history GuardPrerequisiteHistory[]
 
   @@unique([guardId, docTypeName])
   @@index([guardId])
@@ -500,7 +504,7 @@ model GuardPrerequisiteHistory {
   id             String            @id @default(cuid())
   prereqId       String
   prereq         GuardPrerequisite @relation(fields: [prereqId], references: [id], onDelete: Cascade)
-  attachmentData String?           // base64 of archived file
+  attachmentData String? // base64 of archived file
   attachmentName String?
   documentUrl    String?
   uploadedBy     String?
@@ -527,15 +531,15 @@ model Deployment {
   notes            String?
 
   // Extended fields from documentation
-  guardType       String? // Security Guard, Supervisor, etc.
-  salary          Float?
-  overtime        Float?
-  extraHours      Float?
-  postAllowance   Float?
-  dayShiftStart   String? // Time format: HH:MM
-  dayShiftEnd     String?
-  nightShiftStart String?
-  nightShiftEnd   String?
+  guardType        String? // Security Guard, Supervisor, etc.
+  salary           Float?
+  overtime         Float?
+  extraHours       Float?
+  postAllowance    Float?
+  dayShiftStart    String? // Time format: HH:MM
+  dayShiftEnd      String?
+  nightShiftStart  String?
+  nightShiftEnd    String?
   deploymentType   String? @default("REGULAR") // REGULAR, OVERTIME
   deploymentNature String? @default("PERMANENT") // PERMANENT, TEMPORARY
   isExtraGuard     Boolean @default(false)
@@ -570,12 +574,12 @@ model Attendance {
 
   // Deployment link — which deployment auto-generated this record
   deploymentId String?
-  clientId     String?  // denormalized for quick display
-  clientName   String?  // denormalized client name
+  clientId     String? // denormalized for quick display
+  clientName   String? // denormalized client name
 
   // Hours tracking
-  hoursWorked    Float?
-  overtimeHours  Float?
+  hoursWorked   Float?
+  overtimeHours Float?
 
   // Audit
   isAutoGenerated Boolean @default(false)
@@ -683,8 +687,8 @@ model Client {
   // Contact
   contactPerson            String?
   contactPersonDesignation String?
-  phone                    String?  // primary contact number
-  contactNumbers           Json?    // array of all contact numbers
+  phone                    String? // primary contact number
+  contactNumbers           Json? // array of all contact numbers
   postalCode               String?
 
   // Introducer / Referral
@@ -697,18 +701,18 @@ model Client {
   operationalProvinces String?
 
   // Assigned users (stored as plain IDs — resolved at query time)
-  assignedManagerId   String?
+  assignedManagerId String?
 
   // GPS coordinates (used for branchless clients)
-  latitude   Float?
-  longitude  Float?
+  latitude  Float?
+  longitude Float?
 
   // Guard capacities (branchless clients or per-client defaults)
-  dayGuardCapacity       Int?
-  nightGuardCapacity     Int?
-  daySupervisorCapacity  Int?
+  dayGuardCapacity        Int?
+  nightGuardCapacity      Int?
+  daySupervisorCapacity   Int?
   nightSupervisorCapacity Int?
-  cpoCapacity            Int?
+  cpoCapacity             Int?
 
   // Contract details
   contractStart            DateTime?
@@ -721,8 +725,8 @@ model Client {
   contractPrice            Float?
 
   // Contract — day guard specifics
-  contractDayGuardDesignation  String?
-  contractDayGuardExService    String?
+  contractDayGuardDesignation   String?
+  contractDayGuardExService     String?
   // Contract — night guard specifics
   contractNightGuardDesignation String?
   contractNightGuardExService   String?
@@ -735,32 +739,36 @@ model Client {
   regionalOfficeId String?
   regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
 
-  branches              Branch[]
-  deployments           Deployment[]
-  pricingConfigs        PricingConfig[]
-  inventoryAssignments  InventoryAssignment[]
-  storeInventoryAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentClientAssignee")
-  invoices              Invoice[]
-  deploymentRates       DeploymentRate[]
-  supervisorAssignments ClientSupervisorAssignment[]
-  contracts             ClientContract[]
-  insurances            ClientInsurance[]
+  branches                  Branch[]
+  deployments               Deployment[]
+  pricingConfigs            PricingConfig[]
+  inventoryAssignments      InventoryAssignment[]
+  storeInventoryAssignments StoreInventoryAssignment[]   @relation("StoreInventoryAssignmentClientAssignee")
+  invoices                  Invoice[]
+  deploymentRates           DeploymentRate[]
+  supervisorAssignments     ClientSupervisorAssignment[]
+  contracts                 ClientContract[]
+  insurances                ClientInsurance[]
+  payrollSpecialDuties      PayrollSpecialDuty[]
+
+  // Reserve % override: null = use regional or global default 30%
+  reservePct Float?
 
   @@index([name])
   @@index([status])
 }
 
 model Branch {
-  id                  String   @id @default(cuid())
-  clientId            String
-  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name                String
-  code                String?
-  address             String?
-  city                String?
-  province            String?
-  type                String?  // CONVENTIONAL, ISLAMIC, etc.
-  isHeadOffice        Boolean  @default(false)
+  id                       String  @id @default(cuid())
+  clientId                 String
+  client                   Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name                     String
+  code                     String?
+  address                  String?
+  city                     String?
+  province                 String?
+  type                     String? // CONVENTIONAL, ISLAMIC, etc.
+  isHeadOffice             Boolean @default(false)
   contactPerson            String?
   contactPersonDesignation String?
   contactPhone             String?
@@ -769,92 +777,94 @@ model Branch {
   contractAttachments      Json? // Array of { name: string; dataUrl: string }
 
   // Contract details
-  contractStart            DateTime?
-  contractEnd              DateTime?
-  contractRateStart        DateTime?
-  contractRateEnd          DateTime?
-  contractGuardDesignation String?
-  contractAdditionalGuards Int?
-  contractGuardExService   String?
-  contractPrice            Float?
-  contractDayGuardDesignation  String?
-  contractDayGuardExService    String?
+  contractStart                 DateTime?
+  contractEnd                   DateTime?
+  contractRateStart             DateTime?
+  contractRateEnd               DateTime?
+  contractGuardDesignation      String?
+  contractAdditionalGuards      Int?
+  contractGuardExService        String?
+  contractPrice                 Float?
+  contractDayGuardDesignation   String?
+  contractDayGuardExService     String?
   contractNightGuardDesignation String?
   contractNightGuardExService   String?
   contractAdditionalDayGuards   Int?
   contractAdditionalNightGuards Int?
 
   // Assignment
-  assignedManagerId   String?
-  regionalOfficeId    String?
+  assignedManagerId String?
+  regionalOfficeId  String?
 
   // Location coordinates
-  latitude               Float?
-  longitude              Float?
+  latitude  Float?
+  longitude Float?
 
   // Guard / staff capacity requirements
-  dayGuardCapacity         Int?
-  nightGuardCapacity       Int?
-  daySupervisorCapacity    Int?
-  nightSupervisorCapacity  Int?
-  cpoCapacity              Int?
-  dayCpoCapacity           Int?
-  nightCpoCapacity         Int?
-  daySoCapacity            Int?
-  nightSoCapacity          Int?
-  dayAsoCapacity           Int?
-  nightAsoCapacity         Int?
-  dayLsoCapacity           Int?
-  nightLsoCapacity         Int?
-  dayCctvCapacity          Int?
-  nightCctvCapacity        Int?
-  dayReceptionistCapacity  Int?
+  dayGuardCapacity          Int?
+  nightGuardCapacity        Int?
+  daySupervisorCapacity     Int?
+  nightSupervisorCapacity   Int?
+  cpoCapacity               Int?
+  dayCpoCapacity            Int?
+  nightCpoCapacity          Int?
+  daySoCapacity             Int?
+  nightSoCapacity           Int?
+  dayAsoCapacity            Int?
+  nightAsoCapacity          Int?
+  dayLsoCapacity            Int?
+  nightLsoCapacity          Int?
+  dayCctvCapacity           Int?
+  nightCctvCapacity         Int?
+  dayReceptionistCapacity   Int?
   nightReceptionistCapacity Int?
 
   // Branch metadata
-  enrollmentDate           DateTime?
-  isLockerBranch           Boolean   @default(false)
+  enrollmentDate DateTime?
+  isLockerBranch Boolean   @default(false)
 
   // Extended contact person info
-  contactPersonCnic        String?
-  contactPersonPhone       String?
+  contactPersonCnic  String?
+  contactPersonPhone String?
 
   // Branch manager info
-  branchManagerName        String?
-  branchManagerContact     String?
-  branchManagerEmail       String?
+  branchManagerName    String?
+  branchManagerContact String?
+  branchManagerEmail   String?
 
   // Operations manager (separate from assignedManagerId)
   operationsManagerId      String?
   operationsManagerContact String?
 
   // Supervisor contact
-  supervisorContact        String?
+  supervisorContact String?
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   deployments           Deployment[]
   deploymentRates       DeploymentRate[]
   supervisorAssignments ClientSupervisorAssignment[]
   contracts             ClientContract[]
+  payrollSpecialDuties  PayrollSpecialDuty[]
+  invoices              Invoice[]
 
   @@index([clientId])
 }
 
 model ClientContract {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  branchId  String?  // null = client-level; set = branch-specific contract
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branchId  String? // null = client-level; set = branch-specific contract
+  branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   name      String
-  type      String   @default("GENERAL")  // GENERAL, SPECIAL, etc.
+  type      String    @default("GENERAL") // GENERAL, SPECIAL, etc.
   startDate DateTime?
   endDate   DateTime?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   rates ClientContractRate[]
 
@@ -868,8 +878,8 @@ model ClientContractRate {
   contract      ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   province      String?
   city          String?
-  guardType     String         // GUARD, SUPERVISOR, CPO, etc.
-  exService     String?        // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
+  guardType     String // GUARD, SUPERVISOR, CPO, etc.
+  exService     String? // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
   rate          Float
   extraHourRate Float?
   isCurrentRate Boolean        @default(false)
@@ -900,14 +910,26 @@ model Invoice {
   invoiceNumber String    @unique
   month         DateTime
   amount        Float
-  status        String    @default("PENDING") // PENDING, PAID, OVERDUE
+  // status values (widened): DRAFT | PENDING | ADVANCE_PAID | PARTIAL_PAID | PAID | UNPAID | OVERDUE
+  status        String    @default("PENDING")
   dueDate       DateTime?
   paidAt        DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // New: branch-level invoicing, taxes, partial payment, line items
+  branchId   String?
+  branch     Branch?           @relation(fields: [branchId], references: [id])
+  subtotal   Float             @default(0)
+  taxRate    Float?
+  taxAmount  Float             @default(0)
+  paidAmount Float             @default(0)
+  notes      String?
+  lineItems  InvoiceLineItem[]
+
   @@index([clientId])
   @@index([status])
+  @@index([branchId])
 }
 
 // ============================================
@@ -915,35 +937,73 @@ model Invoice {
 // ============================================
 
 model Payroll {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   guardId            String
-  guard              Guard    @relation(fields: [guardId], references: [id])
+  guard              Guard     @relation(fields: [guardId], references: [id])
   month              DateTime
   year               Int
-  deploymentDays     Int      @default(0)
-  baseSalary         Float    @default(0)
-  extraHours         Float    @default(0)
-  extraHoursAmount   Float    @default(0)
-  specialDutyHours   Float    @default(0)
-  specialDutyAmount  Float    @default(0)
-  loans              Float    @default(0)
-  otherDeductions    Float    @default(0)
-  trainingSchoolFees Float    @default(0)
-  cwf                Float    @default(0) // Contribution Welfare Fund
-  eobi               Float    @default(0)
-  essi               Float    @default(0)
-  netSalary          Float    @default(0)
-  paymentStatus      String   @default("PENDING") // PENDING, PAID, UNPAID
+  deploymentDays     Int       @default(0)
+  baseSalary         Float     @default(0)
+  extraHours         Float     @default(0)
+  extraHoursAmount   Float     @default(0)
+  specialDutyHours   Float     @default(0)
+  specialDutyAmount  Float     @default(0)
+  loans              Float     @default(0)
+  otherDeductions    Float     @default(0)
+  trainingSchoolFees Float     @default(0)
+  cwf                Float     @default(0) // Contribution Welfare Fund
+  eobi               Float     @default(0)
+  essi               Float     @default(0)
+  netSalary          Float     @default(0)
+  paymentStatus      String    @default("PENDING") // PENDING, PAID, UNPAID
   paymentMethod      String? // BANK, CASH, MOBILE
   paymentRemarks     String?
   paymentUpdatedAt   DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // New: separated overtime/extras tracking
+  overtimeHours  Float @default(0)
+  overtimeAmount Float @default(0)
+  // NOTE: extraHours / extraHoursAmount above are retained. In the new model they
+  // represent manually-entered extra hours (separate from per-deployment overtime).
+  // Wave 2: trainingSchoolFees, cwf, eobi, essi will be deprecated in favor of
+  // PayrollDeductionEntry. For now they coexist.
+
+  // New: reserve tracking
+  reservePct       Float @default(0.30)
+  reserveAmount    Float @default(0)
+  netBeforeReserve Float @default(0)
+
+  // New: state machine fields (paymentStatus retained for backward compat)
+  // state values: DRAFT | CALCULATED | REGIONAL_LOCKED | GLOBAL_FINALIZED | PAID | HOLD | EMERGENCY_RELEASED
+  state                  String    @default("DRAFT")
+  holdReason             String?
+  holdSetAt              DateTime?
+  holdSetById            String?
+  regionalLockedAt       DateTime?
+  regionalLockedById     String?
+  globalFinalizedAt      DateTime?
+  globalFinalizedById    String?
+  emergencyReleasedAt    DateTime?
+  emergencyReleasedById  String?
+  emergencyReleaseReason String?
+
+  // New: denormalized scope for fast region-wide locking
+  regionId         String?
+  regionalOfficeId String?
+
+  // New: relations
+  deductionEntries PayrollDeductionEntry[]
+  reserveLedger    PayrollReserveLedger[]
 
   @@unique([guardId, month, year])
   @@index([guardId])
   @@index([month])
   @@index([paymentStatus])
+  @@index([state])
+  @@index([regionId])
+  @@index([regionalOfficeId])
 }
 
 model PayrollHoliday {
@@ -953,11 +1013,12 @@ model PayrollHoliday {
   dateFrom         DateTime?
   dateTo           DateTime?
   regionalOfficeId String?
-  valueType        String?   // FIXED_PER_DAY | MULTIPLE_OF_RATE
+  valueType        String? // FIXED_PER_DAY | MULTIPLE_OF_RATE
   value            Float?
   status           String?   @default("active")
   comments         String?
   notes            String?
+  appliesTo        String?   @default("WORKED_ONLY") // WORKED_ONLY | ALL_DEPLOYED_IN_OFFICE | ALL_GUARDS_IN_OFFICE
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -966,30 +1027,30 @@ model PayrollHoliday {
 }
 
 model Loan {
-  id                String    @id @default(cuid())
-  guardId           String
-  guard             Guard     @relation(fields: [guardId], references: [id])
-  month             DateTime
-  amount            Float
-  status            String    @default("PENDING") // PENDING, FINALIZED
-  deploymentDays    Int?
-  supervisor        String?
-  manager           String?
+  id               String    @id @default(cuid())
+  guardId          String
+  guard            Guard     @relation(fields: [guardId], references: [id])
+  month            DateTime
+  amount           Float
+  status           String    @default("PENDING") // PENDING, FINALIZED
+  deploymentDays   Int?
+  supervisor       String?
+  manager          String?
   // Extended fields — legacy ERP parity
-  regionId          String?
-  supervisorUserId  String?
-  managerUserId     String?
-  slipNumber        String?
-  paymentDate       DateTime?
-  paymentMethod     String?   // BANK | CASH | MOBILE
-  bankName          String?
-  accountNumber     String?
-  imageBase64       String?
-  issuerId          String?
-  finalizedAt       DateTime?
-  finalizedById     String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  regionId         String?
+  supervisorUserId String?
+  managerUserId    String?
+  slipNumber       String?
+  paymentDate      DateTime?
+  paymentMethod    String? // BANK | CASH | MOBILE
+  bankName         String?
+  accountNumber    String?
+  imageBase64      String?
+  issuerId         String?
+  finalizedAt      DateTime?
+  finalizedById    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([guardId])
   @@index([status])
@@ -998,22 +1059,28 @@ model Loan {
 }
 
 model PayrollSpecialDuty {
-  id                String   @id @default(cuid())
-  guardId           String
-  guard             Guard    @relation(fields: [guardId], references: [id])
-  dateFrom          DateTime
-  dateTo            DateTime
-  hours             Float
-  hourRate          Float
-  amount            Float
-  comments          String?
-  attachmentBase64  String?
-  status            String   @default("ACTIVE") // ACTIVE | CANCELLED
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  guardId          String
+  guard            Guard    @relation(fields: [guardId], references: [id])
+  dateFrom         DateTime
+  dateTo           DateTime
+  hours            Float
+  hourRate         Float
+  amount           Float
+  comments         String?
+  attachmentBase64 String?
+  status           String   @default("ACTIVE") // ACTIVE | CANCELLED
+  clientId         String?
+  client           Client?  @relation(fields: [clientId], references: [id])
+  branchId         String?
+  branch           Branch?  @relation(fields: [branchId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([guardId])
   @@index([dateFrom])
+  @@index([clientId])
+  @@index([branchId])
 }
 
 model PayrollLoanFinalizationHistory {
@@ -1026,7 +1093,7 @@ model PayrollLoanFinalizationHistory {
   month           DateTime
   loanCount       Int
   totalAmount     Float
-  loanIdsJson     String   // JSON array of loan IDs included in this batch
+  loanIdsJson     String // JSON array of loan IDs included in this batch
   createdAt       DateTime @default(now())
 
   @@index([finalizedAt])
@@ -1034,37 +1101,37 @@ model PayrollLoanFinalizationHistory {
 }
 
 model PayrollSalarySlip {
-  id              String   @id @default(cuid())
-  guardId         String
-  guard           Guard    @relation(fields: [guardId], references: [id])
-  month           DateTime
-  year            Int
-  earningsJson    String   // { basicSalary, workingDays, paidWorkingDays, overtime, gazettedHolidays, arrears, ... }
-  deductionsJson  String   // { advanceSalary, eobi, mess, specialBranch, apsaaTraining, absencePenalty, ... }
-  grossPay        Float
-  netPayable      Float
-  payslipBase64   String?  // generated PDF/HTML as base64
-  generatedById   String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  guardId        String
+  guard          Guard    @relation(fields: [guardId], references: [id])
+  month          DateTime
+  year           Int
+  earningsJson   String // { basicSalary, workingDays, paidWorkingDays, overtime, gazettedHolidays, arrears, ... }
+  deductionsJson String // { advanceSalary, eobi, mess, specialBranch, apsaaTraining, absencePenalty, ... }
+  grossPay       Float
+  netPayable     Float
+  payslipBase64  String? // generated PDF/HTML as base64
+  generatedById  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([guardId, month, year])
   @@index([month])
 }
 
 model PayrollDefault {
-  id                         String   @id @default(cuid())
-  regionalOfficeId           String?
-  trainingSchoolFeeTotal     Float    @default(0)
-  trainingSchoolFeeMonthly   Float    @default(0)
-  cwfDeduction               Float    @default(0)
-  spBrVerAgeLimit            Int?
-  spBrVerDays                Int?
-  spBrVerAmount              Float?
-  createdById                String?
-  createdByName              String?
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  regionalOfficeId         String?
+  trainingSchoolFeeTotal   Float    @default(0)
+  trainingSchoolFeeMonthly Float    @default(0)
+  cwfDeduction             Float    @default(0)
+  spBrVerAgeLimit          Int?
+  spBrVerDays              Int?
+  spBrVerAmount            Float?
+  createdById              String?
+  createdByName            String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@index([regionalOfficeId])
 }
@@ -1084,15 +1151,15 @@ model InventoryCategory {
 }
 
 model InventoryVendor {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  contact   String?
-  companyPhone String?
-  contactPerson String?
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  contact            String?
+  companyPhone       String?
+  contactPerson      String?
   contactPersonPhone String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  address            String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   items     InventoryItem[]
   purchases StoreInventoryPurchase[]
@@ -1238,10 +1305,10 @@ model StoreInventoryUnit {
 }
 
 model StoreInventoryStatus {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String                  @id @default(cuid())
+  name       String                  @unique
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
   categoryId String?
   category   StoreInventoryCategory? @relation(fields: [categoryId], references: [id])
 
@@ -1249,16 +1316,16 @@ model StoreInventoryStatus {
 }
 
 model StoreInventoryCategory {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  canAssignGuard   Boolean  @default(false)
-  canAssignEmployee Boolean @default(false)
-  canAssignClient  Boolean  @default(false)
-  parentId         String?
-  parent           StoreInventoryCategory?  @relation("StoreInventoryCategoryParent", fields: [parentId], references: [id])
-  children         StoreInventoryCategory[] @relation("StoreInventoryCategoryParent")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String                   @id @default(cuid())
+  name              String                   @unique
+  canAssignGuard    Boolean                  @default(false)
+  canAssignEmployee Boolean                  @default(false)
+  canAssignClient   Boolean                  @default(false)
+  parentId          String?
+  parent            StoreInventoryCategory?  @relation("StoreInventoryCategoryParent", fields: [parentId], references: [id])
+  children          StoreInventoryCategory[] @relation("StoreInventoryCategoryParent")
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 
   products StoreInventoryProduct[]
   statuses StoreInventoryStatus[]
@@ -1273,9 +1340,9 @@ model StoreInventoryConditionV2 {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  products            StoreInventoryProduct[]
-  assignments         StoreInventoryAssignment[]
-  returnAssignments   StoreInventoryAssignment[] @relation("StoreInventoryAssignmentReturnCondition")
+  products          StoreInventoryProduct[]
+  assignments       StoreInventoryAssignment[]
+  returnAssignments StoreInventoryAssignment[] @relation("StoreInventoryAssignmentReturnCondition")
 }
 
 model StoreInventoryWeaponType {
@@ -1306,9 +1373,9 @@ model StoreInventoryLicenseType {
 }
 
 model StoreInventoryLicense {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   validity       String
-  licenseNumber  String   @unique
+  licenseNumber  String    @unique
   clientId       String?
   weaponNumber   String?
   weaponTypeId   String?
@@ -1317,8 +1384,8 @@ model StoreInventoryLicense {
   expiryDate     DateTime?
   attachmentName String?
   createdById    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([clientId])
   @@index([weaponTypeId])
@@ -1416,19 +1483,19 @@ model StoreInventoryBalance {
 }
 
 model StoreInventoryPurchase {
-  id           String                       @id @default(cuid())
-  referenceNo  String?                      @unique
-  invoiceNo    String?
+  id            String                       @id @default(cuid())
+  referenceNo   String?                      @unique
+  invoiceNo     String?
   attachmentUrl String?
-  supplierName String?
-  vendorId     String?
-  vendor       InventoryVendor?             @relation(fields: [vendorId], references: [id])
-  status       StoreInventoryPurchaseStatus @default(DRAFT)
-  purchasedAt  DateTime                     @default(now())
-  receivedAt   DateTime?
-  notes        String?
-  createdAt    DateTime                     @default(now())
-  updatedAt    DateTime                     @updatedAt
+  supplierName  String?
+  vendorId      String?
+  vendor        InventoryVendor?             @relation(fields: [vendorId], references: [id])
+  status        StoreInventoryPurchaseStatus @default(DRAFT)
+  purchasedAt   DateTime                     @default(now())
+  receivedAt    DateTime?
+  notes         String?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
 
   storeId      String
   store        Store   @relation(fields: [storeId], references: [id])
@@ -1598,35 +1665,35 @@ model StoreInventoryDemandResponseLine {
 }
 
 model StoreInventoryAssignment {
-  id               String                         @id @default(cuid())
-  quantity         Int                            @default(1)
-  status           StoreInventoryAssignmentStatus @default(ASSIGNED)
+  id               String                             @id @default(cuid())
+  quantity         Int                                @default(1)
+  status           StoreInventoryAssignmentStatus     @default(ASSIGNED)
   assignedToType   StoreInventoryAssignmentTargetType @default(EMPLOYEE)
-  assignedAt       DateTime                       @default(now())
+  assignedAt       DateTime                           @default(now())
   expectedReturnAt DateTime?
   returnedAt       DateTime?
   notes            String?
-  createdAt        DateTime                       @default(now())
-  updatedAt        DateTime                       @updatedAt
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @updatedAt
 
-  storeId          String
-  store            Store                 @relation(fields: [storeId], references: [id])
-  productId        String
-  product          StoreInventoryProduct @relation(fields: [productId], references: [id])
-  conditionId      String?
-  condition        StoreInventoryConditionV2? @relation(fields: [conditionId], references: [id])
-  assignedToUserId String?
-  assignedToUser   User?                 @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
-  assignedToGuardId String?
-  assignedToGuard   Guard?               @relation("StoreInventoryAssignmentGuardAssignee", fields: [assignedToGuardId], references: [id])
+  storeId            String
+  store              Store                      @relation(fields: [storeId], references: [id])
+  productId          String
+  product            StoreInventoryProduct      @relation(fields: [productId], references: [id])
+  conditionId        String?
+  condition          StoreInventoryConditionV2? @relation(fields: [conditionId], references: [id])
+  assignedToUserId   String?
+  assignedToUser     User?                      @relation("StoreInventoryAssignmentAssignee", fields: [assignedToUserId], references: [id])
+  assignedToGuardId  String?
+  assignedToGuard    Guard?                     @relation("StoreInventoryAssignmentGuardAssignee", fields: [assignedToGuardId], references: [id])
   assignedToClientId String?
-  assignedToClient   Client?             @relation("StoreInventoryAssignmentClientAssignee", fields: [assignedToClientId], references: [id])
-  assignedByUserId String
-  assignedByUser   User                  @relation("StoreInventoryAssignmentIssuer", fields: [assignedByUserId], references: [id])
-  returnedByUserId    String?
-  returnedByUser      User?                      @relation("StoreInventoryAssignmentReturner", fields: [returnedByUserId], references: [id])
-  returnConditionId   String?
-  returnCondition     StoreInventoryConditionV2? @relation("StoreInventoryAssignmentReturnCondition", fields: [returnConditionId], references: [id])
+  assignedToClient   Client?                    @relation("StoreInventoryAssignmentClientAssignee", fields: [assignedToClientId], references: [id])
+  assignedByUserId   String
+  assignedByUser     User                       @relation("StoreInventoryAssignmentIssuer", fields: [assignedByUserId], references: [id])
+  returnedByUserId   String?
+  returnedByUser     User?                      @relation("StoreInventoryAssignmentReturner", fields: [returnedByUserId], references: [id])
+  returnConditionId  String?
+  returnCondition    StoreInventoryConditionV2? @relation("StoreInventoryAssignmentReturnCondition", fields: [returnConditionId], references: [id])
 
   @@index([storeId])
   @@index([productId])
@@ -1685,7 +1752,7 @@ model Ticket {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  comments     TicketComment[]
+  comments TicketComment[]
 
   @@index([senderId])
   @@index([assignedToId])
@@ -1860,54 +1927,54 @@ model GuardPledgeableDocument {
 }
 
 model GuardPledgedDocumentRecord {
-  id                   String    @id @default(cuid())
-  guardId              String
-  guard                Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  documentTypeName     String
-  receivedBy           String?
-  receivedAt           DateTime  @default(now())
-  returnedBy           String?
-  returnedAt           DateTime?
-  status               String    @default("HELD") // HELD | RETURNED
+  id                 String                        @id @default(cuid())
+  guardId            String
+  guard              Guard                         @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  documentTypeName   String
+  receivedBy         String?
+  receivedAt         DateTime                      @default(now())
+  returnedBy         String?
+  returnedAt         DateTime?
+  status             String                        @default("HELD") // HELD | RETURNED
   // Return details
-  returnType           String?   // CLEARANCE | TEMPORARY
-  returnConditionId    String?
-  returnCondition      PledgeDocReturnCondition? @relation(fields: [returnConditionId], references: [id])
-  returnReason         String?
-  expectedReturnDate   DateTime?
-  attachmentData       String?
-  attachmentName       String?
-  notes                String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  history              GuardPledgedDocumentHistory[]
+  returnType         String? // CLEARANCE | TEMPORARY
+  returnConditionId  String?
+  returnCondition    PledgeDocReturnCondition?     @relation(fields: [returnConditionId], references: [id])
+  returnReason       String?
+  expectedReturnDate DateTime?
+  attachmentData     String?
+  attachmentName     String?
+  notes              String?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  history            GuardPledgedDocumentHistory[]
 
   @@index([guardId])
   @@index([returnConditionId])
 }
 
 model PledgeDocReturnCondition {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id          String                       @id @default(cuid())
+  name        String                       @unique
   description String?
-  isActive    Boolean   @default(true)
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean                      @default(true)
+  sortOrder   Int                          @default(0)
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
   records     GuardPledgedDocumentRecord[]
 }
 
 model GuardPledgedDocumentHistory {
-  id             String   @id @default(cuid())
+  id             String                     @id @default(cuid())
   recordId       String
   record         GuardPledgedDocumentRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
   guardId        String
-  action         String   // CREATED | RETURNED | REHOLD | VERSION_UPLOADED | UPDATED | DELETED
+  action         String // CREATED | RETURNED | REHOLD | VERSION_UPLOADED | UPDATED | DELETED
   performedBy    String?
-  performedAt    DateTime @default(now())
-  details        String?  // JSON string with snapshot
-  attachmentData String?  // archived file data (for version history)
-  attachmentName String?  // archived file name
+  performedAt    DateTime                   @default(now())
+  details        String? // JSON string with snapshot
+  attachmentData String? // archived file data (for version history)
+  attachmentName String? // archived file name
 
   @@index([recordId])
   @@index([guardId])
@@ -1945,21 +2012,21 @@ model GuardWalletType {
 // ============================================
 
 model GuardCourse {
-  id           String    @id @default(cuid())
-  guardId      String
-  guard        Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  courseName   String
-  courseLevel  String
-  instructor   String
-  location     String
-  issueDate    DateTime?
-  description  String?
-  fileName     String?   // uploaded file name
-  fileData     String?   // base64 file data
-  createdById  String?
-  createdBy    User?     @relation("GuardCourseCreatedBy", fields: [createdById], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  guardId     String
+  guard       Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  courseName  String
+  courseLevel String
+  instructor  String
+  location    String
+  issueDate   DateTime?
+  description String?
+  fileName    String? // uploaded file name
+  fileData    String? // base64 file data
+  createdById String?
+  createdBy   User?     @relation("GuardCourseCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([guardId])
 }
@@ -2002,4 +2069,97 @@ model GuardInsurance {
 
   @@index([guardId])
   @@index([clientInsuranceId])
+}
+
+// ============================================
+// PAYROLL REWORK (Apr 2026)
+// ============================================
+
+model PayrollDeductionType {
+  id            String   @id @default(cuid())
+  code          String   @unique // e.g. "EOBI", "CWF", "TRAINING_FEE"
+  name          String // display name
+  description   String?
+  defaultAmount Float    @default(0) // default amount when auto-applied
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  entries PayrollDeductionEntry[]
+
+  @@index([isActive])
+}
+
+model PayrollDeductionEntry {
+  id              String               @id @default(cuid())
+  payrollId       String
+  payroll         Payroll              @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  deductionTypeId String
+  deductionType   PayrollDeductionType @relation(fields: [deductionTypeId], references: [id])
+  amount          Float
+  notes           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([payrollId, deductionTypeId])
+  @@index([payrollId])
+}
+
+model PayrollReserveLedger {
+  id            String    @id @default(cuid())
+  guardId       String
+  guard         Guard     @relation(fields: [guardId], references: [id])
+  payrollId     String?
+  payroll       Payroll?  @relation(fields: [payrollId], references: [id])
+  type          String // ACCRUED | RELEASED
+  amount        Float
+  reason        String?
+  byUserId      String?
+  byUserName    String?
+  paymentMethod String? // for RELEASED entries
+  slipNumber    String? // for RELEASED entries
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([guardId])
+  @@index([type])
+  @@index([payrollId])
+}
+
+model PayrollSalaryFinalizationHistory {
+  id                String   @id @default(cuid())
+  finalizedAt       DateTime @default(now())
+  finalizedByUserId String
+  finalizedByName   String
+  scope             String // REGION | GLOBAL
+  regionId          String?
+  regionalOfficeId  String?
+  month             DateTime
+  payrollCount      Int
+  totalNetPayable   Float
+  totalReserve      Float
+  payrollIdsJson    String // JSON array of payroll row IDs in this batch
+  createdAt         DateTime @default(now())
+
+  @@index([finalizedAt])
+  @@index([month])
+  @@index([scope])
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  kind        String // GUARD_SALARY | SPECIAL_DUTY | MANUAL
+  refId       String? // payrollId or specialDutyId, nullable for MANUAL
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  lineTotal   Float
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
 }
