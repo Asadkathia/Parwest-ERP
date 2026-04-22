@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,7 +91,20 @@ export async function POST(request: NextRequest) {
       include: { guard: { select: { id: true, parwestId: true, name: true } } },
     })
 
-    return NextResponse.json(created, { status: 201 })
+    // Trigger recalc for each affected month (best-effort; locked months are
+    // surfaced as warnings rather than errors so the source record stays).
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings = await recalcAffectedMonths(
+      guardId,
+      affectedMonthStarts(dateFrom, dateTo),
+      actorUserId
+    )
+
+    return NextResponse.json(
+      warnings.length > 0 ? { ...created, warnings } : created,
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Error creating special duty record:", error)
     return internalServerError("Failed to create record.")

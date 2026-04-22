@@ -1,13 +1,25 @@
+/**
+ * /api/payroll/other-deductions
+ *
+ * Manages a single PayrollDeductionEntry with deduction type code "MISC"
+ * (Other Deductions). The legacy `Payroll.otherDeductions` column is no
+ * longer written here directly — it is recomputed by the canonical engine.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { calculateGuardPayroll } from "@/lib/payroll/calculate"
+import { persistGuardPayroll } from "@/lib/payroll/persist"
 
 import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
+
+const LOCK_MESSAGE_FRAGMENT = "Cannot recalculate payroll"
+const MISC_CODE = "MISC"
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,14 +33,14 @@ export async function GET(request: NextRequest) {
     const monthRaw = searchParams.get("month")
     const search = searchParams.get("search") || undefined
 
-    const where: Prisma.PayrollWhereInput = {}
-    if (guardId) where.guardId = guardId
+    const payrollWhere: Prisma.PayrollWhereInput = {}
+    if (guardId) payrollWhere.guardId = guardId
     if (monthRaw) {
       const month = parseMonth(monthRaw)
-      if (month) where.month = month
+      if (month) payrollWhere.month = month
     }
     if (search) {
-      where.OR = [
+      payrollWhere.OR = [
         { guard: { name: { contains: search, mode: "insensitive" } } },
         { guard: { parwestId: { contains: search, mode: "insensitive" } } },
       ]
@@ -39,19 +51,39 @@ export async function GET(request: NextRequest) {
       if (managerScope.regionalOfficeIds.length > 0) {
         isFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
       }
-      if (Object.keys(isFilter).length > 0) where.guard = { is: isFilter }
+      if (Object.keys(isFilter).length > 0) payrollWhere.guard = { is: isFilter }
     }
 
-    const rows = await prisma.payroll.findMany({
-      where,
-      include: {
-        guard: {
-          select: { id: true, name: true, parwestId: true },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 300,
+    // Find MISC deduction type id (may not yet exist).
+    const miscType = await prisma.payrollDeductionType.findUnique({
+      where: { code: MISC_CODE },
+      select: { id: true },
     })
+
+    const entries = miscType
+      ? await prisma.payrollDeductionEntry.findMany({
+          where: {
+            deductionTypeId: miscType.id,
+            payroll: payrollWhere,
+          },
+          include: {
+            payroll: {
+              include: {
+                guard: { select: { id: true, name: true, parwestId: true } },
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 300,
+        })
+      : []
+
+    // Shape: array of { ...payroll fields, miscAmount, notes } for backward-ish compat.
+    const rows = entries.map((e) => ({
+      ...e.payroll,
+      otherDeductions: e.amount,
+      otherDeductionNotes: e.notes,
+    }))
 
     return NextResponse.json(rows)
   } catch (error) {
@@ -71,9 +103,13 @@ export async function POST(request: NextRequest) {
     const guardId = String(body.guardId || "")
     const monthInput = String(body.month || "")
     const amount = Number(body.amount || 0)
+    const notes: string | null = body.notes != null ? String(body.notes) : null
 
     if (!guardId || !monthInput) {
       return badRequest("guardId and month are required.")
+    }
+    if (!Number.isFinite(amount) || amount < 0) {
+      return badRequest("amount must be a non-negative number.")
     }
 
     const month = parseMonth(monthInput)
@@ -90,54 +126,93 @@ export async function POST(request: NextRequest) {
       return forbidden("Forbidden: guard is outside your scope.")
     }
 
-    const year = month.getUTCFullYear()
-
-    const existing = await prisma.payroll.findFirst({
-      where: { guardId, month, year },
-      select: {
-        id: true,
-        baseSalary: true,
-        extraHoursAmount: true,
-        specialDutyAmount: true,
-        loans: true,
-        otherDeductions: true,
-        trainingSchoolFees: true,
-        cwf: true,
-        eobi: true,
-        essi: true,
+    // Idempotent upsert of the MISC deduction type (real seeding lives elsewhere).
+    const miscType = await prisma.payrollDeductionType.upsert({
+      where: { code: MISC_CODE },
+      update: {},
+      create: {
+        code: MISC_CODE,
+        name: "Other Deductions",
+        defaultAmount: 0,
+        sortOrder: 90,
+        isActive: true,
       },
     })
 
-    const netSalary = calculatePayrollNetSalary({
-      baseSalary: existing?.baseSalary ?? 0,
-      extraHoursAmount: existing?.extraHoursAmount ?? 0,
-      specialDutyAmount: existing?.specialDutyAmount ?? 0,
-      loans: existing?.loans ?? 0,
-      otherDeductions: amount,
-      trainingSchoolFees: existing?.trainingSchoolFees ?? 0,
-      cwf: existing?.cwf ?? 0,
-      eobi: existing?.eobi ?? 0,
-      essi: existing?.essi ?? 0,
-    })
+    const year = month.getUTCFullYear()
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
 
-    const saved = existing
-      ? await prisma.payroll.update({
-          where: { id: existing.id },
-          data: { otherDeductions: amount, netSalary },
-          include: { guard: { select: { id: true, name: true, parwestId: true } } },
+    let payrollId: string
+    try {
+      payrollId = await prisma.$transaction(async (tx) => {
+        // Find or create the Payroll row.
+        const existing = await tx.payroll.findUnique({
+          where: { guardId_month_year: { guardId, month, year } },
+          select: { id: true },
         })
-      : await prisma.payroll.create({
-          data: {
-            guardId,
-            month,
-            year,
-            otherDeductions: amount,
-            netSalary,
+        const row = existing
+          ? existing
+          : await tx.payroll.create({
+              data: { guardId, month, year },
+              select: { id: true },
+            })
+
+        // Upsert the MISC entry.
+        await tx.payrollDeductionEntry.upsert({
+          where: {
+            payrollId_deductionTypeId: {
+              payrollId: row.id,
+              deductionTypeId: miscType.id,
+            },
           },
-          include: { guard: { select: { id: true, name: true, parwestId: true } } },
+          create: {
+            payrollId: row.id,
+            deductionTypeId: miscType.id,
+            amount,
+            notes,
+          },
+          update: {
+            amount,
+            notes,
+          },
         })
 
-    return NextResponse.json(saved, { status: existing ? 200 : 201 })
+        // Recalc.
+        const computation = await calculateGuardPayroll(guardId, month, { trx: tx })
+        const persisted = await persistGuardPayroll(computation, {
+          trx: tx,
+          actorUserId,
+          setStateToCalculated: true,
+        })
+        return persisted.payrollId
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ""
+      if (msg.includes(LOCK_MESSAGE_FRAGMENT)) {
+        return badRequest("Payroll for this month is locked. Cannot edit other deductions.")
+      }
+      throw err
+    }
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: actorUserId,
+          event: "PAYROLL_OTHER_DEDUCTION_UPDATE",
+          module: "PAYROLL",
+          description: `Updated MISC deduction for guard ${guardId} month ${monthInput}`,
+        },
+      })
+    } catch (auditErr) {
+      console.error("Failed to write other-deductions audit log:", auditErr)
+    }
+
+    const saved = await prisma.payroll.findUnique({
+      where: { id: payrollId },
+      include: { guard: { select: { id: true, name: true, parwestId: true } } },
+    })
+    return NextResponse.json(saved)
   } catch (error) {
     console.error("Error saving other deductions:", error)
     return internalServerError("Failed to save other deductions.")

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 export async function PATCH(
   request: NextRequest,
@@ -21,6 +22,8 @@ export async function PATCH(
     const hours = body.hours != null ? Number(body.hours) : existing.hours
     const hourRate = body.hourRate != null ? Number(body.hourRate) : existing.hourRate
     const amount = Number((hours * hourRate).toFixed(2))
+    const nextDateFrom = body.dateFrom ? new Date(String(body.dateFrom)) : existing.dateFrom
+    const nextDateTo = body.dateTo ? new Date(String(body.dateTo)) : existing.dateTo
 
     const updated = await prisma.payrollSpecialDuty.update({
       where: { id },
@@ -42,7 +45,23 @@ export async function PATCH(
       include: { guard: { select: { id: true, parwestId: true, name: true } } },
     })
 
-    return NextResponse.json(updated)
+    // Recalc: union of months touched by old and new date ranges.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const months = new Map<string, Date>()
+    for (const m of affectedMonthStarts(existing.dateFrom, existing.dateTo)) {
+      months.set(m.toISOString(), m)
+    }
+    for (const m of affectedMonthStarts(nextDateFrom, nextDateTo)) {
+      months.set(m.toISOString(), m)
+    }
+    const warnings = await recalcAffectedMonths(
+      existing.guardId,
+      Array.from(months.values()),
+      actorUserId
+    )
+
+    return NextResponse.json(warnings.length > 0 ? { ...updated, warnings } : updated)
   } catch (error) {
     console.error("Error updating special duty record:", error)
     return internalServerError("Failed to update record.")
@@ -67,7 +86,16 @@ export async function DELETE(
       data: { status: "CANCELLED" },
     })
 
-    return NextResponse.json({ ok: true })
+    // Recalc months that the cancelled record used to contribute to.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings = await recalcAffectedMonths(
+      existing.guardId,
+      affectedMonthStarts(existing.dateFrom, existing.dateTo),
+      actorUserId
+    )
+
+    return NextResponse.json(warnings.length > 0 ? { ok: true, warnings } : { ok: true })
   } catch (error) {
     console.error("Error deleting special duty record:", error)
     return internalServerError("Failed to delete record.")

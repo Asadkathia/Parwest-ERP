@@ -1,11 +1,18 @@
+/**
+ * @deprecated Use /api/payroll/special-duty-records instead. This endpoint is
+ * retained for the legacy UI only. It writes Payroll.specialDutyAmount/Hours
+ * directly and triggers a canonical payroll recalc. New code should create
+ * PayrollSpecialDuty records via /api/payroll/special-duty-records.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 
@@ -87,32 +94,9 @@ export async function POST(request: NextRequest) {
     const year = month.getUTCFullYear()
     const amount = Number((hours * rate).toFixed(2))
 
-    const existing = await prisma.payroll.findFirst({
-      where: { guardId, month, year },
-      select: {
-        id: true,
-        baseSalary: true,
-        extraHoursAmount: true,
-        specialDutyAmount: true,
-        loans: true,
-        otherDeductions: true,
-        trainingSchoolFees: true,
-        cwf: true,
-        eobi: true,
-        essi: true,
-      },
-    })
-
-    const netSalary = calculatePayrollNetSalary({
-      baseSalary: existing?.baseSalary ?? 0,
-      extraHoursAmount: existing?.extraHoursAmount ?? 0,
-      specialDutyAmount: amount,
-      loans: existing?.loans ?? 0,
-      otherDeductions: existing?.otherDeductions ?? 0,
-      trainingSchoolFees: existing?.trainingSchoolFees ?? 0,
-      cwf: existing?.cwf ?? 0,
-      eobi: existing?.eobi ?? 0,
-      essi: existing?.essi ?? 0,
+    const existing = await prisma.payroll.findUnique({
+      where: { guardId_month_year: { guardId, month, year } },
+      select: { id: true },
     })
 
     const saved = existing
@@ -121,7 +105,6 @@ export async function POST(request: NextRequest) {
           data: {
             specialDutyHours: hours,
             specialDutyAmount: amount,
-            netSalary,
           },
           include: { guard: { select: { id: true, name: true, parwestId: true } } },
         })
@@ -132,12 +115,19 @@ export async function POST(request: NextRequest) {
             year,
             specialDutyHours: hours,
             specialDutyAmount: amount,
-            netSalary,
           },
           include: { guard: { select: { id: true, name: true, parwestId: true } } },
         })
 
-    return NextResponse.json(saved, { status: existing ? 200 : 201 })
+    // Trigger recalc for the affected month. Locked-state surfaces as warning.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings = await recalcAffectedMonths(guardId, [month], actorUserId)
+
+    return NextResponse.json(
+      warnings.length > 0 ? { ...saved, warnings } : saved,
+      { status: existing ? 200 : 201 }
+    )
   } catch (error) {
     console.error("Error saving special duty:", error)
     return internalServerError("Failed to save special duty.")

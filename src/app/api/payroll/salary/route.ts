@@ -1,11 +1,24 @@
+/**
+ * Legacy bulk salary endpoint — delegates to the /api/payroll/calculate engine.
+ * Prefer POST /api/payroll/calculate for new code.
+ *
+ * GET still returns Payroll rows for browse/list UIs. POST iterates the target
+ * guard set (resolved via deployments in the requested month + filters) and
+ * runs canonical calculate + persist for each, in a per-guard transaction.
+ *
+ * The legacy `finalize` flag is no longer accepted — state transitions happen
+ * via /api/payroll/state/* endpoints.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { calculateGuardPayroll } from "@/lib/payroll/calculate"
+import { persistGuardPayroll } from "@/lib/payroll/persist"
 
 const ALLOWED_PAYMENT_STATUSES = new Set(["PENDING", "UNPAID", "PAID"])
 
@@ -83,7 +96,12 @@ export async function POST(request: NextRequest) {
     const branchId = body.branchId ? String(body.branchId) : undefined
     const regionalOfficeId = body.regionalOfficeId ? String(body.regionalOfficeId) : undefined
     const regionId = body.regionId ? String(body.regionId) : undefined
-    const finalize = Boolean(body.finalize)
+
+    if (body.finalize !== undefined) {
+      return badRequest(
+        "finalize is no longer supported here. Use /api/payroll/state/lock-region instead."
+      )
+    }
 
     if (!monthInput) return badRequest("month is required.")
     const month = parseMonthRange(monthInput)
@@ -116,199 +134,77 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const deployments = await prisma.deployment.findMany({
-      where: {
-        deploymentDate: {
-          gte: month.start,
-          lt: month.end,
-        },
-        ...(guardId ? { guardId } : {}),
-        ...(clientId ? { clientId } : {}),
-        ...(branchId ? { branchId } : {}),
-        ...(regionalOfficeId ? { regionalOfficeId } : {}),
-        ...(managerScope?.regionalOfficeIds.length
-          ? { regionalOfficeId: { in: managerScope.regionalOfficeIds } }
-          : {}),
-        ...(regionId || managerScope?.regionId
-          ? {
-              guard: {
-                is: {
-                  ...(regionId ? { regionId } : {}),
-                  ...(managerScope?.regionId ? { regionId: managerScope.regionId } : {}),
-                },
+    // ---- Resolve target guard set via deployments ----------------------
+    const deploymentWhere: Prisma.DeploymentWhereInput = {
+      deploymentDate: { gte: month.start, lt: month.end },
+      ...(guardId ? { guardId } : {}),
+      ...(clientId ? { clientId } : {}),
+      ...(branchId ? { branchId } : {}),
+      ...(regionalOfficeId ? { regionalOfficeId } : {}),
+      ...(managerScope?.regionalOfficeIds.length
+        ? { regionalOfficeId: { in: managerScope.regionalOfficeIds } }
+        : {}),
+      ...(regionId || managerScope?.regionId
+        ? {
+            guard: {
+              is: {
+                ...(regionId ? { regionId } : {}),
+                ...(managerScope?.regionId ? { regionId: managerScope.regionId } : {}),
               },
-            }
-          : {}),
-      },
-      select: {
-        guardId: true,
-        deploymentDate: true,
-        salary: true,
-        rate: true,
-      },
-    })
+            },
+          }
+        : {}),
+    }
 
-    const guardIds = Array.from(new Set(deployments.map((deployment) => deployment.guardId)))
+    const distinctRows = await prisma.deployment.findMany({
+      where: deploymentWhere,
+      distinct: ["guardId"],
+      select: { guardId: true },
+    })
+    const guardIds = distinctRows.map((r) => r.guardId)
+
     if (guardIds.length === 0) {
       return NextResponse.json({
         calculated: 0,
-        finalized: 0,
         month: month.start.toISOString(),
         rows: [],
       })
     }
 
-    const [finalizedLoans, existingRows] = await Promise.all([
-      prisma.loan.findMany({
-        where: {
-          guardId: { in: guardIds },
-          status: "FINALIZED",
-          month: {
-            gte: month.start,
-            lt: month.end,
-          },
-        },
-        select: {
-          guardId: true,
-          amount: true,
-        },
-      }),
-      prisma.payroll.findMany({
-        where: {
-          guardId: { in: guardIds },
-          month: {
-            gte: month.start,
-            lt: month.end,
-          },
-          year: month.year,
-        },
-        select: {
-          id: true,
-          guardId: true,
-          baseSalary: true,
-          extraHours: true,
-          extraHoursAmount: true,
-          specialDutyHours: true,
-          specialDutyAmount: true,
-          loans: true,
-          otherDeductions: true,
-          trainingSchoolFees: true,
-          cwf: true,
-          eobi: true,
-          essi: true,
-          paymentStatus: true,
-          paymentMethod: true,
-        },
-      }),
-    ])
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
 
-    const loanByGuard = finalizedLoans.reduce<Record<string, number>>((acc, loan) => {
-      acc[loan.guardId] = Number(((acc[loan.guardId] || 0) + Number(loan.amount || 0)).toFixed(2))
-      return acc
-    }, {})
+    // ---- Per-guard delegate to canonical calc + persist -----------------
+    const rows: Array<Record<string, unknown>> = []
+    const errors: Array<{ guardId: string; error: string }> = []
 
-    const deploymentAgg = deployments.reduce<
-      Record<
-        string,
-        {
-          baseSalary: number
-          days: Set<string>
-        }
-      >
-    >((acc, deployment) => {
-      if (!acc[deployment.guardId]) {
-        acc[deployment.guardId] = { baseSalary: 0, days: new Set() }
+    for (const gid of guardIds) {
+      try {
+        const payrollId = await prisma.$transaction(async (tx) => {
+          const computation = await calculateGuardPayroll(gid, month.start, { trx: tx })
+          const persisted = await persistGuardPayroll(computation, {
+            trx: tx,
+            actorUserId,
+          })
+          return persisted.payrollId
+        })
+        const saved = await prisma.payroll.findUnique({
+          where: { id: payrollId },
+          include: { guard: { select: { id: true, name: true, parwestId: true } } },
+        })
+        if (saved) rows.push(saved as unknown as Record<string, unknown>)
+      } catch (err) {
+        errors.push({
+          guardId: gid,
+          error: err instanceof Error ? err.message : "Unknown error",
+        })
       }
-      const amount = Number(deployment.salary ?? deployment.rate ?? 0)
-      acc[deployment.guardId].baseSalary = Number((acc[deployment.guardId].baseSalary + amount).toFixed(2))
-      acc[deployment.guardId].days.add(deployment.deploymentDate.toISOString().slice(0, 10))
-      return acc
-    }, {})
-
-    const existingByGuard = new Map(existingRows.map((row) => [row.guardId, row]))
-    const rows = []
-    let finalizedCount = 0
-    const zeroSalaryGuardIds: string[] = []
-
-    for (const currentGuardId of guardIds) {
-      const existing = existingByGuard.get(currentGuardId)
-      const baseSalary = Number((deploymentAgg[currentGuardId]?.baseSalary || 0).toFixed(2))
-      if (baseSalary === 0) zeroSalaryGuardIds.push(currentGuardId)
-      const deploymentDays = deploymentAgg[currentGuardId]?.days.size || 0
-      const loans = Number((loanByGuard[currentGuardId] || 0).toFixed(2))
-      const extraHoursAmount = Number(existing?.extraHoursAmount || 0)
-      const specialDutyAmount = Number(existing?.specialDutyAmount || 0)
-      const otherDeductions = Number(existing?.otherDeductions || 0)
-      const trainingSchoolFees = Number(existing?.trainingSchoolFees || 0)
-      const cwf = Number(existing?.cwf || 0)
-      const eobi = Number(existing?.eobi || 0)
-      const essi = Number(existing?.essi || 0)
-
-      const netSalary = calculatePayrollNetSalary({
-        baseSalary,
-        extraHoursAmount,
-        specialDutyAmount,
-        loans,
-        otherDeductions,
-        trainingSchoolFees,
-        cwf,
-        eobi,
-        essi,
-      })
-
-      const paymentStatus = finalize
-        ? existing?.paymentStatus === "PAID"
-          ? "PAID"
-          : "UNPAID"
-        : existing?.paymentStatus || "PENDING"
-
-      if (finalize && paymentStatus === "UNPAID") finalizedCount += 1
-
-      const saved = await prisma.payroll.upsert({
-        where: {
-          guardId_month_year: {
-            guardId: currentGuardId,
-            month: month.start,
-            year: month.year,
-          },
-        },
-        create: {
-          guardId: currentGuardId,
-          month: month.start,
-          year: month.year,
-          baseSalary,
-          deploymentDays,
-          extraHours: Number(existing?.extraHours || 0),
-          extraHoursAmount,
-          specialDutyHours: Number(existing?.specialDutyHours || 0),
-          specialDutyAmount,
-          loans,
-          otherDeductions,
-          trainingSchoolFees,
-          cwf,
-          eobi,
-          essi,
-          netSalary,
-          paymentStatus,
-          paymentMethod: existing?.paymentMethod || null,
-        },
-        update: {
-          baseSalary,
-          deploymentDays,
-          loans,
-          netSalary,
-          paymentStatus,
-        },
-        include: {
-          guard: {
-            select: { id: true, name: true, parwestId: true },
-          },
-        },
-      })
-
-      rows.push(saved)
     }
 
+    // Surface zero-base-salary warnings to match the prior response shape.
+    const zeroSalaryGuardIds = rows
+      .filter((r) => Number((r as { baseSalary?: number }).baseSalary || 0) === 0)
+      .map((r) => String((r as { guardId: string }).guardId))
     let warnings: { guardId: string; name: string; parwestId: string | null; guardSalary: number | null }[] = []
     if (zeroSalaryGuardIds.length > 0) {
       const zeroGuards = await prisma.guard.findMany({
@@ -326,10 +222,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         calculated: rows.length,
-        finalized: finalizedCount,
         month: month.start.toISOString(),
         rows,
         ...(warnings.length > 0 ? { warnings } : {}),
+        ...(errors.length > 0 ? { errors } : {}),
       },
       { status: 200 }
     )
