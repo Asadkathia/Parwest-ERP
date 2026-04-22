@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 
+type AppliesTo = "WORKED_ONLY" | "ALL_DEPLOYED_IN_OFFICE" | "ALL_GUARDS_IN_OFFICE"
+
 type Row = {
   id: string
   name: string
@@ -16,7 +18,14 @@ type Row = {
   status: string | null
   comments: string | null
   notes: string | null
+  appliesTo: AppliesTo | null
 }
+
+const APPLIES_TO_OPTIONS: { id: AppliesTo; label: string }[] = [
+  { id: "WORKED_ONLY", label: "Only guards who worked the holiday" },
+  { id: "ALL_DEPLOYED_IN_OFFICE", label: "All guards deployed at the regional office" },
+  { id: "ALL_GUARDS_IN_OFFICE", label: "All guards in the regional office (regardless of deployment)" },
+]
 
 type Office = { id: string; name: string }
 
@@ -41,6 +50,7 @@ export default function PayrollHolidaysManager() {
   const [value, setValue] = useState("")
   const [status, setStatus] = useState("active")
   const [comments, setComments] = useState("")
+  const [appliesTo, setAppliesTo] = useState<AppliesTo>("WORKED_ONLY")
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<string | null>(null)
 
@@ -82,6 +92,7 @@ export default function PayrollHolidaysManager() {
     setValue("")
     setStatus("active")
     setComments("")
+    setAppliesTo("WORKED_ONLY")
     setResult(null)
     setFormOpen(true)
   }
@@ -96,6 +107,7 @@ export default function PayrollHolidaysManager() {
     setValue(row.value != null ? String(row.value) : "")
     setStatus(row.status ?? "active")
     setComments(row.comments ?? "")
+    setAppliesTo(row.appliesTo ?? "WORKED_ONLY")
     setResult(null)
     setFormOpen(true)
   }
@@ -113,6 +125,7 @@ export default function PayrollHolidaysManager() {
       value: value === "" ? null : Number(value),
       status,
       comments: comments || null,
+      appliesTo,
     }
     const url = editingId ? `/api/payroll/holidays/${editingId}` : "/api/payroll/holidays"
     const res = await fetch(url, {
@@ -346,6 +359,26 @@ export default function PayrollHolidaysManager() {
                   placeholder="Holiday name"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                Applies To
+              </label>
+              <select
+                className="ui-select"
+                value={appliesTo}
+                onChange={(e) => setAppliesTo(e.target.value as AppliesTo)}
+              >
+                {APPLIES_TO_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Determines which guards receive holiday pay for this holiday. WORKED_ONLY pays only guards with a deployment on that date; ALL_DEPLOYED pays all guards with any deployment that month at the matching office; ALL_IN_OFFICE pays everyone in the regional office.
+              </p>
             </div>
 
             <div>

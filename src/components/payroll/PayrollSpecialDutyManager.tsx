@@ -18,8 +18,13 @@ type Row = {
   comments: string | null
   attachmentBase64: string | null
   status: string
+  clientId: string | null
+  branchId: string | null
   guard: { id: string; parwestId: string; name: string }
 }
+
+type ClientOption = { id: string; name: string }
+type BranchOption = { id: string; name: string; city?: string | null }
 
 export default function PayrollSpecialDutyManager() {
   const [rows, setRows] = useState<Row[]>([])
@@ -37,6 +42,11 @@ export default function PayrollSpecialDutyManager() {
   const [attachment, setAttachment] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [clients, setClients] = useState<ClientOption[]>([])
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [branchesLoading, setBranchesLoading] = useState(false)
+  const [clientId, setClientId] = useState("")
+  const [branchId, setBranchId] = useState("")
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -51,6 +61,43 @@ export default function PayrollSpecialDutyManager() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
     loadRows()
   }, [loadRows])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time load of clients for invoice linking
+    fetch("/api/clients")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
+        setClients(
+          list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        )
+      })
+      .catch(() => setClients([]))
+  }, [])
+
+  useEffect(() => {
+    if (!clientId) {
+      setBranches([])
+      setBranchId("")
+      return
+    }
+    setBranchesLoading(true)
+    setBranchId("")
+    fetch(`/api/clients/${clientId}/branches`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setBranches(
+          list.map((b: { id: string; name: string; city?: string | null }) => ({
+            id: b.id,
+            name: b.name,
+            city: b.city ?? null,
+          }))
+        )
+      })
+      .catch(() => setBranches([]))
+      .finally(() => setBranchesLoading(false))
+  }, [clientId])
 
   const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
     setParwestIdInput(opt.parwestId)
@@ -67,6 +114,9 @@ export default function PayrollSpecialDutyManager() {
     setHourRate("")
     setComments("")
     setAttachment(null)
+    setClientId("")
+    setBranchId("")
+    setBranches([])
     setResult(null)
   }
 
@@ -85,6 +135,8 @@ export default function PayrollSpecialDutyManager() {
         hourRate: Number(hourRate),
         comments: comments || null,
         attachmentBase64: attachment,
+        clientId: clientId || null,
+        branchId: branchId || null,
       }),
     })
     const data = await res.json()
@@ -303,6 +355,55 @@ export default function PayrollSpecialDutyManager() {
                 label="Choose File"
                 previewMode="link"
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Client
+                </label>
+                <select
+                  className="ui-select"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Optional. Link this special duty to a client (and branch) so it can be added to that client&apos;s invoice.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                  Branch
+                </label>
+                <select
+                  className="ui-select"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  disabled={!clientId || branchesLoading}
+                >
+                  <option value="">
+                    {!clientId
+                      ? "Select client first"
+                      : branchesLoading
+                        ? "Loading branches…"
+                        : branches.length === 0
+                          ? "No branches for this client"
+                          : "— None —"}
+                  </option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.city ? `${b.name} - ${b.city}` : b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="flex justify-between items-center pt-2">

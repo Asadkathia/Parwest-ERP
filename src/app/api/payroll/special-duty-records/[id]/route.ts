@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
@@ -25,6 +25,40 @@ export async function PATCH(
     const nextDateFrom = body.dateFrom ? new Date(String(body.dateFrom)) : existing.dateFrom
     const nextDateTo = body.dateTo ? new Date(String(body.dateTo)) : existing.dateTo
 
+    // clientId / branchId: undefined = no change; null/empty = clear; string = set
+    let clientIdUpdate: string | null | undefined = undefined
+    let branchIdUpdate: string | null | undefined = undefined
+    if (body.clientId !== undefined) {
+      clientIdUpdate = body.clientId ? String(body.clientId) : null
+    }
+    if (body.branchId !== undefined) {
+      branchIdUpdate = body.branchId ? String(body.branchId) : null
+    }
+    const effectiveClientId =
+      clientIdUpdate !== undefined ? clientIdUpdate : existing.clientId
+    const effectiveBranchId =
+      branchIdUpdate !== undefined ? branchIdUpdate : existing.branchId
+    if (effectiveBranchId && !effectiveClientId) {
+      return badRequest("clientId is required when branchId is set.")
+    }
+    if (clientIdUpdate) {
+      const client = await prisma.client.findUnique({
+        where: { id: clientIdUpdate },
+        select: { id: true },
+      })
+      if (!client) return notFound("Client not found.")
+    }
+    if (effectiveBranchId) {
+      const branch = await prisma.branch.findUnique({
+        where: { id: effectiveBranchId },
+        select: { id: true, clientId: true },
+      })
+      if (!branch) return notFound("Branch not found.")
+      if (branch.clientId !== effectiveClientId) {
+        return badRequest("Branch does not belong to the selected client.")
+      }
+    }
+
     const updated = await prisma.payrollSpecialDuty.update({
       where: { id },
       data: {
@@ -41,6 +75,8 @@ export async function PATCH(
               : null
             : undefined,
         status: body.status ? String(body.status) : undefined,
+        clientId: clientIdUpdate,
+        branchId: branchIdUpdate,
       },
       include: { guard: { select: { id: true, parwestId: true, name: true } } },
     })

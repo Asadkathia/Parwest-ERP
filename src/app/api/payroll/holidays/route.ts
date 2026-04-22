@@ -23,6 +23,11 @@ const MOCK_ROWS = [
 ]
 
 const VALID_VALUE_TYPES = new Set(["FIXED_PER_DAY", "MULTIPLE_OF_RATE"])
+const VALID_APPLIES_TO = new Set([
+  "WORKED_ONLY",
+  "ALL_DEPLOYED_IN_OFFICE",
+  "ALL_GUARDS_IN_OFFICE",
+])
 
 export async function GET() {
   try {
@@ -59,10 +64,14 @@ export async function POST(request: NextRequest) {
     const value = body?.value != null ? Number(body.value) : null
     const status = body?.status ? String(body.status) : "active"
     const comments = body?.comments ? String(body.comments) : null
+    const appliesTo = body?.appliesTo ? String(body.appliesTo) : null
 
     if (!dateFromRaw) return badRequest("dateFrom (or date) is required.")
     if (valueTypeRaw && !VALID_VALUE_TYPES.has(valueTypeRaw)) {
       return badRequest("valueType must be FIXED_PER_DAY or MULTIPLE_OF_RATE.")
+    }
+    if (appliesTo && !VALID_APPLIES_TO.has(appliesTo)) {
+      return badRequest("Invalid appliesTo value.")
     }
 
     const dateFrom = new Date(dateFromRaw)
@@ -85,6 +94,7 @@ export async function POST(request: NextRequest) {
           value,
           status,
           comments,
+          appliesTo,
         },
         { status: 201 }
       )
@@ -101,6 +111,7 @@ export async function POST(request: NextRequest) {
         value,
         status,
         comments,
+        appliesTo: appliesTo ?? undefined,
       },
     })
     return NextResponse.json(created, { status: 201 })

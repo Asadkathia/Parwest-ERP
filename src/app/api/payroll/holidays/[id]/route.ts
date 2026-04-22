@@ -6,6 +6,12 @@ import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 
+const VALID_APPLIES_TO = new Set([
+  "WORKED_ONLY",
+  "ALL_DEPLOYED_IN_OFFICE",
+  "ALL_GUARDS_IN_OFFICE",
+])
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -31,6 +37,11 @@ export async function PATCH(
     const valueType = body?.valueType !== undefined ? (body.valueType ? String(body.valueType).toUpperCase() : null) : undefined
     const value = body?.value !== undefined ? (body.value != null ? Number(body.value) : null) : undefined
     const status = body?.status !== undefined ? String(body.status) : undefined
+    const appliesTo =
+      body?.appliesTo !== undefined ? (body.appliesTo ? String(body.appliesTo) : null) : undefined
+    if (appliesTo && !VALID_APPLIES_TO.has(appliesTo)) {
+      return badRequest("Invalid appliesTo value.")
+    }
 
     const data: Record<string, unknown> = {}
     if (name !== undefined) data.name = name
@@ -40,6 +51,7 @@ export async function PATCH(
     if (valueType !== undefined) data.valueType = valueType
     if (value !== undefined) data.value = value
     if (status !== undefined) data.status = status
+    if (appliesTo !== undefined) data.appliesTo = appliesTo
     if (dateRaw !== undefined) {
       const date = new Date(dateRaw)
       if (Number.isNaN(date.getTime())) return badRequest("Invalid date value.")

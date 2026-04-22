@@ -76,6 +76,26 @@ export async function POST(request: NextRequest) {
       return forbidden("Forbidden: guard is outside your scope.")
     }
 
+    const clientId = body.clientId ? String(body.clientId) : null
+    const branchId = body.branchId ? String(body.branchId) : null
+    if (branchId && !clientId) {
+      return badRequest("clientId is required when branchId is provided.")
+    }
+    if (clientId) {
+      const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } })
+      if (!client) return notFound("Client not found.")
+    }
+    if (branchId) {
+      const branch = await prisma.branch.findUnique({
+        where: { id: branchId },
+        select: { id: true, clientId: true },
+      })
+      if (!branch) return notFound("Branch not found.")
+      if (branch.clientId !== clientId) {
+        return badRequest("Branch does not belong to the selected client.")
+      }
+    }
+
     const amount = Number((hours * hourRate).toFixed(2))
     const created = await prisma.payrollSpecialDuty.create({
       data: {
@@ -87,6 +107,8 @@ export async function POST(request: NextRequest) {
         amount,
         comments: body.comments ? String(body.comments) : null,
         attachmentBase64: body.attachmentBase64 ? String(body.attachmentBase64) : null,
+        clientId,
+        branchId,
       },
       include: { guard: { select: { id: true, parwestId: true, name: true } } },
     })
