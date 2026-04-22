@@ -598,7 +598,7 @@ export default function PrerequisitesManager({ regions }: Props) {
       })
       if (!res.ok) {
         const data = await res.json()
-        setDocTypesError(data.error || "Failed to add document type")
+        setDocTypesError(data.message || "Failed to add document type")
         return
       }
       setNewDocTypeName("")
@@ -641,7 +641,7 @@ export default function PrerequisitesManager({ regions }: Props) {
       })
       if (!res.ok) {
         const data = await res.json()
-        setDocTypesError(data.error || "Failed to update document type")
+        setDocTypesError(data.message || "Failed to update document type")
         return
       }
       setEditingDocType(null)

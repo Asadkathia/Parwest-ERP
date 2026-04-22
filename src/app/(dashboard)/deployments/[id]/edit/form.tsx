@@ -259,7 +259,7 @@ export default function ChangeDeploymentForm({ deployment, clients, regionalOffi
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || data.error || "Failed to change deployment")
+        throw new Error(data.message || "Failed to change deployment")
       }
       const result = await res.json()
       router.push(`/deployments/${result.newDeployment.id}`)
@@ -429,12 +429,15 @@ export default function ChangeDeploymentForm({ deployment, clients, regionalOffi
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5">Deployment Type</label>
+                    <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5">
+                      Deployment Type <span className="text-xs text-[var(--text-muted)] font-normal">(metadata only — does not change pay rate)</span>
+                    </label>
                     <select value={deploymentType} onChange={(e) => setDeploymentType(e.target.value)} className="ui-select text-sm">
                       <option value="REGULAR">Regular</option>
                       <option value="OVERTIME">Overtime</option>
                     </select>
                   </div>
+                  {/* postAllowance / extraHours removed — deprecated under new payroll model. Track via /payroll/extra-hours instead. */}
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5">Nature</label>
                     {isExtraGuard ? (

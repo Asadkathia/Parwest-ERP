@@ -105,7 +105,7 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || data.error || "Failed to revoke deployment")
+        throw new Error(data.message || "Failed to revoke deployment")
       }
       router.push(`/guards/${deployment.guard.id}?tab=deployments`)
       router.refresh()

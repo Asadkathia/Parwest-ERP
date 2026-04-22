@@ -19,32 +19,6 @@ type ClientAttendanceRow = {
     regionalOffice: { id: string; name: string } | null
 }
 
-const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
-    { id: "legacy-head-office-lahore", name: "head office lahore" },
-    { id: "legacy-islamabad", name: "islamabad" },
-    { id: "legacy-quetta", name: "quetta" },
-    { id: "legacy-peshawar", name: "peshawar" },
-    { id: "legacy-karachi", name: "karachi" },
-    { id: "legacy-multan", name: "multan" },
-    { id: "legacy-sahiwal", name: "sahiwal" },
-    { id: "legacy-gujranwala", name: "gujranwala" },
-    { id: "legacy-faisalabad", name: "faisalabad" },
-    { id: "legacy-sub-kasur", name: "sub office kasur" },
-    { id: "legacy-sub-sheikhupura", name: "sub office sheikhupura" },
-    { id: "legacy-test-office", name: "test office" },
-    { id: "legacy-hyderabad", name: "hyderabad" },
-    { id: "legacy-sukkur", name: "sukkur" },
-    { id: "legacy-qadir-pur-ghotki", name: "qadir pur ghotki" },
-    { id: "legacy-jand", name: "jand" },
-]
-
-const LEGACY_CLIENTS: Client[] = [
-    { id: "legacy-client-nbp", name: "National Bank of Pakistan" },
-    { id: "legacy-client-scb", name: "Standard Chartered Bank Limited Pakistan" },
-    { id: "legacy-client-ubl", name: "United Bank Limited" },
-    { id: "legacy-client-mcb", name: "MCB Bank Ltd" },
-]
-
 export default function ClientAttendanceManager() {
     const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
     const [clients, setClients] = useState<Client[]>([])
@@ -71,16 +45,16 @@ export default function ClientAttendanceManager() {
 
             if (officesRes.ok) {
                 const officesData = await officesRes.json()
-                setRegionalOffices(Array.isArray(officesData) && officesData.length > 0 ? officesData : LEGACY_REGIONAL_OFFICES)
+                setRegionalOffices(Array.isArray(officesData) ? officesData : [])
             }
 
             if (clientsRes.ok) {
                 const clientsData = await clientsRes.json()
-                setClients(Array.isArray(clientsData) && clientsData.length > 0 ? clientsData : LEGACY_CLIENTS)
+                setClients(Array.isArray(clientsData) ? clientsData : [])
             }
         } catch {
-            setRegionalOffices(LEGACY_REGIONAL_OFFICES)
-            setClients(LEGACY_CLIENTS)
+            setRegionalOffices([])
+            setClients([])
         }
     }, [])
 

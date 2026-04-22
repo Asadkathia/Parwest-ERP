@@ -73,6 +73,9 @@ Prisma with `@prisma/adapter-pg` (uses `pg` Pool for connection pooling — not 
 | `DATABASE_URL_UNPOOLED` | Unpooled Postgres (fallback) |
 | `AUTH_SECRET` / `NEXTAUTH_SECRET` | JWT signing secret |
 | `NEXT_PUBLIC_USE_MOCKS` | Enable mock DB mode |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | OCR vision providers |
+| `OCR_PROVIDER` | Force OCR provider: `gemini` / `openai` / `openrouter` (else auto-picks) |
+| `OCR_DEBUG` | `true` logs raw OCR model responses |
 
 ## Key Gotchas
 
@@ -80,3 +83,13 @@ Prisma with `@prisma/adapter-pg` (uses `pg` Pool for connection pooling — not 
 - **Inventory v2**: `store-inventory/` is the active inventory system. `inventory/` is the legacy system — do not add features there.
 - **Prisma postinstall**: `prisma generate` runs automatically on `npm install`.
 - **Lint budget**: `npm run lint:guard` checks lint count against a baseline in `docs/lint-baseline.json` — don't introduce new lint errors.
+- **API envelope**: use helpers in `src/lib/api/response.ts` (`ok`, `badRequest`, `conflict`, `notFound`, `forbidden`, `unauthorized`, `internalServerError`). Error envelope is `{ success: false, message, code }` — clients read `data.message`, NOT `data.error`.
+- **Regional scoping**: `src/lib/access/scope.ts` — use `deriveManagerScope(session)` + `buildManagerScopeWhere(scope, { regionId, regionalOfficeId })` on list queries; `managerScopeDenied(scope, { ... })` for mutation guards.
+- **Workflow rules**: API validations are gated by `isWorkflowRuleEnabled("...")` from `src/lib/workflows/policy.ts` (e.g. `deployments.requireActiveGuardStatus`). Check that file before adding new validation.
+- **OCR Autofill**: `src/app/api/ocr/extract/route.ts` — vision LLM with Gemini→OpenRouter→OpenAI provider fallback (90s timeouts, AbortController). Tesseract.js is client-side last resort in `src/components/ocr/ParwestAIAutofill.tsx`.
+- **No hardcoded data fallbacks in forms**: if an API returns empty, show empty. Never fall back to a `LEGACY_*` constant array with fake IDs — this caused production eligibility bugs.
+- **Store-inventory auth**: `src/lib/inventory/store-v2-api.ts::requireInventorySession()` is the shared auth+module guard for all v2 store-inventory routes — add checks there, not per-file.
+- **Shared inventory validators**: `src/lib/inventory/store-v2-validators.ts` — exports `isWeaponCategoryName`, `normalizeCategoryScope`. Don't redefine locally in store-inventory routes.
+- **Guard list select**: `api/guards` GET uses explicit `select` that excludes `photoUrl` (base64 blob). Don't add `photoUrl` to list queries — fetch on detail endpoint only.
+- **Parwest ID generation**: uses `findFirst({ orderBy: { parwestId: "desc" } })` — do not revert to a findMany scan.
+- **Pending DB indexes** (need `prisma migrate dev`): `Attendance(guardId,date)`, `Deployment(status,clientId)`, `Payroll(paymentStatus,month)`.

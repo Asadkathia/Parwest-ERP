@@ -87,16 +87,6 @@ type AllDeploymentRow = {
   regionalOffice: { id: string; name: string }
 }
 
-const LEGACY_REGIONAL_OFFICES: RegionalOffice[] = [
-  { id: "legacy-head-office-lahore", name: "head office lahore", seriesCode: "LHR", regionId: "legacy-region-punjab" },
-  { id: "legacy-islamabad", name: "islamabad", seriesCode: "ISB", regionId: "legacy-region-punjab" },
-  { id: "legacy-quetta", name: "quetta", seriesCode: "QTA", regionId: "legacy-region-balochistan" },
-  { id: "legacy-peshawar", name: "peshawar", seriesCode: "PEW", regionId: "legacy-region-kpk" },
-  { id: "legacy-karachi", name: "karachi", seriesCode: "KHI", regionId: "legacy-region-sindh" },
-  { id: "legacy-faisalabad", name: "faisalabad", seriesCode: "FSD", regionId: "legacy-region-punjab" },
-]
-
-
 // ── Static option lists ────────────────────────────────────────────────────
 const DESIGNATION_OPTIONS = [
   { id: "Guard", name: "Guard" },
@@ -356,9 +346,9 @@ export default function DeployGuardForm() {
     try {
       const res = await fetch("/api/regional-offices")
       const data = await res.json()
-      setRegionalOffices(Array.isArray(data) && data.length > 0 ? data : LEGACY_REGIONAL_OFFICES)
+      setRegionalOffices(Array.isArray(data) ? data : [])
     } catch {
-      setRegionalOffices(LEGACY_REGIONAL_OFFICES)
+      setRegionalOffices([])
     }
   }
 
@@ -664,7 +654,9 @@ export default function DeployGuardForm() {
 
             {activeDeployments.length > 0 ? (
               <div>
-                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Type</label>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                  Deployment Type <span className="text-xs text-[var(--text-muted)] font-normal">(metadata only — does not change pay rate)</span>
+                </label>
                 <div className="ui-input bg-amber-50 text-amber-800 text-sm flex items-center gap-2 cursor-not-allowed border-amber-200">
                   <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 110 18A9 9 0 0112 3z" /></svg>
                   Overtime / Double Duty
@@ -673,13 +665,14 @@ export default function DeployGuardForm() {
               </div>
             ) : (
               <SearchableCombobox
-                label="Deployment"
+                label="Deployment (metadata only — does not change pay rate)"
                 value={deploymentType}
                 onChange={setDeploymentType}
                 options={DEPLOYMENT_TYPE_OPTIONS}
                 placeholder="Select deployment type..."
               />
             )}
+            {/* postAllowance / extraHours removed — deprecated under new payroll model. Track via /payroll/extra-hours instead. */}
 
             {/* Deployment Nature — locked to Temporary when Extra Guard is checked */}
             {isExtraGuard ? (
