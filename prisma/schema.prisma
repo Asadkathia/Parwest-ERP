@@ -240,7 +240,10 @@ model Guard {
   addressPermanent         String?
   addressCurrent           String?
   emergencyContact         String?
-  status                   String    @default("PENDING") // PENDING | ACTIVE | PRESENT | DEFAULT | ABSENT | INACTIVE | TERMINATED | BLACKLISTED
+  status                   String    @default("PENDING") // LEGACY shadow, kept in sync via src/lib/guards/lifecycle.ts. Derived from lifecycleStatus + active deployments. Values: PENDING | ACTIVE | PRESENT | DEFAULT | INACTIVE | TERMINATED
+  lifecycleStatus          String    @default("PENDING") // Source of truth: PENDING | ACTIVE | INACTIVE | TERMINATED
+  terminationReason        String? // RESIGNED | FIRED | ABSCONDED | DECEASED | OTHER (required when lifecycleStatus=TERMINATED)
+  lifecycleStatusUpdatedAt DateTime?
   isExService              Boolean   @default(false)
   exServiceRank            String?
   exServiceRegiment        String?
@@ -345,6 +348,7 @@ model Guard {
   @@index([parwestId])
   @@index([cnic])
   @@index([status])
+  @@index([lifecycleStatus])
 }
 
 // Singleton config for guard age limits
@@ -1869,9 +1873,35 @@ model AuditLog {
   description String?
   createdAt   DateTime @default(now())
 
+  // Target-entity enrichment — for insights engine (scope-violation detection, etc.)
+  // All optional so existing writers remain compatible.
+  targetEntityType       String? // "Guard" | "Client" | "Invoice" | ...
+  targetEntityId         String?
+  targetRegionId         String?
+  targetRegionalOfficeId String?
+
   @@index([userId])
   @@index([module])
   @@index([createdAt])
+  @@index([targetEntityType, targetEntityId])
+  @@index([targetRegionId])
+  @@index([targetRegionalOfficeId])
+}
+
+model InsightConfig {
+  id           String    @id @default(cuid())
+  key          String    @unique
+  thresholds   Json      @default("{}")
+  muted        Boolean   @default(false)
+  mutedUntil   DateTime?
+  mutedReason  String?
+  mutedById    String?
+  severityOverride String? // HIGH | MEDIUM | LOW — nullable means use default
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  updatedById  String?
+
+  @@index([muted])
 }
 
 // ============================================

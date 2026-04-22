@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
             profileIntroducer: str(body.profileIntroducer),
             nearestRelativesJson: nearestRelatives.length > 0 ? JSON.stringify(nearestRelatives) : null,
             status: str(body.status) || "PENDING",
+            lifecycleStatus: "PENDING",
             // General extras
             sect: str(body.sect),
             cast: str(body.cast),

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
 /**
  * POST /api/deployments/[id]/change
@@ -140,6 +141,8 @@ export async function POST(
           regionalOffice: true,
         },
       })
+
+      await syncLegacyStatus(tx, current.guardId)
 
       return { ended, created }
     })

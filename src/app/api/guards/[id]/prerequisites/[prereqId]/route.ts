@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { transitionGuard } from "@/lib/guards/lifecycle"
 
 // PATCH /api/guards/[id]/prerequisites/[prereqId]
 // Admin verifies / updates a prerequisite record
@@ -66,10 +67,14 @@ export async function PATCH(
       data,
     })
 
-    // Auto-update guard status based on VERIFICATION doc completion
+    // Auto-flip lifecycleStatus based on VERIFICATION doc completion.
+    // Only toggles between PENDING and ACTIVE — never touches INACTIVE/TERMINATED.
     try {
-      const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true } })
-      if (guard && (guard.status === "PENDING" || guard.status === "ACTIVE")) {
+      const guard = await prisma.guard.findUnique({
+        where: { id: guardId },
+        select: { id: true, lifecycleStatus: true },
+      })
+      if (guard && (guard.lifecycleStatus === "PENDING" || guard.lifecycleStatus === "ACTIVE")) {
         // Get all active VERIFICATION type doc types
         const verificationDocTypes = await prisma.guardDocumentType.findMany({
           where: { isActive: true, docCategory: "VERIFICATION" },
@@ -86,10 +91,24 @@ export async function PATCH(
             guardVerifPrereqs.length === verificationNames.length &&
             guardVerifPrereqs.every((p) => p.status === "VERIFIED")
 
-          if (allVerified && guard.status === "PENDING") {
-            await prisma.guard.update({ where: { id: guardId }, data: { status: "ACTIVE" } })
-          } else if (!allVerified && guard.status === "ACTIVE") {
-            await prisma.guard.update({ where: { id: guardId }, data: { status: "PENDING" } })
+          if (allVerified && guard.lifecycleStatus === "PENDING") {
+            await transitionGuard({
+              guardId,
+              to: "ACTIVE",
+              ctx: {
+                trigger: "SYSTEM",
+                reason: "All verification prerequisites verified",
+              },
+            })
+          } else if (!allVerified && guard.lifecycleStatus === "ACTIVE") {
+            await transitionGuard({
+              guardId,
+              to: "PENDING",
+              ctx: {
+                trigger: "SYSTEM",
+                reason: "Verification prerequisite no longer complete",
+              },
+            })
           }
         }
       }

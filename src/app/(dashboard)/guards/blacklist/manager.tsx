@@ -16,6 +16,16 @@ type BlacklistedGuard = {
 
 type GuardOption = { id: string; name: string; cnic: string; parwestId: string }
 
+type MatchingActiveGuard = {
+    id: string
+    parwestId: string
+    name: string
+    lifecycleStatus: string
+}
+
+const TERMINATION_REASON_OPTIONS = ["RESIGNED", "FIRED", "ABSCONDED", "DECEASED", "OTHER"] as const
+type TerminationReasonOption = (typeof TERMINATION_REASON_OPTIONS)[number]
+
 export default function BlacklistManager() {
     // --- Search / select state ---
     const [cnicQuery, setCnicQuery] = useState("")
@@ -45,6 +55,11 @@ export default function BlacklistManager() {
     const [notice, setNotice] = useState("")
     const [directCnicInput, setDirectCnicInput] = useState("")
     const [directCnicError, setDirectCnicError] = useState("")
+
+    // --- Post-blacklist termination prompt ---
+    const [terminationCandidates, setTerminationCandidates] = useState<MatchingActiveGuard[]>([])
+    const [terminationReason, setTerminationReason] = useState<TerminationReasonOption>("FIRED")
+    const [terminating, setTerminating] = useState(false)
 
     // ── Fetch guard options once ────────────────────────────────────────────────
     const fetchGuardOptions = async () => {
@@ -141,6 +156,8 @@ export default function BlacklistManager() {
         setBlacklisting(true)
         const failures: string[] = []
         let sawConflict = false
+        const aggregatedMatches: MatchingActiveGuard[] = []
+        const seenGuardIds = new Set<string>()
 
         for (const guard of pendingList) {
             const body: { cnic: string; reason: string | null; absconded?: boolean } = {
@@ -153,10 +170,21 @@ export default function BlacklistManager() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             })
+            const data = await res.json().catch(() => ({} as Record<string, unknown>))
             if (!res.ok) {
-                const data = await res.json().catch(() => ({}))
                 if (res.status === 409) sawConflict = true
-                failures.push(`${guard.name} (${guard.cnic}): ${data.message || "failed"}`)
+                const msg = (data as { message?: string }).message || "failed"
+                failures.push(`${guard.name} (${guard.cnic}): ${msg}`)
+            } else {
+                const matches = (data as { matchingActiveGuards?: MatchingActiveGuard[] }).matchingActiveGuards
+                if (Array.isArray(matches)) {
+                    for (const m of matches) {
+                        if (!seenGuardIds.has(m.id)) {
+                            seenGuardIds.add(m.id)
+                            aggregatedMatches.push(m)
+                        }
+                    }
+                }
             }
         }
 
@@ -170,7 +198,42 @@ export default function BlacklistManager() {
             setReason("")
             setAbsconded(false)
         }
+        // Only prompt to terminate when ALL blacklist writes succeeded AND
+        // there are currently-active guards tied to those CNICs.
+        if (failures.length === 0 && aggregatedMatches.length > 0) {
+            setTerminationReason("FIRED")
+            setTerminationCandidates(aggregatedMatches)
+        }
         setBlacklisting(false)
+    }
+
+    const terminateMatchingGuards = async () => {
+        if (terminationCandidates.length === 0) return
+        setTerminating(true)
+        const failures: string[] = []
+        for (const g of terminationCandidates) {
+            const res = await fetch(`/api/guards/${g.id}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    status: "TERMINATED",
+                    terminationReason,
+                    reason: "Blacklist consequence",
+                }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({} as Record<string, unknown>))
+                const msg = (data as { message?: string }).message || "failed"
+                failures.push(`${g.name} (${g.parwestId}): ${msg}`)
+            }
+        }
+        setTerminating(false)
+        setTerminationCandidates([])
+        if (failures.length > 0) {
+            setError(`Some guards could not be terminated:\n${failures.join("\n")}`)
+        } else {
+            setNotice("Matching guards terminated.")
+        }
     }
 
     // ── Remove from blacklist ────────────────────────────────────────────────────
@@ -476,6 +539,46 @@ export default function BlacklistManager() {
                         setConfirmBlacklist(false)
                         await blacklistAll()
                     }}
+                />
+            ) : null}
+
+            {/* Offer to terminate matching active guards after blacklist */}
+            {terminationCandidates.length > 0 ? (
+                <ConfirmDialog
+                    title={`Terminate ${terminationCandidates.length} matching guard${terminationCandidates.length > 1 ? "s" : ""}?`}
+                    processing={terminating}
+                    message={
+                        <div className="space-y-2">
+                            <p>
+                                The following currently-active guard{terminationCandidates.length > 1 ? "s share" : " shares"} a
+                                blacklisted CNIC. Blacklisting the CNIC does <b>not</b> automatically terminate them.
+                                Do you want to terminate them now?
+                            </p>
+                            <ul className="mt-2 space-y-1">
+                                {terminationCandidates.map((g) => (
+                                    <li key={g.id} className="flex items-center justify-between text-sm rounded bg-gray-50 px-2 py-1">
+                                        <span className="font-medium">{g.name}</span>
+                                        <span className="text-gray-500 text-xs">{g.parwestId} · {g.lifecycleStatus}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="mt-3">
+                                <label className="block text-xs text-gray-600 mb-1">Termination reason</label>
+                                <select
+                                    value={terminationReason}
+                                    onChange={(e) => setTerminationReason(e.target.value as TerminationReasonOption)}
+                                    className="w-full rounded-md border px-2 py-1 text-sm"
+                                    disabled={terminating}
+                                >
+                                    {TERMINATION_REASON_OPTIONS.map((r) => (
+                                        <option key={r} value={r}>{r}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    }
+                    onNo={() => setTerminationCandidates([])}
+                    onYes={terminateMatchingGuards}
                 />
             ) : null}
 

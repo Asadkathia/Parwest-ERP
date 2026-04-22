@@ -4,18 +4,44 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Pencil } from "lucide-react"
 import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
 
+// Settable lifecycle choices only. PRESENT / DEFAULT are derived from deployment
+// state server-side and ABSENT / BLACKLISTED are handled by other workflows.
 const STATUS_OPTIONS: { value: string; label: string; description: string; color: string }[] = [
     { value: "PENDING",    label: "Pending",    description: "No deployment yet — awaiting verification",         color: "bg-orange-100 text-orange-800" },
     { value: "ACTIVE",     label: "Active",     description: "Verified and ready for deployment",                 color: "bg-green-100 text-green-800" },
-    { value: "PRESENT",    label: "Present",    description: "Currently on an active deployment",                 color: "bg-blue-100 text-blue-800" },
-    { value: "DEFAULT",    label: "Default",    description: "Returned from deployment — available for redeploy", color: "bg-cyan-100 text-cyan-800" },
-    { value: "ABSENT",     label: "Absent",     description: "On long leave / absent",                            color: "bg-yellow-100 text-yellow-800" },
-    { value: "INACTIVE",   label: "Inactive",   description: "Resigned / left the company",                      color: "bg-gray-200 text-gray-700" },
+    { value: "INACTIVE",   label: "Inactive",   description: "Resigned / left the company",                       color: "bg-gray-200 text-gray-700" },
     { value: "TERMINATED", label: "Terminated", description: "Employment terminated",                             color: "bg-red-100 text-red-800" },
 ]
 
+// Display-only colors for the status badge (covers derived values too).
+const DISPLAY_STATUS_COLORS: Record<string, string> = {
+    PENDING:    "bg-orange-100 text-orange-800",
+    ACTIVE:     "bg-green-100 text-green-800",
+    PRESENT:    "bg-blue-100 text-blue-800",
+    DEFAULT:    "bg-cyan-100 text-cyan-800",
+    INACTIVE:   "bg-gray-200 text-gray-700",
+    TERMINATED: "bg-red-100 text-red-800",
+}
+
+const DISPLAY_STATUS_LABELS: Record<string, string> = {
+    PENDING:    "Pending",
+    ACTIVE:     "Active",
+    PRESENT:    "Present",
+    DEFAULT:    "Default",
+    INACTIVE:   "Inactive",
+    TERMINATED: "Terminated",
+}
+
+const TERMINATION_REASON_OPTIONS: { value: string; label: string }[] = [
+    { value: "RESIGNED",  label: "Resigned" },
+    { value: "FIRED",     label: "Fired" },
+    { value: "ABSCONDED", label: "Absconded" },
+    { value: "DECEASED",  label: "Deceased" },
+    { value: "OTHER",     label: "Other" },
+]
+
 function statusColor(status: string) {
-    return STATUS_OPTIONS.find((s) => s.value === status)?.color ?? "bg-gray-100 text-gray-700"
+    return DISPLAY_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-700"
 }
 
 type User = { id: string; name: string | null; email: string | null; role?: { name: string } | null }
@@ -38,8 +64,9 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
     const [statusSaving, setStatusSaving] = useState(false)
     const [statusError, setStatusError] = useState("")
     const [absconded, setAbsconded] = useState(false)
+    const [terminationReason, setTerminationReason] = useState<string>("")
 
-    const isTerminal = newStatus === "TERMINATED" || newStatus === "BLACKLISTED"
+    const isTerminal = newStatus === "TERMINATED"
 
     // ── Supervisor modal state ──
     const [supOpen, setSupOpen] = useState(false)
@@ -73,6 +100,10 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
 
     const saveStatus = async () => {
         if (!newStatus || newStatus === status) { setStatusOpen(false); return }
+        if (isTerminal && !terminationReason) {
+            setStatusError("Termination reason is required.")
+            return
+        }
         if (isTerminal && absconded && !statusReason.trim()) {
             setStatusError("Reason is required when marking the guard as absconded.")
             return
@@ -88,8 +119,9 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
         setStatusError("")
         try {
             const body: Record<string, unknown> = { status: newStatus, reason: statusReason }
-            if (isTerminal && absconded) {
-                body.absconded = true
+            if (isTerminal) {
+                body.terminationReason = terminationReason
+                if (absconded) body.absconded = true
             }
             const res = await fetch(`/api/guards/${guardId}/status`, {
                 method: "PATCH",
@@ -108,6 +140,7 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
             setStatusOpen(false)
             setStatusReason("")
             setAbsconded(false)
+            setTerminationReason("")
         } catch (e: unknown) {
             setStatusError(e instanceof Error ? e.message : "Error updating status")
         } finally {
@@ -139,13 +172,17 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
         }
     }
 
-    // Reset status choice when opening modal
+    // Reset status choice when opening modal. Default to a settable value
+    // (PENDING / ACTIVE / INACTIVE / TERMINATED) — the current displayed status
+    // may be a derived value like PRESENT/DEFAULT which isn't a valid choice.
     useEffect(() => {
         if (statusOpen) {
-            setNewStatus(status)
+            const settable = STATUS_OPTIONS.some((o) => o.value === status)
+            setNewStatus(settable ? status : "ACTIVE")
             setStatusReason("")
             setStatusError("")
             setAbsconded(false)
+            setTerminationReason("")
         }
     }, [statusOpen, status])
 
@@ -154,7 +191,7 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
             {/* Status badge + edit */}
             <div className="flex items-center gap-1.5">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColor(status)}`}>
-                    {STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status}
+                    {DISPLAY_STATUS_LABELS[status] ?? status}
                 </span>
                 {isAdmin && (
                     <button
@@ -207,6 +244,24 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                                 </label>
                             ))}
                         </div>
+
+                        {isTerminal && (
+                            <div>
+                                <label className="block text-sm text-gray-600 mb-1">
+                                    Termination Reason <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                    value={terminationReason}
+                                    onChange={(e) => setTerminationReason(e.target.value)}
+                                    className="w-full border rounded-md px-3 py-2 text-sm"
+                                >
+                                    <option value="">Select a reason...</option>
+                                    {TERMINATION_REASON_OPTIONS.map((r) => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         {isTerminal && (
                             <label className="flex items-start gap-2 p-3 rounded-lg border border-red-200 bg-red-50 cursor-pointer">

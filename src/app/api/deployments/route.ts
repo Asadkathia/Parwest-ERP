@@ -7,6 +7,7 @@ import { mockDeploymentsList } from "@/lib/mockData/deployments"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
 function parseOptionalNumber(value: unknown) {
     if (value === undefined) return undefined
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
         }
 
         const [guard, client, office, branch] = await Promise.all([
-            prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true, regionalOfficeId: true, joiningDate: true } }),
+            prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true, lifecycleStatus: true, regionalOfficeId: true, joiningDate: true } }),
             prisma.client.findUnique({ where: { id: clientId }, select: { id: true } }),
             prisma.regionalOffice.findUnique({ where: { id: regionalOfficeId }, select: { id: true } }),
             branchId
@@ -143,8 +144,8 @@ export async function POST(request: NextRequest) {
                 return badRequest(`Deployment date cannot be before the guard's joining date (${fmt}).`)
             }
         }
-        if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.status !== "ACTIVE" && guard.status !== "DEFAULT") {
-            return conflict(`Guard cannot be deployed — current status is "${guard.status}". Only ACTIVE or DEFAULT guards are eligible for deployment.`)
+        if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.lifecycleStatus !== "ACTIVE") {
+            return conflict(`Guard cannot be deployed — current lifecycle status is "${guard.lifecycleStatus}". Only ACTIVE guards are eligible for deployment.`)
         }
         if (
             isWorkflowRuleEnabled("deployments.requireGuardOfficeConsistency") &&
@@ -348,11 +349,11 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        // ── Auto-set guard status to PRESENT when deployed ──
+        // ── Recompute legacy status shadow after deployment creation ──
         if (deploymentStatus === "ACTIVE") {
             const prevStatus = deployment.guard.status
+            await syncLegacyStatus(prisma, guardId)
             if (prevStatus !== "PRESENT") {
-                await prisma.guard.update({ where: { id: guardId }, data: { status: "PRESENT" } }).catch(() => { /* non-critical */ })
                 // Record status history
                 const { recordGuardStatusChange } = await import("@/lib/guards/status-history")
                 void recordGuardStatusChange({

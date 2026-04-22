@@ -5,7 +5,7 @@ import { forbidden, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 
 // Static options derived from schema definitions
-const GUARD_STATUSES = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "ABSENT", "INACTIVE", "TERMINATED"]
+const GUARD_STATUSES = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "INACTIVE", "TERMINATED"]
 const EX_SERVICE_TYPES = ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER", "CIVILIAN"]
 const VERIFICATION_STATUSES = [
     "REQUEST_SUBMITTED",

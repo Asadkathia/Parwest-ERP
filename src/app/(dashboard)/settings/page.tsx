@@ -11,6 +11,7 @@ const links = [
   { title: "Fingerprint Device", href: "/settings/fingerprint-device" },
   { title: "Workflow Rules", href: "/settings/workflow-rules" },
   { title: "System Settings", href: "/settings/system" },
+  { title: "Insights Configuration", href: "/settings/insights" },
 ]
 
 export default function SettingsOverviewPage() {

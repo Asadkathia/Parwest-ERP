@@ -5,7 +5,29 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
-import { recordGuardStatusChange } from "@/lib/guards/status-history"
+import {
+    transitionGuard,
+    TERMINATION_REASONS,
+    type LifecycleStatus,
+    type TerminationReason,
+} from "@/lib/guards/lifecycle"
+
+// Legacy enum still accepted on the wire for backward compat with non-web consumers.
+// Internally we translate into lifecycleStatus via the state machine.
+const LEGACY_ACCEPTED = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "INACTIVE", "TERMINATED"] as const
+
+function toLifecycle(incoming: string): LifecycleStatus | null {
+    switch (incoming) {
+        case "PENDING": return "PENDING"
+        case "ACTIVE":
+        case "PRESENT":
+        case "DEFAULT":
+            return "ACTIVE"
+        case "INACTIVE": return "INACTIVE"
+        case "TERMINATED": return "TERMINATED"
+        default: return null
+    }
+}
 
 export async function PATCH(
     request: NextRequest,
@@ -33,10 +55,19 @@ export async function PATCH(
             return badRequest("status is required")
         }
 
+        if (!LEGACY_ACCEPTED.includes(status)) {
+            return badRequest(`Invalid status. Allowed: ${LEGACY_ACCEPTED.join(", ")}`)
+        }
+
+        const to = toLifecycle(status)
+        if (!to) {
+            return badRequest(`Invalid status. Allowed: ${LEGACY_ACCEPTED.join(", ")}`)
+        }
+
         const existingGuard = await prisma.guard.findUnique({
             where: { id },
             select: {
-                id: true, name: true, cnic: true, status: true, parwestId: true,
+                id: true, name: true, cnic: true, status: true, lifecycleStatus: true, parwestId: true,
                 regionId: true, regionalOfficeId: true,
                 region: { select: { name: true } },
                 regionalOffice: { select: { name: true } },
@@ -58,21 +89,29 @@ export async function PATCH(
             return forbidden("Forbidden: guard is outside your scope.")
         }
 
-        const allowedStatuses = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "ABSENT", "INACTIVE", "TERMINATED", "BLACKLISTED"]
-        if (!allowedStatuses.includes(status)) {
-            return badRequest(`Invalid status. Allowed: ${allowedStatuses.join(", ")}`)
-        }
-
         const reason = typeof body.reason === "string" ? body.reason.trim() : ""
-        if (existingGuard.status === "INACTIVE" && status === "ACTIVE" && !reason) {
+        const currentLifecycle = existingGuard.lifecycleStatus as LifecycleStatus
+        if (currentLifecycle === "INACTIVE" && to === "ACTIVE" && !reason) {
             return badRequest("Reactivation reason is required.")
         }
 
-        // Terminal statuses (TERMINATED / BLACKLISTED) require the guard to have
-        // returned all kit and pledged documents first. The `absconded` flag is an
-        // explicit escape hatch for guards who disappeared — it forfeits inventory
-        // (marked LOST) and requires a reason.
-        const isTerminal = status === "TERMINATED" || status === "BLACKLISTED"
+        // TERMINATED requires a terminationReason.
+        let terminationReason: TerminationReason | null = null
+        if (to === "TERMINATED") {
+            const incomingReason = body.terminationReason
+            if (!incomingReason || !TERMINATION_REASONS.includes(incomingReason)) {
+                return badRequest(
+                    `terminationReason is required and must be one of: ${TERMINATION_REASONS.join(", ")}`
+                )
+            }
+            terminationReason = incomingReason as TerminationReason
+        }
+
+        // Terminal status requires the guard to have returned all kit and pledged
+        // documents first. The `absconded` flag is an explicit escape hatch for
+        // guards who disappeared — it forfeits inventory (marked LOST) and requires
+        // a reason.
+        const isTerminal = to === "TERMINATED"
         const absconded = body.absconded === true
         if (isTerminal) {
             if (absconded && !reason) {
@@ -96,25 +135,38 @@ export async function PATCH(
             }
         }
 
-        const guard = await prisma.$transaction(async (tx) => {
-            if (isTerminal && absconded) {
-                await tx.storeInventoryAssignment.updateMany({
-                    where: { assignedToGuardId: id, status: "ASSIGNED" },
-                    data: {
-                        status: "LOST",
-                        returnedAt: new Date(),
-                        returnedByUserId: session.user?.id ?? null,
-                    },
-                })
-            }
-            return tx.guard.update({
-                where: { id },
-                data: { status },
-                select: { id: true, status: true, name: true, cnic: true },
+        // If absconded + terminal, write off held inventory as LOST before transitioning.
+        if (isTerminal && absconded) {
+            await prisma.storeInventoryAssignment.updateMany({
+                where: { assignedToGuardId: id, status: "ASSIGNED" },
+                data: {
+                    status: "LOST",
+                    returnedAt: new Date(),
+                    returnedByUserId: session.user?.id ?? null,
+                },
             })
+        }
+
+        // Atomic transition: updates lifecycleStatus + legacy shadow, writes history.
+        await transitionGuard({
+            guardId: id,
+            to,
+            ctx: {
+                actorId: session.user?.id ?? null,
+                actorName: session.user?.name ?? session.user?.email ?? null,
+                reason: reason || null,
+                trigger: "MANUAL",
+                terminationReason,
+                absconded,
+            },
         })
 
-        if (existingGuard.status === "INACTIVE" && status === "ACTIVE") {
+        const guard = await prisma.guard.findUnique({
+            where: { id },
+            select: { id: true, status: true, lifecycleStatus: true, name: true, cnic: true },
+        })
+
+        if (currentLifecycle === "INACTIVE" && to === "ACTIVE") {
             await prisma.auditLog.create({
                 data: {
                     userId: session.user.id,
@@ -125,39 +177,26 @@ export async function PATCH(
             })
         }
 
-        // Determine event type
-        const eventType = existingGuard.status === "INACTIVE" && status === "ACTIVE"
+        // Service history event
+        const eventType = currentLifecycle === "INACTIVE" && to === "ACTIVE"
             ? "REACTIVATED" as const
             : "STATUS_CHANGED" as const
 
-        const descParts = [`Status changed from ${existingGuard.status} to ${status}`]
+        const descParts = [`Status changed from ${existingGuard.status} to ${guard?.status ?? status}`]
         if (isTerminal && absconded) descParts.push("Absconded (inventory forfeited as LOST)")
+        if (terminationReason) descParts.push(`Termination reason: ${terminationReason}`)
         if (reason) descParts.push(`Reason: ${reason}`)
 
         void recordGuardServiceEvent({
-            cnic: guard.cnic,
-            guardId: guard.id,
+            cnic: existingGuard.cnic,
+            guardId: existingGuard.id,
             parwestId: existingGuard.parwestId,
-            guardName: guard.name,
+            guardName: existingGuard.name,
             event: eventType,
             fromStatus: existingGuard.status,
-            toStatus: status,
+            toStatus: guard?.status ?? status,
             description: descParts.join(". "),
             changedByName: session.user?.name ?? session.user?.email ?? null,
-            regionName: existingGuard.region?.name ?? null,
-            officeName: existingGuard.regionalOffice?.name ?? null,
-        })
-
-        void recordGuardStatusChange({
-            guardId: guard.id,
-            cnic: guard.cnic,
-            parwestId: existingGuard.parwestId,
-            guardName: guard.name,
-            fromStatus: existingGuard.status,
-            toStatus: status,
-            reason: reason || null,
-            changedByName: session.user?.name ?? session.user?.email ?? null,
-            changedByType: "MANUAL",
             regionName: existingGuard.region?.name ?? null,
             officeName: existingGuard.regionalOffice?.name ?? null,
         })
@@ -165,6 +204,7 @@ export async function PATCH(
         return NextResponse.json(guard)
     } catch (error: unknown) {
         console.error("Error updating guard status:", error)
-        return internalServerError("Failed to update guard status")
+        const message = error instanceof Error ? error.message : "Failed to update guard status"
+        return internalServerError(message)
     }
 }

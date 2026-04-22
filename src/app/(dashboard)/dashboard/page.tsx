@@ -1,229 +1,186 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { BellRing, Building2, MapPinned, MessageSquareMore, ShieldCheck, Sparkles, Users } from "lucide-react"
-import StatCard from "@/components/ui/stat-card"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
+import { Sparkles, Users, MessageSquareMore, ShieldCheck, Wallet } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
-import Panel from "@/components/ui/panel"
-import ActionButton from "@/components/ui/action-button"
-import { Select } from "@/components/ui/form-controls"
-import StatusChip from "@/components/ui/status-chip"
+import KpiCard from "@/components/dashboard/KpiCard"
+import AttentionStrip from "@/components/dashboard/AttentionStrip"
+import OpsFeed from "@/components/dashboard/OpsFeed"
+import MyQueue from "@/components/dashboard/MyQueue"
+import ExpiringRenewals from "@/components/dashboard/ExpiringRenewals"
+import FinancePulse from "@/components/dashboard/FinancePulse"
 import GuardClientMapCard from "@/components/dashboard/GuardClientMapCard"
-import { prisma } from "@/lib/db"
-import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import InsightsPanel from "@/components/dashboard/InsightsPanel"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { resolveDashboardRole, roleVisibility, type DashboardRole } from "@/lib/dashboard/role"
+import { loadDashboardData, formatPayrollState, type KpiSeries } from "@/lib/dashboard/queries"
+
+const ROLE_LABELS: Record<DashboardRole, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN_REGIONAL: "Regional Admin",
+  MANAGER: "Manager",
+  SUPERVISOR: "Supervisor",
+  ACCOUNTANT: "Accountant",
+}
 
 export default async function DashboardPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  let totalGuards = 0
-  let activeDeployments = 0
-  let totalClients = 0
-  let pendingTickets = 0
+  const role = resolveDashboardRole(session)
+  const permissions = (session.user?.permissions as string[] | undefined) ?? []
+  const vis = roleVisibility(role, permissions)
+  const scope = deriveManagerScope(session)
+  const userId = (session.user as { id?: string } | undefined)?.id ?? null
 
-  type MapClient = { id: string; name: string; city: string | null; latitude: number | null; longitude: number | null }
-  type MapOffice = { id: string; name: string; seriesCode: string; address: string | null; latitude: number | null; longitude: number | null }
+  const data = await loadDashboardData({
+    userId,
+    role,
+    scope,
+    showFinance: vis.financePulse,
+  })
 
-  let mapClients: MapClient[] = []
-  let mapOffices: MapOffice[] = []
-
-  try {
-    const [guards, deps, clients, tickets, officesRaw] = await Promise.all([
-      prisma.guard.count({ where: { status: "ACTIVE" } }),
-      prisma.deployment.count({ where: { status: "ACTIVE" } }),
-      prisma.client.count(),
-      // Pending = not closed/resolved (safe across any status naming convention)
-      prisma.ticket.count({
-        where: {
-          status: {
-            name: { notIn: ["CLOSED", "RESOLVED", "COMPLETED", "Closed", "Resolved"] },
-          },
-        },
-      }),
-      prisma.regionalOffice.findMany({
-        select: {
-          id: true,
-          name: true,
-          seriesCode: true,
-          address: true,       // added in latest schema
-          latitude: true,
-          longitude: true,
-        },
-      }),
-    ])
-    totalGuards = guards
-    activeDeployments = deps
-    totalClients = clients
-    pendingTickets = tickets
-    mapOffices = officesRaw.map((o) => ({
-      id: o.id,
-      name: o.name,
-      seriesCode: o.seriesCode,
-      address: (o as Record<string, unknown>).address as string | null ?? null,
-      latitude: (o as Record<string, unknown>).latitude as number | null ?? null,
-      longitude: (o as Record<string, unknown>).longitude as number | null ?? null,
-    }))
-
-    const clientRows = await prisma.client.findMany({
-      select: { id: true, name: true, city: true, latitude: true, longitude: true },
-    })
-    mapClients = clientRows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      city: c.city ?? null,
-      latitude: c.latitude ?? null,
-      longitude: c.longitude ?? null,
-    }))
-  } catch (error) {
-    if (!isPrismaMissingSchemaError(error)) {
-      console.error("DashboardPage stats query failed:", error)
-    }
-  }
+  const kpiCards = pickKpis(data.kpis, vis.kpiSet)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <SectionTitle
-        title="Dashboard"
-        subtitle={`Welcome back, ${session.user?.name || "Admin"}.`}
+        title={`Good ${greeting()}, ${session.user?.name?.split(" ")[0] || "there"}`}
+        subtitle={`${ROLE_LABELS[role]}${
+          scope?.regionId ? " · Region-scoped view" : role === "SUPER_ADMIN" ? " · All regions" : ""
+        }`}
         action={
-          <Link
-            href="/dashboard/ai-chat"
-            className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-xs)]"
-          >
-            <Sparkles className="h-4 w-4" />
-            AI Chat
-          </Link>
+          <div className="flex items-center gap-2">
+            <QuickActions role={role} />
+            <Link
+              href="/dashboard/ai-chat"
+              className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-xs)]"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Chat
+            </Link>
+          </div>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Guards" value={totalGuards} tone="brand" icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Active Deployments" value={activeDeployments} tone="success" icon={<MapPinned className="h-5 w-5" />} />
-        <StatCard label="Total Clients" value={totalClients} tone="warning" icon={<Building2 className="h-5 w-5" />} />
-        <StatCard label="Pending Tickets" value={pendingTickets} tone="danger" icon={<MessageSquareMore className="h-5 w-5" />} />
-      </div>
+      {vis.attentionStrip && data.attention.length > 0 ? <AttentionStrip items={data.attention} /> : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Link href="/reports/generated" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">Reports List</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Run system-generated templates.</p>
-        </Link>
-        <Link href="/dashboard/admin-center" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">Admin Center</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Broadcast + recent system logs.</p>
-        </Link>
-        <Link href="/dashboard/shshk" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">SHSHK Insights</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">AI suggestions for system health.</p>
-        </Link>
-        <Link href="/clients/invoicing" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">Client Invoicing</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Branch-wise and client-wise drafts.</p>
-        </Link>
-        <Link href="/guards/docs-checklist" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">Docs Checklist Print</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Select guards and print required docs checklist.</p>
-        </Link>
-        <Link href="/payroll/loans/bulk" className="ui-card p-4 hover:shadow-[var(--shadow-md)] transition">
-          <p className="text-sm font-semibold text-[var(--text)]">Bulk Loans</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Upload and process multiple guard loans.</p>
-        </Link>
-      </div>
+      {vis.kpiRow ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {kpiCards.map((k) => (
+            <KpiCard
+              key={k.label}
+              label={k.label}
+              value={renderKpiValue(k, data)}
+              deltaToday={k.sparkline.length > 0 ? k.deltaToday : undefined}
+              sparkline={k.sparkline}
+              tone={k.tone}
+              href={k.href}
+              footer={kpiFooter(k, data)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {role === "SUPER_ADMIN" || role === "ADMIN_REGIONAL" || role === "ACCOUNTANT" ? (
+        <InsightsPanel canManage={role === "SUPER_ADMIN"} />
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <SectionTitle
-                title="Things To Do"
-                subtitle="Today's events"
-                action={
-                  <div className="flex items-center gap-2">
-                    <Select className="w-40">
-                      <option>All Clients</option>
-                    </Select>
-                    <ActionButton>New To Do</ActionButton>
-                  </div>
-                }
-              />
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[linear-gradient(180deg,#f8faff_0%,#f4f7ff_100%)] p-4">
-                <div className="grid grid-cols-6 gap-3 text-center text-xs text-[var(--text-muted)] mb-4">
-                  {["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26"].map((day, idx) => (
-                    <div key={day} className={idx === 1 ? "font-semibold text-[var(--brand)]" : ""}>{day}</div>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                    <p className="font-medium">Fire Inspection today</p>
-                    <p className="text-xs text-[var(--text-muted)]">2:00 pm</p>
-                  </div>
-                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                    <p className="font-medium">Waste pickup scheduled</p>
-                    <p className="text-xs text-[var(--text-muted)]">2:00 to 4:00 pm</p>
-                  </div>
-                  <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm">
-                    <p className="font-medium">Night supervisor briefing</p>
-                    <p className="text-xs text-[var(--text-muted)]">8:00 pm</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <StatusChip variant="success" label="Online Users : 53" />
-                <Link href="/dashboard/online-users" className="text-sm font-semibold text-[var(--brand)] hover:underline">
-                  Open Online Users
-                </Link>
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Map — real Leaflet with client + regional office pins */}
-          <GuardClientMapCard clients={mapClients} regionalOffices={mapOffices} />
+          {vis.opsFeed ? <OpsFeed entries={data.activity} /> : null}
+          {vis.coverageMap ? (
+            <GuardClientMapCard clients={data.mapClients} regionalOffices={data.mapOffices} />
+          ) : null}
+          {vis.financePulse && data.finance ? <FinancePulse data={data.finance} nowMs={data.generatedAtMs} /> : null}
         </div>
 
         <div className="space-y-4">
-          <Panel>
-            <SectionTitle title="Compliance" subtitle="Alerts and upcoming expiries" />
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
-                <p><strong>5 new</strong> contracts are due to expire this week.</p>
-              </div>
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
-                <p>Dr. Kang&apos;s CDS license expires in 30 days.</p>
-              </div>
-            </div>
-          </Panel>
-
-          <Panel>
-            <SectionTitle title="Reminder" subtitle="Today's reminders" />
-            <div className="mt-3 space-y-3 text-sm">
-              <div className="flex items-start gap-2">
-                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
-                <p>3 chat messages not acknowledged.</p>
-              </div>
-              <div className="flex items-start gap-2">
-                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
-                <p>3 tasks due today.</p>
-              </div>
-              <div className="flex items-start gap-2">
-                <BellRing className="h-4 w-4 mt-0.5 text-[var(--brand)]" />
-                <p>2 overdue tickets need action.</p>
-              </div>
-            </div>
-          </Panel>
-
-          <Panel>
-            <SectionTitle title="Celebration" subtitle="This week" />
-            <div className="mt-3 flex items-center gap-2 text-sm">
-              <ShieldCheck className="h-4 w-4 text-[var(--brand)]" />
-              <p>Dr. John Smith&apos;s birthday on 24 May.</p>
-            </div>
-          </Panel>
+          {vis.myQueue ? (
+            <MyQueue counts={data.myQueue} userName={session.user?.name || "You"} />
+          ) : null}
+          {vis.expiringRenewals ? (
+            <ExpiringRenewals docs={data.expiring.docs} contracts={data.expiring.contracts} />
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return "morning"
+  if (h < 17) return "afternoon"
+  return "evening"
+}
+
+function pickKpis(kpis: KpiSeries[], set: "full" | "reduced" | "finance"): KpiSeries[] {
+  if (set === "reduced") {
+    return kpis.filter((k) => ["Active Guards", "Deployed", "Open Tickets"].includes(k.label))
+  }
+  if (set === "finance") {
+    return kpis.filter((k) => ["Active Guards", "Open Tickets", "Payroll Cycle"].includes(k.label))
+  }
+  return kpis
+}
+
+type DashData = Awaited<ReturnType<typeof loadDashboardData>>
+
+function renderKpiValue(k: KpiSeries, data: DashData): string | number {
+  if (k.label === "Payroll Cycle") {
+    return formatPayrollState(data.payrollCycleState)
+  }
+  return k.value
+}
+
+function kpiFooter(k: KpiSeries, data: DashData): React.ReactNode {
+  if (k.label === "Payroll Cycle") {
+    const month = data.payrollCycleMonth
+    return month ? new Date(month).toLocaleString("en-US", { month: "long", year: "numeric" }) : "Current month"
+  }
+  if (k.label === "Vacant Guards" && k.value === 0) return "Everyone posted"
+  if (k.label === "Pending Approvals" && k.value === 0) return "Nothing waiting"
+  return null
+}
+
+function QuickActions({ role }: { role: DashboardRole }) {
+  const actions: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = []
+  if (role !== "ACCOUNTANT") {
+    actions.push({ href: "/guards/docs-checklist", label: "Docs Checklist", icon: ShieldCheck })
+  }
+  if (role === "SUPER_ADMIN" || role === "ADMIN_REGIONAL" || role === "ACCOUNTANT") {
+    actions.push({ href: "/clients/invoicing", label: "Invoicing", icon: Wallet })
+  }
+  if (role !== "ACCOUNTANT") {
+    actions.push({ href: "/payroll/loans/bulk", label: "Bulk Loans", icon: Users })
+  }
+  actions.push({ href: "/dashboard/admin-center", label: "Admin Center", icon: MessageSquareMore })
+
+  return (
+    <details className="relative">
+      <summary className="list-none inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)]">
+        Quick Action
+      </summary>
+      <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-[var(--shadow-md)]">
+        <ul className="py-1">
+          {actions.map((a) => {
+            const Icon = a.icon
+            return (
+              <li key={a.href}>
+                <Link
+                  href={a.href}
+                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--surface-muted)]"
+                >
+                  <Icon className="h-4 w-4 text-[var(--text-muted)]" />
+                  {a.label}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </details>
+  )
+}
+

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { applyTransition } from "@/lib/guards/lifecycle"
 
 /**
  * Clearance = reverse cycle for deployment.
@@ -79,11 +80,27 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Step 4: Mark guard INACTIVE + record payroll clearance row
-      await tx.guard.update({
+      // Step 4: Transition guard → INACTIVE via the lifecycle state machine.
+      // Skip the transition if the guard is already in a non-ACTIVE state (e.g.
+      // re-running clearance). `revokeDeployments: false` because step 1 above
+      // already revoked them inside this transaction.
+      const guardSnap = await tx.guard.findUnique({
         where: { id: guardId },
-        data: { status: "INACTIVE" },
+        select: { lifecycleStatus: true },
       })
+      if (guardSnap && guardSnap.lifecycleStatus === "ACTIVE") {
+        await applyTransition(tx, {
+          guardId,
+          to: "INACTIVE",
+          ctx: {
+            actorId: session.user?.id ?? null,
+            actorName: userName,
+            reason: "Payroll clearance settlement",
+            trigger: "SYSTEM",
+          },
+          revokeDeployments: false,
+        })
+      }
 
       // Upsert a payroll row marked as clearance settlement
       await tx.payroll.upsert({

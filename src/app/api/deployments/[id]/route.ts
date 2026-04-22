@@ -6,6 +6,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
 function parseOptionalNumber(value: unknown) {
     if (value === undefined) return undefined
@@ -98,11 +99,11 @@ export async function PATCH(
         if (patchGuardId) {
             const guard = await prisma.guard.findUnique({
                 where: { id: patchGuardId },
-                select: { id: true, status: true, regionalOfficeId: true },
+                select: { id: true, lifecycleStatus: true, regionalOfficeId: true },
             })
             if (!guard) return notFound("Guard not found.")
-            if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.status !== "ACTIVE" && guard.status !== "DEFAULT") {
-                return conflict("Only ACTIVE or DEFAULT guards can be deployed.")
+            if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.lifecycleStatus !== "ACTIVE") {
+                return conflict("Only ACTIVE lifecycle guards can be deployed.")
             }
 
             if (isWorkflowRuleEnabled("deployments.singleActivePerGuard")) {
@@ -215,6 +216,12 @@ export async function PATCH(
             },
         })
 
+        // Recompute legacy status shadow for affected guard(s)
+        await syncLegacyStatus(prisma, deployment.guardId)
+        if (patchGuardId && patchGuardId !== existing.guardId) {
+            await syncLegacyStatus(prisma, existing.guardId)
+        }
+
         return NextResponse.json(deployment, { status: 200 })
     } catch (error: unknown) {
         console.error("Error updating deployment:", error)
@@ -238,7 +245,7 @@ export async function DELETE(
 
         const existing = await prisma.deployment.findUnique({
             where: { id },
-            select: { id: true, status: true, regionalOfficeId: true },
+            select: { id: true, status: true, regionalOfficeId: true, guardId: true },
         })
         if (!existing) {
             return notFound("Deployment not found")
@@ -258,6 +265,8 @@ export async function DELETE(
                 endDate: new Date(),
             },
         })
+
+        await syncLegacyStatus(prisma, existing.guardId)
 
         return ok({ message: "Deployment ended successfully", deployment })
     } catch (error: unknown) {

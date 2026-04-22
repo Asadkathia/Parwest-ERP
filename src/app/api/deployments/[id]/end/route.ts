@@ -5,6 +5,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
 export async function POST(
     request: NextRequest,
@@ -71,7 +72,7 @@ export async function POST(
         const revokedByName = (session.user as { name?: string })?.name ?? null
 
         // End the deployment + recompute guard status atomically
-        const { deployment, guardStatusChanged, prevGuardStatus } = await prisma.$transaction(async (tx) => {
+        const { deployment, guardStatusChanged, prevGuardStatus, newGuardStatus } = await prisma.$transaction(async (tx) => {
             const updated = await tx.deployment.update({
                 where: { id },
                 data: {
@@ -89,18 +90,16 @@ export async function POST(
             })
 
             const guardId = updated.guard.id
-            const remainingActive = await tx.deployment.count({
-                where: { guardId, status: "ACTIVE" },
-            })
-
-            let changed = false
             const prev = updated.guard.status
-            if (remainingActive === 0 && prev !== "DEFAULT") {
-                await tx.guard.update({ where: { id: guardId }, data: { status: "DEFAULT" } })
-                changed = true
-            }
+            await syncLegacyStatus(tx, guardId)
+            const refreshed = await tx.guard.findUnique({
+                where: { id: guardId },
+                select: { status: true },
+            })
+            const next = refreshed?.status ?? prev
+            const changed = next !== prev
 
-            return { deployment: updated, guardStatusChanged: changed, prevGuardStatus: prev }
+            return { deployment: updated, guardStatusChanged: changed, prevGuardStatus: prev, newGuardStatus: next }
         })
 
         // Record status-history outside the transaction (non-critical audit side-effect)
@@ -112,7 +111,7 @@ export async function POST(
                 parwestId: deployment.guard.parwestId,
                 guardName: deployment.guard.name,
                 fromStatus: prevGuardStatus,
-                toStatus: "DEFAULT",
+                toStatus: newGuardStatus,
                 reason: `Deployment at ${deployment.client.name} ended`,
                 changedByName: revokedByName,
                 changedByType: "SYSTEM",

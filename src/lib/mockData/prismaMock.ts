@@ -111,6 +111,9 @@ const guards = mockGuardsList.map((g, idx) => {
     addressCurrent?: string | null
     emergencyContact?: string | null
     status: string
+    lifecycleStatus?: string
+    lifecycleStatusUpdatedAt?: Date | string | null
+    terminationReason?: string | null
     isExService?: boolean
     bankName?: string | null
     bankAccountNumber?: string | null
@@ -140,6 +143,33 @@ const guards = mockGuardsList.map((g, idx) => {
   addressCurrent: guard.addressCurrent || null,
   emergencyContact: guard.emergencyContact || null,
   status: guard.status,
+  // Derive lifecycleStatus from the legacy status field when the mock row
+  // doesn't specify one. ACTIVE/PRESENT/DEFAULT -> ACTIVE, PENDING -> PENDING,
+  // INACTIVE/ABSENT -> INACTIVE, TERMINATED/BLACKLISTED -> TERMINATED.
+  lifecycleStatus:
+    guard.lifecycleStatus ||
+    ((): string => {
+      switch (guard.status) {
+        case "ACTIVE":
+        case "PRESENT":
+        case "DEFAULT":
+          return "ACTIVE"
+        case "PENDING":
+          return "PENDING"
+        case "INACTIVE":
+        case "ABSENT":
+          return "INACTIVE"
+        case "TERMINATED":
+        case "BLACKLISTED":
+          return "TERMINATED"
+        default:
+          return "ACTIVE"
+      }
+    })(),
+  lifecycleStatusUpdatedAt: guard.lifecycleStatusUpdatedAt
+    ? new Date(guard.lifecycleStatusUpdatedAt)
+    : now(),
+  terminationReason: guard.terminationReason ?? null,
   isExService: Boolean(guard.isExService),
   exServiceRank: null,
   exServiceRegiment: null,

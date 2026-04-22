@@ -7,7 +7,11 @@ import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
-const STATUS_OPTIONS = ["ACTIVE", "PENDING", "INACTIVE", "TERMINATED", "BLACKLISTED", "PRESENT", "ABSENT", "DEFAULT"]
+// Legacy shadow status (Guard.status) — dual-written, kept for non-web CSV consumers.
+// BLACKLISTED + ABSENT are retired enum values and no longer emitted, so omitted here.
+const STATUS_OPTIONS = ["ACTIVE", "PENDING", "INACTIVE", "TERMINATED", "PRESENT", "DEFAULT"]
+// New canonical lifecycleStatus enum. Prefer this for filtering going forward.
+const LIFECYCLE_STATUS_OPTIONS = ["PENDING", "ACTIVE", "INACTIVE", "TERMINATED"]
 const EX_SERVICE_OPTIONS = ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER", "CIVILIAN"]
 const VERIFICATION_STATUS_OPTIONS = ["PENDING", "VERIFIED", "REJECTED", "IN_PROCESS"]
 
@@ -19,6 +23,7 @@ export default function ExportGuardsManager() {
   const [name, setName] = useState("")
   const [cnic, setCnic] = useState("")
   const [status, setStatus] = useState("")
+  const [lifecycleStatus, setLifecycleStatus] = useState("")
   const [exService, setExService] = useState("")
   const [supervisorId, setSupervisorId] = useState("")
   const [verificationStatus, setVerificationStatus] = useState("")
@@ -50,6 +55,7 @@ export default function ExportGuardsManager() {
     if (name) params.set("name", name)
     if (cnic) params.set("cnic", cnic)
     if (status) params.set("status", status)
+    if (lifecycleStatus) params.set("lifecycleStatus", lifecycleStatus)
     if (exService) params.set("exService", exService)
     if (supervisorId) params.set("supervisorId", supervisorId)
     if (verificationStatus) params.set("verificationStatus", verificationStatus)
@@ -86,6 +92,7 @@ export default function ExportGuardsManager() {
     setName("")
     setCnic("")
     setStatus("")
+    setLifecycleStatus("")
     setExService("")
     setSupervisorId("")
     setVerificationStatus("")
@@ -106,12 +113,20 @@ export default function ExportGuardsManager() {
           <Field label="CNIC#" name="cnic" value={cnic} onChange={setCnic} />
 
           <SelectField
-            label="Select Status"
+            label="Select Status (legacy)"
             name="current_status_id"
             placeholder="--Select Status--"
             value={status}
             onChange={setStatus}
             options={STATUS_OPTIONS}
+          />
+          <SelectField
+            label="Lifecycle Status"
+            name="lifecycle_status_id"
+            placeholder="--Select Lifecycle Status--"
+            value={lifecycleStatus}
+            onChange={setLifecycleStatus}
+            options={LIFECYCLE_STATUS_OPTIONS}
           />
           <SelectField
             label="Ex Service"

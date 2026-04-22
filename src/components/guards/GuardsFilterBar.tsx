@@ -11,7 +11,6 @@ const STATUS_OPTIONS = [
     { value: "PENDING",    label: "Pending" },
     { value: "PRESENT",    label: "Present" },
     { value: "DEFAULT",    label: "Default" },
-    { value: "ABSENT",     label: "Absent" },
     { value: "INACTIVE",   label: "Inactive" },
     { value: "TERMINATED", label: "Terminated" },
 ]

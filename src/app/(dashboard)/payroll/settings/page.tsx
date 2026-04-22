@@ -71,7 +71,7 @@ export default function PayrollSettingsPage() {
       {activeTab === "status-update" && (
         <PlaceholderTab
           tab={activeTab}
-          note="Bulk guard status update tool. Scope: select guards by filter, change status (ACTIVE/INACTIVE/BLACKLISTED), audit trail."
+          note="Bulk guard lifecycle status update tool. Scope: select guards by filter, change lifecycleStatus (ACTIVE/INACTIVE/TERMINATED), audit trail."
         />
       )}
     </PayrollPageShell>

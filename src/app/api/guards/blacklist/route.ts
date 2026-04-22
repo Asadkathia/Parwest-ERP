@@ -5,7 +5,6 @@ import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
-import { recordGuardStatusChange } from "@/lib/guards/status-history"
 
 function sanitizeCnic(value: string) {
     return value.trim()
@@ -135,7 +134,7 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        // Fetch guard snapshot before updating
+        // Fetch guard snapshot for audit event
         const guardSnap = await prisma.guard.findUnique({
             where: { cnic },
             select: {
@@ -145,12 +144,13 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        // Blacklisted guards are set to TERMINATED. If flagged absconded, forfeit
-        // outstanding inventory (mark LOST) and end any active deployments.
-        await prisma.$transaction(async (tx) => {
-            if (absconded && guardsForCnic.length > 0) {
-                const guardIds = guardsForCnic.map((g) => g.id)
-                const now = new Date()
+        // If the caller flagged the guard(s) as absconded, forfeit outstanding
+        // inventory (mark LOST) and end any active deployments. Blacklist no
+        // longer auto-terminates the guard lifecycle — that's a separate action.
+        if (absconded && guardsForCnic.length > 0) {
+            const guardIds = guardsForCnic.map((g) => g.id)
+            const now = new Date()
+            await prisma.$transaction(async (tx) => {
                 await tx.storeInventoryAssignment.updateMany({
                     where: { assignedToGuardId: { in: guardIds }, status: "ASSIGNED" },
                     data: {
@@ -168,11 +168,17 @@ export async function POST(request: NextRequest) {
                         revokedByName: session.user?.name ?? session.user?.email ?? null,
                     },
                 })
-            }
-            await tx.guard.updateMany({
-                where: { cnic },
-                data: { status: "TERMINATED" },
             })
+        }
+
+        // Fetch any non-terminated guards sharing this CNIC so the UI can
+        // optionally prompt to terminate them via the lifecycle state machine.
+        const matchingActiveGuards = await prisma.guard.findMany({
+            where: {
+                cnic,
+                lifecycleStatus: { not: "TERMINATED" },
+            },
+            select: { id: true, parwestId: true, name: true, lifecycleStatus: true },
         })
 
         void recordGuardServiceEvent({
@@ -182,9 +188,9 @@ export async function POST(request: NextRequest) {
             guardName: guardSnap?.name ?? null,
             event: "BLACKLISTED",
             fromStatus: guardSnap?.status ?? null,
-            toStatus: "TERMINATED",
+            toStatus: guardSnap?.status ?? null,
             description: [
-                absconded ? "Blacklisted (Absconded — inventory forfeited as LOST)" : "Blacklisted (Terminated)",
+                absconded ? "CNIC blacklisted (Absconded — inventory forfeited as LOST)" : "CNIC blacklisted",
                 reason ? `Reason: ${reason}` : null,
             ].filter(Boolean).join(". "),
             changedByName: session.user?.name ?? session.user?.email ?? null,
@@ -192,28 +198,12 @@ export async function POST(request: NextRequest) {
             officeName: guardSnap?.regionalOffice?.name ?? null,
         })
 
-        if (guardSnap?.id) {
-            void recordGuardStatusChange({
-                guardId: guardSnap.id,
-                cnic,
-                parwestId: guardSnap.parwestId,
-                guardName: guardSnap.name,
-                fromStatus: guardSnap.status,
-                toStatus: "TERMINATED",
-                reason: reason ?? null,
-                changedByName: session.user?.name ?? session.user?.email ?? null,
-                changedByType: "BLACKLIST",
-                regionName: guardSnap.region?.name ?? null,
-                officeName: guardSnap.regionalOffice?.name ?? null,
-            })
-        }
-
         return NextResponse.json(
             {
                 id: blacklistEntry.id,
                 cnic: blacklistEntry.cnic,
-                status: "TERMINATED",
                 reason: blacklistEntry.reason || null,
+                matchingActiveGuards,
             },
             { status: 200 }
         )
@@ -247,34 +237,17 @@ export async function DELETE(request: NextRequest) {
             return notFound("Blacklist record not found.")
         }
 
-        // Fetch guard snapshot before updating
+        // Snapshot for audit only — DELETE no longer touches Guard rows.
         const guardSnapDel = await prisma.guard.findUnique({
             where: { cnic: record.cnic },
             select: {
-                id: true, parwestId: true, name: true,
+                id: true, parwestId: true, name: true, status: true,
                 region: { select: { name: true } },
                 regionalOffice: { select: { name: true } },
             },
         })
 
-        // Look up the pre-blacklist status from status history
-        let restoreStatus = "PENDING"
-        if (guardSnapDel?.id) {
-            const blacklistHistory = await prisma.guardStatusHistory.findFirst({
-                where: { guardId: guardSnapDel.id, changedByType: "BLACKLIST" },
-                orderBy: { createdAt: "desc" },
-                select: { fromStatus: true },
-            })
-            if (blacklistHistory?.fromStatus) {
-                restoreStatus = blacklistHistory.fromStatus
-            }
-        }
-
         await prisma.blacklistedCnic.delete({ where: { id: record.id } })
-        await prisma.guard.updateMany({
-            where: { cnic: record.cnic, status: "TERMINATED" },
-            data: { status: restoreStatus },
-        })
 
         void recordGuardServiceEvent({
             cnic: record.cnic,
@@ -282,29 +255,13 @@ export async function DELETE(request: NextRequest) {
             parwestId: guardSnapDel?.parwestId ?? null,
             guardName: guardSnapDel?.name ?? null,
             event: "UNBLACKLISTED",
-            fromStatus: "TERMINATED",
-            toStatus: restoreStatus,
-            description: `Removed from blacklist — restored to ${restoreStatus}`,
+            fromStatus: guardSnapDel?.status ?? null,
+            toStatus: guardSnapDel?.status ?? null,
+            description: "CNIC removed from blacklist",
             changedByName: session.user?.name ?? session.user?.email ?? null,
             regionName: guardSnapDel?.region?.name ?? null,
             officeName: guardSnapDel?.regionalOffice?.name ?? null,
         })
-
-        if (guardSnapDel?.id) {
-            void recordGuardStatusChange({
-                guardId: guardSnapDel.id,
-                cnic: record.cnic,
-                parwestId: guardSnapDel.parwestId,
-                guardName: guardSnapDel.name,
-                fromStatus: "TERMINATED",
-                toStatus: restoreStatus,
-                reason: "Removed from blacklist",
-                changedByName: session.user?.name ?? session.user?.email ?? null,
-                changedByType: "BLACKLIST",
-                regionName: guardSnapDel.region?.name ?? null,
-                officeName: guardSnapDel.regionalOffice?.name ?? null,
-            })
-        }
 
         return NextResponse.json({ success: true, cnic: record.cnic })
     } catch (error: unknown) {

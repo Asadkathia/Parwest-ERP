@@ -7,6 +7,7 @@ declare module "next-auth" {
             role: string
             regionId?: string | null
             regionalOfficeId?: string | null
+            permissions?: string[]
         } & DefaultSession["user"]
     }
 
@@ -14,6 +15,7 @@ declare module "next-auth" {
         role: string
         regionId?: string | null
         regionalOfficeId?: string | null
+        permissions?: string[]
     }
 }
 
@@ -23,5 +25,6 @@ declare module "next-auth/jwt" {
         role: string
         regionId?: string | null
         regionalOfficeId?: string | null
+        permissions?: string[]
     }
 }
