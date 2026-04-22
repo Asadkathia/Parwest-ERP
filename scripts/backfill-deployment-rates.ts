@@ -9,6 +9,7 @@
 //
 // Commits in transactional batches of 100 to avoid long-held locks.
 
+import "dotenv/config"
 import { prisma } from "../src/lib/db"
 
 const DRY_RUN = process.argv.includes("--dry-run")

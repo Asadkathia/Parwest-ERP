@@ -4,6 +4,7 @@
 // Idempotent — uses upsert by `code`. Existing rows are NOT overwritten so
 // admin-tuned defaultAmount / sortOrder / isActive values survive re-runs.
 
+import "dotenv/config"
 import { prisma } from "../src/lib/db"
 
 type Seed = {
