@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -9,6 +10,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
     const { id: ticketId } = await params
 
     const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, select: { id: true } })
@@ -30,6 +32,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const session = await auth()
     if (!session?.user?.id) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
     const { id: ticketId } = await params
 
     const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, select: { id: true } })

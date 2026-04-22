@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
 
     const rows = await prisma.payrollDefault.findMany({
       orderBy: { createdAt: "desc" },
@@ -22,6 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
 
     const body = await request.json()
     const regionalOfficeId = body.regionalOfficeId ? String(body.regionalOfficeId) : null

@@ -95,6 +95,9 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const imageBase64 = String(body?.imageBase64 || "").trim()
         if (!imageBase64) return badRequest("imageBase64 is required.")
+        if (imageBase64.length > 10_000_000) {
+            return badRequest("Image too large. Maximum 10 MB.")
+        }
 
         const match = imageBase64.match(/^data:(image\/[a-z+]+);base64,(.+)$/i)
         const mimeType = match?.[1] || "image/png"

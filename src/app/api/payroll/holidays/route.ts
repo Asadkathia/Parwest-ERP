@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const MOCK_ROWS = [
   {
@@ -27,6 +28,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
 
     if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
@@ -47,6 +49,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const body = await request.json()
     const name = String(body?.name || "Holiday").trim()
     const dateFromRaw = body?.dateFrom ? String(body.dateFrom) : body?.date ? String(body.date) : ""

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET(
   _request: NextRequest,
@@ -11,6 +12,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
     const { id } = await context.params
 
     if (isRuntimeMockEnabled()) {
@@ -44,6 +46,7 @@ export async function PATCH(
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
 
     const { id } = await context.params
     const body = await request.json()

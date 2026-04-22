@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { readFingerprintDevices, updateFingerprintDevices, type FingerprintDeviceStatus } from "@/lib/fingerprint/store"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const VALID_STATUS: FingerprintDeviceStatus[] = ["ONLINE", "OFFLINE", "WARNING"]
 const MOCK_OFFICE_NAMES: Record<string, string> = {
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const officeId = searchParams.get("officeId")?.trim() || undefined
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const body = await request.json()
     const name = String(body?.name || "").trim()

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const MOCK_OFFICES = [
     {
@@ -35,6 +36,10 @@ const MOCK_OFFICES = [
 
 export async function GET(request: NextRequest) {
     try {
+        const session = await auth()
+        if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "SETTINGS")) return forbidden()
+
         const { searchParams } = new URL(request.url)
         const regionId = searchParams.get("regionId") || undefined
 
@@ -61,6 +66,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "SETTINGS")) return forbidden()
 
         const body = await request.json()
         const name = String(body?.name || "").trim()

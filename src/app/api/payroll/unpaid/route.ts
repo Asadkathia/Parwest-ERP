@@ -3,12 +3,14 @@ import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope } from "@/lib/access/scope"
-import { internalServerError, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
     const { searchParams } = new URL(request.url)
     const monthRaw = searchParams.get("month")

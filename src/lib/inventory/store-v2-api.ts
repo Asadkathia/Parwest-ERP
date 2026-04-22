@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { forbidden, unauthorized, type ApiEnvelope } from "@/lib/api/response"
 import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
@@ -21,6 +22,8 @@ export async function requireInventorySession(): Promise<AuthedContext | Respons
 
   const user = session.user as SessionUser
   if (!user.id) return unauthorized("Authenticated user id not found in session")
+
+  if (!hasModuleAccess(session, "INVENTORY")) return forbidden()
 
   return {
     userId: user.id,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { conflict, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -11,6 +12,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
     const { id } = await context.params
     const body = await request.json()
     const data: Record<string, unknown> = {}
@@ -35,6 +37,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
     const { id } = await context.params
     if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })
     await prisma.ticketCategory.delete({ where: { id } })

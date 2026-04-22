@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -13,6 +14,7 @@ export async function PATCH(
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params

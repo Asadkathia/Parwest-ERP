@@ -44,6 +44,7 @@ export async function GET() {
         const deployments = await prisma.deployment.findMany({
             where: buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
             orderBy: { createdAt: "desc" },
+            take: 200,
             include: {
                 guard: true,
                 client: true,

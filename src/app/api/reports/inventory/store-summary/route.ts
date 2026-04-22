@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { badRequest, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
@@ -8,6 +9,7 @@ export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "REPORTS")) return forbidden()
 
     const managerScope = deriveManagerScope(session)
     const url = new URL(request.url)

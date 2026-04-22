@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 /**
  * POST /api/deployments/[id]/change
@@ -36,6 +37,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params

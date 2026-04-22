@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
-import { badRequest, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, unauthorized } from "@/lib/api/response"
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { getImportJob, toErrorCsv } from "@/lib/imports/workflow"
 
 export async function GET(
@@ -9,6 +10,7 @@ export async function GET(
 ) {
   const session = await auth()
   if (!session) return unauthorized()
+  if (!hasModuleAccess(session, "IMPORTS")) return forbidden()
 
   const { jobId } = await params
   if (!jobId) return badRequest("jobId is required")

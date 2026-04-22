@@ -7,6 +7,7 @@ import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const MOCK_USERS = [
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")?.trim()
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
 
     const body = await request.json()
     const name = String(body?.name || "").trim()

@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       },
       include: demandInclude,
       orderBy: { createdAt: "desc" },
-      take: 500,
+      take: 200,
     })
 
     return ok(rows)

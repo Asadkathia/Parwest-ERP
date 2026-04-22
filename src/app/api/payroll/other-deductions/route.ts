@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { calculatePayrollNetSalary } from "@/lib/payroll/netSalary"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { searchParams } = new URL(request.url)
@@ -62,6 +64,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()

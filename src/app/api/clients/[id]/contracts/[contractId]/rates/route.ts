@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import type { Session } from "next-auth"
 
@@ -24,6 +25,7 @@ export async function POST(
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "CLIENTS")) return forbidden("Access denied.")
         const { id: clientId, contractId } = await params
 
         const scope = await checkClientScope(clientId, session)
@@ -106,6 +108,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasModuleAccess(session, "CLIENTS")) return forbidden("Access denied.")
         const { id: clientId, contractId } = await params
 
         const scope = await checkClientScope(clientId, session)

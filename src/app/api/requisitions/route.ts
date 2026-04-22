@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROWS = [
   {
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "REQUISITIONS")) return forbidden()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") || undefined
     const moduleName = searchParams.get("module") || undefined
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) return unauthorized()
+    if (!hasModuleAccess(session, "REQUISITIONS")) return forbidden()
     const body = await request.json()
     const title = String(body?.title || "").trim()
     const description = body?.description ? String(body.description) : null

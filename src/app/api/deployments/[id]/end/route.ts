@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 export async function POST(
@@ -14,6 +15,7 @@ export async function POST(
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params
@@ -68,47 +70,54 @@ export async function POST(
 
         const revokedByName = (session.user as { name?: string })?.name ?? null
 
-        // End the deployment
-        const deployment = await prisma.deployment.update({
-            where: { id },
-            data: {
-                status: "INACTIVE",
-                endDate: endDate,
-                endReason: body.reason || null,
-                revokedByName,
-            },
-            include: {
-                guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
-                client: { select: { id: true, name: true } },
-                branch: true,
-                regionalOffice: { select: { id: true, name: true } },
-            },
+        // End the deployment + recompute guard status atomically
+        const { deployment, guardStatusChanged, prevGuardStatus } = await prisma.$transaction(async (tx) => {
+            const updated = await tx.deployment.update({
+                where: { id },
+                data: {
+                    status: "INACTIVE",
+                    endDate: endDate,
+                    endReason: body.reason || null,
+                    revokedByName,
+                },
+                include: {
+                    guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
+                    client: { select: { id: true, name: true } },
+                    branch: true,
+                    regionalOffice: { select: { id: true, name: true } },
+                },
+            })
+
+            const guardId = updated.guard.id
+            const remainingActive = await tx.deployment.count({
+                where: { guardId, status: "ACTIVE" },
+            })
+
+            let changed = false
+            const prev = updated.guard.status
+            if (remainingActive === 0 && prev !== "DEFAULT") {
+                await tx.guard.update({ where: { id: guardId }, data: { status: "DEFAULT" } })
+                changed = true
+            }
+
+            return { deployment: updated, guardStatusChanged: changed, prevGuardStatus: prev }
         })
 
-        // ── Auto-set guard status to DEFAULT when last deployment ends ──
-        const guardId = deployment.guard.id
-        const remainingActive = await prisma.deployment.count({
-            where: { guardId, status: "ACTIVE" },
-        }).catch(() => 1) // if error, assume still active
-
-        if (remainingActive === 0) {
-            const prevStatus = deployment.guard.status
-            if (prevStatus !== "DEFAULT") {
-                await prisma.guard.update({ where: { id: guardId }, data: { status: "DEFAULT" } }).catch(() => { /* non-critical */ })
-                const { recordGuardStatusChange } = await import("@/lib/guards/status-history")
-                void recordGuardStatusChange({
-                    guardId,
-                    cnic: deployment.guard.cnic,
-                    parwestId: deployment.guard.parwestId,
-                    guardName: deployment.guard.name,
-                    fromStatus: prevStatus,
-                    toStatus: "DEFAULT",
-                    reason: `Deployment at ${deployment.client.name} ended`,
-                    changedByName: revokedByName,
-                    changedByType: "SYSTEM",
-                    officeName: deployment.regionalOffice?.name ?? null,
-                })
-            }
+        // Record status-history outside the transaction (non-critical audit side-effect)
+        if (guardStatusChanged) {
+            const { recordGuardStatusChange } = await import("@/lib/guards/status-history")
+            void recordGuardStatusChange({
+                guardId: deployment.guard.id,
+                cnic: deployment.guard.cnic,
+                parwestId: deployment.guard.parwestId,
+                guardName: deployment.guard.name,
+                fromStatus: prevGuardStatus,
+                toStatus: "DEFAULT",
+                reason: `Deployment at ${deployment.client.name} ended`,
+                changedByName: revokedByName,
+                changedByType: "SYSTEM",
+                officeName: deployment.regionalOffice?.name ?? null,
+            })
         }
 
         return ok({ message: "Deployment ended successfully", deployment })

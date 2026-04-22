@@ -3,7 +3,8 @@ import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const MOCK_TICKETS = [
   {
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")?.trim()
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
 
     const body = await request.json()
     const subject = String(body?.subject || "").trim()

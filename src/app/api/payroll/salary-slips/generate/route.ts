@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const EARNING_KEYS = [
   "basicSalary",
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
 
     const body = await request.json()
     const monthRaw = String(body.month || "")

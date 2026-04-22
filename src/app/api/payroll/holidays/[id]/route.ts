@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const { id } = await context.params
     const body = await request.json()
     const name = body?.name != null ? String(body.name).trim() : undefined
@@ -75,6 +77,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
     const { id } = await context.params
 
     if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })

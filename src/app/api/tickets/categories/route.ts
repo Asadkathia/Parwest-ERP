@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 const MOCK_ROWS = [
   { id: "mock-cat-1", name: "General", description: "General requests", color: "#3B82F6" },
@@ -13,6 +14,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
 
     if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
@@ -30,6 +32,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
 
     const body = await request.json()
     const name = String(body?.name || "").trim()

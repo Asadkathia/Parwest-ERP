@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 function parseOptionalNumber(value: unknown) {
@@ -26,6 +27,7 @@ export async function PATCH(
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params
@@ -54,6 +56,21 @@ export async function PATCH(
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId).trim() : null
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: bodyRegionalOfficeId })) {
             return forbidden("Forbidden: cannot move deployment outside your scope.")
+        }
+
+        // If guardId is being changed, validate the new guard is in the requester's scope
+        if (body.guardId && body.guardId !== existing.guardId) {
+            const newGuard = await prisma.guard.findUnique({
+                where: { id: String(body.guardId) },
+                select: { id: true, regionId: true, regionalOfficeId: true },
+            })
+            if (!newGuard) return notFound("Target guard not found.")
+            if (managerScope && managerScopeDenied(managerScope, {
+                regionId: newGuard.regionId,
+                regionalOfficeId: newGuard.regionalOfficeId,
+            })) {
+                return forbidden("Cannot assign deployment to a guard outside your scope.")
+            }
         }
 
         const patchGuardId = body?.guardId ? String(body.guardId).trim() : undefined
@@ -214,6 +231,7 @@ export async function DELETE(
         if (!session) {
             return unauthorized()
         }
+        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 
 type Mode = "report" | "query"
 
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
+    if (!hasModuleAccess(session, "REPORTS")) return forbidden()
 
     const body = await request.json().catch(() => ({}))
     const prompt = String(body?.prompt || "").trim()

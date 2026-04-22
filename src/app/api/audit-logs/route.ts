@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 
 const MOCK_AUDIT_LOGS = [
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "AUDIT")) return forbidden("Access denied.")
 
     const { searchParams } = new URL(request.url)
     const moduleFilter = searchParams.get("module")?.trim()
@@ -101,6 +103,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "AUDIT")) return forbidden("Access denied.")
+    // Creating audit entries is admin-only
+    const role = (session.user as { role?: string })?.role ?? ""
+    if (role.toLowerCase() !== "admin") return forbidden("Only admins can create audit entries.")
 
     const body = await request.json()
     const event = String(body?.event || "").trim()

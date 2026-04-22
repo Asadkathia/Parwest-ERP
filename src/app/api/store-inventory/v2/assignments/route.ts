@@ -9,6 +9,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { CategoryScope, isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const assignmentInclude: any = {
@@ -27,18 +28,6 @@ type AssignmentLineInput = {
   quantity: number
   conditionId: string | null
   notes: string | null
-}
-
-type CategoryScope = "NON_WEAPON" | "WEAPON"
-
-function isWeaponCategoryName(value: string | null | undefined): boolean {
-  const text = String(value ?? "").trim().toLowerCase()
-  return text.includes("weapon") || text.includes("ammo")
-}
-
-function normalizeCategoryScope(value: unknown): CategoryScope {
-  const raw = String(value ?? "").trim().toUpperCase()
-  return raw === "WEAPON" ? "WEAPON" : "NON_WEAPON"
 }
 
 function normalizeLines(body: Record<string, unknown>): AssignmentLineInput[] | null {

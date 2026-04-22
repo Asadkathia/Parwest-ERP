@@ -5,6 +5,7 @@ import { badRequest, conflict, internalServerError, ok } from "@/lib/api/respons
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
+import { CategoryScope, isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
 const purchaseInclude = {
   store: true,
@@ -48,18 +49,6 @@ type PurchaseLineInput = {
   quantity: number
   unitCost: number | null
   notes: string | null
-}
-
-type CategoryScope = "NON_WEAPON" | "WEAPON"
-
-function isWeaponCategoryName(value: string | null | undefined): boolean {
-  const text = String(value ?? "").trim().toLowerCase()
-  return text.includes("weapon") || text.includes("ammo")
-}
-
-function normalizeCategoryScope(value: unknown): CategoryScope {
-  const raw = String(value ?? "").trim().toUpperCase()
-  return raw === "WEAPON" ? "WEAPON" : "NON_WEAPON"
 }
 
 function normalizeStatus(raw: unknown): StoreInventoryPurchaseStatus {

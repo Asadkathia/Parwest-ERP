@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
+import { hasModuleAccess } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
-import { internalServerError, ok, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 
 const MAX_MATRIX_ROWS = 5000
 
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "INVENTORY")) return forbidden()
 
     const { searchParams } = new URL(request.url)
     const storeId = searchParams.get("storeId")?.trim() || undefined
