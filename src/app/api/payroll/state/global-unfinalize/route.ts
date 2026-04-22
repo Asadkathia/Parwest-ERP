@@ -38,21 +38,23 @@ export async function POST(request: NextRequest) {
     const reason = (body.reason ?? "").trim()
     if (!reason) return badRequest("A reason is required to unfreeze.")
 
-    const candidates = await prisma.payroll.findMany({
+    const preview = await prisma.payroll.findMany({
       where: {
         state: "GLOBAL_FINALIZED",
         month: { gte: month.start, lt: month.end },
       },
       select: { id: true },
     })
-    if (candidates.length === 0) {
+    if (preview.length === 0) {
       return ok({ unfinalized: 0, message: "No GLOBAL_FINALIZED payrolls." })
     }
 
-    const ids = candidates.map((c) => c.id)
+    const ids = preview.map((c) => c.id)
     const actor = getActorIdentity(session)
 
-    await prisma.payroll.updateMany({
+    // updateMany guarded by `state: GLOBAL_FINALIZED` ensures only rows still
+    // in that state flip; concurrent runners get count=0.
+    const flip = await prisma.payroll.updateMany({
       where: { id: { in: ids }, state: "GLOBAL_FINALIZED" },
       data: {
         state: "REGIONAL_LOCKED",
@@ -61,18 +63,26 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    if (flip.count === 0) {
+      return ok({
+        unfinalized: 0,
+        message:
+          "No GLOBAL_FINALIZED payrolls remained at unfreeze time (concurrent run).",
+      })
+    }
+
     await safeAuditLog({
       userId: actor.id,
       event: "PAYROLL_GLOBAL_UNFINALIZE",
       module: "PAYROLL",
       description: `Unfroze global finalization on ${
-        candidates.length
+        flip.count
       } payrolls for ${month.start
         .toISOString()
         .slice(0, 7)} — reason: ${reason}`,
     })
 
-    return ok({ unfinalized: candidates.length })
+    return ok({ unfinalized: flip.count })
   } catch (error) {
     console.error("global-unfinalize failed:", error)
     return internalServerError("Failed to unfreeze global finalization.")

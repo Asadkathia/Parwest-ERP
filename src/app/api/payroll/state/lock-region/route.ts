@@ -8,6 +8,12 @@
  * Allowed: any user with PAYROLL module access; if the caller is a regional
  * manager, the requested region must match their scope. SuperAdmin can lock
  * any region.
+ *
+ * TODO(concurrency): Consider adding a partial unique index on
+ * PayrollSalaryFinalizationHistory(month, scope, regionId) WHERE
+ * regionalOfficeId IS NULL — would let the DB enforce one history row per
+ * (month, scope, region) and surface duplicate-attempt as a P2002 we can
+ * return as conflict(). Requires a migration; deferred to a future cleanup.
  */
 
 import { NextRequest } from "next/server"
@@ -75,17 +81,12 @@ export async function POST(request: NextRequest) {
     if (regionId) where.regionId = regionId
     if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
 
-    const candidates = await prisma.payroll.findMany({
+    const preview = await prisma.payroll.findMany({
       where,
-      select: {
-        id: true,
-        guardId: true,
-        netSalary: true,
-        reserveAmount: true,
-      },
+      select: { id: true },
     })
 
-    if (candidates.length === 0) {
+    if (preview.length === 0) {
       return ok({
         locked: 0,
         totalNet: 0,
@@ -97,21 +98,14 @@ export async function POST(request: NextRequest) {
 
     const actor = getActorIdentity(session)
     const now = new Date()
-    const ids = candidates.map((c) => c.id)
-    const totalNet = candidates.reduce(
-      (s, c) => s + Number(c.netSalary ?? 0),
-      0
-    )
-    const totalReserve = candidates.reduce(
-      (s, c) => s + Number(c.reserveAmount ?? 0),
-      0
-    )
 
-    const historyId = await prisma.$transaction(async (trx) => {
-      // Re-check inside the transaction to reduce double-lock races: only update
-      // rows still in CALCULATED.
-      await trx.payroll.updateMany({
-        where: { id: { in: ids }, state: "CALCULATED" },
+    const result = await prisma.$transaction(async (trx) => {
+      // Marker-based concurrency guard: stamp `regionalLockedAt = now` and
+      // `regionalLockedById = actor.id` only on rows still CALCULATED. We then
+      // re-find using these markers to get exactly the rows THIS transaction
+      // flipped (so concurrent runners can't double-write history/ledger).
+      const flip = await trx.payroll.updateMany({
+        where: { ...where, state: "CALCULATED" },
         data: {
           state: "REGIONAL_LOCKED",
           regionalLockedAt: now,
@@ -119,8 +113,41 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      if (flip.count === 0) {
+        return {
+          historyId: null as string | null,
+          locked: 0,
+          totalNet: 0,
+          totalReserve: 0,
+        }
+      }
+
+      const flipped = await trx.payroll.findMany({
+        where: {
+          state: "REGIONAL_LOCKED",
+          regionalLockedAt: now,
+          regionalLockedById: actor.id,
+        },
+        select: {
+          id: true,
+          guardId: true,
+          netSalary: true,
+          reserveAmount: true,
+        },
+      })
+
+      const flippedIds = flipped.map((c) => c.id)
+      const totalNet = flipped.reduce(
+        (s, c) => s + Number(c.netSalary ?? 0),
+        0
+      )
+      const totalReserve = flipped.reduce(
+        (s, c) => s + Number(c.reserveAmount ?? 0),
+        0
+      )
+
       // Create ACCRUED ledger entries for non-zero reserve amounts
-      const ledgerRows = candidates
+      const ledgerRows = flipped
         .filter((c) => Number(c.reserveAmount ?? 0) !== 0)
         .map((c) => ({
           guardId: c.guardId,
@@ -142,33 +169,51 @@ export async function POST(request: NextRequest) {
           regionId: regionId,
           regionalOfficeId: regionalOfficeId,
           month: month.start,
-          payrollCount: candidates.length,
+          payrollCount: flipped.length,
           totalNetPayable: totalNet,
           totalReserve: totalReserve,
-          payrollIdsJson: JSON.stringify(ids),
+          payrollIdsJson: JSON.stringify(flippedIds),
         },
         select: { id: true },
       })
 
-      return history.id
+      return {
+        historyId: history.id as string | null,
+        locked: flipped.length,
+        totalNet,
+        totalReserve,
+      }
     })
+
+    if (result.locked === 0) {
+      return ok({
+        locked: 0,
+        totalNet: 0,
+        totalReserve: 0,
+        historyId: null,
+        message:
+          "No CALCULATED payrolls remained at lock time (concurrent run).",
+      })
+    }
 
     await safeAuditLog({
       userId: actor.id,
       event: "PAYROLL_LOCK_REGION",
       module: "PAYROLL",
-      description: `Locked ${candidates.length} payrolls for ${month.start
+      description: `Locked ${result.locked} payrolls for ${month.start
         .toISOString()
         .slice(0, 7)} (region=${regionId ?? "*"}, office=${
         regionalOfficeId ?? "*"
-      }); totalNet=${totalNet.toFixed(2)} reserve=${totalReserve.toFixed(2)}`,
+      }); totalNet=${result.totalNet.toFixed(
+        2
+      )} reserve=${result.totalReserve.toFixed(2)}`,
     })
 
     return ok({
-      locked: candidates.length,
-      totalNet,
-      totalReserve,
-      historyId,
+      locked: result.locked,
+      totalNet: result.totalNet,
+      totalReserve: result.totalReserve,
+      historyId: result.historyId,
     })
   } catch (error) {
     console.error("lock-region failed:", error)

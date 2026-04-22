@@ -4,6 +4,12 @@
  * Locks all REGIONAL_LOCKED payrolls for a month → GLOBAL_FINALIZED.
  * Records a GLOBAL-scope PayrollSalaryFinalizationHistory snapshot.
  * SuperAdmin only.
+ *
+ * TODO(concurrency): Consider adding a partial unique index on
+ * PayrollSalaryFinalizationHistory(month, scope, regionId) WHERE
+ * regionalOfficeId IS NULL — would let the DB enforce one history row per
+ * (month, scope, region) and surface duplicate-attempt as a P2002 we can
+ * return as conflict(). Requires a migration; deferred to a future cleanup.
  */
 
 import { NextRequest } from "next/server"
@@ -34,15 +40,15 @@ export async function POST(request: NextRequest) {
     const month = parseMonthRange(body.month ?? null)
     if (!month) return badRequest("Valid month required (YYYY-MM).")
 
-    const candidates = await prisma.payroll.findMany({
+    const preview = await prisma.payroll.findMany({
       where: {
         state: "REGIONAL_LOCKED",
         month: { gte: month.start, lt: month.end },
       },
-      select: { id: true, netSalary: true, reserveAmount: true },
+      select: { id: true },
     })
 
-    if (candidates.length === 0) {
+    if (preview.length === 0) {
       return ok({
         finalized: 0,
         totalNet: 0,
@@ -54,25 +60,52 @@ export async function POST(request: NextRequest) {
 
     const actor = getActorIdentity(session)
     const now = new Date()
-    const ids = candidates.map((c) => c.id)
-    const totalNet = candidates.reduce(
-      (s, c) => s + Number(c.netSalary ?? 0),
-      0
-    )
-    const totalReserve = candidates.reduce(
-      (s, c) => s + Number(c.reserveAmount ?? 0),
-      0
-    )
 
-    const historyId = await prisma.$transaction(async (trx) => {
-      await trx.payroll.updateMany({
-        where: { id: { in: ids }, state: "REGIONAL_LOCKED" },
+    const result = await prisma.$transaction(async (trx) => {
+      // Marker-based concurrency guard: stamp `globalFinalizedAt = now` and
+      // `globalFinalizedById = actor.id` only on rows still REGIONAL_LOCKED.
+      // We then re-find by these markers to get the rows THIS transaction
+      // actually flipped, so concurrent runners don't double-write history.
+      const flip = await trx.payroll.updateMany({
+        where: {
+          state: "REGIONAL_LOCKED",
+          month: { gte: month.start, lt: month.end },
+        },
         data: {
           state: "GLOBAL_FINALIZED",
           globalFinalizedAt: now,
           globalFinalizedById: actor.id,
         },
       })
+
+      if (flip.count === 0) {
+        return {
+          historyId: null as string | null,
+          finalized: 0,
+          totalNet: 0,
+          totalReserve: 0,
+        }
+      }
+
+      const flipped = await trx.payroll.findMany({
+        where: {
+          state: "GLOBAL_FINALIZED",
+          globalFinalizedAt: now,
+          globalFinalizedById: actor.id,
+        },
+        select: { id: true, netSalary: true, reserveAmount: true },
+      })
+
+      const flippedIds = flipped.map((c) => c.id)
+      const totalNet = flipped.reduce(
+        (s, c) => s + Number(c.netSalary ?? 0),
+        0
+      )
+      const totalReserve = flipped.reduce(
+        (s, c) => s + Number(c.reserveAmount ?? 0),
+        0
+      )
+
       const history = await trx.payrollSalaryFinalizationHistory.create({
         data: {
           finalizedByUserId: actor.id,
@@ -81,34 +114,51 @@ export async function POST(request: NextRequest) {
           regionId: null,
           regionalOfficeId: null,
           month: month.start,
-          payrollCount: candidates.length,
+          payrollCount: flipped.length,
           totalNetPayable: totalNet,
           totalReserve: totalReserve,
-          payrollIdsJson: JSON.stringify(ids),
+          payrollIdsJson: JSON.stringify(flippedIds),
         },
         select: { id: true },
       })
-      return history.id
+
+      return {
+        historyId: history.id as string | null,
+        finalized: flipped.length,
+        totalNet,
+        totalReserve,
+      }
     })
+
+    if (result.finalized === 0) {
+      return ok({
+        finalized: 0,
+        totalNet: 0,
+        totalReserve: 0,
+        historyId: null,
+        message:
+          "No REGIONAL_LOCKED payrolls remained at finalize time (concurrent run).",
+      })
+    }
 
     await safeAuditLog({
       userId: actor.id,
       event: "PAYROLL_GLOBAL_FINALIZE",
       module: "PAYROLL",
       description: `Globally finalized ${
-        candidates.length
+        result.finalized
       } payrolls for ${month.start
         .toISOString()
-        .slice(0, 7)}; totalNet=${totalNet.toFixed(
+        .slice(0, 7)}; totalNet=${result.totalNet.toFixed(
         2
-      )} reserve=${totalReserve.toFixed(2)}`,
+      )} reserve=${result.totalReserve.toFixed(2)}`,
     })
 
     return ok({
-      finalized: candidates.length,
-      totalNet,
-      totalReserve,
-      historyId,
+      finalized: result.finalized,
+      totalNet: result.totalNet,
+      totalReserve: result.totalReserve,
+      historyId: result.historyId,
     })
   } catch (error) {
     console.error("global-finalize failed:", error)

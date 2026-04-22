@@ -7,10 +7,12 @@
  */
 
 import { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import {
   badRequest,
+  conflict,
   forbidden,
   internalServerError,
   notFound,
@@ -76,46 +78,71 @@ export async function POST(request: NextRequest) {
       return forbidden("This guard is outside your scope.")
     }
 
-    // Compute current balance via grouped sums
-    const sums = await prisma.payrollReserveLedger.groupBy({
-      by: ["type"],
-      where: { guardId },
-      _sum: { amount: true },
-    })
-    let totalAccrued = 0
-    let totalReleased = 0
-    for (const row of sums) {
-      const v = Number(row._sum.amount ?? 0)
-      if (row.type === "ACCRUED") totalAccrued += v
-      else if (row.type === "RELEASED") totalReleased += v
-    }
-    const balance = totalAccrued - totalReleased
-
-    if (amount > balance) {
-      return badRequest(
-        `Requested amount (${amount.toFixed(
-          2
-        )}) exceeds available reserve balance (${balance.toFixed(2)}).`
-      )
-    }
-
     const actor = getActorIdentity(session)
 
-    const ledger = await prisma.payrollReserveLedger.create({
-      data: {
-        guardId,
-        payrollId: null,
-        type: "RELEASED",
-        amount,
-        reason,
-        byUserId: actor.id,
-        byUserName: actor.name,
-        paymentMethod,
-        slipNumber,
-        paidAt,
-      },
-      select: { id: true },
-    })
+    // Wrap balance check + insert in a Serializable transaction so two
+    // concurrent releases for the same guard cannot both pass the balance
+    // check and overdraw the reserve. Throw OVERDRAFT to short-circuit; catch
+    // P2034 (serialization conflict) below and surface it as a 409.
+    let result: { ledgerId: string; newBalance: number }
+    try {
+      result = await prisma.$transaction(
+        async (tx) => {
+          const sums = await tx.payrollReserveLedger.groupBy({
+            by: ["type"],
+            where: { guardId },
+            _sum: { amount: true },
+          })
+          let totalAccrued = 0
+          let totalReleased = 0
+          for (const row of sums) {
+            const v = Number(row._sum.amount ?? 0)
+            if (row.type === "ACCRUED") totalAccrued += v
+            else if (row.type === "RELEASED") totalReleased += v
+          }
+          const balance = totalAccrued - totalReleased
+
+          if (amount > balance) {
+            throw new Error(`OVERDRAFT:${balance.toFixed(2)}`)
+          }
+
+          const ledger = await tx.payrollReserveLedger.create({
+            data: {
+              guardId,
+              payrollId: null,
+              type: "RELEASED",
+              amount,
+              reason,
+              byUserId: actor.id,
+              byUserName: actor.name,
+              paymentMethod,
+              slipNumber,
+              paidAt,
+            },
+            select: { id: true },
+          })
+
+          return { ledgerId: ledger.id, newBalance: balance - amount }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("OVERDRAFT")) {
+        const balanceStr = error.message.split(":")[1] ?? "0.00"
+        return badRequest(
+          `Requested amount (${amount.toFixed(
+            2
+          )}) exceeds available reserve balance (${balanceStr}).`
+        )
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034"
+      ) {
+        return conflict("Concurrent release in progress; please retry.")
+      }
+      throw error
+    }
 
     await safeAuditLog({
       userId: actor.id,
@@ -126,10 +153,7 @@ export async function POST(request: NextRequest) {
       )} from reserve for guard ${guardId} via ${paymentMethod} (slip ${slipNumber}) — reason: ${reason}`,
     })
 
-    return ok({
-      ledgerId: ledger.id,
-      newBalance: balance - amount,
-    })
+    return ok(result)
   } catch (error) {
     console.error("reserve release failed:", error)
     return internalServerError("Failed to release reserve.")

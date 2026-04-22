@@ -55,44 +55,61 @@ export async function POST(request: NextRequest) {
     }
     if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
 
-    const candidates = await prisma.payroll.findMany({
+    const preview = await prisma.payroll.findMany({
       where,
       select: { id: true },
     })
-    if (candidates.length === 0) {
+    if (preview.length === 0) {
       return ok({ unlocked: 0, message: "No REGIONAL_LOCKED payrolls match." })
     }
 
-    const ids = candidates.map((c) => c.id)
+    const ids = preview.map((c) => c.id)
     const actor = getActorIdentity(session)
 
-    await prisma.$transaction([
-      prisma.payroll.updateMany({
+    // Run state flip + ledger reversal in a single transaction. The updateMany
+    // is guarded by `state: REGIONAL_LOCKED`; we use its returned `count` to
+    // decide whether to delete ledger rows. Ledger deletion is keyed to the
+    // same id set inside the same transaction, so concurrent runners can only
+    // delete entries for rows they actually flipped.
+    const flippedCount = await prisma.$transaction(async (trx) => {
+      const flip = await trx.payroll.updateMany({
         where: { id: { in: ids }, state: "REGIONAL_LOCKED" },
         data: {
           state: "CALCULATED",
           regionalLockedAt: null,
           regionalLockedById: null,
         },
-      }),
-      // Reverse the ACCRUED ledger entries from this lock.
-      prisma.payrollReserveLedger.deleteMany({
+      })
+
+      if (flip.count === 0) return 0
+
+      await trx.payrollReserveLedger.deleteMany({
         where: { payrollId: { in: ids }, type: "ACCRUED" },
-      }),
-    ])
+      })
+
+      return flip.count
+    })
+
+    if (flippedCount === 0) {
+      return ok({
+        unlocked: 0,
+        message:
+          "No REGIONAL_LOCKED payrolls remained at unlock time (concurrent run).",
+      })
+    }
 
     await safeAuditLog({
       userId: actor.id,
       event: "PAYROLL_UNLOCK_REGION",
       module: "PAYROLL",
-      description: `Unlocked ${candidates.length} payrolls for ${month.start
+      description: `Unlocked ${flippedCount} payrolls for ${month.start
         .toISOString()
         .slice(0, 7)} (region=${regionId}, office=${regionalOfficeId ?? "*"})${
         reason ? ` — reason: ${reason}` : ""
       }`,
     })
 
-    return ok({ unlocked: candidates.length })
+    return ok({ unlocked: flippedCount })
   } catch (error) {
     console.error("unlock-region failed:", error)
     return internalServerError("Failed to unlock region payrolls.")
