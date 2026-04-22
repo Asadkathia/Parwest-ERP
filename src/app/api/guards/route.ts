@@ -69,7 +69,21 @@ export async function GET(request: NextRequest) {
             orderBy: { name: "asc" },
             take,
             skip,
-            include: {
+            select: {
+                id: true,
+                parwestId: true,
+                name: true,
+                cnic: true,
+                phone: true,
+                email: true,
+                status: true,
+                designation: true,
+                joiningDate: true,
+                salary: true,
+                regionId: true,
+                regionalOfficeId: true,
+                createdAt: true,
+                updatedAt: true,
                 region: true,
                 regionalOffice: true,
             },
@@ -163,20 +177,20 @@ export async function POST(request: NextRequest) {
 
         const generateNextParwestId = async () => {
             const prefix = officeSeriesCode ? `PW-${officeSeriesCode}` : "PW"
-            const candidates = await prisma.guard.findMany({
-                where: { parwestId: { startsWith: `${prefix}-` } },
-                select: { parwestId: true },
-                orderBy: { createdAt: "desc" },
-                take: 1000,
-            })
-            let maxNumber = 0
             const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
             const pattern = new RegExp(`^${escapedPrefix}-(\\d+)$`)
-            for (const row of candidates) {
-                const match = row.parwestId.match(pattern)
-                if (!match) continue
-                const numeric = Number(match[1])
-                if (Number.isFinite(numeric) && numeric > maxNumber) maxNumber = numeric
+            const latest = await prisma.guard.findFirst({
+                where: { parwestId: { startsWith: `${prefix}-` } },
+                select: { parwestId: true },
+                orderBy: { parwestId: "desc" },
+            })
+            let maxNumber = 0
+            if (latest) {
+                const match = latest.parwestId.match(pattern)
+                if (match) {
+                    const numeric = Number(match[1])
+                    if (Number.isFinite(numeric)) maxNumber = numeric
+                }
             }
             return `${prefix}-${String(maxNumber + 1).padStart(5, "0")}`
         }
