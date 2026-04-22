@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
@@ -76,12 +76,48 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
         const reason = typeof body.reason === "string" ? body.reason.trim() : null
+        const absconded = body.absconded === true
         if (!cnic) {
             return badRequest("cnic is required")
         }
 
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
+        }
+
+        // Block blacklist if any matching guard holds kit or pledged docs,
+        // unless the caller explicitly flags the guard as absconded.
+        const guardsForCnic = await prisma.guard.findMany({
+            where: { cnic },
+            select: { id: true, name: true },
+        })
+        if (guardsForCnic.length > 0) {
+            if (absconded && !reason) {
+                return badRequest("Reason is required when blacklisting an absconded guard.")
+            }
+            if (!absconded) {
+                const guardIds = guardsForCnic.map((g) => g.id)
+                const [heldInventory, heldDocs, activeDeployments] = await Promise.all([
+                    prisma.storeInventoryAssignment.count({
+                        where: { assignedToGuardId: { in: guardIds }, status: "ASSIGNED" },
+                    }),
+                    prisma.guardPledgedDocumentRecord.count({
+                        where: { guardId: { in: guardIds }, status: "HELD" },
+                    }),
+                    prisma.deployment.count({
+                        where: { guardId: { in: guardIds }, status: "ACTIVE" },
+                    }),
+                ])
+                const blockers: string[] = []
+                if (activeDeployments > 0) blockers.push(`${activeDeployments} active deployment(s)`)
+                if (heldInventory > 0) blockers.push(`${heldInventory} inventory item(s) still assigned`)
+                if (heldDocs > 0) blockers.push(`${heldDocs} pledged document(s) still held`)
+                if (blockers.length > 0) {
+                    return conflict(
+                        `Cannot blacklist: ${blockers.join(", ")}. Run clearance first, or set absconded=true with a reason.`
+                    )
+                }
+            }
         }
 
         const blacklistEntry = await prisma.blacklistedCnic.upsert({
@@ -109,10 +145,34 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        // Blacklisted guards are set to TERMINATED status
-        await prisma.guard.updateMany({
-            where: { cnic },
-            data: { status: "TERMINATED" },
+        // Blacklisted guards are set to TERMINATED. If flagged absconded, forfeit
+        // outstanding inventory (mark LOST) and end any active deployments.
+        await prisma.$transaction(async (tx) => {
+            if (absconded && guardsForCnic.length > 0) {
+                const guardIds = guardsForCnic.map((g) => g.id)
+                const now = new Date()
+                await tx.storeInventoryAssignment.updateMany({
+                    where: { assignedToGuardId: { in: guardIds }, status: "ASSIGNED" },
+                    data: {
+                        status: "LOST",
+                        returnedAt: now,
+                        returnedByUserId: session.user?.id ?? null,
+                    },
+                })
+                await tx.deployment.updateMany({
+                    where: { guardId: { in: guardIds }, status: "ACTIVE" },
+                    data: {
+                        status: "INACTIVE",
+                        endDate: now,
+                        endReason: "ABSCONDED",
+                        revokedByName: session.user?.name ?? session.user?.email ?? null,
+                    },
+                })
+            }
+            await tx.guard.updateMany({
+                where: { cnic },
+                data: { status: "TERMINATED" },
+            })
         })
 
         void recordGuardServiceEvent({
@@ -123,7 +183,10 @@ export async function POST(request: NextRequest) {
             event: "BLACKLISTED",
             fromStatus: guardSnap?.status ?? null,
             toStatus: "TERMINATED",
-            description: reason ? `Blacklisted (Terminated). Reason: ${reason}` : "Blacklisted (Terminated)",
+            description: [
+                absconded ? "Blacklisted (Absconded — inventory forfeited as LOST)" : "Blacklisted (Terminated)",
+                reason ? `Reason: ${reason}` : null,
+            ].filter(Boolean).join(". "),
             changedByName: session.user?.name ?? session.user?.email ?? null,
             regionName: guardSnap?.region?.name ?? null,
             officeName: guardSnap?.regionalOffice?.name ?? null,

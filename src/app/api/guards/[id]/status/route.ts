@@ -68,10 +68,50 @@ export async function PATCH(
             return badRequest("Reactivation reason is required.")
         }
 
-        const guard = await prisma.guard.update({
-            where: { id },
-            data: { status },
-            select: { id: true, status: true, name: true, cnic: true },
+        // Terminal statuses (TERMINATED / BLACKLISTED) require the guard to have
+        // returned all kit and pledged documents first. The `absconded` flag is an
+        // explicit escape hatch for guards who disappeared — it forfeits inventory
+        // (marked LOST) and requires a reason.
+        const isTerminal = status === "TERMINATED" || status === "BLACKLISTED"
+        const absconded = body.absconded === true
+        if (isTerminal) {
+            if (absconded && !reason) {
+                return badRequest("Reason is required when terminating an absconded guard.")
+            }
+            const [heldInventory, heldDocs] = await Promise.all([
+                prisma.storeInventoryAssignment.count({
+                    where: { assignedToGuardId: id, status: "ASSIGNED" },
+                }),
+                prisma.guardPledgedDocumentRecord.count({
+                    where: { guardId: id, status: "HELD" },
+                }),
+            ])
+            if (!absconded && (heldInventory > 0 || heldDocs > 0)) {
+                const parts: string[] = []
+                if (heldInventory > 0) parts.push(`${heldInventory} inventory item(s) still assigned`)
+                if (heldDocs > 0) parts.push(`${heldDocs} pledged document(s) still held`)
+                return conflict(
+                    `Cannot terminate guard: ${parts.join(" and ")}. Run clearance first, or set absconded=true with a reason.`
+                )
+            }
+        }
+
+        const guard = await prisma.$transaction(async (tx) => {
+            if (isTerminal && absconded) {
+                await tx.storeInventoryAssignment.updateMany({
+                    where: { assignedToGuardId: id, status: "ASSIGNED" },
+                    data: {
+                        status: "LOST",
+                        returnedAt: new Date(),
+                        returnedByUserId: session.user?.id ?? null,
+                    },
+                })
+            }
+            return tx.guard.update({
+                where: { id },
+                data: { status },
+                select: { id: true, status: true, name: true, cnic: true },
+            })
         })
 
         if (existingGuard.status === "INACTIVE" && status === "ACTIVE") {
@@ -91,6 +131,7 @@ export async function PATCH(
             : "STATUS_CHANGED" as const
 
         const descParts = [`Status changed from ${existingGuard.status} to ${status}`]
+        if (isTerminal && absconded) descParts.push("Absconded (inventory forfeited as LOST)")
         if (reason) descParts.push(`Reason: ${reason}`)
 
         void recordGuardServiceEvent({

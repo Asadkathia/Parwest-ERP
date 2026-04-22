@@ -56,7 +56,7 @@ export default function PayrollClearanceManager() {
       if (res.ok) {
         setSteps(data.steps)
       } else {
-        setError(data.error ?? "Clearance failed.")
+        setError(data.message ?? "Clearance failed.")
       }
     } catch {
       setError("Network error.")

@@ -28,8 +28,10 @@ export default function BlacklistManager() {
 
     // --- Reason + confirm ---
     const [reason, setReason] = useState("")
+    const [absconded, setAbsconded] = useState(false)
     const [confirmBlacklist, setConfirmBlacklist] = useState(false)
     const [blacklisting, setBlacklisting] = useState(false)
+    const [abscondedPromptVisible, setAbscondedPromptVisible] = useState(false)
 
     // --- Blacklisted records table ---
     const [rowCountSelect, setRowCountSelect] = useState("10 rows")
@@ -130,18 +132,30 @@ export default function BlacklistManager() {
     // ── Blacklist all pending guards ─────────────────────────────────────────────
     const blacklistAll = async () => {
         if (pendingList.length === 0) { setError("No guards selected to blacklist."); return }
+        if (absconded && !reason.trim()) {
+            setError("A reason is required when marking a guard as absconded.")
+            return
+        }
         setError("")
+        setAbscondedPromptVisible(false)
         setBlacklisting(true)
         const failures: string[] = []
+        let sawConflict = false
 
         for (const guard of pendingList) {
+            const body: { cnic: string; reason: string | null; absconded?: boolean } = {
+                cnic: guard.cnic,
+                reason: reason.trim() || null,
+            }
+            if (absconded) body.absconded = true
             const res = await fetch("/api/guards/blacklist", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ cnic: guard.cnic, reason: reason.trim() || null }),
+                body: JSON.stringify(body),
             })
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
+                if (res.status === 409) sawConflict = true
                 failures.push(`${guard.name} (${guard.cnic}): ${data.message || "failed"}`)
             }
         }
@@ -149,11 +163,13 @@ export default function BlacklistManager() {
         await loadBlacklisted()
         if (failures.length > 0) {
             setError(`Some CNICs failed:\n${failures.join("\n")}`)
+            if (sawConflict && !absconded) setAbscondedPromptVisible(true)
         } else {
             setNotice(`${pendingList.length} CNIC${pendingList.length > 1 ? "s" : ""} blacklisted successfully.`)
+            setPendingList([])
+            setReason("")
+            setAbsconded(false)
         }
-        setPendingList([])
-        setReason("")
         setBlacklisting(false)
     }
 
@@ -340,6 +356,11 @@ export default function BlacklistManager() {
             </div>
 
             {error ? <InlineAlert type="error" message={error} /> : null}
+            {abscondedPromptVisible ? (
+                <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                    Tick the Absconded box to forfeit kit and continue.
+                </p>
+            ) : null}
             {notice ? <InlineAlert type="success" message={notice} /> : null}
 
             {/* Blacklisted records table */}
@@ -433,10 +454,25 @@ export default function BlacklistManager() {
                                 ))}
                             </ul>
                             {reason && <p className="mt-2 text-xs text-gray-500">Reason: {reason}</p>}
+                            <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2">
+                                <label className="flex items-start gap-2 text-sm text-orange-900">
+                                    <input
+                                        type="checkbox"
+                                        checked={absconded}
+                                        onChange={(e) => setAbsconded(e.target.checked)}
+                                        className="mt-0.5"
+                                    />
+                                    <span>Guard has absconded (forfeit kit, end deployments)</span>
+                                </label>
+                                {absconded && !reason.trim() && (
+                                    <p className="mt-1 text-xs text-red-600">A reason is required when marking as absconded.</p>
+                                )}
+                            </div>
                         </div>
                     }
                     onNo={() => setConfirmBlacklist(false)}
                     onYes={async () => {
+                        if (absconded && !reason.trim()) return
                         setConfirmBlacklist(false)
                         await blacklistAll()
                     }}

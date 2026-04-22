@@ -37,6 +37,9 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
     const [statusReason, setStatusReason] = useState("")
     const [statusSaving, setStatusSaving] = useState(false)
     const [statusError, setStatusError] = useState("")
+    const [absconded, setAbsconded] = useState(false)
+
+    const isTerminal = newStatus === "TERMINATED" || newStatus === "BLACKLISTED"
 
     // ── Supervisor modal state ──
     const [supOpen, setSupOpen] = useState(false)
@@ -70,21 +73,41 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
 
     const saveStatus = async () => {
         if (!newStatus || newStatus === status) { setStatusOpen(false); return }
+        if (isTerminal && absconded && !statusReason.trim()) {
+            setStatusError("Reason is required when marking the guard as absconded.")
+            return
+        }
+        if (isTerminal) {
+            const label = STATUS_OPTIONS.find((s) => s.value === newStatus)?.label ?? newStatus
+            const confirmMsg = absconded
+                ? `Mark this guard as ${label} with ABSCONDED? Any assigned inventory will be written off as LOST. This cannot be undone.`
+                : `Mark this guard as ${label}? If the guard still has assigned kit or held documents, the server will block this — run clearance first.`
+            if (!window.confirm(confirmMsg)) return
+        }
         setStatusSaving(true)
         setStatusError("")
         try {
+            const body: Record<string, unknown> = { status: newStatus, reason: statusReason }
+            if (isTerminal && absconded) {
+                body.absconded = true
+            }
             const res = await fetch(`/api/guards/${guardId}/status`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus, reason: statusReason }),
+                body: JSON.stringify(body),
             })
             if (!res.ok) {
                 const d = await res.json().catch(() => ({}))
+                if (res.status === 409 && isTerminal && !absconded) {
+                    setStatusError(`${d.message || "Guard still has outstanding items."} Tick \"Guard has absconded\" below to terminate anyway (kit will be written off as LOST).`)
+                    return
+                }
                 throw new Error(d.message || "Failed to update status")
             }
             setStatus(newStatus)
             setStatusOpen(false)
             setStatusReason("")
+            setAbsconded(false)
         } catch (e: unknown) {
             setStatusError(e instanceof Error ? e.message : "Error updating status")
         } finally {
@@ -122,6 +145,7 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
             setNewStatus(status)
             setStatusReason("")
             setStatusError("")
+            setAbsconded(false)
         }
     }, [statusOpen, status])
 
@@ -184,14 +208,33 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                             ))}
                         </div>
 
+                        {isTerminal && (
+                            <label className="flex items-start gap-2 p-3 rounded-lg border border-red-200 bg-red-50 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={absconded}
+                                    onChange={(e) => setAbsconded(e.target.checked)}
+                                    className="mt-0.5"
+                                />
+                                <div className="text-sm">
+                                    <div className="font-medium text-red-800">Guard has absconded (forfeit kit as LOST)</div>
+                                    <p className="text-xs text-red-700 mt-0.5">
+                                        Normally, termination requires clearance first (return kit, release documents). Tick this only if the guard has run away and clearance cannot be completed — any assigned inventory will be written off as LOST.
+                                    </p>
+                                </div>
+                            </label>
+                        )}
+
                         <div>
-                            <label className="block text-sm text-gray-600 mb-1">Reason / Notes <span className="text-gray-400">(recommended)</span></label>
+                            <label className="block text-sm text-gray-600 mb-1">
+                                Reason / Notes {isTerminal && absconded ? <span className="text-red-500">*</span> : <span className="text-gray-400">(recommended)</span>}
+                            </label>
                             <textarea
                                 value={statusReason}
                                 onChange={(e) => setStatusReason(e.target.value)}
                                 rows={2}
                                 className="w-full border rounded-md px-3 py-2 text-sm resize-none"
-                                placeholder="e.g. Guard is on medical leave, resigned, redeployed..."
+                                placeholder={isTerminal && absconded ? "Required: describe the circumstances (e.g. guard stopped reporting on 12 Apr, phone unreachable)..." : "e.g. Guard is on medical leave, resigned, redeployed..."}
                             />
                         </div>
 

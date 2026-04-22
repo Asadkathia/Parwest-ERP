@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ShoppingCart } from "lucide-react"
 import Link from "next/link"
 
@@ -51,10 +51,10 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
   const [rows, setRows] = useState<StoreInventoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [returningId, setReturningId] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadRows = useCallback(() => {
     if (!guardId) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId
     setLoading(true)
     setError(null)
     fetch(`/api/guards/${encodeURIComponent(guardId)}/store-inventory`)
@@ -69,6 +69,56 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
         setLoading(false)
       })
   }, [guardId])
+
+  useEffect(() => {
+    loadRows()
+  }, [loadRows])
+
+  const handleReturn = useCallback(
+    async (row: StoreInventoryRow) => {
+      if (typeof window !== "undefined") {
+        const confirmed = window.confirm(
+          `Return "${row.productName}" (qty ${row.quantity}) to store?`,
+        )
+        if (!confirmed) return
+      }
+      const notes =
+        typeof window !== "undefined"
+          ? window.prompt("Optional notes (leave blank to skip):") ?? ""
+          : ""
+
+      setReturningId(row.id)
+      try {
+        const res = await fetch(
+          `/api/store-inventory/v2/assignments/${encodeURIComponent(row.id)}/return`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "RETURNED",
+              ...(notes.trim() ? { notes: notes.trim() } : {}),
+            }),
+          },
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean
+          message?: string
+        }
+        if (!res.ok || data.success === false) {
+          const msg = data.message || "Failed to return item."
+          if (typeof window !== "undefined") window.alert(msg)
+          return
+        }
+        loadRows()
+      } catch (err) {
+        console.error("Return assignment failed:", err)
+        if (typeof window !== "undefined") window.alert("Failed to return item.")
+      } finally {
+        setReturningId(null)
+      }
+    },
+    [loadRows],
+  )
 
   return (
     <div className="space-y-6">
@@ -107,6 +157,7 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Revoking Condition</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Revoked By</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -132,6 +183,20 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
                   <td className="px-4 py-3 whitespace-nowrap">{row.returnedByName || "—"}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {row.status === "ASSIGNED" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleReturn(row)}
+                        disabled={returningId === row.id}
+                        className="ui-btn ui-btn-secondary text-xs disabled:opacity-50"
+                      >
+                        {returningId === row.id ? "Returning..." : "Return"}
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
