@@ -6,10 +6,6 @@ import { badRequest, forbidden, internalServerError, notFound, unauthorized } fr
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
-function round2(value: number) {
-  return Math.round(value * 100) / 100
-}
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,15 +17,9 @@ export async function POST(
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params
-    const body = await request.json()
-    const amount = Number(body?.amount)
-    const method = body?.method ? String(body.method) : null
-    const paidAtBody = body?.paidAt ? new Date(body.paidAt) : new Date()
-    const notes = body?.notes ? String(body.notes) : null
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return badRequest("amount must be > 0.")
-    }
+    const body = await request.json().catch(() => ({}))
+    const reason = String(body?.reason || "").trim()
+    if (!reason) return badRequest("A void reason is required.")
 
     const existing = await prisma.invoice.findUnique({
       where: { id },
@@ -42,30 +32,15 @@ export async function POST(
     }
 
     if (existing.status === "VOID") {
-      return badRequest("Cannot record a payment against a voided invoice.")
+      return badRequest("Invoice is already voided.")
     }
-
-    const newPaid = round2(existing.paidAmount + amount)
-    if (newPaid > existing.amount + 0.001) {
-      return badRequest(`Payment exceeds invoice balance. Outstanding: ${round2(existing.amount - existing.paidAmount)}`)
-    }
-
-    let nextStatus = existing.status
-    let nextPaidAt = existing.paidAt
-    if (newPaid >= existing.amount - 0.001) {
-      nextStatus = "PAID"
-      nextPaidAt = paidAtBody
-    } else if (newPaid > 0) {
-      nextStatus = "PARTIAL_PAID"
+    if (existing.paidAmount > 0) {
+      return badRequest("Cannot void an invoice with recorded payments. Refund first.")
     }
 
     const updated = await prisma.invoice.update({
       where: { id },
-      data: {
-        paidAmount: newPaid,
-        status: nextStatus,
-        paidAt: nextPaidAt,
-      },
+      data: { status: "VOID", voidedAt: new Date(), voidReason: reason },
       include: {
         client: { select: { id: true, name: true, regionId: true } },
         branch: { select: { id: true, name: true } },
@@ -75,14 +50,14 @@ export async function POST(
 
     await safeAuditLog({
       userId: session.user?.id || null,
-      event: "INVOICE_PAYMENT_RECORDED",
+      event: "INVOICE_VOID",
       module: "PAYROLL",
-      description: `Recorded payment ${amount}${method ? ` via ${method}` : ""} on invoice ${updated.invoiceNumber} (paid=${newPaid}/${existing.amount})${notes ? ` — ${notes}` : ""}`,
+      description: `Voided invoice ${updated.invoiceNumber} — ${reason}`,
     })
 
     return NextResponse.json(updated)
   } catch (error) {
-    console.error("Error recording invoice payment:", error)
-    return internalServerError("Failed to record payment")
+    console.error("Error voiding invoice:", error)
+    return internalServerError("Failed to void invoice")
   }
 }

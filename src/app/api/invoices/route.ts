@@ -6,11 +6,10 @@ import { badRequest, internalServerError, unauthorized, forbidden, notFound } fr
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import type { Prisma } from "@prisma/client"
+import { parseInvoiceStatus } from "@/lib/invoicing/status"
+import { applyAvailableAdvances } from "@/lib/invoicing/applyAdvances"
 
 const ALLOWED_LINE_KINDS = new Set(["GUARD_SALARY", "SPECIAL_DUTY", "MANUAL"])
-const ALLOWED_INVOICE_STATUSES = new Set([
-  "DRAFT", "PENDING", "ADVANCE_PAID", "PARTIAL_PAID", "PAID", "UNPAID", "OVERDUE",
-])
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -49,7 +48,11 @@ export async function GET(request: NextRequest) {
     const where: Prisma.InvoiceWhereInput = {}
     if (clientId) where.clientId = clientId
     if (branchId) where.branchId = branchId
-    if (status) where.status = status.toUpperCase()
+    if (status) {
+      const parsed = parseInvoiceStatus(status)
+      if (!parsed) return badRequest("Invalid status filter.")
+      where.status = parsed
+    }
 
     if (month) {
       const start = parseMonthStart(month)
@@ -121,13 +124,13 @@ export async function POST(request: NextRequest) {
     const dueDate = body?.dueDate ? new Date(body.dueDate) : null
     const notes = body?.notes ? String(body.notes) : null
     const taxRateRaw = body?.taxRate
-    const status = (body?.status ? String(body.status) : "DRAFT").toUpperCase()
+    const status = parseInvoiceStatus(body?.status ?? "DRAFT")
     const incomingItems: IncomingLineItem[] = Array.isArray(body?.lineItems) ? body.lineItems : []
 
     if (!clientId || !monthValue) {
       return badRequest("clientId and month are required.")
     }
-    if (!ALLOWED_INVOICE_STATUSES.has(status)) {
+    if (!status || status === "VOID") {
       return badRequest("Invalid invoice status.")
     }
 
@@ -218,8 +221,18 @@ export async function POST(request: NextRequest) {
     const taxAmount = round2(subtotal * (taxRate ?? 0))
     const amount = round2(subtotal + taxAmount)
 
+    const existingForPeriod = await prisma.invoice.findFirst({
+      where: { clientId, branchId: branchId || null, month },
+      select: { id: true, invoiceNumber: true, status: true },
+    })
+    if (existingForPeriod && existingForPeriod.status !== "VOID") {
+      return badRequest(
+        `An invoice already exists for this client/branch/month (${existingForPeriod.invoiceNumber}). Void it first to re-issue.`,
+      )
+    }
+
     const invoice = await prisma.$transaction(async (tx) => {
-      return tx.invoice.create({
+      const created = await tx.invoice.create({
         data: {
           clientId,
           branchId: branchId || null,
@@ -246,10 +259,35 @@ export async function POST(request: NextRequest) {
               }
             : undefined,
         },
+      })
+
+      // Auto-apply any outstanding client/branch advance payments
+      const { applied } = await applyAvailableAdvances(tx, {
+        invoiceId: created.id,
+        clientId,
+        branchId: branchId || null,
+        invoiceAmount: amount,
+      })
+
+      if (applied > 0) {
+        const fullyPaid = applied + 0.001 >= amount
+        await tx.invoice.update({
+          where: { id: created.id },
+          data: {
+            paidAmount: applied,
+            status: fullyPaid ? "PAID" : applied > 0 && applied < amount ? "PARTIAL_PAID" : created.status,
+            paidAt: fullyPaid ? new Date() : null,
+          },
+        })
+      }
+
+      return tx.invoice.findUniqueOrThrow({
+        where: { id: created.id },
         include: {
           client: { select: { id: true, name: true, regionId: true } },
           branch: { select: { id: true, name: true } },
           lineItems: true,
+          advanceApplications: { include: { advance: { select: { id: true, paymentDate: true, amount: true } } } },
         },
       })
     })

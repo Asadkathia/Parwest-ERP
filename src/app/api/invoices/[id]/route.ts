@@ -5,10 +5,8 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { parseInvoiceStatus } from "@/lib/invoicing/status"
 
-const ALLOWED_INVOICE_STATUSES = new Set([
-  "DRAFT", "PENDING", "ADVANCE_PAID", "PARTIAL_PAID", "PAID", "UNPAID", "OVERDUE",
-])
 const ALLOWED_LINE_KINDS = new Set(["GUARD_SALARY", "SPECIAL_DUTY", "MANUAL"])
 
 function round2(value: number) {
@@ -82,9 +80,16 @@ export async function PATCH(
       return forbidden("Forbidden: invoice is outside your scope.")
     }
 
-    const status = body?.status ? String(body.status).toUpperCase() : undefined
-    if (status && !ALLOWED_INVOICE_STATUSES.has(status)) {
-      return badRequest("Invalid invoice status.")
+    if (existing.status === "VOID") {
+      return badRequest("This invoice is voided and cannot be edited.")
+    }
+
+    let status: ReturnType<typeof parseInvoiceStatus> | undefined = undefined
+    if (body?.status !== undefined) {
+      const parsed = parseInvoiceStatus(body.status)
+      if (!parsed) return badRequest("Invalid invoice status.")
+      if (parsed === "VOID") return badRequest("Use POST /invoices/[id]/void to void an invoice.")
+      status = parsed
     }
 
     const dueDate = body?.dueDate !== undefined
@@ -170,7 +175,7 @@ export async function PATCH(
     const baseAmount = computedAmount ?? existing.amount
     let paidAt: Date | null | undefined = undefined
     let paidAmount: number | undefined
-    const finalStatus = status
+    const finalStatus: typeof status = status
 
     if (status === "PAID") {
       paidAt = new Date()

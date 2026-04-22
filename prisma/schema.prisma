@@ -750,6 +750,7 @@ model Client {
   contracts                 ClientContract[]
   insurances                ClientInsurance[]
   payrollSpecialDuties      PayrollSpecialDuty[]
+  advancePayments           ClientAdvancePayment[]
 
   // Reserve % override: null = use regional or global default 30%
   reservePct Float?
@@ -848,6 +849,7 @@ model Branch {
   contracts             ClientContract[]
   payrollSpecialDuties  PayrollSpecialDuty[]
   invoices              Invoice[]
+  advancePayments       ClientAdvancePayment[]
 
   @@index([clientId])
 }
@@ -870,6 +872,41 @@ model ClientContract {
 
   @@index([clientId])
   @@index([branchId])
+}
+
+model ClientAdvancePayment {
+  id             String                       @id @default(cuid())
+  clientId       String
+  client         Client                       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?                      @relation(fields: [branchId], references: [id])
+  amount         Float
+  appliedAmount  Float                        @default(0)
+  paymentDate    DateTime                     @default(now())
+  method         String? // CASH | BANK | MOBILE | OTHER
+  reference      String?
+  notes          String?
+  recordedBy     String?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  applications   InvoiceAdvanceApplication[]
+
+  @@index([clientId])
+  @@index([branchId])
+}
+
+model InvoiceAdvanceApplication {
+  id        String               @id @default(cuid())
+  invoiceId String
+  invoice   Invoice              @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  advanceId String
+  advance   ClientAdvancePayment @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+  amount    Float
+  createdAt DateTime             @default(now())
+
+  @@index([invoiceId])
+  @@index([advanceId])
 }
 
 model ClientContractRate {
@@ -903,21 +940,30 @@ model PricingConfig {
   @@index([clientId])
 }
 
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  ADVANCE_PAID
+  PARTIAL_PAID
+  PAID
+  UNPAID
+  OVERDUE
+  VOID
+}
+
 model Invoice {
-  id            String    @id @default(cuid())
+  id            String        @id @default(cuid())
   clientId      String
-  client        Client    @relation(fields: [clientId], references: [id])
-  invoiceNumber String    @unique
+  client        Client        @relation(fields: [clientId], references: [id])
+  invoiceNumber String        @unique
   month         DateTime
   amount        Float
-  // status values (widened): DRAFT | PENDING | ADVANCE_PAID | PARTIAL_PAID | PAID | UNPAID | OVERDUE
-  status        String    @default("PENDING")
+  status        InvoiceStatus @default(DRAFT)
   dueDate       DateTime?
   paidAt        DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  // New: branch-level invoicing, taxes, partial payment, line items
   branchId   String?
   branch     Branch?           @relation(fields: [branchId], references: [id])
   subtotal   Float             @default(0)
@@ -925,8 +971,12 @@ model Invoice {
   taxAmount  Float             @default(0)
   paidAmount Float             @default(0)
   notes      String?
-  lineItems  InvoiceLineItem[]
+  voidedAt          DateTime?
+  voidReason        String?
+  lineItems         InvoiceLineItem[]
+  advanceApplications InvoiceAdvanceApplication[]
 
+  @@unique([clientId, branchId, month], map: "Invoice_client_branch_month_key")
   @@index([clientId])
   @@index([status])
   @@index([branchId])

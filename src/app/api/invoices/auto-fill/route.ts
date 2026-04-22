@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { fromContract, fromDeployment } from "@/lib/invoicing/rates"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -28,6 +29,7 @@ type AutofillItem = {
   quantity: number
   unitPrice: number
   lineTotal: number
+  rateSource?: "DEPLOYMENT" | "CONTRACT" | "NONE"
 }
 
 export async function POST(request: NextRequest) {
@@ -69,13 +71,12 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = []
     const items: AutofillItem[] = []
 
-    // SPECIAL_DUTY: any record overlapping the month for this client (and branch if specified)
+    // ── SPECIAL_DUTY ──────────────────────────────────────────────
     const specialDuties = await prisma.payrollSpecialDuty.findMany({
       where: {
         clientId,
         ...(branchId ? { branchId } : {}),
         status: "ACTIVE",
-        // overlap: dateFrom < monthEnd AND dateTo >= monthStart
         dateFrom: { lt: monthEnd },
         dateTo: { gte: monthStart },
       },
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // GUARD_SALARY: distinct guards deployed at this client (and branch) in this month
+    // ── GUARD_SALARY ──────────────────────────────────────────────
     const deployments = await prisma.deployment.findMany({
       where: {
         clientId,
@@ -101,44 +102,108 @@ export async function POST(request: NextRequest) {
         deploymentDate: { gte: monthStart, lt: monthEnd },
       },
       select: {
+        id: true,
         guardId: true,
+        deploymentDate: true,
+        salary: true,
+        overtime: true,
+        extraHours: true,
+        guardType: true,
         guard: { select: { id: true, name: true, parwestId: true } },
       },
     })
 
-    const seenGuards = new Set<string>()
-    const distinctGuards: { id: string; name: string; parwestId: string }[] = []
-    for (const d of deployments) {
-      if (seenGuards.has(d.guardId)) continue
-      seenGuards.add(d.guardId)
-      distinctGuards.push(d.guard)
+    type GuardAgg = {
+      guard: { id: string; name: string; parwestId: string }
+      guardType: string | null
+      days: Set<string>
+      // dailyRate observed on deployments — pick the most recent non-zero
+      lastDeploymentRate: ReturnType<typeof fromDeployment> | null
+      // newest deployment id used as refId so the line item points somewhere meaningful
+      latestDeploymentId: string
+      latestDeploymentDate: Date
+      overtimeHoursTotal: number
+      overtimeHourlyRate: number
     }
 
-    if (distinctGuards.length) {
-      const payrolls = await prisma.payroll.findMany({
-        where: {
-          guardId: { in: distinctGuards.map((g) => g.id) },
-          month: { gte: monthStart, lt: monthEnd },
-        },
-      })
-      const payrollByGuard = new Map(payrolls.map((p) => [p.guardId, p]))
-      const monthLabel = monthValue
-
-      for (const guard of distinctGuards) {
-        const payroll = payrollByGuard.get(guard.id)
-        if (!payroll) {
-          warnings.push(`No payroll row for ${guard.name} (${guard.parwestId}) in ${monthLabel}`)
-          continue
+    const byGuard = new Map<string, GuardAgg>()
+    for (const d of deployments) {
+      const dayKey = fmtDate(d.deploymentDate)
+      let agg = byGuard.get(d.guardId)
+      if (!agg) {
+        agg = {
+          guard: d.guard,
+          guardType: d.guardType,
+          days: new Set(),
+          lastDeploymentRate: null,
+          latestDeploymentId: d.id,
+          latestDeploymentDate: d.deploymentDate,
+          overtimeHoursTotal: 0,
+          overtimeHourlyRate: 0,
         }
-        const unitPrice = payroll.netSalary || 0
-        items.push({
-          kind: "GUARD_SALARY",
-          refId: payroll.id,
-          description: `Salary: ${guard.name} (${guard.parwestId}) ${monthLabel}`,
-          quantity: 1,
-          unitPrice,
-          lineTotal: round2(unitPrice),
-        })
+        byGuard.set(d.guardId, agg)
+      }
+      agg.days.add(dayKey)
+      const dr = fromDeployment({ salary: d.salary, overtime: d.overtime })
+      if (dr) agg.lastDeploymentRate = dr
+      if (d.deploymentDate > agg.latestDeploymentDate) {
+        agg.latestDeploymentDate = d.deploymentDate
+        agg.latestDeploymentId = d.id
+        if (!agg.guardType && d.guardType) agg.guardType = d.guardType
+      }
+      const oh = Number(d.extraHours ?? 0)
+      if (oh > 0) {
+        agg.overtimeHoursTotal += oh
+        if (Number(d.overtime ?? 0) > 0) agg.overtimeHourlyRate = Number(d.overtime)
+      }
+    }
+
+    for (const agg of byGuard.values()) {
+      const dayCount = agg.days.size
+      const rate =
+        agg.lastDeploymentRate ??
+        (await fromContract({
+          clientId,
+          branchId,
+          guardType: agg.guardType,
+          asOf: agg.latestDeploymentDate,
+        }))
+
+      if (rate.dailyRate <= 0) {
+        warnings.push(
+          `No daily rate found for ${agg.guard.name} (${agg.guard.parwestId}) — set deployment salary or contract rate.`,
+        )
+        continue
+      }
+
+      const lineTotal = round2(dayCount * rate.dailyRate)
+      items.push({
+        kind: "GUARD_SALARY",
+        refId: agg.latestDeploymentId,
+        description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${dayCount} day${dayCount === 1 ? "" : "s"} @ ${rate.dailyRate} (${rate.source.toLowerCase()})`,
+        quantity: dayCount,
+        unitPrice: rate.dailyRate,
+        lineTotal,
+        rateSource: rate.source,
+      })
+
+      if (agg.overtimeHoursTotal > 0) {
+        const otRate = agg.overtimeHourlyRate || rate.overtimeHourly
+        if (otRate > 0) {
+          items.push({
+            kind: "GUARD_SALARY",
+            refId: agg.latestDeploymentId,
+            description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.overtimeHoursTotal}h @ ${otRate}`,
+            quantity: agg.overtimeHoursTotal,
+            unitPrice: otRate,
+            lineTotal: round2(agg.overtimeHoursTotal * otRate),
+            rateSource: rate.source,
+          })
+        } else {
+          warnings.push(
+            `Overtime hours present for ${agg.guard.name} but no overtime hourly rate configured.`,
+          )
+        }
       }
     }
 
