@@ -4,7 +4,13 @@ import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, internalServerError, unauthorized, forbidden, notFound } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import type { Prisma } from "@prisma/client"
+
+const ALLOWED_LINE_KINDS = new Set(["GUARD_SALARY", "SPECIAL_DUTY", "MANUAL"])
+const ALLOWED_INVOICE_STATUSES = new Set([
+  "DRAFT", "PENDING", "ADVANCE_PAID", "PARTIAL_PAID", "PAID", "UNPAID", "OVERDUE",
+])
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -22,6 +28,10 @@ function generateInvoiceNumber() {
   return `INV-${ts}`
 }
 
+function round2(value: number) {
+  return Math.round(value * 100) / 100
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
@@ -31,12 +41,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get("clientId") || undefined
+    const branchId = searchParams.get("branchId") || undefined
     const status = searchParams.get("status") || undefined
     const month = searchParams.get("month") || undefined
     const search = searchParams.get("search")?.trim()
 
     const where: Prisma.InvoiceWhereInput = {}
     if (clientId) where.clientId = clientId
+    if (branchId) where.branchId = branchId
     if (status) where.status = status.toUpperCase()
 
     if (month) {
@@ -72,6 +84,10 @@ export async function GET(request: NextRequest) {
             regionId: true,
           },
         },
+        branch: {
+          select: { id: true, name: true },
+        },
+        _count: { select: { lineItems: true } },
       },
       take: 300,
     })
@@ -83,6 +99,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+type IncomingLineItem = {
+  kind?: string
+  refId?: string | null
+  description?: string
+  quantity?: number | string
+  unitPrice?: number | string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -92,17 +116,33 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const clientId = body?.clientId ? String(body.clientId) : ""
+    const branchId = body?.branchId ? String(body.branchId) : null
     const monthValue = body?.month ? String(body.month) : ""
-    const amount = Number(body?.amount)
     const dueDate = body?.dueDate ? new Date(body.dueDate) : null
+    const notes = body?.notes ? String(body.notes) : null
+    const taxRateRaw = body?.taxRate
+    const status = (body?.status ? String(body.status) : "DRAFT").toUpperCase()
+    const incomingItems: IncomingLineItem[] = Array.isArray(body?.lineItems) ? body.lineItems : []
 
-    if (!clientId || !monthValue || !Number.isFinite(amount) || amount < 0) {
-      return badRequest("clientId, month, and non-negative amount are required.")
+    if (!clientId || !monthValue) {
+      return badRequest("clientId and month are required.")
+    }
+    if (!ALLOWED_INVOICE_STATUSES.has(status)) {
+      return badRequest("Invalid invoice status.")
     }
 
     const month = parseMonthStart(monthValue)
     if (!month) {
       return badRequest("month must be in YYYY-MM format.")
+    }
+
+    let taxRate: number | null = null
+    if (taxRateRaw !== undefined && taxRateRaw !== null && taxRateRaw !== "") {
+      const tr = Number(taxRateRaw)
+      if (!Number.isFinite(tr) || tr < 0 || tr > 1) {
+        return badRequest("taxRate must be a decimal between 0 and 1.")
+      }
+      taxRate = tr
     }
 
     const client = await prisma.client.findUnique({
@@ -117,24 +157,108 @@ export async function POST(request: NextRequest) {
       return forbidden("Forbidden: cannot create invoice outside your scope.")
     }
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        clientId,
-        invoiceNumber: generateInvoiceNumber(),
-        month,
-        amount,
-        dueDate,
-        status: (body?.status ? String(body.status) : "PENDING").toUpperCase(),
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            regionId: true,
-          },
+    if (branchId) {
+      const branch = await prisma.branch.findUnique({
+        where: { id: branchId },
+        select: { id: true, clientId: true },
+      })
+      if (!branch || branch.clientId !== clientId) {
+        return badRequest("branchId does not belong to the given client.")
+      }
+    }
+
+    // Validate and prepare line items
+    type PreparedItem = {
+      kind: string
+      refId: string | null
+      description: string
+      quantity: number
+      unitPrice: number
+      lineTotal: number
+    }
+    const prepared: PreparedItem[] = []
+    for (const item of incomingItems) {
+      const kind = String(item?.kind || "").toUpperCase()
+      if (!ALLOWED_LINE_KINDS.has(kind)) {
+        return badRequest(`Invalid line item kind: ${kind}`)
+      }
+      const description = String(item?.description || "").trim()
+      if (!description) {
+        return badRequest("Each line item requires a description.")
+      }
+      const quantity = item?.quantity != null ? Number(item.quantity) : 1
+      const unitPrice = Number(item?.unitPrice)
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return badRequest("Line item quantity must be > 0.")
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        return badRequest("Line item unitPrice must be >= 0.")
+      }
+      const refId = item?.refId ? String(item.refId) : null
+      if (kind === "GUARD_SALARY") {
+        if (!refId) return badRequest("GUARD_SALARY line items require refId (payrollId).")
+        const exists = await prisma.payroll.findUnique({ where: { id: refId }, select: { id: true } })
+        if (!exists) return badRequest(`Payroll ${refId} not found for GUARD_SALARY line item.`)
+      } else if (kind === "SPECIAL_DUTY") {
+        if (!refId) return badRequest("SPECIAL_DUTY line items require refId (specialDutyId).")
+        const exists = await prisma.payrollSpecialDuty.findUnique({ where: { id: refId }, select: { id: true } })
+        if (!exists) return badRequest(`Special duty ${refId} not found for SPECIAL_DUTY line item.`)
+      }
+      prepared.push({
+        kind,
+        refId,
+        description,
+        quantity,
+        unitPrice,
+        lineTotal: round2(quantity * unitPrice),
+      })
+    }
+
+    const subtotal = round2(prepared.reduce((acc, i) => acc + i.lineTotal, 0))
+    const taxAmount = round2(subtotal * (taxRate ?? 0))
+    const amount = round2(subtotal + taxAmount)
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      return tx.invoice.create({
+        data: {
+          clientId,
+          branchId: branchId || null,
+          invoiceNumber: generateInvoiceNumber(),
+          month,
+          amount,
+          subtotal,
+          taxRate,
+          taxAmount,
+          paidAmount: 0,
+          notes,
+          dueDate,
+          status,
+          lineItems: prepared.length
+            ? {
+                create: prepared.map((p) => ({
+                  kind: p.kind,
+                  refId: p.refId,
+                  description: p.description,
+                  quantity: p.quantity,
+                  unitPrice: p.unitPrice,
+                  lineTotal: p.lineTotal,
+                })),
+              }
+            : undefined,
         },
-      },
+        include: {
+          client: { select: { id: true, name: true, regionId: true } },
+          branch: { select: { id: true, name: true } },
+          lineItems: true,
+        },
+      })
+    })
+
+    await safeAuditLog({
+      userId: session.user?.id || null,
+      event: "INVOICE_CREATE",
+      module: "PAYROLL",
+      description: `Created invoice ${invoice.invoiceNumber} for client ${clientId} (amount ${amount})`,
     })
 
     return NextResponse.json(invoice, { status: 201 })
