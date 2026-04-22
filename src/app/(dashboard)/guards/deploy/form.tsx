@@ -174,6 +174,8 @@ export default function DeployGuardForm() {
   const [deploymentNature, setDeploymentNature] = useState("PERMANENT")
   const [isExtraGuard, setIsExtraGuard] = useState(false)
   const [comment, setComment] = useState("")
+  const [salaryInput, setSalaryInput] = useState("")
+  const [overtimeInput, setOvertimeInput] = useState("")
 
   // Guard deployment history
   const [guardDeployments, setGuardDeployments] = useState<GuardDeployment[]>([])
@@ -208,6 +210,9 @@ export default function DeployGuardForm() {
   }, [selectedRegionalOffice])
 
   useEffect(() => {
+    // Reset rate inputs whenever the selected guard changes — force conscious entry per guard.
+    setSalaryInput("")
+    setOvertimeInput("")
     if (!selectedGuard) {
       setGuardSupervisor("—")
       setGuardDeployments([])
@@ -365,6 +370,20 @@ export default function DeployGuardForm() {
       return
     }
 
+    // Daily Rate is required — payroll engine reads dep.salary ?? dep.rate ?? 0
+    const parsedSalary = parseFloat(salaryInput)
+    if (!salaryInput || Number.isNaN(parsedSalary) || parsedSalary <= 0) {
+      setError("Daily Rate is required.")
+      setLoading(false)
+      return
+    }
+    const parsedOvertime = overtimeInput ? parseFloat(overtimeInput) : undefined
+    if (overtimeInput && (Number.isNaN(parsedOvertime!) || parsedOvertime! < 0)) {
+      setError("Overtime Hourly Rate must be a non-negative number.")
+      setLoading(false)
+      return
+    }
+
     // Guard must pass all eligibility checks
     if (eligibility && !eligibility.eligible) {
       const failedChecks = Object.values(eligibility.checks).filter((c) => !c.pass)
@@ -395,6 +414,8 @@ export default function DeployGuardForm() {
           deploymentNature: isExtraGuard ? "TEMPORARY" : (deploymentNature || "PERMANENT"),
           isExtraGuard,
           comment: isExtraGuard ? comment : null,
+          salary: parsedSalary,
+          overtime: parsedOvertime,
           status: "ACTIVE",
         }),
       })
@@ -421,6 +442,7 @@ export default function DeployGuardForm() {
   const selectedBranchData = branches.find((b) => b.id === selectedBranch) ?? null
 
   const activeDeployments = guardDeployments.filter((d) => d.status === "ACTIVE")
+  const isDoubleDuty = guardDeployments.some((d) => d.status === "ACTIVE")
 
   // Options derived from fetched data
   const regionalOfficeOptions = regionalOffices.map((o) => ({ id: o.id, name: `${o.name} (${o.seriesCode})` }))
@@ -605,6 +627,15 @@ export default function DeployGuardForm() {
           ) : null}
         </section>
 
+        {/* ── Double-duty banner ─────────────────────────────────────────── */}
+        {isDoubleDuty ? (
+          <div className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold text-amber-800 mb-0.5">Double Duty Detected</p>
+            This guard is already deployed today. Creating a second deployment will record a
+            DOUBLE DUTY day — both deployments will pay independently at their own daily rate.
+          </div>
+        ) : null}
+
         {/* ── Shift & Deployment Options ─────────────────────────────────── */}
         <section className="ui-card p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -651,6 +682,50 @@ export default function DeployGuardForm() {
                 </div>
               </>
             ) : null}
+
+            {/* ── Daily Rate (per-day pay for THIS deployment row) ──────── */}
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                {isDoubleDuty
+                  ? "Daily Rate for this Double-Duty Deployment (PKR)"
+                  : "Daily Rate (PKR)"}
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={salaryInput}
+                onChange={(e) => setSalaryInput(e.target.value)}
+                required
+                placeholder="e.g. 1500"
+                className="ui-input"
+              />
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {isDoubleDuty
+                  ? "This is a second deployment for this guard today (double duty). Enter the daily rate for THIS deployment — the first deployment's rate is unaffected. Both will pay independently."
+                  : "Per-day rate for this deployment. Each deployment row pays one day at this rate."}
+              </p>
+            </div>
+
+            {/* ── Overtime Hourly Rate (optional) ───────────────────────── */}
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Overtime Hourly Rate (PKR)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={overtimeInput}
+                onChange={(e) => setOvertimeInput(e.target.value)}
+                placeholder="Optional"
+                className="ui-input"
+              />
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Optional. Used when overtime hours are recorded against this deployment via /payroll/overtime.
+              </p>
+            </div>
 
             {activeDeployments.length > 0 ? (
               <div>
