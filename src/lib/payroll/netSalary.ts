@@ -15,6 +15,15 @@ function toNumber(value: number | null | undefined) {
   return value
 }
 
+/**
+ * @deprecated Use `calculateGuardPayroll` from `./calculate` instead.
+ *
+ * This function is retained only for the legacy `/api/payroll/salary`,
+ * `/api/payroll/extra-hours`, and `/api/payroll/other-deductions` endpoints,
+ * which will be refactored in Wave 2. The canonical engine in `./calculate.ts`
+ * supersedes this formula (handles overtime, holidays, special duty, weighted
+ * reserve %, deduction entries, and state machine).
+ */
 export function calculatePayrollNetSalary(fields: PayrollAmountFields) {
   const gross =
     toNumber(fields.baseSalary) +
