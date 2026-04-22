@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
+import PayrollStateBadge from "@/components/payroll/PayrollStateBadge"
 
 type Row = {
   id: string
@@ -12,6 +13,9 @@ type Row = {
   paymentStatus: string
   paymentRemarks: string | null
   paymentUpdatedAt: string | null
+  state?: string | null
+  holdReason?: string | null
+  emergencyReleaseReason?: string | null
   guard: { id: string; parwestId: string; name: string }
 }
 
@@ -211,20 +215,21 @@ export default function PayrollUnpaidSalariesManager() {
                 <th className="px-3 py-2 text-right">Net</th>
                 <th className="px-3 py-2 text-left">Dated</th>
                 <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">State</th>
                 <th className="px-3 py-2 text-left">Remarks</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                  <td colSpan={8} className="px-3 py-6 text-center text-[var(--text-muted)]">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                  <td colSpan={8} className="px-3 py-6 text-center text-[var(--text-muted)]">
                     No unpaid salaries.
                   </td>
                 </tr>
@@ -250,6 +255,16 @@ export default function PayrollUnpaidSalariesManager() {
                     >
                       {r.paymentStatus}
                     </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.state ? (
+                      <PayrollStateBadge
+                        state={r.state}
+                        reason={r.holdReason ?? r.emergencyReleaseReason ?? null}
+                      />
+                    ) : (
+                      <span className="text-xs text-[var(--text-muted)]">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs">{r.paymentRemarks ?? ""}</td>
                 </tr>

@@ -72,6 +72,7 @@ const allNavItems: NavNode[] = [
             { title: "Special Duty", href: "/payroll/special-duty", icon: DollarSign },
             { title: "Holidays", href: "/payroll/holidays", icon: DollarSign },
             { title: "Salary", href: "/payroll/salary-v2", icon: DollarSign },
+            { title: "Salary State", href: "/payroll/state", icon: ShieldAlert },
             { title: "Bulk Salary Slips", href: "/payroll/bulk-salary-slips", icon: DollarSign },
             { title: "Clearance", href: "/payroll/clearance", icon: DollarSign },
             { title: "UnPaid Salaries", href: "/payroll/unpaid-salaries", icon: DollarSign },

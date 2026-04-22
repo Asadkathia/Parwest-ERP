@@ -19,6 +19,7 @@ import ServiceHistoryTab from "@/components/guards/tabs/ServiceHistoryTab"
 import InsuranceTab from "@/components/guards/tabs/InsuranceTab"
 import StatusHistoryTab from "@/components/guards/tabs/StatusHistoryTab"
 import PBADocumentsTab from "@/components/guards/tabs/PBADocumentsTab"
+import ReserveLedgerPanel from "@/components/payroll/ReserveLedgerPanel"
 import type { GuardTabModel } from "@/components/guards/tabs/types"
 import {
     User,
@@ -36,6 +37,7 @@ import {
     History,
     Shield,
     Activity,
+    Wallet,
 } from "lucide-react"
 
 interface GuardProfileTabsProps {
@@ -61,6 +63,7 @@ const tabs: Tab[] = [
     { id: "insurance", label: "Insurance", icon: Shield },
     { id: "status-history", label: "Status History", icon: Activity },
     { id: "pba-docs", label: "PBA Documents", icon: FileText },
+    { id: "reserve", label: "Reserve", icon: Wallet },
 ]
 
 export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsProps) {
@@ -108,6 +111,8 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
                 return <StatusHistoryTab guardId={guard.id || ""} />
             case "pba-docs":
                 return <PBADocumentsTab guard={guard} />
+            case "reserve":
+                return <ReserveLedgerPanel guardId={guard.id || ""} />
             default:
                 return <GeneralInformationTab guard={guard} />
         }
