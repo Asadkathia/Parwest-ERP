@@ -60,6 +60,21 @@ export async function PUT(
         // Resolve city — form sends it as `clientLocation`
         const city = body.clientLocation || body.city || null
 
+        // Reserve % override — accept null/blank or a decimal between 0 and 1.
+        let reservePctValue: number | null | undefined = undefined
+        if (Object.prototype.hasOwnProperty.call(body, "reservePct")) {
+            const raw = body.reservePct
+            if (raw === null || raw === "" || raw === undefined) {
+                reservePctValue = null
+            } else {
+                const num = typeof raw === "number" ? raw : parseFloat(String(raw))
+                if (Number.isNaN(num) || num < 0 || num > 1) {
+                    return badRequest("reservePct must be a decimal between 0 and 1.")
+                }
+                reservePctValue = num
+            }
+        }
+
         const newData = {
             name:                        body.name,
             type:                        body.type,
@@ -102,6 +117,7 @@ export async function PUT(
             contractAdditionalDayGuards:   toInt(body.contractAdditionalDayGuards),
             contractAdditionalNightGuards: toInt(body.contractAdditionalNightGuards),
             contractPrice:               toFloat(body.contractPrice),
+            ...(reservePctValue !== undefined ? { reservePct: reservePctValue } : {}),
         }
 
         const client = await prisma.$transaction(async (tx) => {

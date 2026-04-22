@@ -32,6 +32,17 @@ export async function PATCH(
     if (body.longitude !== undefined) {
       data.longitude = body.longitude !== null && body.longitude !== "" ? parseFloat(String(body.longitude)) : null
     }
+    if (body.reservePct !== undefined) {
+      if (body.reservePct === null || body.reservePct === "") {
+        data.reservePct = null
+      } else {
+        const num = typeof body.reservePct === "number" ? body.reservePct : parseFloat(String(body.reservePct))
+        if (Number.isNaN(num) || num < 0 || num > 1) {
+          return badRequest("reservePct must be a decimal between 0 and 1.")
+        }
+        data.reservePct = num
+      }
+    }
 
     if (Object.keys(data).length === 0) {
       return badRequest("No valid fields provided.")

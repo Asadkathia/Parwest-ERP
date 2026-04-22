@@ -80,6 +80,7 @@ type Client = {
     contractAdditionalDayGuards: number | null
     contractAdditionalNightGuards: number | null
     contractPrice: number | null
+    reservePct: number | null
 }
 
 type Region = { id: string; name: string }
@@ -124,6 +125,11 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
 
     // Branchless toggle
     const [isBranchless, setIsBranchless] = useState(client.isBranchless)
+
+    // Reserve % override — stored as decimal (0..1) in DB, edited as % (0..100) in UI
+    const [reservePctInput, setReservePctInput] = useState<string>(
+        client.reservePct != null ? String(Math.round(client.reservePct * 10000) / 100) : ""
+    )
 
     useEffect(() => {
         fetch("/api/client-types")
@@ -184,6 +190,20 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
 
         const formData = new FormData(e.currentTarget)
         const filled = contactNumbers.filter((n) => n.trim())
+
+        // Validate + convert reserve % (UI 0-100) -> decimal (0-1) for API
+        let reservePctDecimal: number | null = null
+        const rpTrim = reservePctInput.trim()
+        if (rpTrim !== "") {
+            const pct = parseFloat(rpTrim)
+            if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+                setError("Reserve Salary % must be between 0 and 100.")
+                setLoading(false)
+                return
+            }
+            reservePctDecimal = Math.round((pct / 100) * 10000) / 10000
+        }
+
         const data = {
             ...Object.fromEntries(formData.entries()),
             isBranchless,
@@ -191,6 +211,7 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
             contactNumbers: filled,
             regionId: selectedRegionId || null,
             regionalOfficeId: selectedRegionalOfficeId || null,
+            reservePct: reservePctDecimal,
         }
 
         try {
@@ -467,6 +488,22 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Logo URL</label>
                             <input type="url" name="logoUrl" defaultValue={client.logoUrl || ""} className="ui-input" placeholder="https://example.com/logo.png" />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Reserve Salary % (override)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.01"
+                                value={reservePctInput}
+                                onChange={(e) => setReservePctInput(e.target.value)}
+                                className="ui-input"
+                                placeholder="e.g. 30"
+                            />
+                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                Optional. % of net pay withheld monthly as reserve balance. Leave blank to use the regional office or global default (30%).
+                            </p>
                         </div>
                     </div>
                 </div>

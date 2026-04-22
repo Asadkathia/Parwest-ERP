@@ -79,6 +79,16 @@ export async function POST(request: NextRequest) {
         const latitude = body?.latitude != null && body.latitude !== "" ? parseFloat(String(body.latitude)) : null
         const longitude = body?.longitude != null && body.longitude !== "" ? parseFloat(String(body.longitude)) : null
 
+        // Reserve % override — null/blank or decimal in [0,1]
+        let reservePct: number | null = null
+        if (body?.reservePct != null && body.reservePct !== "") {
+            const num = typeof body.reservePct === "number" ? body.reservePct : parseFloat(String(body.reservePct))
+            if (Number.isNaN(num) || num < 0 || num > 1) {
+                return badRequest("reservePct must be a decimal between 0 and 1.")
+            }
+            reservePct = num
+        }
+
         if (!name || !seriesCode || !regionId) {
             return badRequest("name, seriesCode and regionId are required.")
         }
@@ -119,6 +129,7 @@ export async function POST(request: NextRequest) {
                 fax,
                 ...(latitude != null ? { latitude } : {}),
                 ...(longitude != null ? { longitude } : {}),
+                ...(reservePct != null ? { reservePct } : {}),
             },
             include: {
                 region: true,

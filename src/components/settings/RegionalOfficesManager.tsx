@@ -33,6 +33,7 @@ type OfficeRow = {
   longitude?: number | null
   regionId: string
   region?: Region | null
+  reservePct?: number | null
   createdAt: string
 }
 
@@ -51,6 +52,8 @@ export default function RegionalOfficesManager() {
   const [longitude, setLongitude] = useState("")
   const [regionId, setRegionId] = useState("")
   const [showCreateMap, setShowCreateMap] = useState(false)
+  // Reserve % default for region — UI in % (0-100), persisted as decimal (0-1)
+  const [reservePctInput, setReservePctInput] = useState("")
 
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
@@ -107,6 +110,19 @@ export default function RegionalOfficesManager() {
       setError("Office name, series code, and region are required.")
       return
     }
+
+    // Convert reserve % (UI 0-100) -> decimal (0-1) for API
+    let reservePctDecimal: number | null = null
+    const rpTrim = reservePctInput.trim()
+    if (rpTrim !== "") {
+      const pct = parseFloat(rpTrim)
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        setError("Reserve Salary % must be between 0 and 100.")
+        return
+      }
+      reservePctDecimal = Math.round((pct / 100) * 10000) / 10000
+    }
+
     setSaving(true)
     try {
       const response = await fetch("/api/regional-offices", {
@@ -122,6 +138,7 @@ export default function RegionalOfficesManager() {
           latitude: latitude.trim() || null,
           longitude: longitude.trim() || null,
           regionId,
+          reservePct: reservePctDecimal,
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -130,6 +147,7 @@ export default function RegionalOfficesManager() {
       setOffice(""); setOfficeHead(""); setSeriesCode("")
       setPhone(""); setMobile(""); setFax("")
       setLatitude(""); setLongitude(""); setRegionId("")
+      setReservePctInput("")
       setShowCreateMap(false)
       await load()
     } catch (createError) {
@@ -248,6 +266,23 @@ export default function RegionalOfficesManager() {
           </div>
 
           <Input label="Search" value={search} onChange={setSearch} placeholder="Search" />
+
+          <div className="md:col-span-3">
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Reserve Salary % (default for region)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={reservePctInput}
+              onChange={(e) => setReservePctInput(e.target.value)}
+              className="ui-input md:max-w-xs"
+              placeholder="e.g. 30"
+            />
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Default % of net pay withheld monthly as reserve balance. Leave blank to use the global default (30%). Client-level override takes precedence.
+            </p>
+          </div>
         </div>
 
         {/* Map picker toggle for create form */}
