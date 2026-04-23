@@ -166,6 +166,28 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        if (isWorkflowRuleEnabled("deployments.requireBranchContract")) {
+            const now = new Date()
+            const activeContract = await prisma.clientContract.findFirst({
+                where: {
+                    clientId,
+                    isActive: true,
+                    OR: [
+                        { branchId: null },
+                        ...(branchId ? [{ branchId }] : []),
+                    ],
+                    AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+                },
+                select: { id: true },
+            })
+            if (!activeContract) {
+                const target = branchId ? "this branch or its client" : "this client"
+                return conflict(
+                    `No active contract found for ${target}. Please enter a client-level or branch-level contract before deploying.`
+                )
+            }
+        }
+
         const ruleDelegate = (prisma as unknown as {
             guardDeploymentInventoryRule?: {
                 findUnique: (args: unknown) => Promise<{

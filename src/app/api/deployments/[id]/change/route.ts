@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 /**
  * POST /api/deployments/[id]/change
@@ -93,6 +94,28 @@ export async function POST(
       const branch = await prisma.branch.findUnique({ where: { id: newBranchId }, select: { id: true, clientId: true } })
       if (!branch) return notFound("Branch not found.")
       if (branch.clientId !== newClientId) return badRequest("Branch does not belong to the selected client.")
+    }
+
+    if (isWorkflowRuleEnabled("deployments.requireBranchContract")) {
+      const now = new Date()
+      const activeContract = await prisma.clientContract.findFirst({
+        where: {
+          clientId: newClientId,
+          isActive: true,
+          OR: [
+            { branchId: null },
+            ...(newBranchId ? [{ branchId: newBranchId }] : []),
+          ],
+          AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+        },
+        select: { id: true },
+      })
+      if (!activeContract) {
+        const target = newBranchId ? "this branch or its client" : "this client"
+        return conflict(
+          `No active contract found for ${target}. Please enter a client-level or branch-level contract before deploying.`
+        )
+      }
     }
 
     const userName = (session.user as { name?: string })?.name ?? "System"
