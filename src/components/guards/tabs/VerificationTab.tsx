@@ -12,7 +12,7 @@ type PrereqRow = {
   prereqId: string | null
   status: string
   verificationStatus: string | null
-  attachmentData: string | null
+  hasAttachment: boolean
   attachmentName: string | null
   documentUrl: string | null
   uploadedBy: string | null
@@ -46,8 +46,18 @@ function readFileAsBase64(file: File): Promise<string> {
   })
 }
 
-function viewDocument(row: PrereqRow) {
-  const data = row.attachmentData || row.documentUrl
+async function viewDocument(guardId: string, row: PrereqRow) {
+  let data: string | null = row.documentUrl
+  if (!data && row.hasAttachment && row.prereqId) {
+    try {
+      const res = await fetch(`/api/guards/${guardId}/prerequisites/${row.prereqId}`)
+      if (!res.ok) return
+      const payload = await res.json()
+      data = payload.attachmentData || payload.documentUrl
+    } catch {
+      return
+    }
+  }
   if (!data) return
   const win = window.open()
   if (!win) return
@@ -163,8 +173,8 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
     d ? new Date(d).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" }) : "—"
 
   const verifiedCount = rows.filter((r) => r.status === "VERIFIED").length
-  const uploadedCount = rows.filter((r) => r.attachmentData || r.documentUrl).length
-  const pendingCount = rows.filter((r) => r.isActive && !(r.attachmentData || r.documentUrl)).length
+  const uploadedCount = rows.filter((r) => r.hasAttachment || r.documentUrl).length
+  const pendingCount = rows.filter((r) => r.isActive && !(r.hasAttachment || r.documentUrl)).length
 
   if (loading) return <div className="py-12 text-center text-sm text-gray-500">Loading verifications...</div>
 
@@ -229,7 +239,7 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
                 </td>
               </tr>
             ) : rows.map((row, idx) => {
-              const hasFile = !!(row.attachmentData || row.documentUrl)
+              const hasFile = row.hasAttachment || !!row.documentUrl
               const isUploadingThis = uploading === row.docTypeName
               return (
                 <tr key={row.docTypeId} className="border-t hover:bg-gray-50">
@@ -237,7 +247,7 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
                   <td className="px-4 py-3 font-medium">{row.docTypeName}</td>
                   <td className="px-4 py-3">
                     {hasFile ? (
-                      <button onClick={() => viewDocument(row)} className="flex items-center gap-1 text-blue-600 hover:underline text-xs">
+                      <button onClick={() => viewDocument(guardId, row)} className="flex items-center gap-1 text-blue-600 hover:underline text-xs">
                         <FileText className="h-3 w-3" />
                         {row.attachmentName || "View"}
                       </button>
@@ -304,8 +314,8 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
               <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
                 {verifyModal.docTypeName}
               </div>
-              {(verifyModal.attachmentData || verifyModal.documentUrl) && (
-                <button onClick={() => viewDocument(verifyModal)} className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+              {(verifyModal.hasAttachment || verifyModal.documentUrl) && (
+                <button onClick={() => viewDocument(guardId, verifyModal)} className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
                   <Eye className="h-4 w-4" /> View Uploaded Document
                 </button>
               )}

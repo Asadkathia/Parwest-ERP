@@ -34,7 +34,7 @@ export async function GET(
     const [guard, docTypes, prereqs, pledgedDocs, deploymentInventoryRule] = await Promise.all([
       prisma.guard.findUnique({
         where: { id: guardId },
-        select: { id: true, status: true },
+        select: { id: true, lifecycleStatus: true },
       }),
       prisma.guardDocumentType.findMany({
         where: { isActive: true, docCategory: "VERIFICATION" },
@@ -59,12 +59,14 @@ export async function GET(
     if (!guard) return notFound("Guard not found")
 
     // ── Check 1: Guard Status ─────────────────────────────────────────────
+    // Authoritative field is lifecycleStatus; the legacy `status` shadow flips
+    // to PRESENT when ACTIVE+deployed, which is precisely the double-duty case.
     const statusCheck: EligibilityCheck = {
-      pass: guard.status === "ACTIVE" || guard.status === "DEFAULT",
+      pass: guard.lifecycleStatus === "ACTIVE",
       label: "Guard Status",
-      message: guard.status === "ACTIVE" || guard.status === "DEFAULT"
-        ? `Guard is ${guard.status === "DEFAULT" ? "Default (available for redeployment)" : "Active"}`
-        : `Guard status is ${guard.status} — only Active or Default guards can be deployed`,
+      message: guard.lifecycleStatus === "ACTIVE"
+        ? "Guard is Active"
+        : `Guard lifecycle status is ${guard.lifecycleStatus} — only Active guards can be deployed`,
     }
 
     // ── Check 2: Verification ─────────────────────────────────────────────

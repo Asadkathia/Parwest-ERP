@@ -198,7 +198,7 @@ export default function AssignmentsManager({
         apiGet<Product[]>("/api/store-inventory/v2/products"),
         apiGet<Condition[]>("/api/store-inventory/v2/masters/conditions"),
         apiGet<Employee[]>("/api/users?status=ACTIVE"),
-        apiGet<Guard[]>("/api/guards?status=ACTIVE"),
+        apiGet<Guard[]>("/api/guards?status=DEFAULT,PRESENT,ACTIVE"),
         apiGet<Client[]>("/api/clients?status=ACTIVE"),
         apiGet<Array<InventoryBalance & { store?: { id?: string }; product?: { id?: string } }>>("/api/store-inventory/v2/inventories"),
       ])

@@ -43,7 +43,7 @@ registerInsight({
       }
     }
 
-    const [count, byState] = await Promise.all([
+    const [count, byRegion] = await Promise.all([
       ctx.prisma.payroll.count({ where }),
       ctx.prisma.payroll.groupBy({
         by: ["regionId"],
@@ -58,9 +58,15 @@ registerInsight({
       return { count: 0, summary: "All current-month payrolls globally finalized." }
     }
 
-    const items = byState.map((row) => ({
+    const regionIds = byRegion.map((r) => r.regionId).filter((id): id is string => !!id)
+    const regions = regionIds.length
+      ? await ctx.prisma.region.findMany({ where: { id: { in: regionIds } }, select: { id: true, name: true } })
+      : []
+    const regionNameMap = new Map(regions.map((r) => [r.id, r.name]))
+
+    const items = byRegion.map((row) => ({
       id: row.regionId ?? "no-region",
-      label: row.regionId ? `Region ${row.regionId}` : "No region assigned",
+      label: row.regionId ? (regionNameMap.get(row.regionId) ?? `Region ${row.regionId}`) : "No region assigned",
       sub: `${row._count._all} payroll${row._count._all === 1 ? "" : "s"} pending finalization`,
       href: "/payroll",
     }))

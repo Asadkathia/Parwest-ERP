@@ -65,7 +65,10 @@ function useSectionChecklist() {
     setSections(Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, value])) as Record<string, boolean>)
   }
 
-  return { sections, toggle, allSelected, setAll }
+  const setSection = (id: string, value: boolean) =>
+    setSections((prev) => ({ ...prev, [id]: value }))
+
+  return { sections, toggle, allSelected, setAll, setSection }
 }
 
 function calculateAge(dateOfBirth: string, referenceDate?: string) {
@@ -91,7 +94,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const { sections, toggle, allSelected, setAll } = useSectionChecklist()
+  const { sections, toggle, allSelected, setAll, setSection } = useSectionChecklist()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
     () => Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
   )
@@ -150,6 +153,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   }
   const emptyEmp = (): PreviousEmp => ({ type: "", isExService: false, registrationNo: "", rank: "", unit: "", nameOfCompany: "", designation: "", reasonForLeaving: "", dateOfEnrollment: "", dateOfDischarge: "", years: "", months: "", remarks: "" })
   const [prevEmployments, setPrevEmployments] = useState<PreviousEmp[]>([])
+  const [guardEmploymentType, setGuardEmploymentType] = useState<string>("")
   const empCounterRef = useRef(0)
 
   useEffect(() => {
@@ -163,6 +167,21 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
 
   const toggleSectionCollapse = (id: string) => {
     setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const handleGuardEmploymentTypeChange = (next: string) => {
+    setGuardEmploymentType(next)
+    if (next && next !== "CIVILIAN") {
+      // Force-enable the section, expand it, and seed an empty matching ex-service
+      // row so the user can immediately fill in Registration No / Rank / Unit.
+      setSection("previousEmployment", true)
+      setCollapsed((prev) => ({ ...prev, previousEmployment: false }))
+      setPrevEmployments((prev) =>
+        prev.some((e) => e.type === next)
+          ? prev
+          : [...prev, { ...emptyEmp(), type: next, isExService: true }]
+      )
+    }
   }
 
   const toggleChecklistSection = (id: string) => {
@@ -317,6 +336,36 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       }
     }
 
+    // Validate Guard Employment Type
+    if (!guardEmploymentType) {
+      setError("Guard Employment Type is required.")
+      setLoading(false)
+      return
+    }
+    if (guardEmploymentType !== "CIVILIAN") {
+      const matching = prevEmployments.filter((e) => e.type === guardEmploymentType)
+      if (matching.length === 0) {
+        setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
+        setLoading(false)
+        return
+      }
+      const incomplete = matching.find(
+        (e) => !e.registrationNo.trim() || !e.rank.trim() || !e.unit.trim()
+      )
+      if (incomplete) {
+        setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
+        setLoading(false)
+        return
+      }
+    }
+    for (const emp of prevEmployments) {
+      if (!emp.type) {
+        setError("Each previous employment record must have an Employment Type selected.")
+        setLoading(false)
+        return
+      }
+    }
+
     try {
       data.phone = contactNumbers[0]
       data.additionalContactNumbers = contactNumbers.slice(1).join(", ")
@@ -324,6 +373,8 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       if (prevEmployments.length > 0) {
         data.previousEmploymentsJson = JSON.stringify(prevEmployments)
       }
+      data.exServiceType = guardEmploymentType
+      data.isExService = guardEmploymentType !== "CIVILIAN" ? "true" : "false"
 
       const response = await fetch("/api/guards", {
         method: "POST",
@@ -568,6 +619,47 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           onToggle={() => toggleSectionCollapse("previousEmployment")}
         >
           <div className="space-y-4">
+            {/* Top-level guard employment type — drives PBA SA-10 vs SA-11 */}
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Guard Employment Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="guardEmploymentType"
+                    checked={guardEmploymentType === "CIVILIAN"}
+                    onChange={() => handleGuardEmploymentTypeChange("CIVILIAN")}
+                    className="h-4 w-4 accent-[var(--brand)]"
+                  />
+                  Civilian
+                </label>
+                {exServiceTypeOptions.map((t) => (
+                  <label key={t} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="guardEmploymentType"
+                      checked={guardEmploymentType === t}
+                      onChange={() => handleGuardEmploymentTypeChange(t)}
+                      className="h-4 w-4 accent-[var(--brand)]"
+                    />
+                    {t}
+                  </label>
+                ))}
+                {exServiceTypeOptions.length === 0 && (
+                  <span className="text-xs text-[var(--text-muted)]">Loading types…</span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                {guardEmploymentType === "CIVILIAN"
+                  ? "Civilian — adding previous employment records is optional."
+                  : guardEmploymentType
+                  ? `${guardEmploymentType} — at least one ${guardEmploymentType} record with Registration No, Rank, and Unit is required.`
+                  : "Required. Determines applicable PBA documents (SA-10 for ex-service, SA-11 for civilian)."}
+              </p>
+            </div>
+
             <div className="flex items-center justify-between">
               <p className="text-xs text-[var(--text-muted)]">
                 Add all previous employment records — both <strong>Civilian</strong> and <strong>Ex-Service</strong>.
@@ -986,8 +1078,8 @@ function CollapsibleSection({
   action?: ReactNode
 }) {
   return (
-    <div className="ui-card overflow-hidden">
-      <div className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+    <div className="ui-card">
+      <div className={`flex w-full items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 rounded-t-[var(--radius-lg)] ${collapsed ? "rounded-b-[var(--radius-lg)] border-b-0" : ""}`}>
         <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
         <div className="inline-flex items-center gap-2">
           {action}

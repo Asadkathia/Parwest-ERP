@@ -5,6 +5,37 @@ import { badRequest, forbidden, internalServerError, notFound, unauthorized } fr
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { transitionGuard } from "@/lib/guards/lifecycle"
 
+// GET /api/guards/[id]/prerequisites/[prereqId]
+// Returns the full attachment payload for a single prerequisite (lazy fetch).
+// The list endpoint omits `attachmentData` by default to keep responses small.
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string; prereqId: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session) return unauthorized()
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+
+    const { id: guardId, prereqId } = await params
+    const prereq = await prisma.guardPrerequisite.findFirst({
+      where: { id: prereqId, guardId },
+      select: {
+        id: true,
+        attachmentData: true,
+        attachmentName: true,
+        documentUrl: true,
+      },
+    })
+    if (!prereq) return notFound("Prerequisite record not found")
+
+    return NextResponse.json(prereq)
+  } catch (error) {
+    console.error("GET /api/guards/[id]/prerequisites/[prereqId]:", error)
+    return internalServerError("Failed to fetch prerequisite")
+  }
+}
+
 // PATCH /api/guards/[id]/prerequisites/[prereqId]
 // Admin verifies / updates a prerequisite record
 export async function PATCH(

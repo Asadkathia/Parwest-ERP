@@ -50,6 +50,7 @@ type Guard = {
     joiningDate: Date | null
     status: string
     isExService: boolean
+    exServiceType: string | null
     exServiceRank: string | null
     exServiceRegiment: string | null
     bankName: string | null
@@ -92,7 +93,13 @@ const emptyEmployment = (): PreviousEmployment => ({
     remarks: "",
 })
 
-function PreviousEmploymentEditor({ defaultJson }: { defaultJson: string | null | undefined }) {
+function PreviousEmploymentEditor({
+    defaultJson,
+    defaultEmploymentType,
+}: {
+    defaultJson: string | null | undefined
+    defaultEmploymentType: string
+}) {
     const [employments, setEmployments] = useState<PreviousEmployment[]>(() => {
         if (!defaultJson) return []
         try {
@@ -101,6 +108,7 @@ function PreviousEmploymentEditor({ defaultJson }: { defaultJson: string | null 
         } catch { return [] }
     })
     const [exServiceTypes, setExServiceTypes] = useState<string[]>([])
+    const [guardEmploymentType, setGuardEmploymentType] = useState<string>(defaultEmploymentType || "")
 
     useEffect(() => {
         fetch("/api/guard-ex-service-types?activeOnly=true")
@@ -119,9 +127,61 @@ function PreviousEmploymentEditor({ defaultJson }: { defaultJson: string | null 
         updateEntry(i, { type: value, isExService })
     }
 
+    const handleGuardEmploymentTypeChange = (next: string) => {
+        setGuardEmploymentType(next)
+        if (next && next !== "CIVILIAN") {
+            // Seed a matching ex-service row so the user can immediately fill in
+            // Registration No / Rank / Unit.
+            setEmployments((prev) =>
+                prev.some((e) => e.type === next)
+                    ? prev
+                    : [...prev, { ...emptyEmployment(), type: next, isExService: true }]
+            )
+        }
+    }
+
     return (
         <section className="space-y-3">
             <input type="hidden" name="previousEmploymentsJson" value={JSON.stringify(employments)} />
+            <input type="hidden" name="exServiceType" value={guardEmploymentType} />
+            <input type="hidden" name="isExService" value={guardEmploymentType && guardEmploymentType !== "CIVILIAN" ? "true" : "false"} />
+
+            {/* Top-level guard employment type — drives PBA SA-10 vs SA-11 */}
+            <div className="rounded-md border bg-gray-50 p-4">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+                    Guard Employment Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                            type="radio"
+                            checked={guardEmploymentType === "CIVILIAN"}
+                            onChange={() => handleGuardEmploymentTypeChange("CIVILIAN")}
+                            className="w-4 h-4 text-blue-600"
+                        />
+                        <span className="text-sm">Civilian</span>
+                    </label>
+                    {exServiceTypes.map((t) => (
+                        <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                                type="radio"
+                                checked={guardEmploymentType === t}
+                                onChange={() => handleGuardEmploymentTypeChange(t)}
+                                className="w-4 h-4 text-blue-600"
+                            />
+                            <span className="text-sm">{t}</span>
+                        </label>
+                    ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                    {guardEmploymentType === "CIVILIAN"
+                        ? "Civilian — adding previous employment records is optional."
+                        : guardEmploymentType
+                        ? `${guardEmploymentType} — at least one ${guardEmploymentType} record with Registration No, Rank, and Unit is required.`
+                        : "Required. Determines applicable PBA documents (SA-10 for ex-service, SA-11 for civilian)."}
+                </p>
+            </div>
+
             <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-gray-800">Previous Employment Details</h3>
                 <button
@@ -406,6 +466,37 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
 
         const formData = new FormData(e.currentTarget)
         const data = Object.fromEntries(formData.entries())
+
+        const guardEmploymentType = String(data.exServiceType || "").trim()
+        if (!guardEmploymentType) {
+            setError("Guard Employment Type is required.")
+            setLoading(false)
+            return
+        }
+        type RowShape = { type?: string; registrationNo?: string; rank?: string; unit?: string }
+        let rows: RowShape[] = []
+        try { rows = JSON.parse(String(data.previousEmploymentsJson || "[]")) } catch { rows = [] }
+        if (rows.some((r) => !String(r.type || "").trim())) {
+            setError("Each previous employment record must have an Employment Type selected.")
+            setLoading(false)
+            return
+        }
+        if (guardEmploymentType !== "CIVILIAN") {
+            const matching = rows.filter((r) => r.type === guardEmploymentType)
+            if (matching.length === 0) {
+                setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
+                setLoading(false)
+                return
+            }
+            const incomplete = matching.find(
+                (r) => !String(r.registrationNo || "").trim() || !String(r.rank || "").trim() || !String(r.unit || "").trim()
+            )
+            if (incomplete) {
+                setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
+                setLoading(false)
+                return
+            }
+        }
 
         try {
             const response = await fetch(`/api/guards/${guard.id}`, {
@@ -850,7 +941,10 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                 {/* Previous Employment / Ex-Service Information */}
                 <div>
                     <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Previous Employment Details</h2>
-                    <PreviousEmploymentEditor defaultJson={guard.previousEmploymentsJson ?? null} />
+                    <PreviousEmploymentEditor
+                        defaultJson={guard.previousEmploymentsJson ?? null}
+                        defaultEmploymentType={guard.exServiceType ?? (guard.isExService ? "" : "CIVILIAN")}
+                    />
                 </div>
 
                 {/* Banking Information */}

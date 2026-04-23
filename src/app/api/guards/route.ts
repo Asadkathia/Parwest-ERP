@@ -9,6 +9,7 @@ import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/
 import { hasModuleAccess } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
+import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
 import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
@@ -251,17 +252,26 @@ export async function POST(request: NextRequest) {
             try { parsedPrevEmployments = JSON.parse(String(body.previousEmploymentsJson)) } catch { /* ignore */ }
         }
 
-        // Derive exServiceType + isExService from multi-entry or legacy body fields
-        const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true) ?? parsedPrevEmployments[0] ?? null
-        const exServiceType = derivedExService
-            ? (derivedExService.type ?? "CIVILIAN")
-            : (str(body.exServiceType) ?? "CIVILIAN")
-        const isExService = parsedPrevEmployments.length > 0
-            ? parsedPrevEmployments.some((e) => e.isExService === true)
-            : ["ARMY","POLICE","RANGERS","MUJAHID","OTHER"].includes(exServiceType)
+        // Guard Employment Type — explicit body value is authoritative; row-derivation
+        // is a fallback for legacy clients that don't send the new field.
+        const explicitExServiceType = str(body.exServiceType)
+        let exServiceType: string
+        let isExService: boolean
+        if (explicitExServiceType) {
+            const v = await validateGuardEmploymentType(explicitExServiceType, parsedPrevEmployments)
+            if (!v.ok) return badRequest(v.message)
+            exServiceType = v.exServiceType
+            isExService = v.isExService
+        } else {
+            const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true) ?? parsedPrevEmployments[0] ?? null
+            exServiceType = derivedExService?.type ?? "CIVILIAN"
+            isExService = parsedPrevEmployments.length > 0
+                ? parsedPrevEmployments.some((e) => e.isExService === true)
+                : ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].includes(exServiceType)
+        }
 
         // For the flat legacy fields, fall back to first multi-entry's values when body fields are absent
-        const fe = derivedExService
+        const fe = parsedPrevEmployments.find((e) => e.type === exServiceType) ?? parsedPrevEmployments[0] ?? null
 
         const createGuardPayload = (parwestId: string) => ({
             parwestId,

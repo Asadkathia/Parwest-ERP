@@ -43,6 +43,7 @@ export async function GET(
         prereqId: prereq?.id ?? null,
         status: prereq?.status ?? "PENDING",
         verificationStatus: prereq?.verificationStatus ?? null,
+        hasAttachment: !!prereq?.attachmentData,
         attachmentData: withAttachments ? (prereq?.attachmentData ?? null) : null,
         attachmentName: prereq?.attachmentName ?? null,
         documentUrl: prereq?.documentUrl ?? null,

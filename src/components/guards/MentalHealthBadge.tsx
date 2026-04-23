@@ -31,7 +31,7 @@ export default function MentalHealthBadge({ guardId }: MentalHealthBadgeProps) {
         const row = data.find((d) => d.docTypeName === MENTAL_HEALTH_DOC)
         if (!row) { setStatus("not_uploaded"); return }
 
-        const hasFile = !!(row.attachmentData || row.documentUrl)
+        const hasFile = !!(row.hasAttachment || row.documentUrl)
         if (!hasFile) { setStatus("not_uploaded"); return }
 
         let expiryDate: Date | null = null

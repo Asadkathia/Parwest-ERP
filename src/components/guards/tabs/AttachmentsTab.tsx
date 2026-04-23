@@ -12,7 +12,7 @@ type PrereqRow = {
   prereqId: string | null
   status: string
   verificationStatus: string | null
-  attachmentData: string | null
+  hasAttachment: boolean
   attachmentName: string | null
   documentUrl: string | null
   verifiedAt: string | null
@@ -69,6 +69,31 @@ function downloadFile(data: string, name: string) {
   a.href = data
   a.download = name
   a.click()
+}
+
+async function fetchAttachmentPayload(
+  guardId: string,
+  prereqId: string | null
+): Promise<string | null> {
+  if (!prereqId) return null
+  try {
+    const res = await fetch(`/api/guards/${guardId}/prerequisites/${prereqId}`)
+    if (!res.ok) return null
+    const payload = await res.json()
+    return payload.attachmentData || payload.documentUrl || null
+  } catch {
+    return null
+  }
+}
+
+async function viewAttachment(guardId: string, row: PrereqRow) {
+  const data = row.documentUrl || (await fetchAttachmentPayload(guardId, row.prereqId))
+  if (data) openDocument(data)
+}
+
+async function downloadAttachment(guardId: string, row: PrereqRow) {
+  const data = row.documentUrl || (await fetchAttachmentPayload(guardId, row.prereqId))
+  if (data) downloadFile(data, row.attachmentName || row.docTypeName)
 }
 
 function formatDate(d: string | null) {
@@ -190,7 +215,7 @@ function SystemDocRow({
   onDelete: (row: PrereqRow) => void
 }) {
   const [showHistory, setShowHistory] = useState(false)
-  const hasAttached = !!(row.attachmentData || row.documentUrl)
+  const hasAttached = row.hasAttachment || !!row.documentUrl
   const isUploadingThis = uploading === row.docTypeName
   const isDeletingThis = deleting === row.prereqId
 
@@ -251,13 +276,13 @@ function SystemDocRow({
             {hasAttached && (
               <>
                 <button
-                  onClick={() => openDocument(row.attachmentData || row.documentUrl!)}
+                  onClick={() => viewAttachment(guardId, row)}
                   className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
                 >
                   <Eye className="h-3 w-3" /> View
                 </button>
                 <button
-                  onClick={() => downloadFile(row.attachmentData || row.documentUrl!, row.attachmentName || row.docTypeName)}
+                  onClick={() => downloadAttachment(guardId, row)}
                   className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
                 >
                   <Download className="h-3 w-3" /> Download
@@ -324,7 +349,7 @@ function DocRow({
   onDelete: (row: PrereqRow) => void
 }) {
   const [showHistory, setShowHistory] = useState(false)
-  const hasFile = !!(row.attachmentData || row.documentUrl)
+  const hasFile = row.hasAttachment || !!row.documentUrl
   const isUploadingThis = uploading === row.docTypeName
   const isDeletingThis = deleting === row.prereqId
 
@@ -344,13 +369,13 @@ function DocRow({
             {hasFile && (
               <>
                 <button
-                  onClick={() => openDocument(row.attachmentData || row.documentUrl!)}
+                  onClick={() => viewAttachment(guardId, row)}
                   className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
                 >
                   <Eye className="h-3 w-3" /> View
                 </button>
                 <button
-                  onClick={() => downloadFile(row.attachmentData || row.documentUrl!, row.attachmentName || row.docTypeName)}
+                  onClick={() => downloadAttachment(guardId, row)}
                   className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
                 >
                   <Download className="h-3 w-3" /> Download
@@ -543,7 +568,7 @@ export default function AttachmentsTab({ guardId }: AttachmentsTabProps) {
           </div>
           {attachmentDocs.length > 0 && (
             <span className="text-xs text-[var(--text-muted)]">
-              {attachmentDocs.filter((r) => r.attachmentData || r.documentUrl).length} / {attachmentDocs.length} uploaded
+              {attachmentDocs.filter((r) => r.hasAttachment || r.documentUrl).length} / {attachmentDocs.length} uploaded
             </span>
           )}
         </div>

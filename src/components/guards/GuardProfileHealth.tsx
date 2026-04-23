@@ -145,8 +145,8 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                 const active = data.filter((d: { isActive: boolean }) => d.isActive)
                 if (active.length === 0) { setDocPct(0); return }
                 const uploaded = active.filter(
-                    (d: { attachmentData?: string | null; documentUrl?: string | null }) =>
-                        d.attachmentData || d.documentUrl
+                    (d: { hasAttachment?: boolean; documentUrl?: string | null }) =>
+                        d.hasAttachment || d.documentUrl
                 ).length
                 setDocPct(Math.round((uploaded / active.length) * 100))
             })

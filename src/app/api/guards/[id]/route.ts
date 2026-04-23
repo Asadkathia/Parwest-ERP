@@ -5,6 +5,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasModuleAccess } from "@/lib/api/permissions"
+import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
 
 export async function PUT(
     request: NextRequest,
@@ -84,10 +85,26 @@ export async function PUT(
                 parsedPreviousEmployments = JSON.parse(String(body.previousEmploymentsJson))
             } catch { /* ignore */ }
         }
-        // Derive isExService + exServiceType from previousEmployments
-        const derivedIsExService = parsedPreviousEmployments.some((e) => e.isExService === true)
-        const primaryExService = parsedPreviousEmployments.find((e) => e.isExService === true)
-        const derivedExServiceType = primaryExService?.type ?? (derivedIsExService ? null : "CIVILIAN")
+
+        // Guard Employment Type — explicit body value is authoritative; fall back
+        // to row-derivation for legacy clients that don't send the new field.
+        const explicitExServiceType = body.exServiceType ? String(body.exServiceType).trim() : ""
+        let nextIsExService: boolean
+        let nextExServiceType: string | null
+        if (explicitExServiceType) {
+            const v = await validateGuardEmploymentType(explicitExServiceType, parsedPreviousEmployments)
+            if (!v.ok) return badRequest(v.message)
+            nextExServiceType = v.exServiceType
+            nextIsExService = v.isExService
+        } else {
+            const derivedIsExService = parsedPreviousEmployments.some((e) => e.isExService === true)
+            const primary = parsedPreviousEmployments.find((e) => e.isExService === true)
+            nextExServiceType = primary?.type ?? (derivedIsExService ? null : "CIVILIAN")
+            nextIsExService = parsedPreviousEmployments.length > 0
+                ? derivedIsExService
+                : (body.isExService === "true" || body.isExService === true)
+        }
+        const primaryExService = parsedPreviousEmployments.find((e) => e.type === nextExServiceType) ?? parsedPreviousEmployments.find((e) => e.isExService === true)
 
         // Parse bankAccounts JSON array if provided
         type BankAccountEntry = { bankName?: string; accountNumber?: string; accountType?: string; iban?: string; branchCode?: string; walletType?: string; isActive?: boolean }
@@ -122,8 +139,8 @@ export async function PUT(
                 regionalOfficeId: body.regionalOfficeId || null,
                 joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
                 status: body.status || "PENDING",
-                isExService: parsedPreviousEmployments.length > 0 ? derivedIsExService : (body.isExService === "true" || body.isExService === true),
-                exServiceType: parsedPreviousEmployments.length > 0 ? derivedExServiceType : (body.exServiceType || null),
+                isExService: nextIsExService,
+                exServiceType: nextExServiceType,
                 exServiceRank: primaryExService?.rank || body.exServiceRank || null,
                 exServiceRegistrationNo: primaryExService?.registrationNo || body.exServiceRegistrationNo || null,
                 exServiceUnit: primaryExService?.unit || body.exServiceUnit || null,
