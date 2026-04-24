@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import BranchForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
@@ -32,6 +32,7 @@ export default async function NewBranchPage({ params }: { params: Promise<{ id: 
                 defaultRegionId={client.regionId}
                 defaultRegionalOfficeId={client.regionalOfficeId}
                 defaultManagerId={client.assignedManagerId}
+                isSuperAdmin={isSuperAdmin(session)}
             />
         </div>
     )

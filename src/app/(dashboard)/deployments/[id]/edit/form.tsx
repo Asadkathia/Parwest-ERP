@@ -7,6 +7,7 @@ import {
   Calendar, User, AlertTriangle, CheckCircle2
 } from "lucide-react"
 import Link from "next/link"
+import { isNotFutureDate } from "@/lib/validation/formats"
 
 type Branch = {
   id: string
@@ -235,6 +236,12 @@ export default function ChangeDeploymentForm({ deployment, clients, regionalOffi
   const handleSubmit = async () => {
     setLoading(true)
     setError("")
+    if (!isNotFutureDate(effectiveDate)) {
+      setError("Deployment date cannot be in the future.")
+      setLoading(false)
+      setStep("form")
+      return
+    }
     try {
       const res = await fetch(`/api/deployments/${deployment.id}/change`, {
         method: "POST",

@@ -191,9 +191,12 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
         await apiSend<Product>("/api/store-inventory/v2/products", "POST", payload)
       }
 
-      setNotice({ type: "success", message: editingId ? "Product updated successfully." : "Product created successfully." })
+      const successMessage = editingId ? "Product updated successfully." : "Product created successfully."
       resetForm()
+      // load() clears the notice, so set it AFTER the reload completes —
+      // otherwise the banner flashes for a frame and disappears.
       await load()
+      setNotice({ type: "success", message: successMessage })
     } catch (error) {
       const message = error instanceof Error ? error.message : editingId ? "Failed to update product." : "Failed to create product."
       setNotice({ type: "error", message })

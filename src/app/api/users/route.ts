@@ -9,6 +9,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { checkPasswordStrength } from "@/lib/validation/formats"
 
 const MOCK_USERS = [
   {
@@ -127,6 +128,11 @@ export async function POST(request: NextRequest) {
       return badRequest("Email must end with @parwestgroup.com.")
     }
 
+    const passwordCheck = checkPasswordStrength(password, email)
+    if (!passwordCheck.ok) {
+      return badRequest("Password is too weak: " + passwordCheck.issues.join(", "))
+    }
+
     if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, 12)
 
     const actorId = session.user?.id || null
     const created = await prisma.user.create({

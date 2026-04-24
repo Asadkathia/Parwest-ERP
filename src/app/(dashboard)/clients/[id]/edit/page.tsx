@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import ClientEditForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
@@ -32,6 +32,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                 client={client}
                 regions={regions}
                 currentSupervisorId={supervisorAssignment?.supervisorId ?? null}
+                isSuperAdmin={isSuperAdmin(session)}
             />
         </div>
     )

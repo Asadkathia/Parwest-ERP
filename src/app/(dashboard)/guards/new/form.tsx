@@ -7,6 +7,8 @@ import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 import PhoneInput from "@/components/ui/PhoneInput"
+import CnicInput from "@/components/ui/CnicInput"
+import { isValidGuardAge } from "@/lib/validation/formats"
 
 type RegionalOffice = {
   id: string
@@ -25,6 +27,7 @@ type Props = {
 type SectionConfig = {
   id: string
   label: string
+  required?: boolean
 }
 
 const SECTION_CONFIG: SectionConfig[] = [
@@ -35,8 +38,8 @@ const SECTION_CONFIG: SectionConfig[] = [
   { id: "education", label: "EDUCATION" },
   { id: "introducer", label: "INTRODUCER" },
   { id: "physical", label: "PHYSICAL DETAILS" },
-  { id: "family", label: "ADD FAMILY MEMBER DETAIL" },
-  { id: "nearestRelative", label: "ADD NEAREST RELATIVE DETAIL" },
+  { id: "family", label: "ADD FAMILY MEMBER DETAIL", required: true },
+  { id: "nearestRelative", label: "ADD NEAREST RELATIVE DETAIL", required: true },
 ]
 
 
@@ -60,9 +63,15 @@ function useSectionChecklist() {
   const [sections, setSections] = useState<Record<string, boolean>>(initial)
   const allSelected = useMemo(() => Object.values(sections).every(Boolean), [sections])
 
-  const toggle = (id: string) => setSections((prev) => ({ ...prev, [id]: !prev[id] }))
+  const toggle = (id: string) => {
+    const cfg = SECTION_CONFIG.find((s) => s.id === id)
+    if (cfg?.required) return
+    setSections((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
   const setAll = (value: boolean) => {
-    setSections(Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, value])) as Record<string, boolean>)
+    setSections(Object.fromEntries(
+      SECTION_CONFIG.map((s) => [s.id, s.required ? true : value])
+    ) as Record<string, boolean>)
   }
 
   const setSection = (id: string, value: boolean) =>
@@ -260,6 +269,13 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       return
     }
 
+    const dobForAge = String(data.dateOfBirth || "").trim()
+    if (!dobForAge || !isValidGuardAge(dobForAge)) {
+      setError("Guard must be between 18 and 65 years old.")
+      setLoading(false)
+      return
+    }
+
     if (contactNumbers.length === 0) {
       setError("At least one contact number is required.")
       setLoading(false)
@@ -297,6 +313,22 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
         setLoading(false)
         return
       }
+    }
+
+    // Validate family members (required — at least one with a name)
+    const hasAnyFamilyName = familyRows.some((idx) => String(data[`family_${idx}_name`] || "").trim())
+    if (!hasAnyFamilyName) {
+      setError("At least one family member detail is required. Please fill in the Name field.")
+      setLoading(false)
+      return
+    }
+
+    // Validate nearest relatives (required — at least one with a name)
+    const hasAnyNearestName = nearestRows.some((idx) => String(data[`nearest_${idx}_name`] || "").trim())
+    if (!hasAnyNearestName) {
+      setError("At least one nearest relative detail is required. Please fill in the Name field.")
+      setLoading(false)
+      return
     }
 
     // Validate bank accounts
@@ -457,9 +489,18 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
 
       <div className="grid grid-cols-1 gap-2">
         {SECTION_CONFIG.map((section) => (
-          <label key={section.id} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2">
-            <input type="checkbox" checked={sections[section.id]} onChange={() => toggleChecklistSection(section.id)} className="h-4 w-4 accent-[var(--brand)]" />
-            <span className={sections[section.id] ? "text-sm text-[var(--text)] line-through" : "text-sm text-[var(--text)]"}>{section.label}</span>
+          <label key={section.id} className={`inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 ${section.required ? "cursor-default" : ""}`}>
+            <input
+              type="checkbox"
+              checked={sections[section.id]}
+              onChange={() => toggleChecklistSection(section.id)}
+              className="h-4 w-4 accent-[var(--brand)]"
+              disabled={section.required}
+            />
+            <span className={sections[section.id] ? "text-sm text-[var(--text)] line-through" : "text-sm text-[var(--text)]"}>
+              {section.label}
+            </span>
+            {section.required ? <span className="ml-1 text-xs font-medium text-red-500">(required)</span> : null}
           </label>
         ))}
       </div>
@@ -513,18 +554,29 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 className="ui-input"
+                aria-invalid={Boolean(dateOfBirth && !isValidGuardAge(dateOfBirth))}
               />
+              {dateOfBirth && !isValidGuardAge(dateOfBirth) && (
+                <p className="mt-1 text-[11px] text-red-500">
+                  Guard must be between 18 and 65 years old.
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">AGE</label>
               <input type="number" name="age" readOnly value={ageValue} className="ui-input bg-slate-50" placeholder="AGE" />
-              {ageValue && (Number(ageValue) < 18 || Number(ageValue) > 60) && (
-                <p className="mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  ⚠ Guard age ({ageValue} years) is outside the typical range (18–60). An age approval may be required.
-                </p>
-              )}
             </div>
-            <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X) *" name="cnic" required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CNIC # (FORMAT: XXXXX-XXXXXXX-X) <span className="text-red-500">*</span>
+              </label>
+              <CnicInput
+                name="cnic"
+                required
+                placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)"
+                uniqueCheckUrl="/api/guards/check-cnic"
+              />
+            </div>
             <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
             <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
             <Field label="NEXT OF KIN *" name="nextOfKin" required />
@@ -853,7 +905,10 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Field label="FULL NAME *" name="introducerName" required placeholder="Full Name" />
-            <Field label="Introducer's CNIC" name="introducerCnic" placeholder="Introducer's CNIC" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Introducer&apos;s CNIC</label>
+              <CnicInput name="introducerCnic" placeholder="Introducer's CNIC" />
+            </div>
             <Field label="Introducer's Address" name="introducerAddress" placeholder="Introducer's Address" />
             <Field label="Introducer's Contact" name="introducerContact" placeholder="Introducer's Contact #" />
           </div>
@@ -914,7 +969,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <Field label="NAME" name={`family_${idx}_name`} placeholder="NAME" />
+                  <Field label="NAME *" name={`family_${idx}_name`} placeholder="NAME" />
                   <Field label="RELATION" name={`family_${idx}_relation`} placeholder="RELATION" />
                   <Field label="AGE" name={`family_${idx}_age`} placeholder="AGE" />
                   <Field label="PROFESSION" name={`family_${idx}_profession`} placeholder="PROFESSION" />
@@ -970,11 +1025,14 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <Field label="NAME" name={`nearest_${idx}_name`} placeholder="NAME" />
+                  <Field label="NAME *" name={`nearest_${idx}_name`} placeholder="NAME" />
                   <Field label="FATHER NAME" name={`nearest_${idx}_fatherName`} placeholder="FATHER NAME" />
                   <Field label="RELATION" name={`nearest_${idx}_relation`} placeholder="RELATION" />
                   <Field label="PROFESSION" name={`nearest_${idx}_profession`} placeholder="PROFESSION" />
-                  <Field label="CNIC # (FORMAT: XXXXX-XXXXXXX-X)" name={`nearest_${idx}_cnic`} placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">CNIC # (FORMAT: XXXXX-XXXXXXX-X)</label>
+                    <CnicInput name={`nearest_${idx}_cnic`} placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+                  </div>
                   <Field label="CNIC ISSUE DATE" name={`nearest_${idx}_cnicIssueDate`} type="date" />
                   <Field label="CONTACT #" name={`nearest_${idx}_contact`} placeholder="+__-___-_______" />
                   <Field label="ADDRESS" name={`nearest_${idx}_address`} placeholder="ADDRESS" />

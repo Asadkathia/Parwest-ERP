@@ -6,6 +6,7 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { calculateAgeYears, MIN_GUARD_AGE, MAX_GUARD_AGE } from "@/lib/validation/formats"
 import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
@@ -115,6 +116,13 @@ export async function POST(request: NextRequest) {
         }
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
+        }
+        const dobStr = body?.dateOfBirth ? String(body.dateOfBirth) : ""
+        if (dobStr) {
+            const computedAge = calculateAgeYears(dobStr)
+            if (computedAge == null || computedAge < MIN_GUARD_AGE || computedAge > MAX_GUARD_AGE) {
+                return badRequest("Guard age must be between 18 and 65.")
+            }
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null

@@ -6,6 +6,9 @@ import { ArrowLeft, Save, Plus, X } from "lucide-react"
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
+import CnicInput from "@/components/ui/CnicInput"
+import PhoneInput from "@/components/ui/PhoneInput"
+import { isValidCnic, isValidPhone } from "@/lib/validation/formats"
 
 const CITY_OPTIONS = [
     "All Cities","Lahore","Gujranwala","Sahiwal","Islamabad","Karachi","Multan","Faisalabad",
@@ -89,6 +92,7 @@ type Props = {
     client: Client
     regions: Region[]
     currentSupervisorId?: string | null
+    isSuperAdmin?: boolean
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
@@ -102,7 +106,7 @@ function initContactNumbers(raw: unknown): string[] {
     return [""]
 }
 
-export default function ClientEditForm({ client, regions, currentSupervisorId }: Props) {
+export default function ClientEditForm({ client, regions, currentSupervisorId, isSuperAdmin = false }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
@@ -190,6 +194,38 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
 
         const formData = new FormData(e.currentTarget)
         const filled = contactNumbers.filter((n) => n.trim())
+
+        // CNIC validation
+        const introCnic = String(formData.get("introducerCnicNumber") ?? "").trim()
+        if (introCnic && !isValidCnic(introCnic)) {
+            setError("Introducer CNIC format is invalid. Expected XXXXX-XXXXXXX-X.")
+            setLoading(false)
+            return
+        }
+
+        // Phone validation
+        const introPhone = String(formData.get("introducerContactNumber") ?? "").trim()
+        if (introPhone && !isValidPhone(introPhone)) {
+            setError("Introducer contact number must be in format +92-XXX-XXXXXXX.")
+            setLoading(false)
+            return
+        }
+        for (const num of filled) {
+            if (!isValidPhone(num)) {
+                setError(`Contact number "${num}" must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+
+        // Contract dates consistency
+        const cStart = String(formData.get("contractStart") ?? "").trim()
+        const cEnd = String(formData.get("contractEnd") ?? "").trim()
+        if (cStart && cEnd && new Date(cEnd).getTime() <= new Date(cStart).getTime()) {
+            setError("Contract end date must be after the contract start date.")
+            setLoading(false)
+            return
+        }
 
         // Validate + convert reserve % (UI 0-100) -> decimal (0-1) for API
         let reservePctDecimal: number | null = null
@@ -283,8 +319,12 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
                                 type="date"
                                 name="enrollmentDate"
                                 defaultValue={fmtDate(client.enrollmentDate)}
-                                className="ui-input"
+                                className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
+                                readOnly={!isSuperAdmin}
                             />
+                            {!isSuperAdmin && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Only Super Admin can change the enrollment date.</p>
+                            )}
                         </div>
 
                         <div>
@@ -333,30 +373,38 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
                             <div className="space-y-2">
-                                {contactNumbers.map((num, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            value={num}
-                                            onChange={(e) => {
-                                                const updated = [...contactNumbers]
-                                                updated[idx] = e.target.value
-                                                setContactNumbers(updated)
-                                            }}
-                                            className="ui-input flex-1"
-                                            placeholder={idx === 0 ? "Primary contact number" : `Contact number ${idx + 1}`}
-                                        />
+                                {contactNumbers.map((num, idx) => {
+                                    const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                    return (
+                                    <div key={idx} className="flex items-start gap-2">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={num}
+                                                onChange={(e) => {
+                                                    const updated = [...contactNumbers]
+                                                    updated[idx] = e.target.value
+                                                    setContactNumbers(updated)
+                                                }}
+                                                className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
+                                                placeholder={idx === 0 ? "+92-300-1234567" : `Contact number ${idx + 1}`}
+                                            />
+                                            {invalid && (
+                                                <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
+                                            )}
+                                        </div>
                                         {contactNumbers.length > 1 && (
                                             <button
                                                 type="button"
                                                 onClick={() => setContactNumbers(contactNumbers.filter((_, i) => i !== idx))}
-                                                className="flex-shrink-0 text-[var(--text-muted)] hover:text-red-500"
+                                                className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500"
                                             >
                                                 <X size={16} />
                                             </button>
                                         )}
                                     </div>
-                                ))}
+                                    )
+                                })}
                                 <button
                                     type="button"
                                     onClick={() => setContactNumbers([...contactNumbers, ""])}
@@ -391,7 +439,7 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <input type="text" name="introducerContactNumber" defaultValue={client.introducerContactNumber || ""} className="ui-input" placeholder="Contact number" />
+                            <PhoneInput name="introducerContactNumber" defaultValue={client.introducerContactNumber || ""} />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
@@ -399,7 +447,7 @@ export default function ClientEditForm({ client, regions, currentSupervisorId }:
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC Number</label>
-                            <input type="text" name="introducerCnicNumber" defaultValue={client.introducerCnic || ""} className="ui-input" placeholder="CNIC number" />
+                            <CnicInput name="introducerCnicNumber" defaultValue={client.introducerCnic || ""} placeholder="CNIC number" />
                         </div>
                     </div>
                 </div>

@@ -7,6 +7,35 @@ import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import Link from "next/link"
+import { isNotFutureDate } from "@/lib/validation/formats"
+
+// Convert "HH:MM" to minutes-since-midnight. Returns NaN on invalid input.
+function timeToMinutes(t: string | null | undefined): number {
+  if (!t || typeof t !== "string") return NaN
+  const [h, m] = t.split(":").map((x) => Number(x))
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN
+  return h * 60 + m
+}
+
+// Shift-window overlap check. Shifts may wrap midnight (end < start means
+// the window crosses into the next day). Returns true if [aStart,aEnd) and
+// [bStart,bEnd) overlap on a 24-hour clock.
+function shiftsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  const as = timeToMinutes(aStart), ae = timeToMinutes(aEnd)
+  const bs = timeToMinutes(bStart), be = timeToMinutes(bEnd)
+  if ([as, ae, bs, be].some((n) => !Number.isFinite(n))) return false
+  const expand = (s: number, e: number) => e <= s
+    ? [[s, 1440], [0, e]] as const
+    : [[s, e]] as const
+  const aRanges = expand(as, ae)
+  const bRanges = expand(bs, be)
+  for (const [a0, a1] of aRanges) {
+    for (const [b0, b1] of bRanges) {
+      if (a0 < b1 && b0 < a1) return true
+    }
+  }
+  return false
+}
 
 type Client = {
   id: string
@@ -403,6 +432,45 @@ export default function DeployGuardForm() {
       return
     }
 
+    // ── Future-date block (client) ──────────────────────────────────────
+    if (!isNotFutureDate(deploymentDate)) {
+      setError("Deployment date cannot be in the future.")
+      setLoading(false)
+      return
+    }
+
+    // ── Pre-submit preflight: guard shift-overlap ───────────────────────
+    // Uses the /api/guards/{id}/deployments endpoint (already wired above).
+    // Refetches for the latest picture because the form may have been open
+    // a while. Compares shift windows against any ACTIVE deployment on the
+    // same date.
+    try {
+      const res = await fetch(`/api/guards/${selectedGuard}/deployments`)
+      if (res.ok) {
+        const rows = (await res.json()) as GuardDeployment[]
+        const sameDayActive = rows.filter((d) => {
+          if (d.status !== "ACTIVE") return false
+          const depDay = new Date(d.deploymentDate).toISOString().slice(0, 10)
+          return depDay === deploymentDate
+        })
+        const newStart = shiftType === "DAY" ? dayShiftStart : nightShiftStart
+        const newEnd = shiftType === "DAY" ? dayShiftEnd : nightShiftEnd
+        const conflict = sameDayActive.find((d) => {
+          const existingStart = d.shiftType === "DAY" ? d.dayShiftStart : d.nightShiftStart
+          const existingEnd = d.shiftType === "DAY" ? d.dayShiftEnd : d.nightShiftEnd
+          if (!existingStart || !existingEnd) return false
+          return shiftsOverlap(newStart, newEnd, existingStart, existingEnd)
+        })
+        if (conflict) {
+          setError("This guard is already deployed during the selected shift on this date.")
+          setLoading(false)
+          return
+        }
+      }
+    } catch {
+      // Network hiccup — don't block submission; server has its own shift-conflict guard.
+    }
+
     // Daily Rate is required — payroll engine reads dep.salary ?? dep.rate ?? 0
     const parsedSalary = parseFloat(salaryInput)
     if (!salaryInput || Number.isNaN(parsedSalary) || parsedSalary <= 0) {
@@ -424,6 +492,30 @@ export default function DeployGuardForm() {
       setError(`Guard is not eligible for deployment — ${details}`)
       setLoading(false)
       return
+    }
+
+    // ── Pre-submit preflight: branch capacity ───────────────────────────
+    if (selectedBranch) {
+      try {
+        const capRes = await fetch(
+          `/api/branches/${selectedBranch}/capacity?designation=${encodeURIComponent(designation)}&shift=${encodeURIComponent(shiftType)}`
+        )
+        if (capRes.ok) {
+          const payload = (await capRes.json()) as {
+            data?: { atCapacity?: boolean; used?: number; limit?: number | null; uncapped?: boolean }
+          }
+          const cap = payload.data
+          if (cap && cap.atCapacity) {
+            setError(
+              `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${cap.used}/${cap.limit}). No more guards can be deployed to this role/shift.`
+            )
+            setLoading(false)
+            return
+          }
+        }
+      } catch {
+        // Network hiccup — server enforces capacity too.
+      }
     }
 
     try {
@@ -687,7 +779,7 @@ export default function DeployGuardForm() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Deployment Date</label>
-              <input name="deployment_date" type="date" value={deploymentDate} onChange={(e) => setDeploymentDate(e.target.value)} required className="ui-input" />
+              <input name="deployment_date" type="date" value={deploymentDate} onChange={(e) => setDeploymentDate(e.target.value)} required max={new Date().toISOString().slice(0, 10)} className="ui-input" />
             </div>
 
             {shiftType === "DAY" ? (
@@ -834,9 +926,6 @@ export default function DeployGuardForm() {
         <div className="flex flex-wrap gap-3">
           <ActionButton type="submit" disabled={loading}>{loading ? "Deploying..." : "Save"}</ActionButton>
           <ActionButton type="button" variant="secondary" onClick={() => router.back()}>Cancel</ActionButton>
-          <ActionButton type="button" variant="secondary">Revoke Deployment</ActionButton>
-          <ActionButton type="button" variant="secondary">Change Deployment</ActionButton>
-          <input type="checkbox" name="check" className="h-4 w-4 self-center accent-[var(--brand)]" />
         </div>
       </form>
 

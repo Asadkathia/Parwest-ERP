@@ -7,6 +7,9 @@ import Link from "next/link"
 import SearchSelect from "@/components/ui/SearchSelect"
 import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
+import CnicInput from "@/components/ui/CnicInput"
+import PhoneInput from "@/components/ui/PhoneInput"
+import { isValidCnic, isValidPhone } from "@/lib/validation/formats"
 
 type Region = { id: string; name: string }
 
@@ -17,6 +20,7 @@ type Props = {
     defaultRegionId?: string | null
     defaultRegionalOfficeId?: string | null
     defaultManagerId?: string | null
+    isSuperAdmin?: boolean
 }
 
 const OFFICE_TYPE_OPTIONS = [
@@ -47,7 +51,7 @@ const BRANCH_MODEL_OPTIONS = [
 
 // Loaded dynamically from /api/guard-designation-types and /api/guard-ex-service-types
 
-export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId }: Props) {
+export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId, isSuperAdmin = false }: Props) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -156,6 +160,44 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
         setError("")
 
         const formData = new FormData(e.currentTarget)
+
+        // CNIC validation
+        const contactCnic = String(formData.get("contactPersonCnic") ?? "").trim()
+        if (contactCnic && !isValidCnic(contactCnic)) {
+            setError("Contact Person CNIC format is invalid. Expected XXXXX-XXXXXXX-X.")
+            setLoading(false)
+            return
+        }
+
+        // Phone validation — single-field phones
+        const singlePhoneFields: [string, string][] = [
+            ["Branch Manager Contact", String(formData.get("branchManagerContact") ?? "").trim()],
+            ["Operations Manager Contact", String(formData.get("operationsManagerContact") ?? "").trim()],
+            ["Supervisor Contact", String(formData.get("supervisorContact") ?? "").trim()],
+        ]
+        for (const [label, val] of singlePhoneFields) {
+            if (val && !isValidPhone(val)) {
+                setError(`${label} must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+
+        // At least one contactPhone is required + format
+        const filledPhones = contactPhones.filter((n) => n.trim())
+        if (filledPhones.length === 0) {
+            setError("At least one contact phone number is required.")
+            setLoading(false)
+            return
+        }
+        for (const num of filledPhones) {
+            if (!isValidPhone(num)) {
+                setError(`Contact phone "${num}" must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+
         const data = {
             ...Object.fromEntries(formData.entries()),
             clientId,
@@ -379,9 +421,13 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <input
                                 type="date"
                                 name="enrollmentDate"
-                                className="ui-input"
+                                className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
                                 defaultValue={new Date().toISOString().slice(0, 10)}
+                                readOnly={!isSuperAdmin}
                             />
+                            {!isSuperAdmin && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Auto-set to today. Only Super Admin can override.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-2">
@@ -429,37 +475,39 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC #</label>
-                            <input
-                                type="text"
-                                name="contactPersonCnic"
-                                placeholder="#####-#######-#"
-                                className="ui-input"
-                                maxLength={15}
-                            />
+                            <CnicInput name="contactPersonCnic" placeholder="#####-#######-#" />
                         </div>
                         <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Phone Number</label>
+                            <label className="block text-sm text-[var(--text-muted)] mb-1">Phone Number <span className="text-red-500">*</span></label>
                             <div className="space-y-2">
-                                {contactPhones.map((num, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <input
-                                            type="tel"
-                                            value={num}
-                                            onChange={(e) => {
-                                                const updated = [...contactPhones]
-                                                updated[idx] = e.target.value
-                                                setContactPhones(updated)
-                                            }}
-                                            className="ui-input flex-1"
-                                            placeholder={idx === 0 ? "0300-1234567" : `Phone ${idx + 1}`}
-                                        />
+                                {contactPhones.map((num, idx) => {
+                                    const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                    return (
+                                    <div key={idx} className="flex items-start gap-2">
+                                        <div className="flex-1">
+                                            <input
+                                                type="tel"
+                                                value={num}
+                                                onChange={(e) => {
+                                                    const updated = [...contactPhones]
+                                                    updated[idx] = e.target.value
+                                                    setContactPhones(updated)
+                                                }}
+                                                className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
+                                                placeholder={idx === 0 ? "+92-300-1234567" : `Phone ${idx + 1}`}
+                                            />
+                                            {invalid && (
+                                                <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
+                                            )}
+                                        </div>
                                         {contactPhones.length > 1 && (
-                                            <button type="button" onClick={() => setContactPhones(contactPhones.filter((_, i) => i !== idx))} className="flex-shrink-0 text-[var(--text-muted)] hover:text-red-500">
+                                            <button type="button" onClick={() => setContactPhones(contactPhones.filter((_, i) => i !== idx))} className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500">
                                                 <X size={16} />
                                             </button>
                                         )}
                                     </div>
-                                ))}
+                                    )
+                                })}
                                 <button type="button" onClick={() => setContactPhones([...contactPhones, ""])} className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1">
                                     <Plus size={13} /> Add another number
                                 </button>
@@ -485,7 +533,7 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <input type="tel" name="branchManagerContact" placeholder="0300-1234567" className="ui-input" />
+                            <PhoneInput name="branchManagerContact" />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
@@ -513,7 +561,7 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Manager Contact Number <span className="text-red-500">*</span>
                             </label>
-                            <input type="tel" name="operationsManagerContact" placeholder="0300-1234567" className="ui-input" />
+                            <PhoneInput name="operationsManagerContact" />
                         </div>
                     </div>
                 </div>
@@ -536,7 +584,7 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Supervisor Contact Number <span className="text-red-500">*</span>
                             </label>
-                            <input type="tel" name="supervisorContact" placeholder="0300-1234567" className="ui-input" />
+                            <PhoneInput name="supervisorContact" />
                         </div>
                     </div>
                 </div>

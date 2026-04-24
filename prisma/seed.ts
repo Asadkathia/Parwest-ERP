@@ -226,6 +226,23 @@ async function main() {
 
     console.log('✓ Created inventory categories')
 
+    // Store Inventory v2 categories (separate table from InventoryCategory).
+    // Weapon/Ammo are required so weapon-specific product fields can render
+    // in ProductsManager and purchases/assignments can be scoped by type.
+    for (const [name, canAssignGuard] of [
+        ['Weapon', true],
+        ['Ammo', true],
+        ['Uniform', true],
+        ['Equipment', true],
+    ] as const) {
+        await prisma.storeInventoryCategory.upsert({
+            where: { name },
+            update: {},
+            create: { name, canAssignGuard },
+        })
+    }
+    console.log('✓ Created store-inventory v2 categories')
+
     console.log('\n✅ Database seeded successfully!')
     console.log('\n📝 Login credentials:')
     console.log('   Email: admin@parwestgroup.com')

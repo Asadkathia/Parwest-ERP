@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import ClientEnrollmentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -39,7 +39,7 @@ export default async function NewClientPage({
             <SectionTitle title="Add New Client" subtitle="Enroll a new client into the system" />
             {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-            <ClientEnrollmentForm regions={regions} initialBranchless={initialBranchless} />
+            <ClientEnrollmentForm regions={regions} initialBranchless={initialBranchless} isSuperAdmin={isSuperAdmin(session)} />
         </div>
     )
 }

@@ -95,6 +95,11 @@ export async function PATCH(
             if (Number.isNaN(parsedDeploymentDate.getTime())) {
                 return badRequest("Invalid deploymentDate value.")
             }
+            const endOfToday = new Date()
+            endOfToday.setHours(23, 59, 59, 999)
+            if (parsedDeploymentDate.getTime() > endOfToday.getTime()) {
+                return badRequest("Deployment date cannot be in the future.")
+            }
             if (existing.endDate && parsedDeploymentDate > existing.endDate) {
                 return badRequest("deploymentDate cannot be after endDate.")
             }

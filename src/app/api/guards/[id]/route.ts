@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { calculateAgeYears, MIN_GUARD_AGE, MAX_GUARD_AGE } from "@/lib/validation/formats"
 import { hasAction } from "@/lib/api/permissions"
 import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
 
@@ -24,6 +25,13 @@ export async function PUT(
         const nextCnic = body?.cnic ? String(body.cnic).trim() : ""
         if (nextCnic && !/^\d{5}-\d{7}-\d$/.test(nextCnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
+        }
+        const dobStr = body?.dateOfBirth ? String(body.dateOfBirth) : ""
+        if (dobStr) {
+            const computedAge = calculateAgeYears(dobStr)
+            if (computedAge == null || computedAge < MIN_GUARD_AGE || computedAge > MAX_GUARD_AGE) {
+                return badRequest("Guard age must be between 18 and 65.")
+            }
         }
 
         // Check if guard exists

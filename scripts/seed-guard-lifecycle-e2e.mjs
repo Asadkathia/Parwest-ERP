@@ -625,6 +625,9 @@ async function main() {
             joiningDate: daysAgo(150),
             dateOfBirth: daysAgo(10000),
             status: guard.status,
+            // Deployment API reads lifecycleStatus (not status) when enforcing
+            // the "guard must be ACTIVE" workflow rule. Keep them in sync.
+            lifecycleStatus: guard.status,
             regionalOfficeId: guard.officeId,
             regionId: guard.regionId,
             designation: "Security Guard",

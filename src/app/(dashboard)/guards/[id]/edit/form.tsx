@@ -7,6 +7,8 @@ import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
+import CnicInput from "@/components/ui/CnicInput"
+import { isValidGuardAge } from "@/lib/validation/formats"
 import type { NearestRelative } from "@/components/guards/tabs/types"
 
 type PreviousEmployment = {
@@ -441,6 +443,10 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
 
     // Dynamic supervisor list based on selected regional office
     const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(guard.regionalOfficeId || "")
+    const [dobValue, setDobValue] = useState(() => {
+        if (!guard.dateOfBirth) return ""
+        return new Date(guard.dateOfBirth).toISOString().split("T")[0]
+    })
     const [supervisors, setSupervisors] = useState<Array<{ id: string; name: string; email: string }>>([])
     const [supervisorsLoading, setSupervisorsLoading] = useState(false)
 
@@ -466,6 +472,13 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
 
         const formData = new FormData(e.currentTarget)
         const data = Object.fromEntries(formData.entries())
+
+        const dobForAge = String(data.dateOfBirth || "").trim()
+        if (dobForAge && !isValidGuardAge(dobForAge)) {
+            setError("Guard must be between 18 and 65 years old.")
+            setLoading(false)
+            return
+        }
 
         const guardEmploymentType = String(data.exServiceType || "").trim()
         if (!guardEmploymentType) {
@@ -577,14 +590,14 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 CNIC <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="text"
+                            <CnicInput
                                 name="cnic"
                                 required
-                                pattern="[0-9]{5}-[0-9]{7}-[0-9]{1}"
+                                placeholder="12345-1234567-1"
                                 defaultValue={guard.cnic}
                                 className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="12345-1234567-1"
+                                uniqueCheckUrl="/api/guards/check-cnic"
+                                excludeGuardId={guard.id}
                             />
                         </div>
 
@@ -595,9 +608,16 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                             <input
                                 type="date"
                                 name="dateOfBirth"
-                                defaultValue={formatDateForInput(guard.dateOfBirth)}
+                                value={dobValue}
+                                onChange={(e) => setDobValue(e.target.value)}
                                 className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                aria-invalid={Boolean(dobValue && !isValidGuardAge(dobValue))}
                             />
+                            {dobValue && !isValidGuardAge(dobValue) && (
+                                <p className="mt-1 text-[11px] text-red-500">
+                                    Guard must be between 18 and 65 years old.
+                                </p>
+                            )}
                         </div>
 
                         <div>

@@ -5,6 +5,7 @@ import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import { checkPasswordStrength } from "@/lib/validation/formats"
 
 type RoleOption = { id: string; name: string }
 type RegionOption = { id: string; name: string }
@@ -83,6 +84,11 @@ export default function UserEnrollmentManager() {
     return offices.filter((office) => !office.regionId || office.regionId === form.regionId)
   }, [offices, form.regionId])
 
+  const passwordStrength = useMemo(
+    () => checkPasswordStrength(form.password, form.email),
+    [form.password, form.email]
+  )
+
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -100,6 +106,12 @@ export default function UserEnrollmentManager() {
 
     if (!form.email.endsWith(EMAIL_DOMAIN)) {
       setError(`Email must end with ${EMAIL_DOMAIN}.`)
+      return
+    }
+
+    const strength = checkPasswordStrength(form.password, form.email)
+    if (!strength.ok) {
+      setError(`Password is too weak — needs: ${strength.issues.join(", ")}.`)
       return
     }
 
@@ -169,7 +181,43 @@ export default function UserEnrollmentManager() {
           />
           <Field label="Contact #" required value={form.contactNumber} onChange={(v) => setField("contactNumber", v)} />
 
-          <Field label="Password" required type="password" value={form.password} onChange={(v) => setField("password", v)} />
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Password *</label>
+            <input
+              className="ui-input"
+              type="password"
+              value={form.password}
+              onChange={(e) => setField("password", e.target.value)}
+            />
+            {form.password ? (
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1" aria-label={`Password strength ${passwordStrength.score} of 4`}>
+                  {[1, 2, 3, 4].map((i) => {
+                    const active = i <= passwordStrength.score
+                    const color = !active
+                      ? "bg-gray-200"
+                      : passwordStrength.score <= 1
+                      ? "bg-red-500"
+                      : passwordStrength.score === 2
+                      ? "bg-orange-500"
+                      : passwordStrength.score === 3
+                      ? "bg-yellow-500"
+                      : "bg-green-600"
+                    return <div key={i} className={`h-1.5 flex-1 rounded ${color}`} />
+                  })}
+                </div>
+                {passwordStrength.ok ? (
+                  <p className="text-xs text-green-700">✓ Password is strong</p>
+                ) : (
+                  <ul className="list-disc pl-4 text-xs text-red-600">
+                    {passwordStrength.issues.map((issue) => (
+                      <li key={issue}>{issue}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </div>
           <SelectField
             label="Status"
             value={form.status}

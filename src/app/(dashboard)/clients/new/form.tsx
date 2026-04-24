@@ -8,6 +8,9 @@ import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
 import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
+import CnicInput from "@/components/ui/CnicInput"
+import PhoneInput from "@/components/ui/PhoneInput"
+import { isValidCnic, isValidPhone } from "@/lib/validation/formats"
 
 // Client types loaded dynamically from DB (see useEffect below)
 
@@ -37,6 +40,7 @@ type Region = {
 type Props = {
     regions: Region[]
     initialBranchless?: boolean
+    isSuperAdmin?: boolean
 }
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -48,12 +52,13 @@ function readFileAsBase64(file: File): Promise<string> {
     })
 }
 
-export default function ClientEnrollmentForm({ regions, initialBranchless = true }: Props) {
+export default function ClientEnrollmentForm({ regions, initialBranchless = true, isSuperAdmin = false }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [isBranchless, setIsBranchless] = useState(initialBranchless)
+    const [selectedProvince, setSelectedProvince] = useState("")
     const [introducerAddress, setIntroducerAddress] = useState("")
     const [defaultBranchName, setDefaultBranchName] = useState("")
     const [contactNumbers, setContactNumbers] = useState<string[]>([""])
@@ -229,6 +234,73 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
         const formData = new FormData(e.currentTarget)
         const filled = contactNumbers.filter((n) => n.trim())
         const branchFilled = branchContactPhones.filter((n) => n.trim())
+
+        // CNIC validation
+        const cnicFields: [string, string][] = [
+            ["Introducer CNIC", String(formData.get("introducerCnicNumber") ?? "").trim()],
+            ["Branch Contact Person CNIC", String(formData.get("branchContactPersonCnic") ?? "").trim()],
+        ]
+        for (const [label, val] of cnicFields) {
+            if (val && !isValidCnic(val)) {
+                setError(`${label} format is invalid. Expected XXXXX-XXXXXXX-X.`)
+                setLoading(false)
+                return
+            }
+        }
+
+        // Phone validation — visible inline fields
+        const phoneFields: [string, string][] = [
+            ["Introducer Contact Number", String(formData.get("introducerContactNumber") ?? "").trim()],
+            ["Branch Manager Contact", String(formData.get("branchManagerContact") ?? "").trim()],
+            ["Branch Operations Manager Contact", String(formData.get("branchOperationsManagerContact") ?? "").trim()],
+            ["Branch Supervisor Contact", String(formData.get("branchSupervisorContact") ?? "").trim()],
+        ]
+        for (const [label, val] of phoneFields) {
+            if (val && !isValidPhone(val)) {
+                setError(`${label} must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+
+        // Primary contact number required + format
+        const primary = filled[0] ?? ""
+        if (!primary) {
+            setError("Primary contact number is required.")
+            setLoading(false)
+            return
+        }
+        for (const num of filled) {
+            if (!isValidPhone(num)) {
+                setError(`Contact number "${num}" must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+        for (const num of branchFilled) {
+            if (!isValidPhone(num)) {
+                setError(`Branch phone "${num}" must be in format +92-XXX-XXXXXXX.`)
+                setLoading(false)
+                return
+            }
+        }
+
+        // Contract file requires contract start + end dates
+        if (contractFile) {
+            const cStart = String(formData.get("contractStart") ?? "").trim()
+            const cEnd = String(formData.get("contractEnd") ?? "").trim()
+            if (!cStart || !cEnd) {
+                setError("Contract start and end dates are required when uploading a contract.")
+                setLoading(false)
+                return
+            }
+            if (new Date(cEnd).getTime() <= new Date(cStart).getTime()) {
+                setError("Contract end date must be after the contract start date.")
+                setLoading(false)
+                return
+            }
+        }
+
         const data = {
             ...Object.fromEntries(formData.entries()),
             isBranchless,
@@ -348,15 +420,19 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
 
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Enrollment Date* (Please Enter Correct Enrollment Date For Accurate Reporting)
+                                Enrollment Date <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="date"
                                 name="enrollmentDate"
                                 required
-                                className="ui-input"
+                                className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
                                 defaultValue={new Date().toISOString().slice(0, 10)}
+                                readOnly={!isSuperAdmin}
                             />
+                            {!isSuperAdmin && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Auto-set to today. Only Super Admin can override.</p>
+                            )}
                         </div>
 
                         <div className="md:col-span-2">
@@ -397,31 +473,39 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number *</label>
                             <div className="space-y-2">
-                                {contactNumbers.map((num, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            value={num}
-                                            required={idx === 0}
-                                            onChange={(e) => {
-                                                const updated = [...contactNumbers]
-                                                updated[idx] = e.target.value
-                                                setContactNumbers(updated)
-                                            }}
-                                            className="ui-input flex-1"
-                                            placeholder={idx === 0 ? "Primary contact number" : `Contact number ${idx + 1}`}
-                                        />
+                                {contactNumbers.map((num, idx) => {
+                                    const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                    return (
+                                    <div key={idx} className="flex items-start gap-2">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={num}
+                                                required={idx === 0}
+                                                onChange={(e) => {
+                                                    const updated = [...contactNumbers]
+                                                    updated[idx] = e.target.value
+                                                    setContactNumbers(updated)
+                                                }}
+                                                className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
+                                                placeholder={idx === 0 ? "+92-300-1234567" : `Contact number ${idx + 1}`}
+                                            />
+                                            {invalid && (
+                                                <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
+                                            )}
+                                        </div>
                                         {contactNumbers.length > 1 && (
                                             <button
                                                 type="button"
                                                 onClick={() => setContactNumbers(contactNumbers.filter((_, i) => i !== idx))}
-                                                className="flex-shrink-0 text-[var(--text-muted)] hover:text-red-500"
+                                                className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500"
                                             >
                                                 <X size={16} />
                                             </button>
                                         )}
                                     </div>
-                                ))}
+                                    )
+                                })}
                                 <button
                                     type="button"
                                     onClick={() => setContactNumbers([...contactNumbers, ""])}
@@ -456,7 +540,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <input type="text" name="introducerContactNumber" className="ui-input" placeholder="Contact number" />
+                            <PhoneInput name="introducerContactNumber" />
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
@@ -472,7 +556,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC Number</label>
-                            <input type="text" name="introducerCnicNumber" className="ui-input" placeholder="CNIC number" />
+                            <CnicInput name="introducerCnicNumber" placeholder="CNIC number" />
                         </div>
                     </div>
                 </div>
@@ -483,7 +567,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Operational Provinces</label>
-                            <SearchSelect name="operationalProvinces" options={PROVINCE_OPTIONS} placeholder="Select Operational Territory" />
+                            <SearchSelect name="operationalProvinces" options={PROVINCE_OPTIONS} placeholder="Select Operational Territory" onChange={(val) => setSelectedProvince(val)} />
                         </div>
                     </div>
                 </div>
@@ -492,13 +576,19 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                 <div>
                     <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {!selectedProvince && (
+                            <p className="md:col-span-2 text-sm text-[var(--text-muted)] bg-amber-50 rounded-[var(--radius-md)] px-4 py-3 border border-amber-200">
+                                Select an Operational Territory above before assigning a region.
+                            </p>
+                        )}
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
                             <select
                                 name="regionId"
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionId}
                                 onChange={(e) => setSelectedRegionId(e.target.value)}
+                                disabled={!selectedProvince}
                             >
                                 <option value="">— Select Region —</option>
                                 {regions.map((r) => (
@@ -689,9 +779,13 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 <input
                                     type="date"
                                     name="branchEnrollmentDate"
-                                    className="ui-input"
+                                    className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
                                     defaultValue={new Date().toISOString().slice(0, 10)}
+                                    readOnly={!isSuperAdmin}
                                 />
+                                {!isSuperAdmin && (
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">Auto-set to today. Only Super Admin can override.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm text-[var(--text-muted)] mb-2">
@@ -724,31 +818,39 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC #</label>
-                                    <input type="text" name="branchContactPersonCnic" placeholder="#####-#######-#" className="ui-input" maxLength={15} />
+                                    <CnicInput name="branchContactPersonCnic" placeholder="#####-#######-#" />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Phone Number</label>
                                     <div className="space-y-2">
-                                        {branchContactPhones.map((num, idx) => (
-                                            <div key={idx} className="flex items-center gap-2">
-                                                <input
-                                                    type="tel"
-                                                    value={num}
-                                                    onChange={(e) => {
-                                                        const updated = [...branchContactPhones]
-                                                        updated[idx] = e.target.value
-                                                        setBranchContactPhones(updated)
-                                                    }}
-                                                    className="ui-input flex-1"
-                                                    placeholder={idx === 0 ? "0300-1234567" : `Phone ${idx + 1}`}
-                                                />
+                                        {branchContactPhones.map((num, idx) => {
+                                            const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                            return (
+                                            <div key={idx} className="flex items-start gap-2">
+                                                <div className="flex-1">
+                                                    <input
+                                                        type="tel"
+                                                        value={num}
+                                                        onChange={(e) => {
+                                                            const updated = [...branchContactPhones]
+                                                            updated[idx] = e.target.value
+                                                            setBranchContactPhones(updated)
+                                                        }}
+                                                        className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
+                                                        placeholder={idx === 0 ? "+92-300-1234567" : `Phone ${idx + 1}`}
+                                                    />
+                                                    {invalid && (
+                                                        <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
+                                                    )}
+                                                </div>
                                                 {branchContactPhones.length > 1 && (
-                                                    <button type="button" onClick={() => setBranchContactPhones(branchContactPhones.filter((_, i) => i !== idx))} className="flex-shrink-0 text-[var(--text-muted)] hover:text-red-500">
+                                                    <button type="button" onClick={() => setBranchContactPhones(branchContactPhones.filter((_, i) => i !== idx))} className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500">
                                                         <X size={16} />
                                                     </button>
                                                 )}
                                             </div>
-                                        ))}
+                                            )
+                                        })}
                                         <button type="button" onClick={() => setBranchContactPhones([...branchContactPhones, ""])} className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1">
                                             <Plus size={13} /> Add another number
                                         </button>
@@ -770,7 +872,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                                    <input type="tel" name="branchManagerContact" placeholder="0300-1234567" className="ui-input" />
+                                    <PhoneInput name="branchManagerContact" />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
@@ -800,7 +902,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                             <label className="block text-sm text-[var(--text-muted)] mb-1">
                                                 Manager Contact Number
                                             </label>
-                                            <input type="tel" name="branchOperationsManagerContact" placeholder="0300-1234567" className="ui-input" />
+                                            <PhoneInput name="branchOperationsManagerContact" />
                                         </div>
                                     </div>
                                 </div>
@@ -822,7 +924,7 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                             <label className="block text-sm text-[var(--text-muted)] mb-1">
                                                 Supervisor Contact Number
                                             </label>
-                                            <input type="tel" name="branchSupervisorContact" placeholder="0300-1234567" className="ui-input" />
+                                            <PhoneInput name="branchSupervisorContact" />
                                         </div>
                                     </div>
                                 </div>
@@ -831,13 +933,15 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
 
                     </div>}
 
-                    {/* ── Contract (unified for both modes) ── */}
-                    <div>
-                        <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">
-                            {isBranchless ? "Branchless Client Contract" : "Branch Client Contract"}
-                        </h2>
-                        <ContractFields regions={regions} prefix="" designationOptions={designationOptions} exServiceOptions={exServiceOptions} />
-                    </div>
+                    {/* ── Contract (branchless only; branch clients set contract per-branch) ── */}
+                    {isBranchless && (
+                        <div>
+                            <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">
+                                Branchless Client Contract
+                            </h2>
+                            <ContractFields regions={regions} prefix="" designationOptions={designationOptions} exServiceOptions={exServiceOptions} />
+                        </div>
+                    )}
 
                 </div>
 

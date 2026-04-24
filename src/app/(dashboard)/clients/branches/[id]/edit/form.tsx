@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Save } from "lucide-react"
 import Link from "next/link"
 import { deriveBranchModel } from "@/lib/branches/model"
+import PhoneInput from "@/components/ui/PhoneInput"
+import { isValidPhone } from "@/lib/validation/formats"
 
 type Branch = {
     id: string
@@ -41,6 +43,14 @@ export default function BranchEditForm({ branch }: Props) {
         setError("")
 
         const formData = new FormData(e.currentTarget)
+
+        const contactPhoneVal = String(formData.get("contactPhone") ?? "").trim()
+        if (contactPhoneVal && !isValidPhone(contactPhoneVal)) {
+            setError("Contact phone must be in format +92-XXX-XXXXXXX.")
+            setLoading(false)
+            return
+        }
+
         const data = {
             ...Object.fromEntries(formData.entries()),
             isHeadOffice: formData.get("isHeadOffice") === "on",
@@ -203,13 +213,7 @@ export default function BranchEditForm({ branch }: Props) {
                             <label className="block text-sm text-[var(--text-muted)] mb-1">
                                 Contact Phone
                             </label>
-                            <input
-                                type="tel"
-                                name="contactPhone"
-                                defaultValue={branch.contactPhone || ""}
-                                placeholder="0300-1234567"
-                                className="ui-input"
-                            />
+                            <PhoneInput name="contactPhone" defaultValue={branch.contactPhone || ""} />
                         </div>
 
                         <div>
