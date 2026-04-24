@@ -31,10 +31,14 @@ test.describe("Inventory v2 — product create (non-weapon happy path)", () => {
     expect(created.sku).toBe(filled.sku)
     expect(created.name).toBe(filled.name)
 
-    // The UI flashes a green alert, but ProductsManager.load() calls
-    // setNotice(null) immediately after, wiping it — so we can't reliably
-    // assert on that banner (this is a real UX bug worth fixing). Instead
-    // confirm resetForm() cleared the inputs.
+    // The green success banner should persist after load() — reordered so
+    // setNotice runs after the reload completes.
+    await expect(page.locator(".bg-green-50").first()).toContainText(
+      /product created successfully/i,
+      { timeout: 15_000 }
+    )
+
+    // And the form is reset.
     const nameInput = page
       .locator("label", { hasText: /^Name \*$/ })
       .locator("..")
@@ -45,7 +49,7 @@ test.describe("Inventory v2 — product create (non-weapon happy path)", () => {
       .locator("..")
       .locator("input")
       .first()
-    await expect(nameInput).toHaveValue("", { timeout: 15_000 })
+    await expect(nameInput).toHaveValue("")
     await expect(skuInput).toHaveValue("")
   })
 })
@@ -81,6 +85,12 @@ test.describe("Inventory v2 — weapon category conditional fields", () => {
     const categorySelect = fieldByLabel(/^Category$/)
     await expect(categorySelect).toBeVisible()
 
+    // Categories are loaded asynchronously from /api/store-inventory/v2/masters/categories.
+    // Wait until at least one real option (beyond the placeholder) renders.
+    await expect
+      .poll(async () => (await categorySelect.locator("option").count()) > 1, { timeout: 10_000 })
+      .toBe(true)
+
     const optionTexts = await categorySelect.locator("option").allTextContents()
     const weaponOption = optionTexts.find((label) =>
       /(weapon|ammo|ammunition)/i.test(label)
@@ -99,9 +109,14 @@ test.describe("Inventory v2 — weapon category conditional fields", () => {
     await expect(page.locator("label", { hasText: /^Weapon Type \*$/ })).toBeVisible()
     await expect(page.locator("label", { hasText: /^Calibre \*$/ })).toBeVisible()
 
-    // Switching back to a non-weapon category restores Size/Color.
+    // Switching back to a non-weapon category restores Size/Color. The
+    // `isWeaponCategory` check in ProductsManager matches /weapon|ammo|ammunition/i
+    // on either the category name or its parent's name, so exclude both.
     const nonWeaponOption = optionTexts.find(
-      (label) => label && !/select category/i.test(label) && label !== weaponOption
+      (label) =>
+        label &&
+        !/select category/i.test(label) &&
+        !/(weapon|ammo|ammunition)/i.test(label)
     )
     if (nonWeaponOption) {
       await categorySelect.selectOption({ label: nonWeaponOption })

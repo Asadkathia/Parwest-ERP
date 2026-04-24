@@ -17,7 +17,8 @@ export function validClient(): Required<ClientFormOverrides> {
     name: `QA Client ${run}`,
     email: `qa-${run.toLowerCase()}@example.test`,
     contactPerson: "QA Contact",
-    phone: "042-12345678",
+    // Form now validates this client-side against +92-XXX-XXXXXXX.
+    phone: "+92-300-1234567",
     headOfficeAddress: "Gulberg, Lahore",
     defaultBranchName: `QA Branch ${run}`,
   }
@@ -53,12 +54,21 @@ export async function fillValidClientForm(
   await expect(typeTrigger).not.toContainText(/loading/i, { timeout: 15_000 })
   const typeValue = await pickFirstSearchSelectOption(page, "type")
 
-  // Contact
+  // Contact — first contact-number input is the primary (required). The
+  // placeholder was recently changed to the phone format template.
   await page.locator('input[name="contactPerson"]').fill(c.contactPerson)
   await page
-    .locator('input[placeholder="Primary contact number"]')
+    .locator('input[placeholder="+92-300-1234567"]')
     .first()
     .fill(c.phone)
+
+  // PhoneInput fields always pre-fill "+92-" which now fails the format
+  // validator on submit. Fill every rendered PhoneInput with a valid number.
+  // branchManagerContact renders in both modes; the rest render only in branch
+  // mode but filling them unconditionally is harmless when the field is absent.
+  await page.locator('input[name="introducerContactNumber"]').fill(c.phone)
+  const branchManager = page.locator('input[name="branchManagerContact"]')
+  if (await branchManager.count()) await branchManager.fill(c.phone)
 
   // Location (SearchSelect for clientLocation defaults to Lahore — leave as is).
 

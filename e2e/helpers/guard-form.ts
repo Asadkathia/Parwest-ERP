@@ -61,11 +61,15 @@ async function uncheckSection(page: Page, label: string) {
   if (await cb.isChecked()) await cb.click()
 }
 
-// PhoneInput now accepts pasted / programmatic values (it extracts digits and
-// formats). A simple fill() with the final formatted value works.
+// PhoneInput reformats on each keystroke. Playwright's .fill() can land in a
+// character-typing path where the intermediate 11-digit value trips the
+// country-code-strip branch. Type the 10 digits at the end of the "+92-"
+// prefix — this always hits the normal typing path.
 async function fillPhone(page: Page, digits: string) {
   const input = page.locator('input[name="phone"]')
-  await input.fill(`+92-${digits.slice(0, 3)}-${digits.slice(3, 10)}`)
+  await input.click()
+  await input.press("End")
+  await input.pressSequentially(digits, { delay: 5 })
 }
 
 /**
