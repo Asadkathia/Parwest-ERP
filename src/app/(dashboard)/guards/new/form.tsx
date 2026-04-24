@@ -124,7 +124,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const [nearestRows, setNearestRows] = useState([0])
   const familyCounterRef = useRef(1)
   const nearestCounterRef = useRef(1)
-  const [contactRows, setContactRows] = useState([1])
+  const [contactRows, setContactRows] = useState<number[]>([])
   const contactCounterRef = useRef(2)
   const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
@@ -336,33 +336,37 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       }
     }
 
-    // Validate Guard Employment Type
-    if (!guardEmploymentType) {
-      setError("Guard Employment Type is required.")
-      setLoading(false)
-      return
-    }
-    if (guardEmploymentType !== "CIVILIAN") {
-      const matching = prevEmployments.filter((e) => e.type === guardEmploymentType)
-      if (matching.length === 0) {
-        setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
+    // Validate Guard Employment Type — only when the Previous Employment
+    // section is checked on the section checklist. Hidden sections must not
+    // block submit for fields the user cannot see.
+    if (sections.previousEmployment) {
+      if (!guardEmploymentType) {
+        setError("Guard Employment Type is required.")
         setLoading(false)
         return
       }
-      const incomplete = matching.find(
-        (e) => !e.registrationNo.trim() || !e.rank.trim() || !e.unit.trim()
-      )
-      if (incomplete) {
-        setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
-        setLoading(false)
-        return
+      if (guardEmploymentType !== "CIVILIAN") {
+        const matching = prevEmployments.filter((e) => e.type === guardEmploymentType)
+        if (matching.length === 0) {
+          setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
+          setLoading(false)
+          return
+        }
+        const incomplete = matching.find(
+          (e) => !e.registrationNo.trim() || !e.rank.trim() || !e.unit.trim()
+        )
+        if (incomplete) {
+          setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
+          setLoading(false)
+          return
+        }
       }
-    }
-    for (const emp of prevEmployments) {
-      if (!emp.type) {
-        setError("Each previous employment record must have an Employment Type selected.")
-        setLoading(false)
-        return
+      for (const emp of prevEmployments) {
+        if (!emp.type) {
+          setError("Each previous employment record must have an Employment Type selected.")
+          setLoading(false)
+          return
+        }
       }
     }
 

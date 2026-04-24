@@ -138,7 +138,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
     ): Promise<string> => {
         onProgress("Loading PDF renderer…", 10)
         const arrayBuffer = await file.arrayBuffer()
-        const pdfjsLib = await import("pdfjs-dist")
+        const pdfjsLib = await import("pdfjs-dist/build/pdf.mjs")
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdn.jsdelivr.net/npm/pdfjs-dist@5/build/pdf.worker.min.mjs"
         onProgress("Parsing PDF…", 18)

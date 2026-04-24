@@ -28,9 +28,11 @@ interface InsuranceTabProps {
   insurance: GuardLooseRow[]
   guardId: string
   parwestId?: string
+  canCreate?: boolean
+  canUpdate?: boolean
 }
 
-export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) {
+export default function InsuranceTab({ guardId, parwestId, canCreate = false, canUpdate = false }: InsuranceTabProps) {
   const [records, setRecords] = useState<GuardInsuranceRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -128,7 +130,7 @@ export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--text)]">Guard Insurance</h2>
         <div className="flex items-center gap-2">
-          {records.length > 0 && (
+          {canUpdate && records.length > 0 && (
             <button
               onClick={() => records.length > 0 && openStatusModal(records[0])}
               className="ui-btn ui-btn-secondary text-sm flex items-center gap-1.5 px-3 py-1.5"
@@ -137,12 +139,14 @@ export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) 
               Change Status
             </button>
           )}
-          <button
-            onClick={openAddModal}
-            className="ui-btn ui-btn-primary text-sm flex items-center gap-1.5 px-3 py-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+          {canCreate && (
+            <button
+              onClick={openAddModal}
+              className="ui-btn ui-btn-primary text-sm flex items-center gap-1.5 px-3 py-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -183,12 +187,16 @@ export default function InsuranceTab({ guardId, parwestId }: InsuranceTabProps) 
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => openStatusModal(rec)}
-                      className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    >
-                      Change Status
-                    </button>
+                    {canUpdate ? (
+                      <button
+                        onClick={() => openStatusModal(rec)}
+                        className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        Change Status
+                      </button>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

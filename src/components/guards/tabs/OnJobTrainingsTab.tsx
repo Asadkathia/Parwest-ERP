@@ -18,6 +18,8 @@ type Branch = { id: string; name: string; supervisorName: string | null; contact
 
 interface OnJobTrainingsTabProps {
     guardId: string
+    canCreate?: boolean
+    canDelete?: boolean
 }
 
 function parseNotes(raw: string | null): Record<string, string> {
@@ -49,7 +51,7 @@ const EMPTY_FORM = {
     supervisorWithUniform: false,
 }
 
-export default function OnJobTrainingsTab({ guardId }: OnJobTrainingsTabProps) {
+export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelete = false }: OnJobTrainingsTabProps) {
     const [trainings, setTrainings] = useState<Training[]>([])
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
@@ -185,12 +187,14 @@ export default function OnJobTrainingsTab({ guardId }: OnJobTrainingsTabProps) {
                 <h2 className="text-2xl font-bold">OnJob Trainings</h2>
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-600">Sessions: <span className="font-semibold">{trainings.length}</span></span>
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-                    >
-                        <Plus className="h-4 w-4" /> Add Training
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                        >
+                            <Plus className="h-4 w-4" /> Add Training
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -229,9 +233,13 @@ export default function OnJobTrainingsTab({ guardId }: OnJobTrainingsTabProps) {
                                         <td className="px-4 py-3 text-sm">{n["armorer"] || "—"}</td>
                                         <td className="px-4 py-3 text-sm">{n["supervisor with uniform"] || "—"}</td>
                                         <td className="px-4 py-3">
-                                            <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700">
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            {canDelete ? (
+                                                <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            ) : (
+                                                <span className="text-gray-400">—</span>
+                                            )}
                                         </td>
                                     </tr>
                                 )

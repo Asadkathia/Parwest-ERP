@@ -50,10 +50,11 @@ interface Props {
     guardId: string
     currentStatus: string
     currentSupervisorName?: string | null
-    isAdmin?: boolean
+    isSuperAdmin?: boolean
+    canUpdate?: boolean
 }
 
-export default function GuardStatusSupervisorEditor({ guardId, currentStatus, currentSupervisorName, isAdmin = false }: Props) {
+export default function GuardStatusSupervisorEditor({ guardId, currentStatus, currentSupervisorName, isSuperAdmin = false, canUpdate = false }: Props) {
     const [status, setStatus] = useState(currentStatus)
     const [supervisorName, setSupervisorName] = useState(currentSupervisorName ?? null)
 
@@ -193,7 +194,7 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColor(status)}`}>
                     {DISPLAY_STATUS_LABELS[status] ?? status}
                 </span>
-                {isAdmin && (
+                {isSuperAdmin && canUpdate && (
                     <button
                         type="button"
                         title="Edit status"
@@ -210,14 +211,16 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                 <span className="text-sm text-gray-600">
                     Supervisor: <span className="font-medium text-gray-800">{supervisorName || "—"}</span>
                 </span>
-                <button
-                    type="button"
-                    title="Change supervisor"
-                    onClick={openSupervisorModal}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                    <Pencil size={13} />
-                </button>
+                {canUpdate && (
+                    <button
+                        type="button"
+                        title="Change supervisor"
+                        onClick={openSupervisorModal}
+                        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                        <Pencil size={13} />
+                    </button>
+                )}
             </div>
 
             {/* ── Status Edit Modal ── */}

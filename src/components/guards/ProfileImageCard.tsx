@@ -9,6 +9,7 @@ type Props = {
   guardId: string
   guardName: string
   initialUrl?: string | null
+  canCreate?: boolean
 }
 
 const initialsFrom = (name: string) =>
@@ -27,7 +28,7 @@ async function savePhotoToDb(guardId: string, photoUrl: string | null) {
   })
 }
 
-export default function ProfileImageCard({ guardId, guardName, initialUrl }: Props) {
+export default function ProfileImageCard({ guardId, guardName, initialUrl, canCreate = false }: Props) {
   // DB value is the source of truth; no localStorage fallback here because the
   // payload is a base64 data URL (up to 2 MB) and would blow the storage quota.
   const [preview, setPreview] = useState<string | null>(initialUrl ?? null)
@@ -147,26 +148,30 @@ export default function ProfileImageCard({ guardId, guardName, initialUrl }: Pro
           </div>
         )}
         <div className="space-y-2">
-          <label className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm cursor-pointer inline-flex items-center gap-1.5">
-            {saving ? "Saving…" : "Upload / Change"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={saving}
-              onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-            />
-          </label>
-          <div>
-            <button
-              type="button"
-              onClick={removeImage}
-              disabled={saving}
-              className="text-xs text-red-600 hover:underline disabled:opacity-50"
-            >
-              Remove
-            </button>
-          </div>
+          {canCreate && (
+            <label className="ui-btn ui-btn-secondary px-3 py-1.5 text-sm cursor-pointer inline-flex items-center gap-1.5">
+              {saving ? "Saving…" : "Upload / Change"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={saving}
+                onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+              />
+            </label>
+          )}
+          {canCreate && preview && (
+            <div>
+              <button
+                type="button"
+                onClick={removeImage}
+                disabled={saving}
+                className="text-xs text-red-600 hover:underline disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </div>
+          )}
           {saveError && <p className="text-xs text-red-600">{saveError}</p>}
           {saving && <p className="text-xs text-gray-400">Saving to database…</p>}
         </div>

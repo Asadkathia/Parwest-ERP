@@ -2234,7 +2234,7 @@ model InvoiceLineItem {
   invoiceId   String
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   kind        String // GUARD_SALARY | SPECIAL_DUTY | MANUAL
-  refId       String? // payrollId or specialDutyId, nullable for MANUAL
+  refId       String? // GUARD_SALARY: payrollId OR deploymentId; SPECIAL_DUTY: specialDutyId; nullable for MANUAL
   description String
   quantity    Float    @default(1)
   unitPrice   Float

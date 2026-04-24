@@ -23,6 +23,7 @@ interface StoreInventoryTabProps {
   guardId: string
   // legacy prop — kept for backwards compat, ignored
   items?: unknown[]
+  canCreate?: boolean
 }
 
 function formatDate(iso: string | null) {
@@ -47,7 +48,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
+export default function StoreInventoryTab({ guardId, canCreate = false }: StoreInventoryTabProps) {
   const [rows, setRows] = useState<StoreInventoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -185,7 +186,7 @@ export default function StoreInventoryTab({ guardId }: StoreInventoryTabProps) {
                     <StatusBadge status={row.status} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {row.status === "ASSIGNED" ? (
+                    {row.status === "ASSIGNED" && canCreate ? (
                       <button
                         type="button"
                         onClick={() => handleReturn(row)}

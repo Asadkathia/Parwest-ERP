@@ -3,8 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
-import { fromContract, fromDeployment } from "@/lib/invoicing/rates"
+import { hasAction } from "@/lib/api/permissions"
+import { fromContract } from "@/lib/invoicing/rates"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -29,14 +29,14 @@ type AutofillItem = {
   quantity: number
   unitPrice: number
   lineTotal: number
-  rateSource?: "DEPLOYMENT" | "CONTRACT" | "NONE"
+  rateSource?: "CONTRACT" | "NONE"
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()
@@ -105,8 +105,6 @@ export async function POST(request: NextRequest) {
         id: true,
         guardId: true,
         deploymentDate: true,
-        salary: true,
-        overtime: true,
         extraHours: true,
         guardType: true,
         guard: { select: { id: true, name: true, parwestId: true } },
@@ -117,13 +115,9 @@ export async function POST(request: NextRequest) {
       guard: { id: string; name: string; parwestId: string }
       guardType: string | null
       days: Set<string>
-      // dailyRate observed on deployments — pick the most recent non-zero
-      lastDeploymentRate: ReturnType<typeof fromDeployment> | null
-      // newest deployment id used as refId so the line item points somewhere meaningful
       latestDeploymentId: string
       latestDeploymentDate: Date
       overtimeHoursTotal: number
-      overtimeHourlyRate: number
     }
 
     const byGuard = new Map<string, GuardAgg>()
@@ -135,43 +129,34 @@ export async function POST(request: NextRequest) {
           guard: d.guard,
           guardType: d.guardType,
           days: new Set(),
-          lastDeploymentRate: null,
           latestDeploymentId: d.id,
           latestDeploymentDate: d.deploymentDate,
           overtimeHoursTotal: 0,
-          overtimeHourlyRate: 0,
         }
         byGuard.set(d.guardId, agg)
       }
       agg.days.add(dayKey)
-      const dr = fromDeployment({ salary: d.salary, overtime: d.overtime })
-      if (dr) agg.lastDeploymentRate = dr
       if (d.deploymentDate > agg.latestDeploymentDate) {
         agg.latestDeploymentDate = d.deploymentDate
         agg.latestDeploymentId = d.id
         if (!agg.guardType && d.guardType) agg.guardType = d.guardType
       }
       const oh = Number(d.extraHours ?? 0)
-      if (oh > 0) {
-        agg.overtimeHoursTotal += oh
-        if (Number(d.overtime ?? 0) > 0) agg.overtimeHourlyRate = Number(d.overtime)
-      }
+      if (oh > 0) agg.overtimeHoursTotal += oh
     }
 
     for (const agg of byGuard.values()) {
       const dayCount = agg.days.size
-      const rate =
-        agg.lastDeploymentRate ??
-        (await fromContract({
-          clientId,
-          branchId,
-          guardType: agg.guardType,
-          asOf: agg.latestDeploymentDate,
-        }))
+      const rate = await fromContract({
+        clientId,
+        branchId,
+        guardType: agg.guardType,
+        asOf: agg.latestDeploymentDate,
+      })
 
       if (rate.dailyRate <= 0) {
         warnings.push(
-          `No daily rate found for ${agg.guard.name} (${agg.guard.parwestId}) — set deployment salary or contract rate.`,
+          `No contract rate found for ${agg.guard.name} (${agg.guard.parwestId}) — add a contract rate for guard type "${agg.guardType ?? "unknown"}".`,
         )
         continue
       }
@@ -180,7 +165,7 @@ export async function POST(request: NextRequest) {
       items.push({
         kind: "GUARD_SALARY",
         refId: agg.latestDeploymentId,
-        description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${dayCount} day${dayCount === 1 ? "" : "s"} @ ${rate.dailyRate} (${rate.source.toLowerCase()})`,
+        description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${dayCount} day${dayCount === 1 ? "" : "s"} @ ${rate.dailyRate}`,
         quantity: dayCount,
         unitPrice: rate.dailyRate,
         lineTotal,
@@ -188,20 +173,19 @@ export async function POST(request: NextRequest) {
       })
 
       if (agg.overtimeHoursTotal > 0) {
-        const otRate = agg.overtimeHourlyRate || rate.overtimeHourly
-        if (otRate > 0) {
+        if (rate.overtimeHourly > 0) {
           items.push({
             kind: "GUARD_SALARY",
             refId: agg.latestDeploymentId,
-            description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.overtimeHoursTotal}h @ ${otRate}`,
+            description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.overtimeHoursTotal}h @ ${rate.overtimeHourly}`,
             quantity: agg.overtimeHoursTotal,
-            unitPrice: otRate,
-            lineTotal: round2(agg.overtimeHoursTotal * otRate),
+            unitPrice: rate.overtimeHourly,
+            lineTotal: round2(agg.overtimeHoursTotal * rate.overtimeHourly),
             rateSource: rate.source,
           })
         } else {
           warnings.push(
-            `Overtime hours present for ${agg.guard.name} but no overtime hourly rate configured.`,
+            `Overtime hours present for ${agg.guard.name} but no overtime rate in contract for guard type "${agg.guardType ?? "unknown"}".`,
           )
         }
       }

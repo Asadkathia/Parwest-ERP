@@ -49,6 +49,9 @@ type ReturnCondition = {
 
 interface PledgedDocumentsTabProps {
   guardId: string
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
 }
 
 function fmt(iso: string | null | undefined) {
@@ -90,7 +93,7 @@ function downloadDoc(data: string, name: string) {
   a.click()
 }
 
-export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProps) {
+export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpdate = false, canDelete = false }: PledgedDocumentsTabProps) {
   const [records, setRecords] = useState<PledgedDocRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -336,12 +339,14 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
             </span>
           )}
         </div>
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
-        >
-          <Plus className="h-4 w-4" /> Add
-        </button>
+        {canCreate && (
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-4 w-4" /> Add
+          </button>
+        )}
       </div>
 
       {error && (
@@ -420,8 +425,8 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
-                          {/* Return: only while HELD */}
-                          {isHeld && (
+                          {/* Return: only while HELD — PATCH */}
+                          {isHeld && canUpdate && (
                             <button
                               onClick={() => openReturn(rec)}
                               className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-50 border border-orange-200 transition-colors"
@@ -429,8 +434,8 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                               <Undo2 className="h-3 w-3" /> Return
                             </button>
                           )}
-                          {/* Hold: only while RETURNED (especially after TEMPORARY) */}
-                          {!isHeld && (
+                          {/* Hold: only while RETURNED — PATCH */}
+                          {!isHeld && canUpdate && (
                             <button
                               onClick={() => setReholdRec(rec)}
                               className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 border border-indigo-200 transition-colors"
@@ -438,13 +443,15 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                               <LockKeyhole className="h-3 w-3" /> Hold
                             </button>
                           )}
-                          {/* New Version: always available */}
-                          <button
-                            onClick={() => openVersionModal(rec)}
-                            className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 border border-teal-200 transition-colors"
-                          >
-                            <FilePlus className="h-3 w-3" /> New Ver.
-                          </button>
+                          {/* New Version: PATCH */}
+                          {canUpdate && (
+                            <button
+                              onClick={() => openVersionModal(rec)}
+                              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50 border border-teal-200 transition-colors"
+                            >
+                              <FilePlus className="h-3 w-3" /> New Ver.
+                            </button>
+                          )}
                           {/* History */}
                           {rec.history.length > 0 && (
                             <button
@@ -470,12 +477,14 @@ export default function PledgedDocumentsTab({ guardId }: PledgedDocumentsTabProp
                               </button>
                             </>
                           )}
-                          <button
-                            onClick={() => setDeleteRec(rec)}
-                            className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={() => setDeleteRec(rec)}
+                              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -3,23 +3,11 @@ import { prisma } from "@/lib/db"
 export type RateLookup = {
   dailyRate: number
   overtimeHourly: number
-  source: "DEPLOYMENT" | "CONTRACT" | "NONE"
+  source: "CONTRACT" | "NONE"
   note?: string
 }
 
-type DeploymentRateInput = {
-  salary?: number | null
-  overtime?: number | null
-}
-
 const NONE: RateLookup = { dailyRate: 0, overtimeHourly: 0, source: "NONE" }
-
-export function fromDeployment(d: DeploymentRateInput): RateLookup | null {
-  const dailyRate = Number(d.salary ?? 0)
-  const overtimeHourly = Number(d.overtime ?? 0)
-  if (dailyRate <= 0 && overtimeHourly <= 0) return null
-  return { dailyRate, overtimeHourly, source: "DEPLOYMENT" }
-}
 
 /**
  * Look up the active ClientContractRate for a (clientId, branchId, guardType) tuple

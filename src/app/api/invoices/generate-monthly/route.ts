@@ -3,10 +3,10 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { applyAvailableAdvances } from "@/lib/invoicing/applyAdvances"
-import { fromContract, fromDeployment } from "@/lib/invoicing/rates"
+import { fromContract } from "@/lib/invoicing/rates"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -71,7 +71,7 @@ async function buildLineItems(args: {
     },
     select: {
       id: true, guardId: true, deploymentDate: true,
-      salary: true, overtime: true, extraHours: true, guardType: true,
+      extraHours: true, guardType: true,
       guard: { select: { name: true, parwestId: true } },
     },
   })
@@ -80,65 +80,55 @@ async function buildLineItems(args: {
     guard: { name: string; parwestId: string }
     guardType: string | null
     days: Set<string>
-    lastRate: { dailyRate: number; overtimeHourly: number; source: "DEPLOYMENT" | "CONTRACT" | "NONE" } | null
     latestId: string
     latestDate: Date
     otHours: number
-    otRate: number
   }
   const byGuard = new Map<string, Agg>()
   for (const d of deployments) {
     const dayKey = fmtDate(d.deploymentDate)
     let agg = byGuard.get(d.guardId)
     if (!agg) {
-      agg = { guard: d.guard, guardType: d.guardType, days: new Set(), lastRate: null,
-              latestId: d.id, latestDate: d.deploymentDate, otHours: 0, otRate: 0 }
+      agg = { guard: d.guard, guardType: d.guardType, days: new Set(),
+              latestId: d.id, latestDate: d.deploymentDate, otHours: 0 }
       byGuard.set(d.guardId, agg)
     }
     agg.days.add(dayKey)
-    const dr = fromDeployment({ salary: d.salary, overtime: d.overtime })
-    if (dr) agg.lastRate = dr
     if (d.deploymentDate > agg.latestDate) {
       agg.latestDate = d.deploymentDate
       agg.latestId = d.id
       if (!agg.guardType && d.guardType) agg.guardType = d.guardType
     }
     const oh = Number(d.extraHours ?? 0)
-    if (oh > 0) {
-      agg.otHours += oh
-      if (Number(d.overtime ?? 0) > 0) agg.otRate = Number(d.overtime)
-    }
+    if (oh > 0) agg.otHours += oh
   }
 
   for (const agg of byGuard.values()) {
     const days = agg.days.size
-    const rate = agg.lastRate ?? await fromContract({
+    const rate = await fromContract({
       clientId: args.clientId, branchId: args.branchId, guardType: agg.guardType, asOf: agg.latestDate,
     })
     if (rate.dailyRate <= 0) {
-      warnings.push(`No rate for ${agg.guard.name} (${agg.guard.parwestId}).`)
+      warnings.push(`No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — guard type "${agg.guardType ?? "unknown"}".`)
       continue
     }
     items.push({
       kind: "GUARD_SALARY",
       refId: agg.latestId,
-      description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${days} day${days === 1 ? "" : "s"} @ ${rate.dailyRate} (${rate.source.toLowerCase()})`,
+      description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${days} day${days === 1 ? "" : "s"} @ ${rate.dailyRate}`,
       quantity: days,
       unitPrice: rate.dailyRate,
       lineTotal: round2(days * rate.dailyRate),
     })
-    if (agg.otHours > 0) {
-      const otRate = agg.otRate || rate.overtimeHourly
-      if (otRate > 0) {
-        items.push({
-          kind: "GUARD_SALARY",
-          refId: agg.latestId,
-          description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.otHours}h @ ${otRate}`,
-          quantity: agg.otHours,
-          unitPrice: otRate,
-          lineTotal: round2(agg.otHours * otRate),
-        })
-      }
+    if (agg.otHours > 0 && rate.overtimeHourly > 0) {
+      items.push({
+        kind: "GUARD_SALARY",
+        refId: agg.latestId,
+        description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.otHours}h @ ${rate.overtimeHourly}`,
+        quantity: agg.otHours,
+        unitPrice: rate.overtimeHourly,
+        lineTotal: round2(agg.otHours * rate.overtimeHourly),
+      })
     }
   }
 
@@ -149,7 +139,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()

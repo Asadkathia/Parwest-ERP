@@ -31,6 +31,8 @@ type HistoryRecord = {
 
 interface AttachmentsTabProps {
   guardId: string
+  canCreate?: boolean
+  canDelete?: boolean
 }
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -206,6 +208,8 @@ function SystemDocRow({
   deleting,
   onUploadClick,
   onDelete,
+  canCreate,
+  canDelete,
 }: {
   row: PrereqRow
   guardId: string
@@ -213,6 +217,8 @@ function SystemDocRow({
   deleting: string | null
   onUploadClick: (name: string) => void
   onDelete: (row: PrereqRow) => void
+  canCreate: boolean
+  canDelete: boolean
 }) {
   const [showHistory, setShowHistory] = useState(false)
   const hasAttached = row.hasAttachment || !!row.documentUrl
@@ -289,14 +295,16 @@ function SystemDocRow({
                 </button>
               </>
             )}
-            <button
-              onClick={() => onUploadClick(row.docTypeName)}
-              disabled={isUploadingThis}
-              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-muted)] border border-[var(--border)] transition-colors disabled:opacity-50"
-            >
-              <Upload className="h-3 w-3" />
-              {isUploadingThis ? "Uploading..." : hasAttached ? "Replace" : "Upload"}
-            </button>
+            {canCreate && (
+              <button
+                onClick={() => onUploadClick(row.docTypeName)}
+                disabled={isUploadingThis}
+                className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-muted)] border border-[var(--border)] transition-colors disabled:opacity-50"
+              >
+                <Upload className="h-3 w-3" />
+                {isUploadingThis ? "Uploading..." : hasAttached ? "Replace" : "Upload"}
+              </button>
+            )}
             {hasAttached && row.prereqId && (
               <>
                 <button
@@ -307,14 +315,16 @@ function SystemDocRow({
                   <History className="h-3 w-3" />
                   {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
-                <button
-                  onClick={() => onDelete(row)}
-                  disabled={isDeletingThis}
-                  className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {isDeletingThis ? "..." : "Delete"}
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => onDelete(row)}
+                    disabled={isDeletingThis}
+                    className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {isDeletingThis ? "..." : "Delete"}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -340,6 +350,8 @@ function DocRow({
   deleting,
   onUploadClick,
   onDelete,
+  canCreate,
+  canDelete,
 }: {
   row: PrereqRow
   guardId: string
@@ -347,6 +359,8 @@ function DocRow({
   deleting: string | null
   onUploadClick: (name: string) => void
   onDelete: (row: PrereqRow) => void
+  canCreate: boolean
+  canDelete: boolean
 }) {
   const [showHistory, setShowHistory] = useState(false)
   const hasFile = row.hasAttachment || !!row.documentUrl
@@ -382,14 +396,16 @@ function DocRow({
                 </button>
               </>
             )}
-            <button
-              onClick={() => onUploadClick(row.docTypeName)}
-              disabled={isUploadingThis}
-              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-muted)] border border-[var(--border)] transition-colors disabled:opacity-50"
-            >
-              <Upload className="h-3 w-3" />
-              {isUploadingThis ? "Uploading..." : hasFile ? "Replace" : "Upload"}
-            </button>
+            {canCreate && (
+              <button
+                onClick={() => onUploadClick(row.docTypeName)}
+                disabled={isUploadingThis}
+                className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-muted)] border border-[var(--border)] transition-colors disabled:opacity-50"
+              >
+                <Upload className="h-3 w-3" />
+                {isUploadingThis ? "Uploading..." : hasFile ? "Replace" : "Upload"}
+              </button>
+            )}
             {hasFile && row.prereqId && (
               <>
                 <button
@@ -400,14 +416,16 @@ function DocRow({
                   <History className="h-3 w-3" />
                   {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
-                <button
-                  onClick={() => onDelete(row)}
-                  disabled={isDeletingThis}
-                  className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {isDeletingThis ? "..." : "Delete"}
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => onDelete(row)}
+                    disabled={isDeletingThis}
+                    className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {isDeletingThis ? "..." : "Delete"}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -426,7 +444,7 @@ function DocRow({
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function AttachmentsTab({ guardId }: AttachmentsTabProps) {
+export default function AttachmentsTab({ guardId, canCreate = false, canDelete = false }: AttachmentsTabProps) {
   const [rows, setRows] = useState<PrereqRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -550,6 +568,8 @@ export default function AttachmentsTab({ guardId }: AttachmentsTabProps) {
                   deleting={deleting}
                   onUploadClick={handleUploadClick}
                   onDelete={handleDelete}
+                  canCreate={canCreate}
+                  canDelete={canDelete}
                 />
               ))}
             </tbody>
@@ -599,6 +619,8 @@ export default function AttachmentsTab({ guardId }: AttachmentsTabProps) {
                   deleting={deleting}
                   onUploadClick={handleUploadClick}
                   onDelete={handleDelete}
+                  canCreate={canCreate}
+                  canDelete={canDelete}
                 />
               ))}
             </tbody>

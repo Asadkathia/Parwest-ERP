@@ -135,9 +135,14 @@ export async function PATCH(
         if (!Number.isFinite(unitPrice) || unitPrice < 0) return badRequest("Line item unitPrice must be >= 0.")
         const refId = item?.refId ? String(item.refId) : null
         if (kind === "GUARD_SALARY") {
-          if (!refId) return badRequest("GUARD_SALARY line items require refId.")
-          const exists = await prisma.payroll.findUnique({ where: { id: refId }, select: { id: true } })
-          if (!exists) return badRequest(`Payroll ${refId} not found.`)
+          if (!refId) return badRequest("GUARD_SALARY line items require refId (payrollId or deploymentId).")
+          const [payroll, deployment] = await Promise.all([
+            prisma.payroll.findUnique({ where: { id: refId }, select: { id: true } }),
+            prisma.deployment.findUnique({ where: { id: refId }, select: { id: true } }),
+          ])
+          if (!payroll && !deployment) {
+            return badRequest(`No Payroll or Deployment found with id ${refId} for GUARD_SALARY line item.`)
+          }
         } else if (kind === "SPECIAL_DUTY") {
           if (!refId) return badRequest("SPECIAL_DUTY line items require refId.")
           const exists = await prisma.payrollSpecialDuty.findUnique({ where: { id: refId }, select: { id: true } })

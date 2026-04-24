@@ -36,15 +36,22 @@ export default function PhoneInput({
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value
 
-        // User deleted past the prefix — restore it
-        if (!raw.startsWith(PREFIX)) {
-            setValue(PREFIX)
-            setError(false)
-            return
+        let afterPrefix: string
+        if (raw.startsWith(PREFIX)) {
+            // Normal typing path: prefix is intact, extract digits after it.
+            afterPrefix = raw.slice(PREFIX.length).replace(/\D/g, "").slice(0, MAX_DIGITS)
+        } else {
+            // Recovery path: paste, autofill, or programmatic .fill() that
+            // overwrote the prefix. Strip all non-digits and drop a leading
+            // country code if one is present.
+            const allDigits = raw.replace(/\D/g, "")
+            const stripped =
+                allDigits.startsWith("92") && allDigits.length > MAX_DIGITS
+                    ? allDigits.slice(2)
+                    : allDigits
+            afterPrefix = stripped.slice(0, MAX_DIGITS)
         }
 
-        // Extract only digits after the prefix
-        const afterPrefix = raw.slice(PREFIX.length).replace(/\D/g, "")
         const formatted = formatPhoneDigits(afterPrefix)
         setValue(formatted)
 

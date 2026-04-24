@@ -18,7 +18,13 @@ type Row = {
 type Client = { id: string; name: string }
 type Branch = { id: string; name: string; clientId: string }
 
-export default function PayrollExtraHoursManager() {
+type PayrollExtraHoursManagerProps = {
+  canCreate?: boolean
+}
+
+export default function PayrollExtraHoursManager({
+  canCreate = false,
+}: PayrollExtraHoursManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [search, setSearch] = useState("")
@@ -131,7 +137,11 @@ export default function PayrollExtraHoursManager() {
     <PayrollPageShell
       title="Payroll — Extra Hours"
       subtitle="Record monthly extra-hour adjustments per guard."
-      actions={<ActionButton onClick={() => setFormOpen(true)}>+ Add Extra Hours</ActionButton>}
+      actions={
+        canCreate ? (
+          <ActionButton onClick={() => setFormOpen(true)}>+ Add Extra Hours</ActionButton>
+        ) : undefined
+      }
     >
       <section className="ui-card p-4 space-y-4">
         <div className="flex gap-3 flex-wrap items-end">

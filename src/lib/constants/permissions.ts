@@ -29,6 +29,7 @@ export const MODULES = [
     "IMPORTS",
     "REQUISITIONS",
     "AUDIT",
+    "ADMIN_APPROVALS",
 ] as const
 
 export const ACTIONS = [

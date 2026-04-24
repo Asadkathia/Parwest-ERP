@@ -70,7 +70,13 @@ function parseCsvRows(text: string): Record<string, string>[] {
   })
 }
 
-export default function PayrollBulkSalarySlipsManager() {
+type PayrollBulkSalarySlipsManagerProps = {
+  canCreate?: boolean
+}
+
+export default function PayrollBulkSalarySlipsManager({
+  canCreate = false,
+}: PayrollBulkSalarySlipsManagerProps = {}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
@@ -242,9 +248,11 @@ export default function PayrollBulkSalarySlipsManager() {
 
       <div className="flex justify-end mt-6">
         {result && <span className="self-center text-sm mr-4">{result}</span>}
-        <ActionButton onClick={generate} disabled={busy || parsedRows.length === 0}>
-          {busy ? "Generating…" : "Upload & Generate Payslips"}
-        </ActionButton>
+        {canCreate && (
+          <ActionButton onClick={generate} disabled={busy || parsedRows.length === 0}>
+            {busy ? "Generating…" : "Upload & Generate Payslips"}
+          </ActionButton>
+        )}
       </div>
 
       <section className="ui-card p-4 mt-8 space-y-3">

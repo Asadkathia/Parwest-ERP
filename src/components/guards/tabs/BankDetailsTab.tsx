@@ -26,6 +26,7 @@ type BankDetails = {
 interface BankDetailsTabProps {
     bankDetails: GuardLooseRow | null | undefined
     guardId: string
+    canUpdate?: boolean
 }
 
 function mask(value: string | null | undefined, visible: boolean): string {
@@ -100,7 +101,7 @@ function AccountCard({ account, index, isActive, visible }: { account: BankAccou
     )
 }
 
-export default function BankDetailsTab({ bankDetails, guardId }: BankDetailsTabProps) {
+export default function BankDetailsTab({ bankDetails, guardId, canUpdate = false }: BankDetailsTabProps) {
     const [visible, setVisible] = useState(false)
     const details = (bankDetails || {}) as BankDetails
 
@@ -136,13 +137,15 @@ export default function BankDetailsTab({ bankDetails, guardId }: BankDetailsTabP
                         {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         {visible ? "Hide" : "Show"} Details
                     </button>
-                    <a
-                        href={`/guards/${guardId}/edit?tab=bank`}
-                        className="flex items-center gap-2 rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Update Details
-                    </a>
+                    {canUpdate && (
+                        <a
+                            href={`/guards/${guardId}/edit?tab=bank`}
+                            className="flex items-center gap-2 rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Update Details
+                        </a>
+                    )}
                 </div>
             </div>
 

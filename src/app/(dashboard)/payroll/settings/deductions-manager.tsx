@@ -49,7 +49,17 @@ async function readEnvelope<T>(res: Response): Promise<{ ok: boolean; data?: T; 
   }
 }
 
-export default function DeductionsManager() {
+type DeductionsManagerProps = {
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
+}
+
+export default function DeductionsManager({
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
+}: DeductionsManagerProps = {}) {
   const [rows, setRows] = useState<DeductionType[]>([])
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -171,7 +181,9 @@ export default function DeductionsManager() {
             the calculation engine.
           </p>
         </div>
-        <ActionButton onClick={openCreate}>+ Add Deduction</ActionButton>
+        {canCreate && (
+          <ActionButton onClick={openCreate}>+ Add Deduction</ActionButton>
+        )}
       </div>
 
       <div className="ui-card p-4 overflow-x-auto">
@@ -210,35 +222,51 @@ export default function DeductionsManager() {
                 <td className="px-3 py-2 text-right">{r.defaultAmount}</td>
                 <td className="px-3 py-2 text-right">{r.sortOrder}</td>
                 <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    disabled={busyId === r.id}
-                    onClick={() => toggleActive(r)}
-                    className={
-                      r.isActive
-                        ? "text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
-                        : "text-xs px-2 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }
-                  >
-                    {r.isActive ? "Active" : "Inactive"}
-                  </button>
+                  {canUpdate ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => toggleActive(r)}
+                      className={
+                        r.isActive
+                          ? "text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
+                          : "text-xs px-2 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }
+                    >
+                      {r.isActive ? "Active" : "Inactive"}
+                    </button>
+                  ) : (
+                    <span
+                      className={
+                        r.isActive
+                          ? "text-xs px-2 py-1 rounded bg-green-100 text-green-700"
+                          : "text-xs px-2 py-1 rounded bg-gray-200 text-gray-700"
+                      }
+                    >
+                      {r.isActive ? "Active" : "Inactive"}
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2 space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(r)}
-                    className="text-[var(--brand)] hover:underline text-xs"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(r)}
-                    disabled={busyId === r.id}
-                    className="text-red-500 hover:underline text-xs"
-                  >
-                    Deactivate
-                  </button>
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(r)}
+                      className="text-[var(--brand)] hover:underline text-xs"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => remove(r)}
+                      disabled={busyId === r.id}
+                      className="text-red-500 hover:underline text-xs"
+                    >
+                      Deactivate
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -351,12 +379,14 @@ export default function DeductionsManager() {
               <ActionButton variant="secondary" onClick={() => setFormOpen(false)}>
                 Cancel
               </ActionButton>
-              <ActionButton
-                onClick={submit}
-                disabled={saving || !form.name.trim() || (!editingId && !form.code.trim())}
-              >
-                {saving ? "Saving…" : "Save"}
-              </ActionButton>
+              {(editingId ? canUpdate : canCreate) && (
+                <ActionButton
+                  onClick={submit}
+                  disabled={saving || !form.name.trim() || (!editingId && !form.code.trim())}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </ActionButton>
+              )}
             </div>
           </div>
         </div>

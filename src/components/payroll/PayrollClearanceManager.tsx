@@ -9,7 +9,13 @@ import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
 type ClearanceStep = { step: string; ok: boolean; count?: number; message?: string }
 
-export default function PayrollClearanceManager() {
+type PayrollClearanceManagerProps = {
+  canCreate?: boolean
+}
+
+export default function PayrollClearanceManager({
+  canCreate = false,
+}: PayrollClearanceManagerProps = {}) {
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -134,11 +140,13 @@ export default function PayrollClearanceManager() {
           />
         </div>
 
-        <div className="flex justify-end">
-          <ActionButton onClick={initiate} disabled={!canSubmit || busy}>
-            {busy ? "Processing…" : "Initiate Clearance"}
-          </ActionButton>
-        </div>
+        {canCreate && (
+          <div className="flex justify-end">
+            <ActionButton onClick={initiate} disabled={!canSubmit || busy}>
+              {busy ? "Processing…" : "Initiate Clearance"}
+            </ActionButton>
+          </div>
+        )}
 
         {error && <div className="text-sm text-red-500">{error}</div>}
       </section>

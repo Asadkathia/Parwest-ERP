@@ -34,7 +34,17 @@ const VALUE_TYPES = [
   { id: "MULTIPLE_OF_RATE", label: "Multiple of location Rate" },
 ] as const
 
-export default function PayrollHolidaysManager() {
+type PayrollHolidaysManagerProps = {
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
+}
+
+export default function PayrollHolidaysManager({
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
+}: PayrollHolidaysManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [offices, setOffices] = useState<Office[]>([])
   const [loading, setLoading] = useState(false)
@@ -154,7 +164,7 @@ export default function PayrollHolidaysManager() {
     <PayrollPageShell
       title="Payroll — Holidays"
       subtitle="Regional holidays with fixed or rate-multiple payouts."
-      actions={<ActionButton onClick={openCreate}>+ Add Holiday</ActionButton>}
+      actions={canCreate ? <ActionButton onClick={openCreate}>+ Add Holiday</ActionButton> : undefined}
     >
       <section className="ui-card p-4 space-y-4">
         <input
@@ -223,20 +233,24 @@ export default function PayrollHolidaysManager() {
                       </span>
                     </td>
                     <td className="px-3 py-2 space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(r)}
-                        className="text-[var(--brand)] hover:underline text-xs"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(r.id)}
-                        className="text-red-500 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
+                      {canUpdate && (
+                        <button
+                          type="button"
+                          onClick={() => openEdit(r)}
+                          className="text-[var(--brand)] hover:underline text-xs"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => remove(r.id)}
+                          className="text-red-500 hover:underline text-xs"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )

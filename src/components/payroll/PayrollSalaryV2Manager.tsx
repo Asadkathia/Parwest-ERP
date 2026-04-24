@@ -48,7 +48,13 @@ const ALL_COLUMNS = [
   { id: "totalSalary", label: "Total Salary" },
 ] as const
 
-export default function PayrollSalaryV2Manager() {
+type PayrollSalaryV2ManagerProps = {
+  canCreate?: boolean
+}
+
+export default function PayrollSalaryV2Manager({
+  canCreate = false,
+}: PayrollSalaryV2ManagerProps = {}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [regionalOfficeId, setRegionalOfficeId] = useState("")
   const [clientId, setClientId] = useState("")
@@ -211,9 +217,11 @@ export default function PayrollSalaryV2Manager() {
           <ActionButton onClick={generate} disabled={loading}>
             {loading ? "Loading…" : "Generate"}
           </ActionButton>
-          <ActionButton onClick={calculateSalary} disabled={busy}>
-            {busy ? "Calculating…" : "Calculate Salary"}
-          </ActionButton>
+          {canCreate && (
+            <ActionButton onClick={calculateSalary} disabled={busy}>
+              {busy ? "Calculating…" : "Calculate Salary"}
+            </ActionButton>
+          )}
           <ActionButton variant="secondary" onClick={exportIndex} disabled={!summary}>
             Export Index
           </ActionButton>

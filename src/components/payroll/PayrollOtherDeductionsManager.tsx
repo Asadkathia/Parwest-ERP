@@ -14,7 +14,13 @@ type Row = {
   guard: { id: string; name: string; parwestId: string }
 }
 
-export default function PayrollOtherDeductionsManager() {
+type PayrollOtherDeductionsManagerProps = {
+  canCreate?: boolean
+}
+
+export default function PayrollOtherDeductionsManager({
+  canCreate = false,
+}: PayrollOtherDeductionsManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [search, setSearch] = useState("")
@@ -86,7 +92,11 @@ export default function PayrollOtherDeductionsManager() {
     <PayrollPageShell
       title="Payroll — Other Deductions"
       subtitle="Record ad-hoc deductions per guard per month."
-      actions={<ActionButton onClick={() => setFormOpen(true)}>+ Add Deduction</ActionButton>}
+      actions={
+        canCreate ? (
+          <ActionButton onClick={() => setFormOpen(true)}>+ Add Deduction</ActionButton>
+        ) : undefined
+      }
     >
       <section className="ui-card p-4 space-y-4">
         <div className="flex gap-3 flex-wrap items-end">

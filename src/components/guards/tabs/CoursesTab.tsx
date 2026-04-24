@@ -21,6 +21,8 @@ type GuardCourse = {
 interface CoursesTabProps {
   courses: GuardLooseRow[]
   guardId: string
+  canCreate?: boolean
+  canDelete?: boolean
 }
 
 function formatDate(val: string | null | undefined) {
@@ -40,7 +42,7 @@ const EMPTY_FORM = {
   fileData: "",
 }
 
-export default function CoursesTab({ guardId }: CoursesTabProps) {
+export default function CoursesTab({ guardId, canCreate = false, canDelete = false }: CoursesTabProps) {
   const [records, setRecords] = useState<GuardCourse[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -165,13 +167,15 @@ export default function CoursesTab({ guardId }: CoursesTabProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--text)] uppercase tracking-wide">Refresher Courses</h2>
-        <button
-          onClick={openModal}
-          className="ui-btn ui-btn-primary flex items-center justify-center w-9 h-9 p-0 rounded"
-          title="Add New Course"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+        {canCreate && (
+          <button
+            onClick={openModal}
+            className="ui-btn ui-btn-primary flex items-center justify-center w-9 h-9 p-0 rounded"
+            title="Add New Course"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -225,16 +229,20 @@ export default function CoursesTab({ guardId }: CoursesTabProps) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(course.id)}
-                      disabled={deletingId === course.id}
-                      className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
-                      title="Delete"
-                    >
-                      {deletingId === course.id
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Trash2 className="h-3.5 w-3.5" />}
-                    </button>
+                    {canDelete ? (
+                      <button
+                        onClick={() => handleDelete(course.id)}
+                        disabled={deletingId === course.id}
+                        className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                        title="Delete"
+                      >
+                        {deletingId === course.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

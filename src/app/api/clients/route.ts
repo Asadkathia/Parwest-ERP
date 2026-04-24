@@ -97,7 +97,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(mock, { status: 201 })
         }
 
-        const isBranchless = body.isBranchless === "true"
+        // The client form sends this as a JS boolean after merging state into
+        // the POST body; older callers may still send the string "true". Accept
+        // both so branchless clients aren't silently stored with isBranchless=false.
+        const isBranchless = body.isBranchless === true || body.isBranchless === "true"
         // For branchless clients the form sends "__branchless_default__" as a sentinel;
         // we store it as "Default Branch" so the record is identifiable but treated as branchless.
         const rawBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""

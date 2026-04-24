@@ -12,9 +12,10 @@ function getPermissions(session: SessionLike): string[] {
 }
 
 /**
- * SuperAdmin rule (matches middleware.ts and CLAUDE.md):
- *   role === "Admin" AND permissions.length === 0 → unrestricted access.
- * An Admin *with* permissions is a regional admin constrained to those permissions.
+ * SuperAdmin rule:
+ *   "Super User" role → always unrestricted (regardless of permissions).
+ *   "Admin" role with NO permissions → unrestricted SuperAdmin.
+ *   "Admin" role WITH permissions → regional admin, permissions enforced.
  *
  * NOTE: case-sensitive role match — "admin" (lowercase) is not a SuperAdmin.
  */
@@ -22,6 +23,7 @@ export function isSuperAdmin(session: SessionLike): boolean {
   if (!session?.user) return false
   const role = getRole(session)
   const perms = getPermissions(session)
+  if (role === "Super User") return true
   return role === "Admin" && perms.length === 0
 }
 

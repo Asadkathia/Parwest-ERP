@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasAction(session, "GUARDS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "ADMIN_APPROVALS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     let config = await prisma.guardAgeConfig.findFirst()
     if (!config) {
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasAction(session, "GUARDS", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "ADMIN_APPROVALS", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const body = await request.json()
     const minAge = parseInt(String(body.minAge ?? ""))

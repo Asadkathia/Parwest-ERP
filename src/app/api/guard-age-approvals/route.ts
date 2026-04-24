@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasAction(session, "GUARDS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "ADMIN_APPROVALS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") // PENDING | APPROVED | REJECTED | null (all)

@@ -12,7 +12,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasAction(session, "GUARDS", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "ADMIN_APPROVALS", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const { id } = await params
     const body = await request.json()

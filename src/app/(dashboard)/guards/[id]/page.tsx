@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
@@ -97,7 +97,9 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
     const session = await auth()
     if (!session) redirect("/login")
 
+    const canCreateGuard = hasAction(session, "GUARDS", "CREATE")
     const canUpdateGuard = hasAction(session, "GUARDS", "UPDATE")
+    const canDeleteGuard = hasAction(session, "GUARDS", "DELETE")
 
     const { id } = await params
     const managerScope = deriveManagerScope(session)
@@ -454,17 +456,29 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                             guardId={guard.id}
                             currentStatus={guard.status}
                             currentSupervisorName={guardWithTabs.managerName ?? null}
-                            isAdmin={(session.user as { role?: string })?.role?.toLowerCase() === "admin"}
+                            isSuperAdmin={isSuperAdmin(session)}
+                            canUpdate={canUpdateGuard}
                         />
                         <MentalHealthBadge guardId={guard.id} />
                     </div>
                 </div>
             </div>
-            <ProfileImageCard guardId={guard.id} guardName={guard.name} initialUrl={guard.photoUrl ?? null} />
+            <ProfileImageCard
+                guardId={guard.id}
+                guardName={guard.name}
+                initialUrl={guard.photoUrl ?? null}
+                canCreate={canCreateGuard}
+            />
             </div>
 
             {/* Tabs */}
-            <GuardProfileTabs guard={guardWithTabs} baseUrl={`/guards/${guard.id}`} />
+            <GuardProfileTabs
+                guard={guardWithTabs}
+                baseUrl={`/guards/${guard.id}`}
+                canCreate={canCreateGuard}
+                canUpdate={canUpdateGuard}
+                canDelete={canDeleteGuard}
+            />
         </div>
     )
 }

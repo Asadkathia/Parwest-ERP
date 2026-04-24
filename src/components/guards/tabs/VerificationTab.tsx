@@ -70,9 +70,11 @@ async function viewDocument(guardId: string, row: PrereqRow) {
 
 interface VerificationTabProps {
   guardId: string
+  canCreate?: boolean
+  canUpdate?: boolean
 }
 
-export default function VerificationTab({ guardId }: VerificationTabProps) {
+export default function VerificationTab({ guardId, canCreate = false, canUpdate = false }: VerificationTabProps) {
   const [rows, setRows] = useState<PrereqRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -274,25 +276,29 @@ export default function VerificationTab({ guardId }: VerificationTabProps) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       {/* Upload button — always shown in verification tab */}
-                      <button
-                        onClick={() => handleUploadClick(row.docTypeName)}
-                        disabled={isUploadingThis}
-                        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                        title={hasFile ? "Replace document" : "Upload document"}
-                      >
-                        <Upload className="h-3 w-3" />
-                        {isUploadingThis ? "..." : hasFile ? "Replace" : "Upload"}
-                      </button>
+                      {canCreate && (
+                        <button
+                          onClick={() => handleUploadClick(row.docTypeName)}
+                          disabled={isUploadingThis}
+                          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                          title={hasFile ? "Replace document" : "Upload document"}
+                        >
+                          <Upload className="h-3 w-3" />
+                          {isUploadingThis ? "..." : hasFile ? "Replace" : "Upload"}
+                        </button>
+                      )}
                       {/* Verify button — requires file */}
-                      <button
-                        onClick={() => openVerifyModal(row)}
-                        disabled={!hasFile}
-                        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        title={!hasFile ? "Upload document first" : "Set verification status"}
-                      >
-                        <ShieldCheck className="h-3 w-3" />
-                        {row.prereqId && hasFile ? "Update" : "Verify"}
-                      </button>
+                      {canUpdate && (
+                        <button
+                          onClick={() => openVerifyModal(row)}
+                          disabled={!hasFile}
+                          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          title={!hasFile ? "Upload document first" : "Set verification status"}
+                        >
+                          <ShieldCheck className="h-3 w-3" />
+                          {row.prereqId && hasFile ? "Update" : "Verify"}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -19,7 +19,13 @@ type Row = {
   guard: { id: string; parwestId: string; name: string }
 }
 
-export default function PayrollUnpaidSalariesManager() {
+type PayrollUnpaidSalariesManagerProps = {
+  canUpdate?: boolean
+}
+
+export default function PayrollUnpaidSalariesManager({
+  canUpdate = false,
+}: PayrollUnpaidSalariesManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -168,14 +174,16 @@ export default function PayrollUnpaidSalariesManager() {
 
         <div className="flex items-center justify-between">
           {result && <span className="text-sm">{result}</span>}
-          <div className="ml-auto">
-            <ActionButton
-              onClick={submit}
-              disabled={!selectedRow || !newStatus || !remarks || saving}
-            >
-              {saving ? "Updating…" : "Update"}
-            </ActionButton>
-          </div>
+          {canUpdate && (
+            <div className="ml-auto">
+              <ActionButton
+                onClick={submit}
+                disabled={!selectedRow || !newStatus || !remarks || saving}
+              >
+                {saving ? "Updating…" : "Update"}
+              </ActionButton>
+            </div>
+          )}
         </div>
       </section>
 

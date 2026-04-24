@@ -26,7 +26,15 @@ type Row = {
 type ClientOption = { id: string; name: string }
 type BranchOption = { id: string; name: string; city?: string | null }
 
-export default function PayrollSpecialDutyManager() {
+type PayrollSpecialDutyManagerProps = {
+  canCreate?: boolean
+  canDelete?: boolean
+}
+
+export default function PayrollSpecialDutyManager({
+  canCreate = false,
+  canDelete = false,
+}: PayrollSpecialDutyManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
@@ -161,7 +169,11 @@ export default function PayrollSpecialDutyManager() {
     <PayrollPageShell
       title="Payroll — Special Duty"
       subtitle="Record date-range special duty with attachment."
-      actions={<ActionButton onClick={() => setFormOpen(true)}>+ Add Special Duty</ActionButton>}
+      actions={
+        canCreate ? (
+          <ActionButton onClick={() => setFormOpen(true)}>+ Add Special Duty</ActionButton>
+        ) : undefined
+      }
     >
       <section className="ui-card p-4 space-y-4">
         <input
@@ -227,13 +239,17 @@ export default function PayrollSpecialDutyManager() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => cancel(r.id)}
-                      className="text-red-500 hover:underline text-xs"
-                    >
-                      Cancel
-                    </button>
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => cancel(r.id)}
+                        className="text-red-500 hover:underline text-xs"
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <span className="text-xs text-[var(--text-muted)]">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

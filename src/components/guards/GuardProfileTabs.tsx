@@ -43,6 +43,9 @@ import {
 interface GuardProfileTabsProps {
     guard: GuardTabModel & { id?: string }
     baseUrl: string
+    canCreate?: boolean
+    canUpdate?: boolean
+    canDelete?: boolean
 }
 
 const tabs: Tab[] = [
@@ -66,7 +69,13 @@ const tabs: Tab[] = [
     { id: "reserve", label: "Reserve", icon: Wallet },
 ]
 
-export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsProps) {
+export default function GuardProfileTabs({
+    guard,
+    baseUrl,
+    canCreate = false,
+    canUpdate = false,
+    canDelete = false,
+}: GuardProfileTabsProps) {
     const searchParams = useSearchParams()
     const activeTab = searchParams.get("tab") || "general"
 
@@ -77,7 +86,7 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "profile":
                 return <ProfileTab guard={guard} />
             case "attachments":
-                return <AttachmentsTab guardId={guard.id || ""} />
+                return <AttachmentsTab guardId={guard.id || ""} canCreate={canCreate} canDelete={canDelete} />
             case "attendance":
                 return <AttendanceTab
                     attendance={guard.attendance || []}
@@ -90,23 +99,23 @@ export default function GuardProfileTabs({ guard, baseUrl }: GuardProfileTabsPro
             case "deployments":
                 return <DeploymentHistoryTab deployments={guard.deployments || []} />
             case "courses":
-                return <CoursesTab courses={guard.courses || []} guardId={guard.id || ""} />
+                return <CoursesTab courses={guard.courses || []} guardId={guard.id || ""} canCreate={canCreate} canDelete={canDelete} />
             case "verification":
-                return <VerificationTab guardId={guard.id || ""} />
+                return <VerificationTab guardId={guard.id || ""} canCreate={canCreate} canUpdate={canUpdate} />
             case "pledged-docs":
-                return <PledgedDocumentsTab guardId={guard.id || ""} />
+                return <PledgedDocumentsTab guardId={guard.id || ""} canCreate={canCreate} canUpdate={canUpdate} canDelete={canDelete} />
             case "bank-details":
-                return <BankDetailsTab bankDetails={guard.bankDetails || {}} guardId={guard.id || ""} />
+                return <BankDetailsTab bankDetails={guard.bankDetails || {}} guardId={guard.id || ""} canUpdate={canUpdate} />
             case "residence-history":
                 return <ResidenceHistoryTab residenceHistory={guard.residenceHistory || []} />
             case "ojt":
-                return <OnJobTrainingsTab guardId={guard.id || ""} />
+                return <OnJobTrainingsTab guardId={guard.id || ""} canCreate={canCreate} canDelete={canDelete} />
             case "store-inventory":
-                return <StoreInventoryTab guardId={guard.id || ""} />
+                return <StoreInventoryTab guardId={guard.id || ""} canCreate={canCreate} />
             case "service-history":
                 return <ServiceHistoryTab guardId={guard.id || ""} />
             case "insurance":
-                return <InsuranceTab insurance={guard.insurance || []} guardId={guard.id || ""} parwestId={guard.parwestId} />
+                return <InsuranceTab insurance={guard.insurance || []} guardId={guard.id || ""} parwestId={guard.parwestId} canCreate={canCreate} canUpdate={canUpdate} />
             case "status-history":
                 return <StatusHistoryTab guardId={guard.id || ""} />
             case "pba-docs":

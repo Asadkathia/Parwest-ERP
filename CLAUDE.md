@@ -53,7 +53,7 @@ Two auth configs exist intentionally:
 - `src/lib/auth.ts` — full config with PrismaAdapter, used for sign-in
 
 Permission model: users have a `role` + `permissions[]` array in the JWT.
-**SuperAdmin gotcha**: `role === "Admin"` AND `permissions.length === 0` = unrestricted access. An Admin *with* permissions is a regional admin restricted to those modules.
+**SuperAdmin gotcha**: `role === "Super User"` = always unrestricted. `role === "Admin"` AND `permissions.length === 0` = unrestricted access. An Admin *with* permissions is a regional admin restricted to those modules.
 
 Module → permission mapping is in `middleware.ts` `MODULE_ROUTES`.
 
