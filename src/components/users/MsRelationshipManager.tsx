@@ -13,7 +13,6 @@ type RelationshipRow = {
   id: string
   manager?: { id: string; name: string } | null
   supervisor?: { id: string; name: string } | null
-  effectiveDate: string
   status: string
 }
 
@@ -102,7 +101,6 @@ export default function MsRelationshipManager() {
   const [users, setUsers] = useState<User[]>([])
   const [managerId, setManagerId] = useState("")
   const [supervisorId, setSupervisorId] = useState("")
-  const [effectiveDate, setEffectiveDate] = useState("")
   const [notes, setNotes] = useState("")
   const [filterManagerId, setFilterManagerId] = useState("")
   const [loading, setLoading] = useState(false)
@@ -187,7 +185,6 @@ export default function MsRelationshipManager() {
         body: JSON.stringify({
           managerId,
           supervisorId,
-          effectiveDate: effectiveDate || null,
           notes: notes || null,
         }),
       })
@@ -197,7 +194,6 @@ export default function MsRelationshipManager() {
       setManagerId("")
       setSupervisorId("")
       setNotes("")
-      setEffectiveDate("")
       await load()
     } catch (assignError) {
       setError(assignError instanceof Error ? assignError.message : "Failed to assign relationship.")
@@ -277,10 +273,6 @@ export default function MsRelationshipManager() {
           <SearchableSelect label="Manager" value={managerId} onChange={setManagerId} options={managerOptions} placeholder="Search manager…" />
           <SearchableSelect label="Supervisor" value={supervisorId} onChange={setSupervisorId} options={supervisorOptions} placeholder="Search supervisor…" />
           <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Effective Date</label>
-            <input className="ui-input" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
-          </div>
-          <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Notes</label>
             <input className="ui-input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
           </div>
@@ -319,11 +311,6 @@ export default function MsRelationshipManager() {
             render: (row) => editId === row.id ? (
               <SearchableSelect label="" value={editSupervisorId} onChange={setEditSupervisorId} options={supervisorOptions} placeholder="Supervisor…" />
             ) : (row.supervisor?.name || "—"),
-          },
-          {
-            key: "effectiveDate",
-            header: "Effective Date",
-            render: (row) => new Date(row.effectiveDate).toLocaleDateString("en-US"),
           },
           { key: "status", header: "Status" },
           {

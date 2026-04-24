@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 // GET - return the singleton age config (creates default if missing)
 export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "GUARDS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     let config = await prisma.guardAgeConfig.findFirst()
     if (!config) {
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "GUARDS", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const body = await request.json()
     const minAge = parseInt(String(body.minAge ?? ""))

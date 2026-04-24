@@ -21,7 +21,7 @@ import {
   ok,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { getActorIdentity } from "@/lib/payroll/state-permissions"
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
 
     const body = (await request.json().catch(() => ({}))) as {
       payrollId?: string

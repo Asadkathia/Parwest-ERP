@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 
 function sanitizeCnic(value: string) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
         const { searchParams } = new URL(request.url)
         const cnicQuery = sanitizeCnic(searchParams.get("cnic") || "")
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
         const body = await request.json()
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
@@ -219,7 +219,7 @@ export async function DELETE(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "DELETE")) return forbidden("Access denied.")
 
         const body = await request.json().catch(() => ({}))
         const id = typeof body.id === "string" ? body.id.trim() : ""

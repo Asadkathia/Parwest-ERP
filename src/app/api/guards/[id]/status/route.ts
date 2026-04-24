@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import {
     transitionGuard,
@@ -38,7 +38,7 @@ export async function PATCH(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         // Only admins can manually change guard status

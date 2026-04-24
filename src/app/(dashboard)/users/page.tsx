@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { Plus, Users as UsersIcon, UserCheck, UserX } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -15,6 +16,9 @@ export default async function UsersPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isAdmin = (session.user as any)?.role === "Admin"
+  const canCreateUser = hasAction(session, "USERS", "CREATE")
+  const canUpdateUser = hasAction(session, "USERS", "UPDATE")
+  const canDeleteUser = hasAction(session, "USERS", "DELETE")
 
   type UserRow = {
     id: string
@@ -66,10 +70,12 @@ export default async function UsersPage() {
         title="Users"
         subtitle="Manage system users and their permissions"
         action={
-          <Link href="/users/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add User
-          </Link>
+          canCreateUser ? (
+            <Link href="/users/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add User
+            </Link>
+          ) : null
         }
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
@@ -86,6 +92,8 @@ export default async function UsersPage() {
           lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
         }))}
         isAdmin={isAdmin}
+        canUpdate={canUpdateUser}
+        canDelete={canDeleteUser}
       />
     </div>
   )

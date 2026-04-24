@@ -7,7 +7,7 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -18,7 +18,7 @@ export async function PATCH(
     if (!session) {
       return unauthorized()
     }
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "UPDATE")) return forbidden("Access denied.")
 
     const { id } = await context.params
     const body = await request.json()
@@ -101,7 +101,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "DELETE")) return forbidden("Access denied.")
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const actorRole = (session.user as any)?.role as string | undefined

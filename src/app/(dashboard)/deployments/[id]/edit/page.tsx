@@ -1,12 +1,14 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import DeploymentEditForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
 export default async function EditDeploymentPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
+    if (!hasAction(session, "GUARDS", "UPDATE")) redirect("/deployments")
 
     const { id } = await params
 
@@ -25,7 +27,7 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
             },
         }),
         prisma.client.findMany({
-            where: { status: "Active" },
+            where: { status: "ACTIVE" },
             orderBy: { name: "asc" },
             include: {
                 branches: {

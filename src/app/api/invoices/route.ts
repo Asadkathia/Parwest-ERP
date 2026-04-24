@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, internalServerError, unauthorized, forbidden, notFound } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import type { Prisma } from "@prisma/client"
 import { parseInvoiceStatus } from "@/lib/invoicing/status"
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { searchParams } = new URL(request.url)
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()

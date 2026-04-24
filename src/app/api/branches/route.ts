@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden()
+        if (!hasAction(session, "CLIENTS", "VIEW")) return forbidden()
         const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden()
+        if (!hasAction(session, "CLIENTS", "CREATE")) return forbidden()
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
 

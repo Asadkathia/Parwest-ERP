@@ -4,7 +4,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
+import { isSuperAdmin } from "@/lib/payroll/state-permissions"
 
 const MOCK_TICKETS = [
   {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
-    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
+    if (!hasAction(session, "TICKETING", "VIEW")) return forbidden("Access denied.")
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")?.trim()
@@ -59,6 +60,21 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    if (!isSuperAdmin(session)) {
+      const userId = session.user?.id
+      if (!userId) return unauthorized()
+      const visibilityOr: Prisma.TicketWhereInput[] = [
+        { senderId: userId },
+        { assignedToId: userId },
+      ]
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: visibilityOr }]
+        delete where.OR
+      } else {
+        where.OR = visibilityOr
+      }
+    }
+
     const tickets = await prisma.ticket.findMany({
       where,
       include: {
@@ -85,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized()
     }
-    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
+    if (!hasAction(session, "TICKETING", "CREATE")) return forbidden("Access denied.")
 
     const body = await request.json()
     const subject = String(body?.subject || "").trim()

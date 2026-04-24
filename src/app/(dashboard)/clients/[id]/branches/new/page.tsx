@@ -1,12 +1,14 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import BranchForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
 export default async function NewBranchPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
+    if (!hasAction(session, "CLIENTS", "CREATE")) redirect("/clients")
 
     const { id } = await params
 

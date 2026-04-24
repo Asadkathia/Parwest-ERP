@@ -18,7 +18,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { calculateGuardPayroll } from "@/lib/payroll/calculate"
 import { persistGuardPayroll } from "@/lib/payroll/persist"
 
@@ -43,7 +43,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "UPDATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params
@@ -124,7 +124,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "DELETE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params

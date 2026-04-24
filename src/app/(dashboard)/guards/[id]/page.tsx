@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
@@ -95,6 +96,8 @@ function formatShortDate(value?: Date | string | null) {
 export default async function GuardDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
+
+    const canUpdateGuard = hasAction(session, "GUARDS", "UPDATE")
 
     const { id } = await params
     const managerScope = deriveManagerScope(session)
@@ -372,13 +375,15 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                         Back to Guards
                     </Link>
                 </div>
-                <Link
-                    href={`/guards/${guard.id}/edit`}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                    <Edit className="h-4 w-4" />
-                    Edit Guard
-                </Link>
+                {canUpdateGuard ? (
+                    <Link
+                        href={`/guards/${guard.id}/edit`}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                        <Edit className="h-4 w-4" />
+                        Edit Guard
+                    </Link>
+                ) : null}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">

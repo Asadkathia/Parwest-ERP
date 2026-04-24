@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 type PreviewRow = {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
     const { searchParams } = new URL(request.url)
     const fromSupervisorId = String(searchParams.get("fromSupervisorId") || "").trim()
     const toSupervisorId = String(searchParams.get("toSupervisorId") || "").trim()
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "CREATE")) return forbidden("Access denied.")
     const body = await request.json()
     const fromSupervisorId = String(body?.fromSupervisorId || "").trim()
     const toSupervisorId = String(body?.toSupervisorId || "").trim()

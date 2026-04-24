@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
         const [guard, client, office, branch] = await Promise.all([
             prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, status: true, lifecycleStatus: true, regionalOfficeId: true, joiningDate: true } }),
-            prisma.client.findUnique({ where: { id: clientId }, select: { id: true } }),
+            prisma.client.findUnique({ where: { id: clientId }, select: { id: true, isBranchless: true, _count: { select: { branches: true } } } }),
             prisma.regionalOffice.findUnique({ where: { id: regionalOfficeId }, select: { id: true } }),
             branchId
                 ? prisma.branch.findUnique({
@@ -156,6 +156,13 @@ export async function POST(request: NextRequest) {
         }
         if (!client) return notFound("Client not found.")
         if (!office) return notFound("Regional office not found.")
+        if (
+            isWorkflowRuleEnabled("deployments.requireClientHasBranches") &&
+            !client.isBranchless &&
+            client._count.branches === 0
+        ) {
+            return conflict("Guards cannot be deployed to clients without any branches. Add a branch to this client first.")
+        }
         if (branchId && !branch) return notFound("Branch not found.")
         if (branch && branch.clientId !== clientId) {
             return badRequest("Branch does not belong to the selected client.")

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 function csvEscape(value: unknown): string {
   if (value == null) return ""
@@ -18,7 +18,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
 
     const { id } = await params
     const record = await prisma.payrollLoanFinalizationHistory.findUnique({ where: { id } })

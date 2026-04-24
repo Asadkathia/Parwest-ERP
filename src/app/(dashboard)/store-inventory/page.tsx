@@ -1,31 +1,42 @@
 import Link from 'next/link'
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { hasAction } from "@/lib/api/permissions"
 import SectionTitle from '@/components/ui/section-title'
 import { Card, CardBody } from '@/components/ui/card'
 
-const links = [
-  { label: 'Products', href: '/store-inventory/products' },
-  { label: 'Create Product', href: '/store-inventory/product-create' },
-  { label: 'Purchases', href: '/store-inventory/purchases' },
-  { label: 'Create Purchase', href: '/store-inventory/purchase-create' },
-  { label: 'Adjustments', href: '/store-inventory/adjustments' },
-  { label: 'Create Adjustment', href: '/store-inventory/adjustment-create' },
-  { label: 'Inventories', href: '/store-inventory/inventories' },
-  { label: 'Demand Send', href: '/store-inventory/demands-send' },
-  { label: 'Demand Response', href: '/store-inventory/demands-response' },
-  { label: 'Stores', href: '/store-inventory/stores' },
-  { label: 'Vendors', href: '/store-inventory/vendors' },
-  { label: 'Weapon Types', href: '/store-inventory/weapon-types' },
-  { label: 'Brands', href: '/store-inventory/brands' },
-  { label: 'Units', href: '/store-inventory/units' },
-  { label: 'Categories', href: '/store-inventory/categories' },
-  { label: 'Conditions', href: '/store-inventory/conditions' },
-  { label: 'Employee Assignments', href: '/store-inventory/employee-assignments' },
-  { label: 'Inventory Assignments', href: '/store-inventory/inventory-assignments' },
-  { label: 'Client Assignments', href: '/store-inventory/client-assignments' },
-  { label: 'Audits', href: '/store-inventory/audits' },
+type InventoryAction = "VIEW" | "CREATE" | "REQUISITIONS"
+
+const links: { label: string; href: string; requiredAction: InventoryAction }[] = [
+  { label: 'Products', href: '/store-inventory/products', requiredAction: 'VIEW' },
+  { label: 'Create Product', href: '/store-inventory/product-create', requiredAction: 'CREATE' },
+  { label: 'Purchases', href: '/store-inventory/purchases', requiredAction: 'VIEW' },
+  { label: 'Create Purchase', href: '/store-inventory/purchase-create', requiredAction: 'CREATE' },
+  { label: 'Adjustments', href: '/store-inventory/adjustments', requiredAction: 'VIEW' },
+  { label: 'Create Adjustment', href: '/store-inventory/adjustment-create', requiredAction: 'CREATE' },
+  { label: 'Inventories', href: '/store-inventory/inventories', requiredAction: 'VIEW' },
+  { label: 'Demand Send', href: '/store-inventory/demands-send', requiredAction: 'REQUISITIONS' },
+  { label: 'Demand Response', href: '/store-inventory/demands-response', requiredAction: 'REQUISITIONS' },
+  { label: 'Stores', href: '/store-inventory/stores', requiredAction: 'VIEW' },
+  { label: 'Vendors', href: '/store-inventory/vendors', requiredAction: 'VIEW' },
+  { label: 'Weapon Types', href: '/store-inventory/weapon-types', requiredAction: 'VIEW' },
+  { label: 'Brands', href: '/store-inventory/brands', requiredAction: 'VIEW' },
+  { label: 'Units', href: '/store-inventory/units', requiredAction: 'VIEW' },
+  { label: 'Categories', href: '/store-inventory/categories', requiredAction: 'VIEW' },
+  { label: 'Conditions', href: '/store-inventory/conditions', requiredAction: 'VIEW' },
+  { label: 'Employee Assignments', href: '/store-inventory/employee-assignments', requiredAction: 'VIEW' },
+  { label: 'Inventory Assignments', href: '/store-inventory/inventory-assignments', requiredAction: 'VIEW' },
+  { label: 'Client Assignments', href: '/store-inventory/client-assignments', requiredAction: 'VIEW' },
+  { label: 'Audits', href: '/store-inventory/audits', requiredAction: 'VIEW' },
 ]
 
-export default function StoreInventoryDashboardPage() {
+export default async function StoreInventoryDashboardPage() {
+  const session = await auth()
+  if (!session) redirect("/login")
+
+  // Middleware maps /store-inventory → INVENTORY module permissions.
+  const visibleLinks = links.filter((l) => hasAction(session, "INVENTORY", l.requiredAction))
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Store Inventory" subtitle="Inventory V2 namespace (add-first migration foundation)." />
@@ -34,7 +45,7 @@ export default function StoreInventoryDashboardPage() {
         <CardBody>
           <p className="mb-3 text-sm font-semibold text-[var(--text)]">Store Inventory Navigation</p>
           <div className="flex flex-wrap gap-2">
-            {links.map((link) => (
+            {visibleLinks.map((link) => (
               <Link key={link.href} href={link.href} className="ui-btn ui-btn-secondary">
                 {link.label}
               </Link>

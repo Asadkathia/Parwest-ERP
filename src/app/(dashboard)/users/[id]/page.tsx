@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import UserProfileClient from "./UserProfileClient"
@@ -43,6 +44,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isAdmin = (session.user as any)?.role === "Admin"
+    const canUpdateUser = hasAction(session, "USERS", "UPDATE")
 
     return (
         <div className="space-y-6">
@@ -68,6 +70,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 offices={offices.map((o) => ({ ...o, regionId: o.regionId ?? null }))}
                 auditLogs={auditLogs.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() }))}
                 isAdmin={isAdmin}
+                canUpdate={canUpdateUser}
             />
         </div>
     )

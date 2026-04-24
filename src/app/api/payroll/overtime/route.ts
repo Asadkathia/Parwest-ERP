@@ -20,7 +20,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { parseMonthRange, parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 import { calculateGuardPayroll } from "@/lib/payroll/calculate"
 import { persistGuardPayroll } from "@/lib/payroll/persist"
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { searchParams } = new URL(request.url)
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const body = await request.json()

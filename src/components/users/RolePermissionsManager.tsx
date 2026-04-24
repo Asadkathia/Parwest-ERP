@@ -3,12 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, Save, Shield } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
+import { ACTIONS, MODULES } from "@/lib/constants/permissions"
 
-const MODULES = [
-    "GUARDS", "PAYROLL", "INVENTORY", "USERS", "CLIENTS",
-    "TICKETING", "SETTINGS", "REPORTS", "IMPORTS", "REQUISITIONS", "AUDIT",
-]
-const ACTIONS = ["CREATE", "VIEW", "UPDATE", "DELETE", "REQUISITIONS"] as const
 type ActionName = (typeof ACTIONS)[number]
 type PermMap = Record<ActionName, boolean>
 

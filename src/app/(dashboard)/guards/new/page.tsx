@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import GuardEnrollmentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -9,6 +10,7 @@ import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 export default async function NewGuardPage() {
     const session = await auth()
     if (!session) redirect("/login")
+    if (!hasAction(session, "GUARDS", "CREATE")) redirect("/guards")
 
     let regionalOffices: Array<{ id: string; name: string; region: { id: string; name: string } }> = []
     let dbWarning = ""

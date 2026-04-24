@@ -17,10 +17,17 @@ type UserRow = {
 export default function UsersTable({
   initialUsers,
   isAdmin,
+  canUpdate,
+  canDelete,
 }: {
   initialUsers: UserRow[]
   isAdmin: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
 }) {
+  // Default to the legacy isAdmin gate for backward compatibility when capability props aren't passed.
+  const showEdit = canUpdate ?? isAdmin
+  const showDelete = canDelete ?? isAdmin
   const [users, setUsers] = useState(initialUsers)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -89,7 +96,15 @@ export default function UsersTable({
                     <Link href={`/users/${user.id}`} className="text-[var(--brand)] hover:underline font-medium">
                       View
                     </Link>
-                    {isAdmin && (
+                    {showEdit && (
+                      <Link
+                        href={`/users/${user.id}/edit`}
+                        className="text-[var(--brand)] hover:underline font-medium"
+                      >
+                        Edit
+                      </Link>
+                    )}
+                    {showDelete && (
                       <button
                         onClick={() => handleDelete(user)}
                         disabled={deleting === user.id}

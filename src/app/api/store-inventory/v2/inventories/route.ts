@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "INVENTORY")) return forbidden()
+    if (!hasAction(session, "INVENTORY", "VIEW")) return forbidden()
 
     const { searchParams } = new URL(request.url)
     const storeId = searchParams.get("storeId")?.trim() || undefined

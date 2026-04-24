@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function DELETE(
@@ -15,7 +15,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "DELETE")) return forbidden("Access denied.")
     const { id } = (await context.params) as { id: string }
     const managerScope = deriveManagerScope(session)
 

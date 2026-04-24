@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
@@ -39,7 +39,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
     const { id } = await params
@@ -85,11 +85,18 @@ export async function POST(
 
     // Validate new client/branch/office exist
     const [newClient, newOffice] = await Promise.all([
-      prisma.client.findUnique({ where: { id: newClientId }, select: { id: true, name: true } }),
+      prisma.client.findUnique({ where: { id: newClientId }, select: { id: true, name: true, isBranchless: true, _count: { select: { branches: true } } } }),
       prisma.regionalOffice.findUnique({ where: { id: newRegionalOfficeId }, select: { id: true } }),
     ])
     if (!newClient) return notFound("New client not found.")
     if (!newOffice) return notFound("Regional office not found.")
+    if (
+      isWorkflowRuleEnabled("deployments.requireClientHasBranches") &&
+      !newClient.isBranchless &&
+      newClient._count.branches === 0
+    ) {
+      return conflict("Guards cannot be deployed to clients without any branches. Add a branch to this client first.")
+    }
     if (newBranchId) {
       const branch = await prisma.branch.findUnique({ where: { id: newBranchId }, select: { id: true, clientId: true } })
       if (!branch) return notFound("Branch not found.")

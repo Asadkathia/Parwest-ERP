@@ -16,14 +16,14 @@ import {
   ok,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
 
     const guardId = request.nextUrl.searchParams.get("guardId") ?? ""
     if (!guardId) return badRequest("guardId is required.")

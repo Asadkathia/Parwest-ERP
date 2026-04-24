@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { forbidden, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { getCurrentGuardContext } from "@/lib/guards/currentContext"
 
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const session = await auth()
   if (!session) return unauthorized()
-  if (!hasModuleAccess(session, "GUARDS") && !hasModuleAccess(session, "PAYROLL")) {
+  if (!hasAction(session, "GUARDS", "VIEW") && !hasAction(session, "PAYROLL", "VIEW")) {
     return forbidden("Access denied.")
   }
 

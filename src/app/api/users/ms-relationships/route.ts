@@ -6,7 +6,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const MOCK_ROWS = [
@@ -14,7 +14,6 @@ const MOCK_ROWS = [
     id: "mock-ms-1",
     manager: { id: "mock-user-2", name: "Muhammad Nazir" },
     supervisor: { id: "mock-user-3", name: "Muhammad Aslam" },
-    effectiveDate: "2026-02-01T00:00:00.000Z",
     status: "ACTIVE",
     notes: null,
   },
@@ -24,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
     const { searchParams } = new URL(request.url)
     const managerId = searchParams.get("managerId") || undefined
     const supervisorId = searchParams.get("supervisorId") || undefined
@@ -92,11 +91,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "CREATE")) return forbidden("Access denied.")
     const body = await request.json()
     const managerId = String(body?.managerId || "").trim()
     const supervisorId = String(body?.supervisorId || "").trim()
-    const effectiveDate = body?.effectiveDate ? new Date(String(body.effectiveDate)) : new Date()
     const notes = body?.notes ? String(body.notes) : null
     const regionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId).trim() : null
     const managerScope = deriveManagerScope(session)
@@ -111,7 +109,6 @@ export async function POST(request: NextRequest) {
           id: `mock-ms-${Date.now()}`,
           manager: { id: managerId, name: "Manager" },
           supervisor: { id: supervisorId, name: "Supervisor" },
-          effectiveDate: effectiveDate.toISOString(),
           status: "ACTIVE",
           notes,
         },
@@ -144,12 +141,17 @@ export async function POST(request: NextRequest) {
     }
 
     const actorId = session.user?.id || null
-    const created = await prisma.managerSupervisorAssignment.create({
-      data: {
+    const created = await prisma.managerSupervisorAssignment.upsert({
+      where: { managerId_supervisorId: { managerId, supervisorId } },
+      create: {
         managerId,
         supervisorId,
         regionalOfficeId,
-        effectiveDate,
+        notes,
+        status: "ACTIVE",
+      },
+      update: {
+        regionalOfficeId,
         notes,
         status: "ACTIVE",
       },

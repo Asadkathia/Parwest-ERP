@@ -3,12 +3,14 @@ import { readWorkflowRuleOverridesSync } from "@/lib/workflows/store"
 export type WorkflowRuleKey =
   | "deployments.singleActivePerGuard"
   | "deployments.blockInactiveUpdate"
+  | "deployments.lockAfterEnd"
   | "deployments.requireActiveGuardStatus"
   | "deployments.requireGuardOfficeConsistency"
   | "deployments.requireEndDate"
   | "deployments.disallowEndDateBeforeDeploymentDate"
   | "deployments.disallowFutureEndDate"
   | "deployments.requireBranchContract"
+  | "deployments.requireClientHasBranches"
   | "inventoryDemand.requirePendingInitialStatus"
   | "inventoryDemand.enforceTransitionMap"
   | "inventoryDemand.blockCoreEditsAfterTerminal"
@@ -30,12 +32,14 @@ export type WorkflowPreset = {
 const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "deployments.singleActivePerGuard": true,
   "deployments.blockInactiveUpdate": true,
+  "deployments.lockAfterEnd": true,
   "deployments.requireActiveGuardStatus": true,
   "deployments.requireGuardOfficeConsistency": false,
   "deployments.requireEndDate": true,
   "deployments.disallowEndDateBeforeDeploymentDate": true,
   "deployments.disallowFutureEndDate": true,
   "deployments.requireBranchContract": true,
+  "deployments.requireClientHasBranches": true,
   "inventoryDemand.requirePendingInitialStatus": true,
   "inventoryDemand.enforceTransitionMap": true,
   "inventoryDemand.blockCoreEditsAfterTerminal": true,
@@ -66,12 +70,14 @@ export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
       ...BASE_WORKFLOW_RULES,
       "deployments.singleActivePerGuard": false,
       "deployments.blockInactiveUpdate": false,
+      "deployments.lockAfterEnd": false,
       "deployments.requireActiveGuardStatus": false,
       "deployments.requireGuardOfficeConsistency": false,
       "deployments.requireEndDate": false,
       "deployments.disallowEndDateBeforeDeploymentDate": false,
       "deployments.disallowFutureEndDate": false,
       "deployments.requireBranchContract": false,
+      "deployments.requireClientHasBranches": false,
       "inventoryDemand.requirePendingInitialStatus": false,
       "inventoryDemand.enforceTransitionMap": false,
       "inventoryDemand.blockCoreEditsAfterTerminal": false,
@@ -85,6 +91,7 @@ export const WORKFLOW_PRESET_ENV_KEY = "WORKFLOW_RULE_PRESET"
 export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
   "deployments.singleActivePerGuard": "WORKFLOW_RULE_DEPLOYMENTS_SINGLE_ACTIVE_PER_GUARD",
   "deployments.blockInactiveUpdate": "WORKFLOW_RULE_DEPLOYMENTS_BLOCK_INACTIVE_UPDATE",
+  "deployments.lockAfterEnd": "WORKFLOW_RULE_DEPLOYMENTS_LOCK_AFTER_END",
   "deployments.requireActiveGuardStatus": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_ACTIVE_GUARD_STATUS",
   "deployments.requireGuardOfficeConsistency": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_GUARD_OFFICE_CONSISTENCY",
   "deployments.requireEndDate": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_END_DATE",
@@ -92,6 +99,7 @@ export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
     "WORKFLOW_RULE_DEPLOYMENTS_DISALLOW_ENDDATE_BEFORE_DEPLOYMENTDATE",
   "deployments.disallowFutureEndDate": "WORKFLOW_RULE_DEPLOYMENTS_DISALLOW_FUTURE_ENDDATE",
   "deployments.requireBranchContract": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_BRANCH_CONTRACT",
+  "deployments.requireClientHasBranches": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_CLIENT_HAS_BRANCHES",
   "inventoryDemand.requirePendingInitialStatus": "WORKFLOW_RULE_INVENTORY_DEMAND_REQUIRE_PENDING_INITIAL_STATUS",
   "inventoryDemand.enforceTransitionMap": "WORKFLOW_RULE_INVENTORY_DEMAND_ENFORCE_TRANSITION_MAP",
   "inventoryDemand.blockCoreEditsAfterTerminal":

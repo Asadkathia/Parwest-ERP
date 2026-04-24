@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { csvDownload, parseReportFormat, toCsv } from "@/lib/reports/utils"
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "REPORTS")) return forbidden()
+    if (!hasAction(session, "REPORTS", "VIEW")) return forbidden()
 
     const url = new URL(request.url)
     const format = parseReportFormat(url.searchParams.get("format"))

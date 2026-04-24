@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function GET(
   _request: NextRequest,
@@ -11,7 +11,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
     const { id: guardId } = await context.params
 
@@ -33,7 +33,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
     const { id: guardId } = await context.params
     const body = await request.json()

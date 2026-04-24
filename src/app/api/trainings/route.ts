@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function GET() {
     try {
@@ -11,7 +11,7 @@ export async function GET() {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+        if (!hasAction(session, "GUARDS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
         const trainings = await prisma.training.findMany({
             orderBy: { completedAt: "desc" },
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+        if (!hasAction(session, "GUARDS", "CREATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
         const body = await request.json()
 

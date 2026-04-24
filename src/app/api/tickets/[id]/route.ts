@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
+import { isSuperAdmin } from "@/lib/payroll/state-permissions"
 
 export async function GET(
   _request: NextRequest,
@@ -12,7 +13,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
+    if (!hasAction(session, "TICKETING", "VIEW")) return forbidden("Access denied.")
     const { id } = await context.params
 
     if (isRuntimeMockEnabled()) {
@@ -30,6 +31,12 @@ export async function GET(
       },
     })
     if (!ticket) return notFound("Ticket not found.")
+    if (!isSuperAdmin(session)) {
+      const userId = session.user?.id
+      if (!userId || (ticket.senderId !== userId && ticket.assignedToId !== userId)) {
+        return forbidden("You do not have access to this ticket.")
+      }
+    }
     return NextResponse.json(ticket)
   } catch (error: unknown) {
     console.error("Error fetching ticket:", error)
@@ -46,7 +53,7 @@ export async function PATCH(
     if (!session) {
       return unauthorized()
     }
-    if (!hasModuleAccess(session, "TICKETING")) return forbidden("Access denied.")
+    if (!hasAction(session, "TICKETING", "UPDATE")) return forbidden("Access denied.")
 
     const { id } = await context.params
     const body = await request.json()
@@ -61,6 +68,19 @@ export async function PATCH(
 
     if (Object.keys(data).length === 0) {
       return badRequest("No valid fields provided.")
+    }
+
+    if (!isSuperAdmin(session)) {
+      const userId = session.user?.id
+      if (!userId) return unauthorized()
+      const existing = await prisma.ticket.findUnique({
+        where: { id },
+        select: { senderId: true, assignedToId: true },
+      })
+      if (!existing) return notFound("Ticket not found.")
+      if (existing.senderId !== userId && existing.assignedToId !== userId) {
+        return forbidden("You do not have access to this ticket.")
+      }
     }
 
     if (isRuntimeMockEnabled()) {

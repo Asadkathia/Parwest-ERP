@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status?: Lookup | null }) {
   )
 }
 
-export default function TicketListManager() {
+export default function TicketListManager({ canCreate = true }: { canCreate?: boolean }) {
   const [tickets, setTickets] = useState<TicketRow[]>([])
   const [categories, setCategories] = useState<Lookup[]>([])
   const [priorities, setPriorities] = useState<Lookup[]>([])
@@ -119,9 +119,11 @@ export default function TicketListManager() {
           <h1 className="text-2xl font-bold text-[var(--text)]">Tickets</h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">Track and resolve support tickets</p>
         </div>
-        <Link href="/tickets/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-          <Plus className="h-4 w-4" /> New Ticket
-        </Link>
+        {canCreate ? (
+          <Link href="/tickets/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+            <Plus className="h-4 w-4" /> New Ticket
+          </Link>
+        ) : null}
       </div>
 
       {error ? <InlineAlert type="error" message={error} /> : null}

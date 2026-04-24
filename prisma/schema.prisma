@@ -879,22 +879,22 @@ model ClientContract {
 }
 
 model ClientAdvancePayment {
-  id             String                       @id @default(cuid())
-  clientId       String
-  client         Client                       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  branchId       String?
-  branch         Branch?                      @relation(fields: [branchId], references: [id])
-  amount         Float
-  appliedAmount  Float                        @default(0)
-  paymentDate    DateTime                     @default(now())
-  method         String? // CASH | BANK | MOBILE | OTHER
-  reference      String?
-  notes          String?
-  recordedBy     String?
-  createdAt      DateTime                     @default(now())
-  updatedAt      DateTime                     @updatedAt
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  amount        Float
+  appliedAmount Float    @default(0)
+  paymentDate   DateTime @default(now())
+  method        String? // CASH | BANK | MOBILE | OTHER
+  reference     String?
+  notes         String?
+  recordedBy    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  applications   InvoiceAdvanceApplication[]
+  applications InvoiceAdvanceApplication[]
 
   @@index([clientId])
   @@index([branchId])
@@ -968,16 +968,16 @@ model Invoice {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  branchId   String?
-  branch     Branch?           @relation(fields: [branchId], references: [id])
-  subtotal   Float             @default(0)
-  taxRate    Float?
-  taxAmount  Float             @default(0)
-  paidAmount Float             @default(0)
-  notes      String?
-  voidedAt          DateTime?
-  voidReason        String?
-  lineItems         InvoiceLineItem[]
+  branchId            String?
+  branch              Branch?                     @relation(fields: [branchId], references: [id])
+  subtotal            Float                       @default(0)
+  taxRate             Float?
+  taxAmount           Float                       @default(0)
+  paidAmount          Float                       @default(0)
+  notes               String?
+  voidedAt            DateTime?
+  voidReason          String?
+  lineItems           InvoiceLineItem[]
   advanceApplications InvoiceAdvanceApplication[]
 
   @@unique([clientId, branchId, month], map: "Invoice_client_branch_month_key")
@@ -1889,17 +1889,17 @@ model AuditLog {
 }
 
 model InsightConfig {
-  id           String    @id @default(cuid())
-  key          String    @unique
-  thresholds   Json      @default("{}")
-  muted        Boolean   @default(false)
-  mutedUntil   DateTime?
-  mutedReason  String?
-  mutedById    String?
+  id               String    @id @default(cuid())
+  key              String    @unique
+  thresholds       Json      @default("{}")
+  muted            Boolean   @default(false)
+  mutedUntil       DateTime?
+  mutedReason      String?
+  mutedById        String?
   severityOverride String? // HIGH | MEDIUM | LOW — nullable means use default
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  updatedById  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  updatedById      String?
 
   @@index([muted])
 }
@@ -1916,12 +1916,12 @@ model ManagerSupervisorAssignment {
   supervisor       User            @relation("SupervisorAssignments", fields: [supervisorId], references: [id])
   regionalOfficeId String?
   regionalOffice   RegionalOffice? @relation(fields: [regionalOfficeId], references: [id])
-  effectiveDate    DateTime        @default(now())
   status           String          @default("ACTIVE")
   notes            String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
+  @@unique([managerId, supervisorId])
   @@index([managerId])
   @@index([supervisorId])
   @@index([regionalOfficeId])

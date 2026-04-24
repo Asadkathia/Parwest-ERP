@@ -6,7 +6,7 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
 

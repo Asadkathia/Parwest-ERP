@@ -6,7 +6,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const MOCK_ROWS = [
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get("clientId") || undefined
     const branchId = searchParams.get("branchId") || undefined
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "USERS")) return forbidden("Access denied.")
+    if (!hasAction(session, "USERS", "CREATE")) return forbidden("Access denied.")
     const body = await request.json()
     const clientId = String(body?.clientId || "").trim()
     const branchId = body?.branchId ? String(body.branchId).trim() : null

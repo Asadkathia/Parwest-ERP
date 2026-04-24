@@ -2,6 +2,7 @@ import { type ReactNode } from "react"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { hasAction } from "@/lib/api/permissions"
 import Image from "next/image"
 import { prisma } from "@/lib/db"
 import PricingManager from "@/components/clients/PricingManager"
@@ -92,6 +93,8 @@ export default async function ClientDetailPage({
 }) {
   const session = await auth()
   if (!session) redirect("/login")
+  const canCreateClient = hasAction(session, "CLIENTS", "CREATE")
+  const canUpdateClient = hasAction(session, "CLIENTS", "UPDATE")
   const inventoryAssignmentHref = "/store-inventory/inventory-assignments"
 
   const { id } = await params
@@ -271,17 +274,19 @@ export default async function ClientDetailPage({
               <ArrowLeft className="h-4 w-4" />
               Back
             </Link>
-            {!client.isBranchless && (
+            {!client.isBranchless && canCreateClient && (
               <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Add Branch
               </Link>
             )}
-            <ClientStatusToggle clientId={client.id} currentStatus={client.status} />
-            <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-              <Edit className="h-4 w-4" />
-              Edit
-            </Link>
+            {canUpdateClient ? <ClientStatusToggle clientId={client.id} currentStatus={client.status} /> : null}
+            {canUpdateClient ? (
+              <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -307,10 +312,12 @@ export default async function ClientDetailPage({
           <Card>
             <CardHeader className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-[var(--text)]">GENERAL INFORMATION</h2>
-              <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
-              </Link>
+              {canUpdateClient ? (
+                <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </Link>
+              ) : null}
             </CardHeader>
             <CardBody className="space-y-4">
               {/* Logo + quick metrics */}
@@ -592,10 +599,12 @@ export default async function ClientDetailPage({
         <Card>
           <CardHeader className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--text)]">BRANCHES</h2>
-            <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Branch
-            </Link>
+            {canCreateClient ? (
+              <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Branch
+              </Link>
+            ) : null}
           </CardHeader>
           <CardBody className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="branches">

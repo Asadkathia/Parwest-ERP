@@ -1,4 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { hasAction } from '@/lib/api/permissions'
 import ConfiguredInteractiveScreen from '@/components/parity/ConfiguredInteractiveScreen'
 import MasterManager from '@/components/store-inventory-v2/MasterManager'
 import ProductsManager from '@/components/store-inventory-v2/ProductsManager'
@@ -14,6 +16,23 @@ import { storeInventoryLinks, storeInventoryScreens } from '@/lib/inventory/stor
 
 export default async function StoreInventoryScreenPage({ params }: { params: Promise<{ screen: string }> }) {
   const { screen } = await params
+
+  const session = await auth()
+  if (!session) redirect("/login")
+
+  // Gate create/adjustment create screens on CREATE action.
+  const createScreens = new Set([
+    'product-create', 'purchase-create', 'weapon-purchase-create',
+    'adjustment-create', 'weapon-adjustment-create',
+  ])
+  if (createScreens.has(screen) && !hasAction(session, "INVENTORY", "CREATE")) {
+    redirect("/store-inventory")
+  }
+  // Demand / requisition screens.
+  if ((screen === 'demands-send' || screen === 'demands-response') &&
+      !hasAction(session, "INVENTORY", "REQUISITIONS")) {
+    redirect("/store-inventory")
+  }
 
   if (screen === 'stores') {
     return (

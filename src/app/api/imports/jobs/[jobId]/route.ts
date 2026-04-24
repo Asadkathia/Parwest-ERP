@@ -1,6 +1,6 @@
 import { badRequest, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { auth } from "@/lib/auth"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { getImportJob } from "@/lib/imports/workflow"
 
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "IMPORTS")) return forbidden()
+    if (!hasAction(session, "IMPORTS", "VIEW")) return forbidden()
 
     const { jobId } = await params
     if (!jobId) return badRequest("jobId is required")

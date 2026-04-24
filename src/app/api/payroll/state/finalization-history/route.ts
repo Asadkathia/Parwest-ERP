@@ -17,7 +17,7 @@ import {
   ok,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope } from "@/lib/access/scope"
 import { parseMonthRange } from "@/lib/payroll/date-helpers"
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
 
     const params = request.nextUrl.searchParams
     const monthRaw = params.get("month")

@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 /**
  * Returns the cross-client pricing overview — one row per client with:
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "CLIENTS")) return forbidden("Access denied.")
+    if (!hasAction(session, "CLIENTS", "VIEW")) return forbidden("Access denied.")
     const scope = deriveManagerScope(session)
 
     const { searchParams } = new URL(request.url)

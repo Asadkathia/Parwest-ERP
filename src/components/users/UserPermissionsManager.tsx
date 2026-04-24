@@ -6,12 +6,8 @@ import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
 import { ChevronDown, Info, X } from "lucide-react"
+import { ACTIONS, MODULES } from "@/lib/constants/permissions"
 
-const MODULES = [
-    "GUARDS", "PAYROLL", "INVENTORY", "USERS", "CLIENTS",
-    "TICKETING", "SETTINGS", "REPORTS", "IMPORTS", "REQUISITIONS", "AUDIT",
-]
-const ACTIONS = ["CREATE", "VIEW", "UPDATE", "DELETE", "REQUISITIONS"] as const
 type ActionName = (typeof ACTIONS)[number]
 
 type ActionMap = Record<ActionName, boolean>

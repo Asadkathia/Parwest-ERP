@@ -59,7 +59,7 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise<{ id: string }> }) {
+export default function TicketDetail({ paramsPromise, canUpdate = true }: { paramsPromise: Promise<{ id: string }>; canUpdate?: boolean }) {
   const { id } = use(paramsPromise)
   const router = useRouter()
 
@@ -251,35 +251,37 @@ export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise
             )}
 
             {/* Reply form */}
-            <div className="px-5 py-4 border-t border-[var(--border)] bg-[var(--surface-muted)] space-y-3">
-              <textarea
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                className="ui-textarea min-h-[100px]"
-                placeholder="Write a reply..."
-              />
-              <div className="flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isInternal}
-                    onChange={e => setIsInternal(e.target.checked)}
-                    className="h-4 w-4 rounded border-[var(--border)] accent-amber-500"
-                  />
-                  <span className="text-sm text-[var(--text-muted)] flex items-center gap-1">
-                    <Lock className="h-3.5 w-3.5" /> Internal note (admin only)
-                  </span>
-                </label>
-                <button
-                  onClick={handleReply}
-                  disabled={posting || !message.trim()}
-                  className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-                >
-                  <Send className="h-4 w-4" />
-                  {posting ? "Sending..." : "Send Reply"}
-                </button>
+            {canUpdate ? (
+              <div className="px-5 py-4 border-t border-[var(--border)] bg-[var(--surface-muted)] space-y-3">
+                <textarea
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
+                  className="ui-textarea min-h-[100px]"
+                  placeholder="Write a reply..."
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isInternal}
+                      onChange={e => setIsInternal(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-amber-500"
+                    />
+                    <span className="text-sm text-[var(--text-muted)] flex items-center gap-1">
+                      <Lock className="h-3.5 w-3.5" /> Internal note (admin only)
+                    </span>
+                  </label>
+                  <button
+                    onClick={handleReply}
+                    disabled={posting || !message.trim()}
+                    className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+                  >
+                    <Send className="h-4 w-4" />
+                    {posting ? "Sending..." : "Send Reply"}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
 
@@ -297,7 +299,7 @@ export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise
                 className="ui-select text-sm"
                 value={ticket.status?.id ?? ""}
                 onChange={e => void patch({ statusId: e.target.value })}
-                disabled={updating}
+                disabled={updating || !canUpdate}
               >
                 {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -312,7 +314,7 @@ export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise
                 className="ui-select text-sm"
                 value={ticket.priority?.id ?? ""}
                 onChange={e => void patch({ priorityId: e.target.value })}
-                disabled={updating}
+                disabled={updating || !canUpdate}
               >
                 {priorities.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -327,7 +329,7 @@ export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise
                 className="ui-select text-sm"
                 value={ticket.category?.id ?? ""}
                 onChange={e => void patch({ categoryId: e.target.value })}
-                disabled={updating}
+                disabled={updating || !canUpdate}
               >
                 <option value="">— None —</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -343,7 +345,7 @@ export default function TicketDetail({ paramsPromise }: { paramsPromise: Promise
                 className="ui-select text-sm"
                 value={ticket.assignedTo?.id ?? ""}
                 onChange={e => void patch({ assignedToId: e.target.value || null })}
-                disabled={updating}
+                disabled={updating || !canUpdate}
               >
                 <option value="">— Unassigned —</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}

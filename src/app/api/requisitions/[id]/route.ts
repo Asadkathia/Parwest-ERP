@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
@@ -13,7 +13,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session?.user?.id) return unauthorized()
-    if (!hasModuleAccess(session, "REQUISITIONS")) return forbidden()
+    if (!hasAction(session, "REQUISITIONS", "REQUISITIONS")) return forbidden()
     const { id } = await context.params
 
     if (isRuntimeMockEnabled()) {
@@ -45,7 +45,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session?.user?.id) return unauthorized()
-    if (!hasModuleAccess(session, "REQUISITIONS")) return forbidden()
+    if (!hasAction(session, "REQUISITIONS", "REQUISITIONS")) return forbidden()
     const { id } = await context.params
     const body = await request.json()
     const data: Record<string, unknown> = {}

@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 const ALLOWED_PAYMENT_STATUSES = new Set(["PENDING", "UNPAID", "PAID"])
 const ALLOWED_PAYMENT_METHODS = new Set(["BANK", "CASH", "MOBILE"])
@@ -15,7 +15,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "UPDATE")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
     const { id } = await params
     const body = await request.json()

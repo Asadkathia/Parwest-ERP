@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft, Edit, Building, User, Calendar, FileText } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -10,6 +11,10 @@ import StatusChip from "@/components/ui/status-chip"
 export default async function DeploymentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session) redirect("/login")
+
+  // Deployments semantically belong to GUARDS module (no dedicated DEPLOYMENTS module).
+  const canUpdateDeployment = hasAction(session, "GUARDS", "UPDATE")
+  const canDeleteDeployment = hasAction(session, "GUARDS", "DELETE")
 
   const { id } = await params
 
@@ -44,15 +49,17 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
               <ArrowLeft className="h-4 w-4" />
               Back
             </Link>
-            {deployment.status === "ACTIVE" ? (
+            {deployment.status === "ACTIVE" && canDeleteDeployment ? (
               <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger">
                 End Deployment
               </Link>
             ) : null}
-            <Link href={`/deployments/${deployment.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-              <Edit className="h-4 w-4" />
-              Edit
-            </Link>
+            {!deployment.endDate && canUpdateDeployment ? (
+              <Link href={`/deployments/${deployment.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -133,7 +140,7 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
             <CardBody className="space-y-2">
               <Link href={`/guards/${deployment.guard.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Guard Profile</Link>
               <Link href={`/clients/${deployment.client.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Client Details</Link>
-              {deployment.status === "ACTIVE" ? <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger w-full text-left">End Deployment</Link> : null}
+              {deployment.status === "ACTIVE" && canDeleteDeployment ? <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger w-full text-left">End Deployment</Link> : null}
             </CardBody>
           </Card>
         </div>

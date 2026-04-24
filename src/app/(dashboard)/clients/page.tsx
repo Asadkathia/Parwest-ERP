@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { Plus, Building2, Building, Users, Ban } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -15,6 +16,8 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 export default async function ClientsPage() {
   const session = await auth()
   if (!session) redirect("/login")
+
+  const canCreateClient = hasAction(session, "CLIENTS", "CREATE")
 
   let clients: Array<{
     id: string
@@ -118,16 +121,18 @@ export default async function ClientsPage() {
         title="Clients"
         subtitle="Manage clients and their branch locations"
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Branch Client
-            </Link>
-            <Link href="/clients/new?mode=branchless" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Branchless Client
-            </Link>
-          </div>
+          canCreateClient ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Branch Client
+              </Link>
+              <Link href="/clients/new?mode=branchless" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Branchless Client
+              </Link>
+            </div>
+          ) : null
         }
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
@@ -16,7 +16,7 @@ export async function POST(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params

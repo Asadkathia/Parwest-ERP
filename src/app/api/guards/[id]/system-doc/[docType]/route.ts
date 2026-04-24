@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -1097,7 +1097,7 @@ export async function GET(
 ) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
     const { id, docType } = await params
     const generator = DOC_GENERATORS[docType]

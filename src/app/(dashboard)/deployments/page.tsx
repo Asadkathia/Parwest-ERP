@@ -9,6 +9,7 @@ import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { hasAction } from "@/lib/api/permissions"
 
 type DeploymentRow = {
   id: string
@@ -30,6 +31,11 @@ type DeploymentRow = {
 export default async function DeploymentsPage() {
   const session = await auth()
   if (!session) redirect("/login")
+
+  // Deployments are semantically part of GUARDS (no dedicated DEPLOYMENTS module in MODULES).
+  const canCreateDeployment = hasAction(session, "GUARDS", "CREATE")
+  const canUpdateDeployment = hasAction(session, "GUARDS", "UPDATE")
+  const canDeleteDeployment = hasAction(session, "GUARDS", "DELETE")
 
   let deployments: DeploymentRow[] = []
   let dbWarning = ""
@@ -83,10 +89,12 @@ export default async function DeploymentsPage() {
         title="Deployments"
         subtitle="Manage guard deployments to client locations"
         action={
-          <Link href="/guards/deploy" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Deploy Guard
-          </Link>
+          canCreateDeployment ? (
+            <Link href="/guards/deploy" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Deploy Guard
+            </Link>
+          ) : null
         }
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
@@ -203,22 +211,30 @@ export default async function DeploymentsPage() {
                       </Link>
                       {dep.status === "ACTIVE" ? (
                         <>
-                          <span className="text-[var(--border)]">·</span>
-                          <Link
-                            href={`/deployments/${dep.id}/edit`}
-                            className="text-xs text-[var(--text-muted)] hover:text-[var(--brand)] font-medium inline-flex items-center gap-1"
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                            Change
-                          </Link>
-                          <span className="text-[var(--border)]">·</span>
-                          <Link
-                            href={`/deployments/${dep.id}/end`}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium inline-flex items-center gap-1"
-                          >
-                            <ShieldOff className="h-3 w-3" />
-                            Revoke
-                          </Link>
+                          {canUpdateDeployment ? (
+                            <>
+                              <span className="text-[var(--border)]">·</span>
+                              <Link
+                                href={`/deployments/${dep.id}/edit`}
+                                className="text-xs text-[var(--text-muted)] hover:text-[var(--brand)] font-medium inline-flex items-center gap-1"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                Change
+                              </Link>
+                            </>
+                          ) : null}
+                          {canDeleteDeployment ? (
+                            <>
+                              <span className="text-[var(--border)]">·</span>
+                              <Link
+                                href={`/deployments/${dep.id}/end`}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium inline-flex items-center gap-1"
+                              >
+                                <ShieldOff className="h-3 w-3" />
+                                Revoke
+                              </Link>
+                            </>
+                          ) : null}
                         </>
                       ) : null}
                     </div>

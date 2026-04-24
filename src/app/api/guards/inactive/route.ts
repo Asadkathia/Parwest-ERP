@@ -5,7 +5,7 @@ import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockInactiveGuards } from "@/lib/mockData/guards"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
 export async function GET() {
@@ -14,7 +14,7 @@ export async function GET() {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
         const managerScope = deriveManagerScope(session)
 

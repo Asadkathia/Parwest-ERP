@@ -19,7 +19,7 @@ import {
   ok,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { getActorIdentity, isSuperAdmin } from "@/lib/payroll/state-permissions"
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "CREATE")) return forbidden("Access denied.")
     if (!isSuperAdmin(session)) {
       return forbidden("Only SuperAdmin can perform an emergency release.")
     }

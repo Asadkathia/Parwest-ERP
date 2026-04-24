@@ -1,12 +1,14 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import EndDeploymentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
 export default async function EndDeploymentPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
+    if (!hasAction(session, "GUARDS", "DELETE")) redirect("/deployments")
 
     const { id } = await params
 

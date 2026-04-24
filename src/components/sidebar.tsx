@@ -24,6 +24,7 @@ import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
+import { permissionKey, type ActionKey } from "@/lib/constants/permissions"
 
 const allNavItems: NavNode[] = [
     {
@@ -269,13 +270,70 @@ const allNavItems: NavNode[] = [
     },
 ]
 
+/**
+ * Infer the action required to show a nav item.
+ *  - explicit `requiredAction` wins
+ *  - href ending in `/new`, or title containing "Add"/"New"/"Create" → CREATE
+ *  - title containing "Delete" → DELETE
+ *  - everything else → VIEW (navigation is fundamentally a read)
+ */
+function inferRequiredAction(node: NavNode): ActionKey {
+    if (node.requiredAction) return node.requiredAction
+    const title = node.title ?? ""
+    const href = node.href ?? ""
+    if (/delete/i.test(title)) return "DELETE"
+    if (/\/new(\/|$)/.test(href) || /\b(add|new|create)\b/i.test(title)) return "CREATE"
+    return "VIEW"
+}
+
+/**
+ * Filter a subtree by the user's permission set.
+ * For each node:
+ *  - if it has a `module` set, the user must hold `"MODULE:<action>"`
+ *  - children are filtered recursively using the PARENT's module
+ *  - a group node with no surviving children is dropped
+ */
+function filterSubtree(node: NavNode, permissions: string[], module: string | null): NavNode | null {
+    // Determine the effective module for this node (inherits from parent).
+    const effectiveModule = (node.module ?? module) as string | null
+
+    // Dashboard / no-module items are always visible.
+    if (effectiveModule === null || effectiveModule === undefined) {
+        if (node.children?.length) {
+            const children = node.children
+                .map((c) => filterSubtree(c, permissions, null))
+                .filter((c): c is NavNode => c !== null)
+            return { ...node, children }
+        }
+        return node
+    }
+
+    // For gated items, check the per-action permission key.
+    const action = inferRequiredAction(node)
+    const required = permissionKey(effectiveModule, action)
+    const allowed = permissions.includes(required)
+
+    if (node.children?.length) {
+        const children = node.children
+            .map((c) => filterSubtree(c, permissions, effectiveModule))
+            .filter((c): c is NavNode => c !== null)
+
+        // Parent group itself: allow if the user has VIEW on the module
+        // (navigation is fundamentally a read).
+        const parentAllowed = permissions.includes(permissionKey(effectiveModule, "VIEW"))
+
+        if (!parentAllowed && children.length === 0) return null
+        return { ...node, children }
+    }
+
+    return allowed ? node : null
+}
+
 function filterNavByPermissions(items: NavNode[], permissions: string[], isAdmin: boolean): NavNode[] {
     if (isAdmin) return items
-    return items.filter((item) => {
-        const mod = item.module
-        if (mod === null || mod === undefined) return true // Dashboard — always visible
-        return permissions.includes(mod)
-    })
+    return items
+        .map((item) => filterSubtree(item, permissions, null))
+        .filter((item): item is NavNode => item !== null)
 }
 
 function hasPathInTree(node: NavNode, pathname: string): boolean {

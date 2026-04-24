@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
+import { isSuperAdmin } from "@/lib/api/permissions"
 
 const authSecret =
     process.env.AUTH_SECRET ||
@@ -46,10 +47,13 @@ export async function middleware(req: NextRequest) {
     const userRole = token.role as string | undefined
     const permissions = (token.permissions as string[] | undefined) ?? []
 
-    // SuperAdmin bypass:
+    // SuperAdmin bypass (shared rule from @/lib/api/permissions):
     // An "Admin" role user with NO permissions assigned = unrestricted SuperAdmin.
     // An "Admin" role user WITH permissions assigned = regional admin, respect their permissions.
-    if (userRole === "Admin" && permissions.length === 0) return NextResponse.next()
+    // We pass a session-like shape since middleware works with raw JWT tokens.
+    if (isSuperAdmin({ user: { role: userRole, permissions } } as Parameters<typeof isSuperAdmin>[0])) {
+        return NextResponse.next()
+    }
 
     // For all other users (including Admin role with specific permissions): enforce module permissions
 

@@ -10,7 +10,7 @@ import {
   ok,
   unauthorized,
 } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function GET(
   _req: NextRequest,
@@ -19,7 +19,7 @@ export async function GET(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
 
     const { id } = await params
     const row = await prisma.payrollDeductionType.findUnique({ where: { id } })
@@ -38,7 +38,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "UPDATE")) return forbidden("Access denied.")
 
     const { id } = await params
     const body = await request.json().catch(() => null)
@@ -97,7 +97,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "PAYROLL")) return forbidden("Access denied.")
+    if (!hasAction(session, "PAYROLL", "DELETE")) return forbidden("Access denied.")
 
     const { id } = await params
     const { searchParams } = new URL(request.url)

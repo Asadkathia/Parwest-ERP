@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
 import { Plus, Shield, ShieldCheck, Clock3, ShieldX } from "lucide-react"
+import { hasAction } from "@/lib/api/permissions"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
@@ -22,6 +23,8 @@ export default async function GuardsPage({
 }) {
   const session = await auth()
   if (!session) redirect("/login")
+
+  const canCreateGuard = hasAction(session, "GUARDS", "CREATE")
 
   const { q = "", status = "", officeId = "" } = await searchParams
 
@@ -143,10 +146,12 @@ export default async function GuardsPage({
         title="Guards"
         subtitle="Manage security guards and their information"
         action={
-          <Link href="/guards/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Guard
-          </Link>
+          canCreateGuard ? (
+            <Link href="/guards/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Guard
+            </Link>
+          ) : null
         }
       />
 

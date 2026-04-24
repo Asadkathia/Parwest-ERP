@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
@@ -36,7 +36,7 @@ export async function PUT(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden("Access denied.")
+        if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
@@ -165,7 +165,7 @@ export async function PATCH(
     try {
         const session = await auth()
         if (!session) return unauthorized()
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden("Access denied.")
+        if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"

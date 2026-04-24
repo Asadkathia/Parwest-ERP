@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { getPrismaCode, toErrorMessage } from "@/lib/prisma-errors"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 function parseAllowedCategoryIds(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "INVENTORY")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "INVENTORY", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const ruleDelegate = (prisma as unknown as {
       guardDeploymentInventoryRule?: {
@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "INVENTORY")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
+    if (!hasAction(session, "INVENTORY", "UPDATE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
     const body = await request.json()
     const minimumAssignedItems = Number(body?.minimumAssignedItems ?? 1)

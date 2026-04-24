@@ -32,6 +32,7 @@ interface Props {
     offices: OfficeRow[]
     auditLogs: AuditLog[]
     isAdmin: boolean
+    canUpdate?: boolean
 }
 
 type Tab = "general" | "permissions" | "status-history" | "audit"
@@ -40,7 +41,8 @@ function fmt(iso: string) {
     return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
-export default function UserProfileClient({ user: initial, roles, regions, offices, auditLogs, isAdmin }: Props) {
+export default function UserProfileClient({ user: initial, roles, regions, offices, auditLogs, isAdmin, canUpdate }: Props) {
+    const showEdit = canUpdate ?? isAdmin
     const [user, setUser] = useState(initial)
     const [tab, setTab] = useState<Tab>("general")
     const [editing, setEditing] = useState(false)
@@ -125,7 +127,7 @@ export default function UserProfileClient({ user: initial, roles, regions, offic
                             </div>
                         </div>
                     </div>
-                    {isAdmin && (
+                    {showEdit && (
                         <button type="button" onClick={() => setEditing((v) => !v)}
                             className="ui-btn ui-btn-secondary text-sm">
                             {editing ? "Cancel" : "Edit Profile"}

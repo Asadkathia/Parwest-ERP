@@ -1,6 +1,6 @@
 import { badRequest, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { auth } from "@/lib/auth"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { processImport, readImportPayload, validateImport } from "@/lib/imports/workflow"
 
 export async function POST(
@@ -10,7 +10,7 @@ export async function POST(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "IMPORTS")) return forbidden()
+    if (!hasAction(session, "IMPORTS", "CREATE")) return forbidden()
 
     const { module } = await params
     const payload = await readImportPayload(request)

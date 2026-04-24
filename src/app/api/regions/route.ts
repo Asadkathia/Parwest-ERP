@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 const MOCK_REGIONS = [
     { id: "mock-region-punjab", name: "Punjab", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
@@ -14,7 +14,7 @@ export async function GET() {
     try {
         const session = await auth()
         if (!session) return unauthorized()
-        if (!hasModuleAccess(session, "SETTINGS")) return forbidden()
+        if (!hasAction(session, "SETTINGS", "VIEW")) return forbidden()
 
         if (isRuntimeMockEnabled()) {
             return NextResponse.json(MOCK_REGIONS, { status: 200 })
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "SETTINGS")) return forbidden()
+        if (!hasAction(session, "SETTINGS", "CREATE")) return forbidden()
 
         const body = await request.json()
         const name = String(body?.name || "").trim()

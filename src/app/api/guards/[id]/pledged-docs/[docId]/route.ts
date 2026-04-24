@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -12,7 +12,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
 
     const { id, docId } = await context.params
 
@@ -151,7 +151,7 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    if (!hasAction(session, "GUARDS", "DELETE")) return forbidden("Access denied.")
 
     const { id, docId } = await context.params
 

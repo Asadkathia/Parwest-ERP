@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
-
-const MODULES = [
-    "GUARDS", "PAYROLL", "INVENTORY", "USERS", "CLIENTS",
-    "TICKETING", "SETTINGS", "REPORTS", "IMPORTS", "REQUISITIONS", "AUDIT",
-]
+import { MODULES } from "@/lib/constants/permissions"
 
 type PermissionPayload = {
     module?: unknown

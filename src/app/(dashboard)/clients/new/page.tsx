@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
+import { hasAction } from "@/lib/api/permissions"
 import ClientEnrollmentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -13,6 +14,7 @@ export default async function NewClientPage({
 }) {
     const session = await auth()
     if (!session) redirect("/login")
+    if (!hasAction(session, "CLIENTS", "CREATE")) redirect("/clients")
     const params = searchParams ? await searchParams : undefined
     const mode = params?.mode === "branch" ? "branch" : "branchless"
     const initialBranchless = mode !== "branch"

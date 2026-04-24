@@ -12,6 +12,13 @@ export type NavNode = {
   children?: NavNode[]
   /** Top-level module key used for permission filtering. null = always visible. */
   module?: string | null
+  /**
+   * Optional override for the action this nav item requires on its module.
+   * When omitted, the sidebar filter infers from href/title
+   * (e.g. href ending in "/new" or titles containing "Add"/"Create" → CREATE,
+   * title containing "Delete" → DELETE, everything else → VIEW).
+   */
+  requiredAction?: "CREATE" | "VIEW" | "UPDATE" | "DELETE" | "REQUISITIONS"
 }
 
 type Props = {

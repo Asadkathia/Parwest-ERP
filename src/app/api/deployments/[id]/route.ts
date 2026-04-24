@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
@@ -28,7 +28,7 @@ export async function PATCH(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params
@@ -40,6 +40,10 @@ export async function PATCH(
         })
         if (!existing) {
             return notFound("Deployment not found")
+        }
+
+        if (isWorkflowRuleEnabled("deployments.lockAfterEnd") && existing.endDate) {
+            return conflict("Deployment is ended and cannot be modified.")
         }
 
         if (isWorkflowRuleEnabled("deployments.blockInactiveUpdate") && existing.status !== "ACTIVE") {
@@ -238,7 +242,7 @@ export async function DELETE(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+        if (!hasAction(session, "GUARDS", "DELETE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { id } = await params

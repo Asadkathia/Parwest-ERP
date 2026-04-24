@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function PATCH(
@@ -15,7 +15,7 @@ export async function PATCH(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden()
+        if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden()
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
 
@@ -95,7 +95,7 @@ export async function DELETE(
         if (!session) {
             return unauthorized()
         }
-        if (!hasModuleAccess(session, "CLIENTS")) return forbidden()
+        if (!hasAction(session, "CLIENTS", "DELETE")) return forbidden()
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
 
