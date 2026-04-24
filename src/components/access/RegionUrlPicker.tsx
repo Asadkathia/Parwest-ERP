@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useTransition } from "react"
 import { Lock } from "lucide-react"
+import { GLOBAL_REGION_VALUE } from "./region-sentinels"
 
 type RegionOption = { id: string; name: string }
 
@@ -17,11 +18,14 @@ export default function RegionUrlPicker({
     locked = false,
     paramName = "regionId",
     label = "Region",
+    includeGlobalOption = false,
 }: {
     regions: RegionOption[]
     locked?: boolean
     paramName?: string
     label?: string
+    /** When true, prepend a "Global" option that filters to users with no region. */
+    includeGlobalOption?: boolean
 }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -51,6 +55,9 @@ export default function RegionUrlPicker({
                 onChange={(e) => handleChange(e.target.value)}
             >
                 <option value="">-- Select {label} --</option>
+                {includeGlobalOption && (
+                    <option value={GLOBAL_REGION_VALUE}>Global</option>
+                )}
                 {regions.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                 ))}

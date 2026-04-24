@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
+import type { Prisma } from "@prisma/client"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { buildManagerScopeWhere, deriveRegionalScope } from "@/lib/access/scope"
 import Link from "next/link"
@@ -11,6 +12,7 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import UsersTable from "@/components/users/UsersTable"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { GLOBAL_REGION_VALUE } from "@/components/access/region-sentinels"
 import { Suspense } from "react"
 
 export default async function UsersPage({
@@ -55,9 +57,17 @@ export default async function UsersPage({
   if (!needsRegionGate) try {
     // Resolve the active regionId filter: explicit URL param (SuperAdmin picker)
     // or the user's scoped region (regional users via scope helpers).
+    //   - GLOBAL sentinel → filter to users with no region (e.g., Super Users)
+    //   - real id          → filter to that region
     const scopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
-    const regionWhere = urlRegionId && superAdmin ? { regionId: urlRegionId } : {}
-    const where = { ...scopeWhere, ...regionWhere }
+    const where: Prisma.UserWhereInput = { ...scopeWhere }
+    if (superAdmin && urlRegionId) {
+      if (urlRegionId === GLOBAL_REGION_VALUE) {
+        where.regionId = null
+      } else {
+        where.regionId = urlRegionId
+      }
+    }
 
     const [rows, total, active, inactive] = await Promise.all([
       prisma.user.findMany({
@@ -108,7 +118,11 @@ export default async function UsersPage({
 
       <section className="ui-card p-5">
         <Suspense>
-          <RegionUrlPicker regions={pickerRegions} locked={Boolean(scope?.regionId)} />
+          <RegionUrlPicker
+            regions={pickerRegions}
+            locked={Boolean(scope?.regionId)}
+            includeGlobalOption={superAdmin}
+          />
         </Suspense>
       </section>
 
