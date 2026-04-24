@@ -33,7 +33,7 @@ const defaultForm: FormState = {
   status: "ACTIVE",
 }
 
-export default function UserEnrollmentManager() {
+export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const [form, setForm] = useState<FormState>(defaultForm)
   const [roles, setRoles] = useState<RoleOption[]>([])
   const [regions, setRegions] = useState<RegionOption[]>([])
@@ -178,30 +178,43 @@ export default function UserEnrollmentManager() {
             required
             value={form.roleId}
             onChange={(v) => setField("roleId", v)}
-            options={roles.map((role) => ({ value: role.id, label: role.name }))}
+            options={roles
+              // Only Super Users can assign GLOBAL-scoped roles (e.g. creating another Super User).
+              .filter((role) => isSuperAdmin || role.scopeType !== "GLOBAL")
+              .map((role) => ({ value: role.id, label: role.name }))}
             placeholder="-- Select User Role --"
           />
           <SelectField
             label="Select Region"
             required={isRegionalRole}
             disabled={isGlobalRole}
-            value={form.regionId}
+            value={isGlobalRole ? "__GLOBAL__" : form.regionId}
             onChange={(v) => {
               setField("regionId", v)
               setField("regionalOfficeId", "")
             }}
-            options={regions.map((region) => ({ value: region.id, label: region.name }))}
-            placeholder={isGlobalRole ? "Not applicable for global roles" : "-- Select Region --"}
+            options={
+              isGlobalRole
+                ? [{ value: "__GLOBAL__", label: "Global" }]
+                : regions.map((region) => ({ value: region.id, label: region.name }))
+            }
+            placeholder={isGlobalRole ? "" : "-- Select Region --"}
+            hidePlaceholder={isGlobalRole}
           />
 
           <SelectField
             label="Regional Office"
             required={isRegionalRole}
             disabled={isGlobalRole}
-            value={form.regionalOfficeId}
+            value={isGlobalRole ? "__GLOBAL__" : form.regionalOfficeId}
             onChange={(v) => setField("regionalOfficeId", v)}
-            options={availableOffices.map((office) => ({ value: office.id, label: office.name }))}
-            placeholder={isGlobalRole ? "Not applicable for global roles" : "-- Select Regional Office --"}
+            options={
+              isGlobalRole
+                ? [{ value: "__GLOBAL__", label: "Global" }]
+                : availableOffices.map((office) => ({ value: office.id, label: office.name }))
+            }
+            placeholder={isGlobalRole ? "" : "-- Select Regional Office --"}
+            hidePlaceholder={isGlobalRole}
           />
           <Field label="Contact #" required value={form.contactNumber} onChange={(v) => setField("contactNumber", v)} />
 
@@ -299,6 +312,7 @@ function SelectField({
   placeholder,
   required,
   disabled,
+  hidePlaceholder,
 }: {
   label: string
   value: string
@@ -307,6 +321,7 @@ function SelectField({
   placeholder: string
   required?: boolean
   disabled?: boolean
+  hidePlaceholder?: boolean
 }) {
   return (
     <div>
@@ -320,7 +335,7 @@ function SelectField({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">{placeholder}</option>
+        {!hidePlaceholder && <option value="">{placeholder}</option>}
         {options.map((option) => (
           <option key={`${label}-${option.value}`} value={option.value}>
             {option.label}

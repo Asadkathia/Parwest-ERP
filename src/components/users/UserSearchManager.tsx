@@ -15,8 +15,13 @@ type UserRow = {
   email: string
   status: string
   createdAt: string
-  role?: { id: string; name: string } | null
+  role?: { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" } | null
   regionalOffice?: { id: string; name: string } | null
+}
+
+function formatRegionalOffice(row: UserRow): string {
+  if (row.role?.scopeType === "GLOBAL") return "Global"
+  return row.regionalOffice?.name || "—"
 }
 
 export default function UserSearchManager() {
@@ -79,7 +84,7 @@ export default function UserSearchManager() {
         name: row.name,
         email: row.email,
         role: row.role?.name || "—",
-        office: row.regionalOffice?.name || "—",
+        office: formatRegionalOffice(row),
         status: row.status,
       })),
     [rows]
@@ -149,7 +154,7 @@ export default function UserSearchManager() {
           { key: "name", header: "Name", sortable: true },
           { key: "email", header: "Email", sortable: true },
           { key: "role", header: "Role", render: (row) => row.role?.name || "—", sortable: true },
-          { key: "regionalOffice", header: "Regional Office", render: (row) => row.regionalOffice?.name || "—", sortable: true },
+          { key: "regionalOffice", header: "Regional Office", render: (row) => formatRegionalOffice(row), sortable: true },
           {
             key: "status",
             header: "Status",

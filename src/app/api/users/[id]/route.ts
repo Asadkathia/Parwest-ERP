@@ -7,7 +7,7 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -96,7 +96,7 @@ export async function PATCH(
       where: { id },
       data,
       include: {
-        role: { select: { id: true, name: true } },
+        role: { select: { id: true, name: true, scopeType: true } },
         region: { select: { id: true, name: true } },
         regionalOffice: { select: { id: true, name: true } },
       },
@@ -131,9 +131,7 @@ export async function DELETE(
     if (!session) return unauthorized()
     if (!hasAction(session, "USERS", "DELETE")) return forbidden("Access denied.")
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actorRole = (session.user as any)?.role as string | undefined
-    if (actorRole !== "Admin") return forbidden("Only Admin can delete users.")
+    if (!isSuperAdmin(session)) return forbidden("Only a SuperAdmin can delete users.")
 
     const { id } = await context.params
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

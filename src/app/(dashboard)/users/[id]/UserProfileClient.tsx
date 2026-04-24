@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { User, Mail, Phone, Shield, MapPin, Clock, History, Lock, CheckCircle, XCircle } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -13,14 +13,14 @@ type UserData = {
     id: string; name: string; email: string; status: string
     contactNumber: string | null; photoUrl: string | null
     createdAt: string; lastLoginAt: string | null
-    role: { id: string; name: string } | null
+    role: { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" } | null
     region: { id: string; name: string } | null
     regionalOffice: { id: string; name: string } | null
     permissions: Array<{ module: string; canCreate: boolean; canView: boolean; canUpdate: boolean; canDelete: boolean; canRequisition: boolean }>
     statusHistory: Array<{ id: string; status: string; reason: string | null; changedAt: string }>
 }
 
-type RoleRow = { id: string; name: string }
+type RoleRow = { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" }
 type RegionRow = { id: string; name: string }
 type OfficeRow = { id: string; name: string; regionId: string | null }
 type AuditLog = { id: string; event: string; module: string | null; description: string | null; createdAt: string }
@@ -59,6 +59,16 @@ export default function UserProfileClient({ user: initial, roles, regions, offic
     const [error, setError] = useState("")
 
     const filteredOffices = offices.filter((o) => !form.regionId || o.regionId === form.regionId)
+    const selectedRole = roles.find((r) => r.id === form.roleId) ?? null
+    const selectedRoleScopeIsGlobal = selectedRole?.scopeType === "GLOBAL"
+
+    // When role is switched to a GLOBAL-scoped role, clear region/office so
+    // the API-level validation passes ("GLOBAL role must not have region").
+    useEffect(() => {
+        if (selectedRoleScopeIsGlobal && (form.regionId || form.regionalOfficeId)) {
+            setForm((p) => ({ ...p, regionId: "", regionalOfficeId: "" }))
+        }
+    }, [selectedRoleScopeIsGlobal, form.regionId, form.regionalOfficeId])
 
     const handleSave = async () => {
         setSaving(true); setNotice(""); setError("")
@@ -167,7 +177,9 @@ export default function UserProfileClient({ user: initial, roles, regions, offic
                             <Field label="Role">
                                 <select className="ui-select" value={form.roleId} onChange={(e) => setForm((p) => ({ ...p, roleId: e.target.value }))}>
                                     <option value="">-- Select Role --</option>
-                                    {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    {roles
+                                        .filter((r) => isAdmin || r.scopeType !== "GLOBAL")
+                                        .map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                             </Field>
                             <Field label="Status">
@@ -177,17 +189,33 @@ export default function UserProfileClient({ user: initial, roles, regions, offic
                                 </select>
                             </Field>
                             <Field label="Region">
-                                <select className="ui-select" value={form.regionId}
+                                <select className="ui-select"
+                                    value={selectedRoleScopeIsGlobal ? "__GLOBAL__" : form.regionId}
+                                    disabled={selectedRoleScopeIsGlobal}
                                     onChange={(e) => setForm((p) => ({ ...p, regionId: e.target.value, regionalOfficeId: "" }))}>
-                                    <option value="">-- No Region --</option>
-                                    {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    {selectedRoleScopeIsGlobal ? (
+                                        <option value="__GLOBAL__">Global</option>
+                                    ) : (
+                                        <>
+                                            <option value="">-- No Region --</option>
+                                            {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                        </>
+                                    )}
                                 </select>
                             </Field>
                             <Field label="Regional Office">
-                                <select className="ui-select" value={form.regionalOfficeId} onChange={(e) => setForm((p) => ({ ...p, regionalOfficeId: e.target.value }))}
-                                    disabled={!form.regionId}>
-                                    <option value="">{form.regionId ? "-- Select Office --" : "-- Select Region First --"}</option>
-                                    {filteredOffices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                <select className="ui-select"
+                                    value={selectedRoleScopeIsGlobal ? "__GLOBAL__" : form.regionalOfficeId}
+                                    disabled={selectedRoleScopeIsGlobal || !form.regionId}
+                                    onChange={(e) => setForm((p) => ({ ...p, regionalOfficeId: e.target.value }))}>
+                                    {selectedRoleScopeIsGlobal ? (
+                                        <option value="__GLOBAL__">Global</option>
+                                    ) : (
+                                        <>
+                                            <option value="">{form.regionId ? "-- Select Office --" : "-- Select Region First --"}</option>
+                                            {filteredOffices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                        </>
+                                    )}
                                 </select>
                             </Field>
                             <div className="md:col-span-2 flex gap-2 pt-2">
@@ -205,8 +233,16 @@ export default function UserProfileClient({ user: initial, roles, regions, offic
                             <InfoRow icon={<Mail />} label="Email" value={user.email} />
                             <InfoRow icon={<Phone />} label="Contact" value={user.contactNumber || "—"} />
                             <InfoRow icon={<Shield />} label="Role" value={user.role?.name || "—"} />
-                            <InfoRow icon={<MapPin />} label="Region" value={user.region?.name || "—"} />
-                            <InfoRow icon={<MapPin />} label="Regional Office" value={user.regionalOffice?.name || "—"} />
+                            <InfoRow
+                                icon={<MapPin />}
+                                label="Region"
+                                value={user.role?.scopeType === "GLOBAL" ? "Global" : (user.region?.name || "—")}
+                            />
+                            <InfoRow
+                                icon={<MapPin />}
+                                label="Regional Office"
+                                value={user.role?.scopeType === "GLOBAL" ? "Global" : (user.regionalOffice?.name || "—")}
+                            />
                             <InfoRow icon={<Clock />} label="Created" value={fmt(user.createdAt)} />
                             <InfoRow icon={<Clock />} label="Last Login" value={user.lastLoginAt ? fmt(user.lastLoginAt) : "Never"} />
                         </div>

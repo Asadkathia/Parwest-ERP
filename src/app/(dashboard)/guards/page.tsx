@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
 import { Plus, Shield, ShieldCheck, Clock3, ShieldX } from "lucide-react"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import FilterBar from "@/components/ui/filter-bar"
@@ -25,8 +25,13 @@ export default async function GuardsPage({
   if (!session) redirect("/login")
 
   const canCreateGuard = hasAction(session, "GUARDS", "CREATE")
+  const isSuperAdminUser = isSuperAdmin(session)
 
   const { q = "", status = "", officeId = "" } = await searchParams
+
+  // SuperAdmin must pick an office before the full guard list loads. Regional
+  // users are auto-scoped, so they don't hit this gate.
+  const needsOfficeGate = isSuperAdminUser && !officeId && !q && !status
 
   let guards: Array<{
     id: string
@@ -48,6 +53,18 @@ export default async function GuardsPage({
 
   let offices: { id: string; name: string }[] = []
 
+  // Skip expensive queries when SuperAdmin hasn't picked an office yet. We
+  // still load the offices list so the filter dropdown is usable.
+  if (needsOfficeGate) {
+    try {
+      offices = await prisma.regionalOffice.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    } catch (error) {
+      console.error("Failed to load offices:", error)
+    }
+  } else {
   try {
     // Build where clause from filters
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,16 +138,22 @@ export default async function GuardsPage({
     }
     console.error("GuardsPage query failed:", error)
   }
+  }
 
   guards = applyManagerScope(guards, scope, {
     regionId: (row) => row.regionId,
     regionalOfficeId: (row) => row.regionalOfficeId,
   })
 
+  // Regional users only see their own office in the dropdown.
+  if (scope?.regionalOfficeIds.length) {
+    offices = offices.filter((o) => scope.regionalOfficeIds.includes(o.id))
+  }
+
   if (scope) {
     dbWarning = dbWarning
-      ? `${dbWarning} Manager scope active: showing data for your region/regional office only.`
-      : "Manager scope active: showing data for your region/regional office only."
+      ? `${dbWarning} Scope: showing guards for your assigned region/office only.`
+      : "Scope: showing guards for your assigned region/office only."
   }
 
   const statusColor = (s: string): import("@/components/ui/status-chip").ChipVariant => {
@@ -157,18 +180,28 @@ export default async function GuardsPage({
 
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
+      <FilterBar>
+        <Suspense>
+          <GuardsFilterBar offices={offices} />
+        </Suspense>
+      </FilterBar>
+
+      {needsOfficeGate ? (
+        <div className="ui-card p-10 text-center">
+          <Shield className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
+          <p className="text-base font-medium text-[var(--text)]">Select an office to view guards.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Guards are region-scoped. Pick an office from the filter above, or search by name / CNIC / Parwest ID to see results across all offices.
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Guards" value={stats.total} icon={<Shield className="h-5 w-5" />} tone="brand" />
         <StatCard label="Active" value={stats.active} icon={<ShieldCheck className="h-5 w-5" />} tone="success" />
         <StatCard label="Pending" value={stats.pending} icon={<Clock3 className="h-5 w-5" />} tone="warning" />
         <StatCard label="Inactive" value={stats.inactive} icon={<ShieldX className="h-5 w-5" />} tone="danger" />
       </div>
-
-      <FilterBar>
-        <Suspense>
-          <GuardsFilterBar offices={offices} />
-        </Suspense>
-      </FilterBar>
 
       <div className="text-xs text-gray-500 -mt-4">
         {guards.length} guard{guards.length !== 1 ? "s" : ""} found
@@ -223,6 +256,8 @@ export default async function GuardsPage({
           </tbody>
         </table>
       </section>
+        </>
+      )}
     </div>
   )
 }

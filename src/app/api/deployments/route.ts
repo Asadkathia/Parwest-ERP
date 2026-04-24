@@ -30,9 +30,20 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url)
         const guardIdParam = searchParams.get("guardId")?.trim() || null
+        const regionIdParam = searchParams.get("regionId")?.trim() || null
+        const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
         const statusParam = searchParams.get("status")?.trim().toUpperCase() || null
         const allowedStatuses = new Set(["ACTIVE", "INACTIVE", "PAUSED", "ENDED"])
         const statusFilter = statusParam && allowedStatuses.has(statusParam) ? statusParam : null
+
+        // Reject cross-scope requests early so a regional user can't request
+        // another region's data even with a crafted URL.
+        if (managerScope && managerScopeDenied(managerScope, {
+            regionId: regionIdParam,
+            regionalOfficeId: regionalOfficeIdParam,
+        })) {
+            return forbidden("Forbidden: cannot query deployments outside your scope.")
+        }
 
         if (isRuntimeMockEnabled()) {
             return NextResponse.json(
@@ -56,6 +67,8 @@ export async function GET(request: NextRequest) {
                 ...buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
                 ...(guardIdParam ? { guardId: guardIdParam } : {}),
                 ...(statusFilter ? { status: statusFilter } : {}),
+                ...(regionalOfficeIdParam ? { regionalOfficeId: regionalOfficeIdParam } : {}),
+                ...(regionIdParam ? { regionalOffice: { regionId: regionIdParam } } : {}),
             },
             orderBy: { createdAt: "desc" },
             take: 200,

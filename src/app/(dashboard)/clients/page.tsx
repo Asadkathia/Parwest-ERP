@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
 import { Plus, Building2, Building, Users, Ban } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -12,12 +12,25 @@ import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { Suspense } from "react"
 
-export default async function ClientsPage() {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ regionId?: string }>
+}) {
   const session = await auth()
   if (!session) redirect("/login")
 
   const canCreateClient = hasAction(session, "CLIENTS", "CREATE")
+  const isSuperAdminUser = isSuperAdmin(session)
+  const { regionId = "" } = await searchParams
+  const needsRegionGate = isSuperAdminUser && !regionId
+
+  const regions = await prisma.region
+    .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+    .catch(() => [] as { id: string; name: string }[])
 
   let clients: Array<{
     id: string
@@ -36,9 +49,15 @@ export default async function ClientsPage() {
   const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
-  try {
+  if (!needsRegionGate) try {
+    // Resolve the active regionId filter: explicit URL param (SuperAdmin picker)
+    // or the user's scoped region (regional users).
+    const activeRegionId = regionId || scope?.regionId || undefined
+    const regionFilter = activeRegionId ? { regionId: activeRegionId } : {}
+
     const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
       prisma.client.findMany({
+        where: regionFilter,
         take: 20,
         orderBy: { createdAt: "desc" },
         include: {
@@ -55,10 +74,10 @@ export default async function ClientsPage() {
           },
         },
       }),
-      prisma.client.count(),
-      prisma.client.count({ where: { status: "ACTIVE" } }),
-      prisma.client.count({ where: { status: "INACTIVE" } }),
-      prisma.branch.count(),
+      prisma.client.count({ where: regionFilter }),
+      prisma.client.count({ where: { status: "ACTIVE", ...regionFilter } }),
+      prisma.client.count({ where: { status: "INACTIVE", ...regionFilter } }),
+      prisma.branch.count({ where: activeRegionId ? { client: { regionId: activeRegionId } } : {} }),
     ])
     clients = clientRows.map((c) => {
       const ratesByType = new Map<string, number>()
@@ -111,9 +130,14 @@ export default async function ClientsPage() {
   })
   if (scope) {
     dbWarning = dbWarning
-      ? `${dbWarning} Manager scope active: showing clients for your region only.`
-      : "Manager scope active: showing clients for your region only."
+      ? `${dbWarning} Scope: showing clients for your assigned region only.`
+      : "Scope: showing clients for your assigned region only."
   }
+
+  // Regional users see only their own region in the picker.
+  const pickerRegions = scope?.regionId
+    ? regions.filter((r) => r.id === scope.regionId)
+    : regions
 
   return (
     <div className="space-y-6">
@@ -137,6 +161,20 @@ export default async function ClientsPage() {
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
+      <section className="ui-card p-5">
+        <Suspense>
+          <RegionUrlPicker regions={pickerRegions} locked={Boolean(scope?.regionId)} />
+        </Suspense>
+      </section>
+
+      {needsRegionGate ? (
+        <div className="ui-card p-10 text-center">
+          <Users className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
+          <p className="text-base font-medium text-[var(--text)]">Select a region to view clients.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Clients are region-scoped.</p>
+        </div>
+      ) : (
+        <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
         <StatCard label="Active" value={stats.active} icon={<Building2 className="h-5 w-5" />} tone="success" />
@@ -232,6 +270,8 @@ export default async function ClientsPage() {
           </tbody>
         </table>
       </section>
+        </>
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import UserProfileClient from "./UserProfileClient"
@@ -19,7 +19,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 id: true, name: true, email: true, status: true,
                 contactNumber: true, photoUrl: true,
                 createdAt: true, lastLoginAt: true,
-                role: { select: { id: true, name: true } },
+                role: { select: { id: true, name: true, scopeType: true } },
                 region: { select: { id: true, name: true } },
                 regionalOffice: { select: { id: true, name: true } },
                 permissions: {
@@ -29,7 +29,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 statusHistory: { orderBy: { changedAt: "desc" }, take: 20 },
             },
         }),
-        prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, scopeType: true } }),
         prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
         prisma.regionalOffice.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, regionId: true } }).catch(() => []),
         prisma.auditLog.findMany({
@@ -42,8 +42,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
     if (!user) notFound()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isAdmin = (session.user as any)?.role === "Admin"
+    const isAdmin = isSuperAdmin(session)
     const canUpdateUser = hasAction(session, "USERS", "UPDATE")
 
     return (

@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import UserEditForm from "./form"
@@ -58,6 +58,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
                 roles={roles}
                 regions={regions}
                 offices={offices.map((o) => ({ ...o, regionId: o.regionId ?? null }))}
+                isSuperAdmin={isSuperAdmin(session)}
             />
         </div>
     )

@@ -24,9 +24,10 @@ type Props = {
     roles: RoleOption[]
     regions: RegionOption[]
     offices: OfficeOption[]
+    isSuperAdmin?: boolean
 }
 
-export default function UserEditForm({ user, roles, regions, offices }: Props) {
+export default function UserEditForm({ user, roles, regions, offices, isSuperAdmin = false }: Props) {
     const router = useRouter()
     const [name, setName] = useState(user.name ?? "")
     const [contactNumber, setContactNumber] = useState(user.contactNumber ?? "")
@@ -136,11 +137,14 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
                         required
                     >
                         <option value="">-- Select Role --</option>
-                        {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                                {role.name}
-                            </option>
-                        ))}
+                        {roles
+                            // Only Super Users can assign GLOBAL-scoped roles.
+                            .filter((role) => isSuperAdmin || role.scopeType !== "GLOBAL")
+                            .map((role) => (
+                                <option key={role.id} value={role.id}>
+                                    {role.name}
+                                </option>
+                            ))}
                     </select>
                 </div>
 
@@ -160,21 +164,25 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
                     </label>
                     <select
                         className="ui-select"
-                        value={regionId}
+                        value={isGlobalRole ? "__GLOBAL__" : regionId}
                         disabled={isGlobalRole}
                         onChange={(e) => {
                             setRegionId(e.target.value)
                             setRegionalOfficeId("")
                         }}
                     >
-                        <option value="">
-                            {isGlobalRole ? "Not applicable for global roles" : "-- Select Region --"}
-                        </option>
-                        {regions.map((region) => (
-                            <option key={region.id} value={region.id}>
-                                {region.name}
-                            </option>
-                        ))}
+                        {isGlobalRole ? (
+                            <option value="__GLOBAL__">Global</option>
+                        ) : (
+                            <>
+                                <option value="">-- Select Region --</option>
+                                {regions.map((region) => (
+                                    <option key={region.id} value={region.id}>
+                                        {region.name}
+                                    </option>
+                                ))}
+                            </>
+                        )}
                     </select>
                 </div>
 
@@ -184,18 +192,22 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
                     </label>
                     <select
                         className="ui-select"
-                        value={regionalOfficeId}
+                        value={isGlobalRole ? "__GLOBAL__" : regionalOfficeId}
                         disabled={isGlobalRole}
                         onChange={(e) => setRegionalOfficeId(e.target.value)}
                     >
-                        <option value="">
-                            {isGlobalRole ? "Not applicable for global roles" : "-- Select Regional Office --"}
-                        </option>
-                        {availableOffices.map((office) => (
-                            <option key={office.id} value={office.id}>
-                                {office.name}
-                            </option>
-                        ))}
+                        {isGlobalRole ? (
+                            <option value="__GLOBAL__">Global</option>
+                        ) : (
+                            <>
+                                <option value="">-- Select Regional Office --</option>
+                                {availableOffices.map((office) => (
+                                    <option key={office.id} value={office.id}>
+                                        {office.name}
+                                    </option>
+                                ))}
+                            </>
+                        )}
                     </select>
                 </div>
 

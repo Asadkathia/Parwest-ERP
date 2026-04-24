@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const users = await prisma.user.findMany({
       where,
       include: {
-        role: { select: { id: true, name: true } },
+        role: { select: { id: true, name: true, scopeType: true } },
         region: { select: { id: true, name: true } },
         regionalOffice: { select: { id: true, name: true } },
       },
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         regionalOfficeId,
       },
       include: {
-        role: { select: { id: true, name: true } },
+        role: { select: { id: true, name: true, scopeType: true } },
         region: { select: { id: true, name: true } },
         regionalOffice: { select: { id: true, name: true } },
       },
