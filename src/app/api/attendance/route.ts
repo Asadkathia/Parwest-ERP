@@ -38,11 +38,33 @@ export async function GET(request: NextRequest) {
         const records = await prisma.attendance.findMany({
             where: {
                 ...(resolvedGuardId ? { guardId: resolvedGuardId } : {}),
+                // Attendance rows are written with `date = setHours(0,0,0,0)`
+                // in the server's local timezone. Parse query dates the same
+                // way so exact-day queries don't miss rows across timezones.
                 ...(startDate || endDate
                     ? {
                         date: {
-                            ...(startDate ? { gte: new Date(startDate) } : {}),
-                            ...(endDate ? { lte: new Date(endDate) } : {}),
+                            ...(startDate
+                                ? {
+                                      gte: (() => {
+                                          const d = new Date(startDate)
+                                          d.setHours(0, 0, 0, 0)
+                                          return d
+                                      })(),
+                                  }
+                                : {}),
+                            ...(endDate
+                                ? {
+                                      // Include the full end day: use the next
+                                      // midnight and `lt` rather than `lte`.
+                                      lt: (() => {
+                                          const d = new Date(endDate)
+                                          d.setHours(0, 0, 0, 0)
+                                          d.setDate(d.getDate() + 1)
+                                          return d
+                                      })(),
+                                  }
+                                : {}),
                         },
                     }
                     : {}),

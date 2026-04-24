@@ -248,12 +248,18 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
             }
         }
 
-        // Phone validation — visible inline fields
+        // Phone validation — visible inline fields.
+        // PhoneInput pre-fills "+92-" into its form value, so an untouched
+        // optional field submits as the bare prefix. Treat prefix-only as empty.
+        const normalizePhone = (raw: string) => {
+            const v = raw.trim()
+            return v === "+92-" ? "" : v
+        }
         const phoneFields: [string, string][] = [
-            ["Introducer Contact Number", String(formData.get("introducerContactNumber") ?? "").trim()],
-            ["Branch Manager Contact", String(formData.get("branchManagerContact") ?? "").trim()],
-            ["Branch Operations Manager Contact", String(formData.get("branchOperationsManagerContact") ?? "").trim()],
-            ["Branch Supervisor Contact", String(formData.get("branchSupervisorContact") ?? "").trim()],
+            ["Introducer Contact Number", normalizePhone(String(formData.get("introducerContactNumber") ?? ""))],
+            ["Branch Manager Contact", normalizePhone(String(formData.get("branchManagerContact") ?? ""))],
+            ["Branch Operations Manager Contact", normalizePhone(String(formData.get("branchOperationsManagerContact") ?? ""))],
+            ["Branch Supervisor Contact", normalizePhone(String(formData.get("branchSupervisorContact") ?? ""))],
         ]
         for (const [label, val] of phoneFields) {
             if (val && !isValidPhone(val)) {

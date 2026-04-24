@@ -1,4 +1,5 @@
 import type { Session } from "next-auth"
+import { isSuperAdmin } from "@/lib/api/permissions"
 
 export type ManagerScope = {
   role: string
@@ -11,24 +12,66 @@ export type ScopedQueryFilters = {
   regionalOfficeId?: string | null
 }
 
-export function isManagerRole(role: string | null | undefined) {
-  const value = (role || "").toLowerCase()
-  return value.includes("manager")
+type SessionUserLike = {
+  role?: string
+  roleScopeType?: "GLOBAL" | "REGIONAL"
+  regionId?: string | null
+  regionalOfficeId?: string | null
+  permissions?: string[]
 }
 
-export function deriveManagerScope(session: Session | null): ManagerScope | null {
-  const role = session?.user?.role || ""
-  if (!isManagerRole(role)) return null
+function getUser(session: Session | null): SessionUserLike | undefined {
+  return session?.user as SessionUserLike | undefined
+}
 
-  const maybeRegionId = (session?.user as Record<string, unknown> | undefined)?.regionId
-  const maybeOfficeId = (session?.user as Record<string, unknown> | undefined)?.regionalOfficeId
+/**
+ * Return a regional scope for this session, or null if the user should see
+ * all regions. A user is regionally scoped when:
+ *   - they are NOT a SuperAdmin (per isSuperAdmin — "Super User" role, or
+ *     "Admin" with no explicit permissions), AND
+ *   - their role's scopeType is REGIONAL.
+ *
+ * The regionId / regionalOfficeId are read from the session and, in the
+ * well-formed case, are guaranteed to be set for REGIONAL users (the API
+ * layer rejects user creations/updates that violate this invariant).
+ */
+export function deriveRegionalScope(session: Session | null): ManagerScope | null {
+  if (isSuperAdmin(session)) return null
+
+  const user = getUser(session)
+  if (!user) return null
+
+  if (user.roleScopeType !== "REGIONAL") return null
+
+  const regionId = typeof user.regionId === "string" ? user.regionId : null
+  const regionalOfficeId =
+    typeof user.regionalOfficeId === "string" ? user.regionalOfficeId : null
+
+  // REGIONAL users without a regionId should never happen (API-enforced),
+  // but if we hit one (pre-migration data, direct DB edit, etc.), fail safe
+  // by scoping them to an impossible region so they see nothing — better
+  // than silently leaking cross-region data.
+  if (!regionId && !regionalOfficeId) {
+    return {
+      role: user.role ?? "",
+      regionId: "__missing__",
+      regionalOfficeIds: [],
+    }
+  }
 
   return {
-    role,
-    regionId: typeof maybeRegionId === "string" ? maybeRegionId : null,
-    regionalOfficeIds: typeof maybeOfficeId === "string" ? [maybeOfficeId] : [],
+    role: user.role ?? "",
+    regionId,
+    regionalOfficeIds: regionalOfficeId ? [regionalOfficeId] : [],
   }
 }
+
+/**
+ * Back-compat alias. Existing call sites (~190 endpoints) still import
+ * `deriveManagerScope` — redirect them to the new regional scope logic so
+ * the entire system picks up the fix without touching each endpoint.
+ */
+export const deriveManagerScope = deriveRegionalScope
 
 export function applyManagerScope<T>(
   rows: T[],

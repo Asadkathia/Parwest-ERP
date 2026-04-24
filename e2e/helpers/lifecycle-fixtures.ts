@@ -92,10 +92,6 @@ async function findClientByName(
  * End any ACTIVE deployments for the given guard. Used before a happy-path
  * test to ensure the guard is "deployment-clean", since prior runs may have
  * left an ACTIVE deployment that blocks the singleActivePerGuard rule.
- *
- * GET /api/deployments does not accept guardId or status filters — it returns
- * up to 200 rows unfiltered. We filter client-side to avoid ending unrelated
- * deployments.
  */
 export async function endActiveDeploymentsForGuard(
   page: Page,
@@ -103,17 +99,16 @@ export async function endActiveDeploymentsForGuard(
 ): Promise<number> {
   const guard = await findGuardByParwestId(page.request, guardParwestId)
   if (!guard) return 0
-  const listRes = await page.request.get(`/api/deployments`)
+  const listRes = await page.request.get(
+    `/api/deployments?guardId=${encodeURIComponent(guard.id)}&status=ACTIVE`
+  )
   if (!listRes.ok()) return 0
   const body = (await listRes.json()) as
-    | { id: string; guardId?: string; status?: string }[]
-    | { data?: { id: string; guardId?: string; status?: string }[] }
-  const all = Array.isArray(body) ? body : body.data ?? []
-  const mine = all.filter(
-    (d) => d.guardId === guard.id && d.status === "ACTIVE"
-  )
+    | { id: string }[]
+    | { data?: { id: string }[] }
+  const list: { id: string }[] = Array.isArray(body) ? body : body.data ?? []
   let ended = 0
-  for (const d of mine) {
+  for (const d of list) {
     const res = await page.request.post(`/api/deployments/${d.id}/end`, {
       data: {
         endDate: new Date().toISOString().slice(0, 10),
@@ -140,14 +135,14 @@ export async function ensureOneActiveDeployment(
   const guard = await findGuardByParwestId(page.request, guardParwestId)
   expect(guard).toBeTruthy()
 
-  const listRes = await page.request.get(`/api/deployments`)
-  const body = (await listRes.json()) as
-    | { id: string; guardId?: string; status?: string; shiftType?: string }[]
-    | { data?: { id: string; guardId?: string; status?: string; shiftType?: string }[] }
-  const all = Array.isArray(body) ? body : body.data ?? []
-  const existing = all.find(
-    (d) => d.guardId === guard!.id && d.status === "ACTIVE" && d.shiftType === shift
+  const listRes = await page.request.get(
+    `/api/deployments?guardId=${encodeURIComponent(guard!.id)}&status=ACTIVE`
   )
+  const body = (await listRes.json()) as
+    | { id: string; shiftType?: string }[]
+    | { data?: { id: string; shiftType?: string }[] }
+  const all = Array.isArray(body) ? body : body.data ?? []
+  const existing = all.find((d) => d.shiftType === shift)
   if (existing) return existing.id
 
   // End any conflicting ACTIVE deployments (wrong shift, BOTH, etc.)

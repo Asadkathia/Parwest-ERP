@@ -55,7 +55,12 @@ export async function POST(
       },
     })
     if (!current) return notFound("Deployment not found")
-    if (current.status === "INACTIVE") return badRequest("Cannot change an already inactive deployment.")
+    if (
+      isWorkflowRuleEnabled("deployments.blockInactiveUpdate") &&
+      current.status !== "ACTIVE"
+    ) {
+      return badRequest("Cannot change an already inactive deployment.")
+    }
     if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: current.regionalOfficeId })) {
       return forbidden("Forbidden: deployment is outside your scope.")
     }

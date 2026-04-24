@@ -1,5 +1,5 @@
-import UserPermissionsManager from "@/components/users/UserPermissionsManager"
+import { redirect } from "next/navigation"
 
 export default function UserPermissionsPage() {
-  return <UserPermissionsManager />
+  redirect("/users/roles?tab=overrides")
 }

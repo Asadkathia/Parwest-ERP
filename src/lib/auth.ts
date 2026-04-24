@@ -142,6 +142,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     email: user.email,
                     name: user.name,
                     role: user.role.name,
+                    roleScopeType: user.role.scopeType,
                     regionId: user.regionId,
                     regionalOfficeId: user.regionalOfficeId,
                     permissions,
@@ -156,6 +157,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (user) {
                 token.id = user.id
                 token.role = user.role
+                token.roleScopeType = user.roleScopeType
                 token.regionId = user.regionId ?? null
                 token.regionalOfficeId = user.regionalOfficeId ?? null
                 token.permissions = user.permissions ?? []
@@ -179,8 +181,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     } as const
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.id as string },
-                        select: { roleId: true },
+                        select: { roleId: true, role: { select: { scopeType: true } } },
                     })
+                    if (dbUser?.role?.scopeType) {
+                        token.roleScopeType = dbUser.role.scopeType
+                    }
                     const [userPerms, rolePerms] = await Promise.all([
                         prisma.userPermission.findMany({
                             where: { userId: token.id as string, OR: anyEnabled },

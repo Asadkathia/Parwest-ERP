@@ -21,24 +21,16 @@ export function todayIsoDate(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-/** Fetch attendance rows for a guard. Window is ±1 day to defuse timezone
- *  skew: the server writes date = local midnight via `setHours(0,0,0,0)`, but
- *  the GET filter parses `new Date(startDate)` as UTC midnight, so an exact
- *  startDate=endDate=today query drops the row in any non-UTC timezone.
+/** Fetch attendance rows for a guard on a specific date. The server now
+ *  normalizes startDate/endDate to local midnight, so exact-day queries
+ *  reliably match rows written with `setHours(0,0,0,0)`.
  */
 export async function fetchAttendanceForGuard(
   req: APIRequestContext,
   guardId: string,
   date: string
 ): Promise<{ ok: boolean; status: number; bodyText: string; rows: AttendanceRow[] }> {
-  const d = new Date(`${date}T00:00:00`)
-  const start = new Date(d)
-  start.setDate(start.getDate() - 1)
-  const end = new Date(d)
-  end.setDate(end.getDate() + 1)
-  const iso = (x: Date) =>
-    `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
-  const url = `/api/attendance?guardId=${encodeURIComponent(guardId)}&startDate=${iso(start)}&endDate=${iso(end)}`
+  const url = `/api/attendance?guardId=${encodeURIComponent(guardId)}&startDate=${date}&endDate=${date}`
   const res = await req.get(url)
   const bodyText = await res.text()
   let rows: AttendanceRow[] = []

@@ -27,7 +27,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
                 regionalOfficeId: true,
             },
         }),
-        prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, scopeType: true } }),
         prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
         prisma.regionalOffice
             .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, regionId: true } })

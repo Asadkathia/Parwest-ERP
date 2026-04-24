@@ -94,14 +94,14 @@ export async function fillValidGuardForm(
   expect(officeValue, "at least one RegionalOffice must be seeded").toBeTruthy()
   await officeSelect.selectOption(officeValue!)
 
-  // Trim optional sections. Previous Employment can now be unchecked — its
-  // validator is gated on the section checkbox (fixed).
+  // Trim optional sections. ADD FAMILY MEMBER DETAIL and ADD NEAREST RELATIVE
+  // DETAIL are now marked `required: true` — their checkboxes render disabled
+  // and cannot be unchecked. The form accepts empty sub-rows so we leave them
+  // rendered with no data.
   for (const label of [
     "GUARD BANK ACCOUNT DETAILS",
     "PREVIOUS EMPLOYMENT DETAILS",
     "EDUCATION",
-    "ADD FAMILY MEMBER DETAIL",
-    "ADD NEAREST RELATIVE DETAIL",
   ]) {
     await uncheckSection(page, label)
   }
@@ -122,6 +122,26 @@ export async function fillValidGuardForm(
   await page.locator('input[name="joiningDate"]').fill(isoDate(-7))
   await page.locator('input[name="policeStation"]').fill(g.policeStation)
   await page.locator('select[name="bloodGroup"]').selectOption("O+ve")
+  await page.locator('select[name="maritalStatus"]').selectOption("single")
+  await page.locator('input[name="profileIntroducer"]').fill("QA Profile Introducer")
+
+  // Supervisor is a required hidden input (supervisorId) backed by a typeahead
+  // populated after Regional Office is picked.
+  const supervisorBox = page.locator('input[placeholder^="Search supervisor"]').first()
+  const supervisorHidden = page.locator('input[type="hidden"][name="supervisorId"]')
+  if (await supervisorBox.count()) {
+    await supervisorBox.click()
+    // Wait for the async fetch to populate the dropdown.
+    const firstUser = page
+      .locator('.absolute.z-50 button[type="button"]')
+      .filter({ has: page.locator("span.font-medium") })
+      .first()
+    await firstUser.waitFor({ state: "visible", timeout: 10_000 })
+    // onMouseDown (not onClick) is what the component listens to.
+    await firstUser.dispatchEvent("mousedown")
+    // Confirm the hidden input now has a value.
+    await expect(supervisorHidden).not.toHaveValue("", { timeout: 5_000 })
+  }
 
   // ADDRESS
   await page.locator('input[name="addressCurrent"]').fill(g.addressCurrent)
@@ -131,6 +151,26 @@ export async function fillValidGuardForm(
 
   // INTRODUCER
   await page.locator('input[name="introducerName"]').fill(g.introducerName)
+
+  // FAMILY MEMBER — every Name/Relation/Age/Profession/Address is required.
+  if (await page.locator('input[name="family_0_name"]').count()) {
+    await page.locator('input[name="family_0_name"]').fill("QA Family Member")
+    await page.locator('input[name="family_0_relation"]').fill("Brother")
+    await page.locator('input[name="family_0_age"]').fill("28")
+    await page.locator('input[name="family_0_profession"]').fill("Teacher")
+    await page.locator('input[name="family_0_address"]').fill("Village X")
+  }
+  // NEAREST RELATIVE — Name/Father/Relation/Profession/CNIC/CNIC Issue/Contact/Address required.
+  if (await page.locator('input[name="nearest_0_name"]').count()) {
+    await page.locator('input[name="nearest_0_name"]').fill("QA Nearest Relative")
+    await page.locator('input[name="nearest_0_fatherName"]').fill("QA Uncle")
+    await page.locator('input[name="nearest_0_relation"]').fill("Uncle")
+    await page.locator('input[name="nearest_0_profession"]').fill("Farmer")
+    await page.locator('input[name="nearest_0_cnic"]').fill("42101-7654321-1")
+    await page.locator('input[name="nearest_0_cnicIssueDate"]').fill("2015-06-01")
+    await page.locator('input[name="nearest_0_contact"]').fill("+92-301-1111111")
+    await page.locator('input[name="nearest_0_address"]').fill("Village X")
+  }
 
   // PHYSICAL
   await page.locator('input[name="height"]').fill(g.height)

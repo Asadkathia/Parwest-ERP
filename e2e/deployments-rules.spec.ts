@@ -55,6 +55,7 @@ test.describe("Deployment — workflow rule enforcement", () => {
   test("second ACTIVE DAY deployment for a guard is rejected (singleActivePerGuard)", async ({
     page,
   }) => {
+    test.slow() // heavy setup + UI fill
     await ensureLifecycleContract(page)
     // Ensure LC-G-0004 has exactly one ACTIVE DAY deployment to probe
     // singleActivePerGuard. This is self-sufficient: prior test runs may have

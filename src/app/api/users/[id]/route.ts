@@ -40,6 +40,34 @@ export async function PATCH(
       return NextResponse.json({ id, ...data })
     }
 
+    // Enforce role scope ↔ region consistency when role/region is being changed.
+    if (data.roleId !== undefined || data.regionId !== undefined || data.regionalOfficeId !== undefined) {
+      const current = await prisma.user.findUnique({
+        where: { id },
+        select: { roleId: true, regionId: true, regionalOfficeId: true },
+      })
+      if (!current) return notFound("User not found.")
+
+      const targetRoleId = (data.roleId as string | undefined) ?? current.roleId
+      const targetRegionId = data.regionId === undefined ? current.regionId : (data.regionId as string | null)
+      const targetOfficeId = data.regionalOfficeId === undefined ? current.regionalOfficeId : (data.regionalOfficeId as string | null)
+
+      const role = await prisma.role.findUnique({
+        where: { id: targetRoleId },
+        select: { scopeType: true, name: true },
+      })
+      if (!role) return badRequest("Invalid roleId.")
+      if (role.scopeType === "REGIONAL") {
+        if (!targetRegionId || !targetOfficeId) {
+          return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
+        }
+      } else {
+        if (targetRegionId || targetOfficeId) {
+          return badRequest(`Role "${role.name}" is global — it cannot be assigned to a region or office.`)
+        }
+      }
+    }
+
     if (managerScope) {
       const existingUser = await prisma.user.findUnique({
         where: { id },

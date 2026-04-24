@@ -290,6 +290,22 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       }
     }
 
+    // Validate address contact numbers when the address section is included
+    if (sections.address) {
+      const currentContact = String(data.currentAddressContact || "").trim()
+      const permanentContact = String(data.permanentAddressContact || "").trim()
+      if (currentContact && !/^\+92-\d{3}-\d{7}$/.test(currentContact)) {
+        setError("Current Address Contact No format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
+      if (permanentContact && !/^\+92-\d{3}-\d{7}$/.test(permanentContact)) {
+        setError("Permanent Address Contact No format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
+    }
+
     // Validate CNIC dates
     const cnicIssueDate = formData.get("cnicIssueDate") as string
     const cnicExpiryDate = formData.get("cnicExpiryDate") as string
@@ -315,6 +331,25 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       }
     }
 
+    // Validate general section required fields that HTML required can't catch (hidden inputs + selects)
+    if (sections.general) {
+      if (!String(data.supervisorId || "").trim()) {
+        setError("Supervisor is required.")
+        setLoading(false)
+        return
+      }
+      if (!String(data.bloodGroup || "").trim()) {
+        setError("Blood Group is required.")
+        setLoading(false)
+        return
+      }
+      if (!String(data.maritalStatus || "").trim()) {
+        setError("Marital Status is required.")
+        setLoading(false)
+        return
+      }
+    }
+
     // Validate family members (required — at least one with a name)
     const hasAnyFamilyName = familyRows.some((idx) => String(data[`family_${idx}_name`] || "").trim())
     if (!hasAnyFamilyName) {
@@ -329,6 +364,16 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
       setError("At least one nearest relative detail is required. Please fill in the Name field.")
       setLoading(false)
       return
+    }
+
+    // Validate nearest relative contact numbers format
+    for (const idx of nearestRows) {
+      const contact = String(data[`nearest_${idx}_contact`] || "").trim()
+      if (contact && !/^\+92-\d{3}-\d{7}$/.test(contact)) {
+        setError("Nearest Relative Contact # format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
     }
 
     // Validate bank accounts
@@ -580,7 +625,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
             <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
             <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
             <Field label="NEXT OF KIN *" name="nextOfKin" required />
-            <Field label="NATIONALITY" name="nationality" placeholder="e.g. Pakistani" />
+            <Field label="NATIONALITY *" name="nationality" required placeholder="e.g. Pakistani" />
             <div className="space-y-3 lg:col-span-3">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 CONTACT # (FORMAT: +92-300-1234567) <span className="text-red-500">*</span>
@@ -615,7 +660,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 Add Contact Number
               </button>
             </div>
-            <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" />
+            <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" required />
             <Field label="SECT *" name="sect" required placeholder="SECT" />
             <Field label="CAST *" name="cast" required placeholder="CAST" />
             <div>
@@ -637,11 +682,14 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
               <input type="text" name="enrolledBy" readOnly value={currentUserName} className="ui-input bg-slate-50" />
             </div>
             <Field label="POLICE STATION *" name="policeStation" required />
-            <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" />
+            <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" required />
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">MARITAL STATUS</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                MARITAL STATUS <span className="text-red-500">*</span>
+              </label>
               <select
                 name="maritalStatus"
+                required
                 value={maritalStatus}
                 onChange={(e) => setMaritalStatus(e.target.value)}
                 className="ui-input"
@@ -652,8 +700,8 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                 ))}
               </select>
             </div>
-            <SupervisorSelector regionalOfficeId={selectedRegionalOfficeId} />
-            <Field label="Profile Introducer" name="profileIntroducer" placeholder="Profile Introducer" />
+            <SupervisorSelector regionalOfficeId={selectedRegionalOfficeId} required />
+            <Field label="PROFILE INTRODUCER *" name="profileIntroducer" required placeholder="Profile Introducer" />
           </div>
         </CollapsibleSection>
       ) : null}
@@ -876,9 +924,19 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Field label="CURRENT RESIDENTIAL ADDRESS *" name="addressCurrent" required placeholder="Current Residential Address" />
-            <Field label="CURRENT ADDRESS CONTACT NO *" name="currentAddressContact" required placeholder="Current Address Contact No" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CURRENT ADDRESS CONTACT NO <span className="text-red-500">*</span>
+              </label>
+              <PhoneInput name="currentAddressContact" required />
+            </div>
             <Field label="PERMANENT RESIDENTIAL ADDRESS *" name="addressPermanent" required placeholder="Permanent Residential Address" />
-            <Field label="PERMANENT ADDRESS CONTACT NO *" name="permanentAddressContact" required placeholder="Permanent Address Contact No" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                PERMANENT ADDRESS CONTACT NO <span className="text-red-500">*</span>
+              </label>
+              <PhoneInput name="permanentAddressContact" required />
+            </div>
           </div>
         </CollapsibleSection>
       ) : null}
@@ -969,16 +1027,16 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <Field label="NAME *" name={`family_${idx}_name`} placeholder="NAME" />
-                  <Field label="RELATION" name={`family_${idx}_relation`} placeholder="RELATION" />
-                  <Field label="AGE" name={`family_${idx}_age`} placeholder="AGE" />
-                  <Field label="PROFESSION" name={`family_${idx}_profession`} placeholder="PROFESSION" />
-                  <Field label="ADDRESS" name={`family_${idx}_address`} placeholder="ADDRESS" />
+                  <Field label="NAME *" name={`family_${idx}_name`} required placeholder="NAME" />
+                  <Field label="RELATION *" name={`family_${idx}_relation`} required placeholder="RELATION" />
+                  <Field label="AGE *" name={`family_${idx}_age`} required placeholder="AGE" />
+                  <Field label="PROFESSION *" name={`family_${idx}_profession`} required placeholder="PROFESSION" />
+                  <Field label="ADDRESS *" name={`family_${idx}_address`} required placeholder="ADDRESS" />
                   {maritalStatus === "married" ? (
                     <>
-                      <Field label="B-FORM / CNIC (CHILD)" name={`family_${idx}_childCnic`} placeholder="B-Form / CNIC No" />
-                      <Field label="CHILD AGE" name={`family_${idx}_childAge`} placeholder="Age" />
-                      <Field label="CHILD DATE OF BIRTH" name={`family_${idx}_childDob`} type="date" />
+                      <Field label="B-FORM / CNIC (CHILD) *" name={`family_${idx}_childCnic`} required placeholder="B-Form / CNIC No" />
+                      <Field label="CHILD AGE *" name={`family_${idx}_childAge`} required placeholder="Age" />
+                      <Field label="CHILD DATE OF BIRTH *" name={`family_${idx}_childDob`} required type="date" />
                     </>
                   ) : null}
                 </div>
@@ -1025,17 +1083,24 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
                   ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <Field label="NAME *" name={`nearest_${idx}_name`} placeholder="NAME" />
-                  <Field label="FATHER NAME" name={`nearest_${idx}_fatherName`} placeholder="FATHER NAME" />
-                  <Field label="RELATION" name={`nearest_${idx}_relation`} placeholder="RELATION" />
-                  <Field label="PROFESSION" name={`nearest_${idx}_profession`} placeholder="PROFESSION" />
+                  <Field label="NAME *" name={`nearest_${idx}_name`} required placeholder="NAME" />
+                  <Field label="FATHER NAME *" name={`nearest_${idx}_fatherName`} required placeholder="FATHER NAME" />
+                  <Field label="RELATION *" name={`nearest_${idx}_relation`} required placeholder="RELATION" />
+                  <Field label="PROFESSION *" name={`nearest_${idx}_profession`} required placeholder="PROFESSION" />
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">CNIC # (FORMAT: XXXXX-XXXXXXX-X)</label>
-                    <CnicInput name={`nearest_${idx}_cnic`} placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      CNIC # (FORMAT: XXXXX-XXXXXXX-X) <span className="text-red-500">*</span>
+                    </label>
+                    <CnicInput name={`nearest_${idx}_cnic`} required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
                   </div>
-                  <Field label="CNIC ISSUE DATE" name={`nearest_${idx}_cnicIssueDate`} type="date" />
-                  <Field label="CONTACT #" name={`nearest_${idx}_contact`} placeholder="+__-___-_______" />
-                  <Field label="ADDRESS" name={`nearest_${idx}_address`} placeholder="ADDRESS" />
+                  <Field label="CNIC ISSUE DATE *" name={`nearest_${idx}_cnicIssueDate`} required type="date" />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      CONTACT # <span className="text-red-500">*</span>
+                    </label>
+                    <PhoneInput name={`nearest_${idx}_contact`} required />
+                  </div>
+                  <Field label="ADDRESS *" name={`nearest_${idx}_address`} required placeholder="ADDRESS" />
                 </div>
               </div>
             ))}
@@ -1183,7 +1248,7 @@ function Field({
   )
 }
 
-function SupervisorSelector({ regionalOfficeId }: { regionalOfficeId: string }) {
+function SupervisorSelector({ regionalOfficeId, required }: { regionalOfficeId: string; required?: boolean }) {
   const [query, setQuery] = useState("")
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [selected, setSelected] = useState<{ id: string; name: string } | null>(null)
@@ -1214,7 +1279,9 @@ function SupervisorSelector({ regionalOfficeId }: { regionalOfficeId: string }) 
 
   return (
     <div className="relative">
-      <label className="mb-2 block text-sm font-medium text-gray-700">Supervisor</label>
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        Supervisor {required ? <span className="text-red-500">*</span> : null}
+      </label>
       <input type="hidden" name="supervisorId" value={selected?.id || ""} />
       <input type="hidden" name="managerName" value={selected?.name || ""} />
       {!regionalOfficeId ? (
@@ -1275,17 +1342,21 @@ function SelectField({
   options,
   defaultValue = "",
   placeholder,
+  required,
 }: {
   label: string
   name: string
   options: Array<string | { label: string; value: string }>
   defaultValue?: string
   placeholder?: string
+  required?: boolean
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700">{label}</label>
-      <select name={name} defaultValue={defaultValue} className="ui-input">
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {label} {required ? <span className="text-red-500">*</span> : null}
+      </label>
+      <select name={name} defaultValue={defaultValue} required={required} className="ui-input">
         <option value="">{placeholder || `Select ${label.toLowerCase()}`}</option>
         {options.map((option) => {
           const value = typeof option === "string" ? option : option.value

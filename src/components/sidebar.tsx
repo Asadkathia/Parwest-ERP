@@ -25,6 +25,7 @@ import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
 import { permissionKey, type ActionKey } from "@/lib/constants/permissions"
+import { isSuperAdmin } from "@/lib/api/permissions"
 
 const allNavItems: NavNode[] = [
     {
@@ -196,8 +197,7 @@ const allNavItems: NavNode[] = [
             { title: "All Users", href: "/users", icon: Users },
             { title: "Add User", href: "/users/new", icon: Users },
             { title: "Search Users", href: "/users/search", icon: Search },
-            { title: "Roles", href: "/users/roles", icon: Settings },
-            { title: "Permissions", href: "/users/permissions", icon: Settings },
+            { title: "Roles & Permissions", href: "/users/roles", icon: Settings },
             { title: "M/S Relationship", href: "/users/ms-relationship", icon: Users },
             { title: "Switch Supervisor", href: "/users/switch-supervisor", icon: Users },
             { title: "C/S Relationship", href: "/users/cs-relationship", icon: Users },
@@ -384,19 +384,18 @@ export function Sidebar() {
         )
     }
 
-    // Derive visible nav items from session permissions
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userRole = (session?.user as any)?.role as string | undefined
+    // Derive visible nav items from session permissions.
+    // SuperAdmin bypass (shared rule from @/lib/api/permissions):
+    //   - "Super User" role → always unrestricted
+    //   - "Admin" role with NO permissions → unrestricted
+    //   - Anyone else → filtered by their per-action permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const permissions = ((session?.user as any)?.permissions as string[]) || []
-
-    // Admin role is always unrestricted — sees all modules regardless of permissions.
-    // Non-admin users see only modules matching their assigned permissions.
-    const isUnrestrictedAdmin = userRole === "Admin"
+    const isUnrestricted = isSuperAdmin(session)
 
     const navItems = status === "loading"
         ? [] // show nothing while loading to avoid flash
-        : filterNavByPermissions(allNavItems, permissions, isUnrestrictedAdmin)
+        : filterNavByPermissions(allNavItems, permissions, isUnrestricted)
 
     const sidebarContent = (
         <div className="flex h-full flex-col">
@@ -423,7 +422,7 @@ export function Sidebar() {
                 )}
             </nav>
             {/* Permission notice for non-admin users */}
-            {!isUnrestrictedAdmin && status === "authenticated" && navItems.length <= 1 && (
+            {!isUnrestricted && status === "authenticated" && navItems.length <= 1 && (
                 <div className="border-t border-[var(--sidebar-border)] p-4">
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                         <ShieldAlert className="h-3.5 w-3.5 shrink-0" />

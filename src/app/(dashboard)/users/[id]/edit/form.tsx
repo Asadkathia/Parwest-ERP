@@ -1,10 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-type RoleOption = { id: string; name: string }
+type RoleOption = { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" }
 type RegionOption = { id: string; name: string }
 type OfficeOption = { id: string; name: string; regionId: string | null }
 
@@ -42,6 +42,18 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
         return offices.filter((office) => !office.regionId || office.regionId === regionId)
     }, [offices, regionId])
 
+    const selectedRole = useMemo(() => roles.find((r) => r.id === roleId) || null, [roles, roleId])
+    const isGlobalRole = selectedRole?.scopeType === "GLOBAL"
+    const isRegionalRole = selectedRole?.scopeType === "REGIONAL"
+
+    // Clear region/office when switching to a global role.
+    useEffect(() => {
+        if (isGlobalRole && (regionId || regionalOfficeId)) {
+            setRegionId("")
+            setRegionalOfficeId("")
+        }
+    }, [isGlobalRole, regionId, regionalOfficeId])
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setLoading(true)
@@ -54,6 +66,11 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
         }
         if (!roleId) {
             setError("Role is required.")
+            setLoading(false)
+            return
+        }
+        if (isRegionalRole && (!regionId || !regionalOfficeId)) {
+            setError("Region and Regional Office are required for regional roles.")
             setLoading(false)
             return
         }
@@ -138,16 +155,21 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
                 </div>
 
                 <div>
-                    <label className="mb-1 block text-sm text-[var(--text-muted)]">Region</label>
+                    <label className="mb-1 block text-sm text-[var(--text-muted)]">
+                        Region{isRegionalRole ? " *" : ""}
+                    </label>
                     <select
                         className="ui-select"
                         value={regionId}
+                        disabled={isGlobalRole}
                         onChange={(e) => {
                             setRegionId(e.target.value)
                             setRegionalOfficeId("")
                         }}
                     >
-                        <option value="">-- Select Region --</option>
+                        <option value="">
+                            {isGlobalRole ? "Not applicable for global roles" : "-- Select Region --"}
+                        </option>
                         {regions.map((region) => (
                             <option key={region.id} value={region.id}>
                                 {region.name}
@@ -157,13 +179,18 @@ export default function UserEditForm({ user, roles, regions, offices }: Props) {
                 </div>
 
                 <div>
-                    <label className="mb-1 block text-sm text-[var(--text-muted)]">Regional Office</label>
+                    <label className="mb-1 block text-sm text-[var(--text-muted)]">
+                        Regional Office{isRegionalRole ? " *" : ""}
+                    </label>
                     <select
                         className="ui-select"
                         value={regionalOfficeId}
+                        disabled={isGlobalRole}
                         onChange={(e) => setRegionalOfficeId(e.target.value)}
                     >
-                        <option value="">-- Select Regional Office --</option>
+                        <option value="">
+                            {isGlobalRole ? "Not applicable for global roles" : "-- Select Regional Office --"}
+                        </option>
                         {availableOffices.map((office) => (
                             <option key={office.id} value={office.id}>
                                 {office.name}

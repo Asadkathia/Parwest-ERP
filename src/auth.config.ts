@@ -15,7 +15,11 @@ const authSecret =
  */
 export const authConfig = {
     secret: authSecret,
-    session: { strategy: "jwt" as const },
+    session: {
+        strategy: "jwt" as const,
+        maxAge: 60 * 60 * 8,
+        updateAge: 60 * 60,
+    },
     pages: { signIn: "/login" },
     providers: [
         Credentials({
@@ -35,6 +39,7 @@ export const authConfig = {
             if (user) {
                 token.id = user.id
                 token.role = user.role
+                token.roleScopeType = user.roleScopeType
                 token.regionId = user.regionId ?? null
                 token.regionalOfficeId = user.regionalOfficeId ?? null
                 token.permissions = user.permissions ?? []
@@ -46,6 +51,7 @@ export const authConfig = {
             if (session.user) {
                 session.user.id = token.id as string
                 session.user.role = token.role as string
+                session.user.roleScopeType = token.roleScopeType as "GLOBAL" | "REGIONAL" | undefined
                 session.user.regionId = (token.regionId as string | null) ?? null
                 session.user.regionalOfficeId = (token.regionalOfficeId as string | null) ?? null
                 session.user.permissions = (token.permissions as string[]) ?? []

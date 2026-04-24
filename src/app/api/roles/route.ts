@@ -5,11 +5,16 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
 
 const MOCK_ROLES = [
-  { id: "mock-role-admin", name: "Admin", description: "System administrator" },
-  { id: "mock-role-manager", name: "Manager", description: "Regional manager" },
-  { id: "mock-role-supervisor", name: "Supervisor", description: "Field supervisor" },
-  { id: "mock-role-accountant", name: "Accountant", description: "Payroll and billing" },
+  { id: "mock-role-admin", name: "Admin", description: "System administrator", scopeType: "REGIONAL" },
+  { id: "mock-role-manager", name: "Manager", description: "Regional manager", scopeType: "REGIONAL" },
+  { id: "mock-role-supervisor", name: "Supervisor", description: "Field supervisor", scopeType: "REGIONAL" },
+  { id: "mock-role-accountant", name: "Accountant", description: "Payroll and billing", scopeType: "REGIONAL" },
 ]
+
+function parseScopeType(value: unknown): "GLOBAL" | "REGIONAL" | null {
+  if (value === "GLOBAL" || value === "REGIONAL") return value
+  return null
+}
 
 export async function GET() {
   try {
@@ -43,6 +48,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const name = String(body?.name || "").trim()
     const description = body?.description ? String(body.description) : null
+    const scopeType = parseScopeType(body?.scopeType) ?? "REGIONAL"
 
     if (!name) {
       return badRequest("Role name is required.")
@@ -50,13 +56,13 @@ export async function POST(request: NextRequest) {
 
     if (isRuntimeMockEnabled()) {
       return NextResponse.json(
-        { id: `mock-role-${Date.now()}`, name, description, createdAt: new Date().toISOString() },
+        { id: `mock-role-${Date.now()}`, name, description, scopeType, createdAt: new Date().toISOString() },
         { status: 201 }
       )
     }
 
     const role = await prisma.role.create({
-      data: { name, description },
+      data: { name, description, scopeType },
     })
 
     return NextResponse.json(role, { status: 201 })

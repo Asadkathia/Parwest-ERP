@@ -262,7 +262,10 @@ export async function DELETE(
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: existing.regionalOfficeId })) {
             return forbidden("Forbidden: deployment is outside your scope.")
         }
-        if (existing.status !== "ACTIVE") {
+        if (
+            isWorkflowRuleEnabled("deployments.blockInactiveUpdate") &&
+            existing.status !== "ACTIVE"
+        ) {
             return conflict("Deployment is already ended.")
         }
 

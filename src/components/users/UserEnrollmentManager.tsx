@@ -7,7 +7,7 @@ import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import { checkPasswordStrength } from "@/lib/validation/formats"
 
-type RoleOption = { id: string; name: string }
+type RoleOption = { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" }
 type RegionOption = { id: string; name: string }
 type OfficeOption = { id: string; name: string; regionId?: string | null }
 
@@ -79,10 +79,25 @@ export default function UserEnrollmentManager() {
     }
   }, [])
 
+  const selectedRole = useMemo(
+    () => roles.find((r) => r.id === form.roleId) || null,
+    [roles, form.roleId]
+  )
+  const isGlobalRole = selectedRole?.scopeType === "GLOBAL"
+  const isRegionalRole = selectedRole?.scopeType === "REGIONAL"
+
   const availableOffices = useMemo(() => {
     if (!form.regionId) return offices
     return offices.filter((office) => !office.regionId || office.regionId === form.regionId)
   }, [offices, form.regionId])
+
+  // When the user picks a GLOBAL role, clear any region/office that may have
+  // been set (the API rejects region assignments on GLOBAL roles).
+  useEffect(() => {
+    if (isGlobalRole && (form.regionId || form.regionalOfficeId)) {
+      setForm((prev) => ({ ...prev, regionId: "", regionalOfficeId: "" }))
+    }
+  }, [isGlobalRole, form.regionId, form.regionalOfficeId])
 
   const passwordStrength = useMemo(
     () => checkPasswordStrength(form.password, form.email),
@@ -106,6 +121,11 @@ export default function UserEnrollmentManager() {
 
     if (!form.email.endsWith(EMAIL_DOMAIN)) {
       setError(`Email must end with ${EMAIL_DOMAIN}.`)
+      return
+    }
+
+    if (isRegionalRole && (!form.regionId || !form.regionalOfficeId)) {
+      setError("Region and Regional Office are required for regional roles.")
       return
     }
 
@@ -163,21 +183,25 @@ export default function UserEnrollmentManager() {
           />
           <SelectField
             label="Select Region"
+            required={isRegionalRole}
+            disabled={isGlobalRole}
             value={form.regionId}
             onChange={(v) => {
               setField("regionId", v)
               setField("regionalOfficeId", "")
             }}
             options={regions.map((region) => ({ value: region.id, label: region.name }))}
-            placeholder="-- Select Region --"
+            placeholder={isGlobalRole ? "Not applicable for global roles" : "-- Select Region --"}
           />
 
           <SelectField
             label="Regional Office"
+            required={isRegionalRole}
+            disabled={isGlobalRole}
             value={form.regionalOfficeId}
             onChange={(v) => setField("regionalOfficeId", v)}
             options={availableOffices.map((office) => ({ value: office.id, label: office.name }))}
-            placeholder="-- Select Regional Office --"
+            placeholder={isGlobalRole ? "Not applicable for global roles" : "-- Select Regional Office --"}
           />
           <Field label="Contact #" required value={form.contactNumber} onChange={(v) => setField("contactNumber", v)} />
 
@@ -274,6 +298,7 @@ function SelectField({
   options,
   placeholder,
   required,
+  disabled,
 }: {
   label: string
   value: string
@@ -281,6 +306,7 @@ function SelectField({
   options: Array<{ value: string; label: string }>
   placeholder: string
   required?: boolean
+  disabled?: boolean
 }) {
   return (
     <div>
@@ -288,7 +314,12 @@ function SelectField({
         {label}
         {required ? " *" : ""}
       </label>
-      <select className="ui-select" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className="ui-select"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="">{placeholder}</option>
         {options.map((option) => (
           <option key={`${label}-${option.value}`} value={option.value}>

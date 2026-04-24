@@ -62,13 +62,9 @@ export async function fillValidClientForm(
     .first()
     .fill(c.phone)
 
-  // PhoneInput fields always pre-fill "+92-" which now fails the format
-  // validator on submit. Fill every rendered PhoneInput with a valid number.
-  // branchManagerContact renders in both modes; the rest render only in branch
-  // mode but filling them unconditionally is harmless when the field is absent.
-  await page.locator('input[name="introducerContactNumber"]').fill(c.phone)
-  const branchManager = page.locator('input[name="branchManagerContact"]')
-  if (await branchManager.count()) await branchManager.fill(c.phone)
+  // Optional PhoneInput fields are left untouched — the server-side validator
+  // now treats bare "+92-" (the prefix-only value PhoneInput renders by
+  // default) as empty, so an untouched field no longer trips submit.
 
   // Location (SearchSelect for clientLocation defaults to Lahore — leave as is).
 

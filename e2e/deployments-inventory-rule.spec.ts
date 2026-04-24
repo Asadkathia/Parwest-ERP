@@ -138,6 +138,7 @@ test.describe("Deployment — GuardDeploymentInventoryRule enforcement", () => {
   test("accepts a guard that holds an allowed-category assignment (2xx)", async ({
     page,
   }) => {
+    test.slow() // multiple fixture API calls before the actual assertion
     const assignedParwestId = LIFECYCLE.guards.assigned.parwestId // LC-G-0003
 
     await endActiveDeploymentsForGuard(page, assignedParwestId)

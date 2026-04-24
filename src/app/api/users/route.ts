@@ -133,6 +133,23 @@ export async function POST(request: NextRequest) {
       return badRequest("Password is too weak: " + passwordCheck.issues.join(", "))
     }
 
+    if (!isRuntimeMockEnabled()) {
+      const role = await prisma.role.findUnique({
+        where: { id: roleId },
+        select: { scopeType: true, name: true },
+      })
+      if (!role) return badRequest("Invalid roleId.")
+      if (role.scopeType === "REGIONAL") {
+        if (!regionId || !regionalOfficeId) {
+          return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
+        }
+      } else {
+        if (regionId || regionalOfficeId) {
+          return badRequest(`Role "${role.name}" is global — it cannot be assigned to a region or office.`)
+        }
+      }
+    }
+
     if (isRuntimeMockEnabled()) {
       return NextResponse.json(
         {

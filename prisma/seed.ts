@@ -21,19 +21,21 @@ const prisma = new PrismaClient({ adapter })
 async function main() {
     console.log('Starting database seed...')
 
-    // Create Super User role
+    // Create Super User role (only GLOBAL-scoped role).
     await prisma.role.upsert({
         where: { name: 'Super User' },
-        update: {},
+        update: { scopeType: 'GLOBAL' },
         create: {
             name: 'Super User',
             description: 'Full system access',
+            scopeType: 'GLOBAL',
         },
     })
 
     console.log('✓ Created Super User role')
 
-    // Create Admin role
+    // Create Admin role. REGIONAL by default; users with this role AND zero
+    // assigned permissions still hit the SuperAdmin bypass in isSuperAdmin().
     const adminRole = await prisma.role.upsert({
         where: { name: 'Admin' },
         update: {},
@@ -45,7 +47,17 @@ async function main() {
 
     console.log('✓ Created Admin role')
 
+    // Regional Admin — administrative access scoped to a single region/office.
+    await prisma.role.upsert({
+        where: { name: 'Regional Admin' },
+        update: {},
+        create: {
+            name: 'Regional Admin',
+            description: 'Administrative access scoped to an assigned region and office.',
+        },
+    })
 
+    console.log('✓ Created Regional Admin role')
 
     // Create Manager role
     await prisma.role.upsert({

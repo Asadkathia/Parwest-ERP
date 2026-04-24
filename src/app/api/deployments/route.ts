@@ -20,13 +20,19 @@ function isValidShiftType(value: string) {
     return value === "DAY" || value === "NIGHT" || value === "BOTH"
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
             return unauthorized()
         }
         const managerScope = deriveManagerScope(session)
+
+        const { searchParams } = new URL(request.url)
+        const guardIdParam = searchParams.get("guardId")?.trim() || null
+        const statusParam = searchParams.get("status")?.trim().toUpperCase() || null
+        const allowedStatuses = new Set(["ACTIVE", "INACTIVE", "PAUSED", "ENDED"])
+        const statusFilter = statusParam && allowedStatuses.has(statusParam) ? statusParam : null
 
         if (isRuntimeMockEnabled()) {
             return NextResponse.json(
@@ -35,15 +41,22 @@ export async function GET() {
                         const scoped = row as { regionalOfficeId?: string | null }
                         return scoped.regionalOfficeId ?? null
                     },
-                }).map((row) => ({
-                    ...row,
-                    deploymentDate: new Date(row.deploymentDate),
-                }))
+                })
+                    .filter((row) => (guardIdParam ? row.guardId === guardIdParam : true))
+                    .filter((row) => (statusFilter ? row.status === statusFilter : true))
+                    .map((row) => ({
+                        ...row,
+                        deploymentDate: new Date(row.deploymentDate),
+                    }))
             )
         }
 
         const deployments = await prisma.deployment.findMany({
-            where: buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
+            where: {
+                ...buildManagerScopeWhere(managerScope, { regionalOfficeId: "regionalOfficeId" }),
+                ...(guardIdParam ? { guardId: guardIdParam } : {}),
+                ...(statusFilter ? { status: statusFilter } : {}),
+            },
             orderBy: { createdAt: "desc" },
             take: 200,
             include: {
@@ -164,6 +177,31 @@ export async function POST(request: NextRequest) {
         }
         if (isWorkflowRuleEnabled("deployments.requireActiveGuardStatus") && guard.lifecycleStatus !== "ACTIVE") {
             return conflict(`Guard cannot be deployed — current lifecycle status is "${guard.lifecycleStatus}". Only ACTIVE guards are eligible for deployment.`)
+        }
+        if (isWorkflowRuleEnabled("deployments.requireVerifiedPrerequisites")) {
+            const verificationDocTypes = await prisma.guardDocumentType.findMany({
+                where: { isActive: true, docCategory: "VERIFICATION" },
+                select: { name: true },
+            })
+            if (verificationDocTypes.length > 0) {
+                const verificationNames = verificationDocTypes.map((dt) => dt.name)
+                const guardVerifPrereqs = await prisma.guardPrerequisite.findMany({
+                    where: { guardId, docTypeName: { in: verificationNames } },
+                    select: { docTypeName: true, status: true },
+                })
+                const missingCount = verificationNames.filter(
+                    (name) => !guardVerifPrereqs.find((p) => p.docTypeName === name)
+                ).length
+                const unverifiedCount = guardVerifPrereqs.filter((p) => p.status !== "VERIFIED").length
+                if (missingCount > 0 || unverifiedCount > 0) {
+                    const parts: string[] = []
+                    if (missingCount > 0) parts.push(`${missingCount} not submitted`)
+                    if (unverifiedCount > 0) parts.push(`${unverifiedCount} not yet verified`)
+                    return conflict(
+                        `Guard verification is incomplete (${parts.join(", ")}). All verification documents must be submitted and verified before deployment.`
+                    )
+                }
+            }
         }
         if (
             isWorkflowRuleEnabled("deployments.requireGuardOfficeConsistency") &&

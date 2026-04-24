@@ -5,20 +5,25 @@ import { Plus, Trash2, Shield } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
 import ActionButton from "@/components/ui/action-button"
 import RolePermissionsManager from "@/components/users/RolePermissionsManager"
+import UserPermissionsManager from "@/components/users/UserPermissionsManager"
 
-type RoleRow = { id: string; name: string; description: string | null }
+type RoleRow = { id: string; name: string; description: string | null; scopeType: "GLOBAL" | "REGIONAL" }
+
+type TabKey = "roles" | "permissions" | "overrides"
 
 interface Props {
     initialRoles: RoleRow[]
+    initialTab?: TabKey
 }
 
-export default function RolesManager({ initialRoles }: Props) {
+export default function RolesManager({ initialRoles, initialTab = "roles" }: Props) {
     const [roles, setRoles] = useState<RoleRow[]>(initialRoles)
-    const [activeTab, setActiveTab] = useState<"roles" | "permissions">("roles")
+    const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
 
     // Create role form
     const [name, setName] = useState("")
     const [desc, setDesc] = useState("")
+    const [scopeType, setScopeType] = useState<"GLOBAL" | "REGIONAL">("REGIONAL")
     const [saving, setSaving] = useState(false)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [notice, setNotice] = useState("")
@@ -31,12 +36,12 @@ export default function RolesManager({ initialRoles }: Props) {
             const res = await fetch("/api/roles", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: name.trim(), description: desc.trim() || null }),
+                body: JSON.stringify({ name: name.trim(), description: desc.trim() || null, scopeType }),
             })
             const data = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(data?.message || "Failed to create role")
             setRoles((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
-            setName(""); setDesc("")
+            setName(""); setDesc(""); setScopeType("REGIONAL")
             setNotice(`Role "${data.name}" created.`)
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to create role")
@@ -68,11 +73,12 @@ export default function RolesManager({ initialRoles }: Props) {
                     {[
                         { key: "roles", label: "Role Definitions" },
                         { key: "permissions", label: "Role Permissions" },
+                        { key: "overrides", label: "User Overrides" },
                     ].map((tab) => (
                         <button
                             key={tab.key}
                             type="button"
-                            onClick={() => setActiveTab(tab.key as "roles" | "permissions")}
+                            onClick={() => setActiveTab(tab.key as TabKey)}
                             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                                 activeTab === tab.key
                                     ? "border-[var(--brand)] text-[var(--brand)]"
@@ -101,11 +107,21 @@ export default function RolesManager({ initialRoles }: Props) {
                                 <input className="ui-input" value={desc} onChange={(e) => setDesc(e.target.value)}
                                     placeholder="Optional description" />
                             </div>
+                            <div className="min-w-[200px]">
+                                <label className="ui-label">Scope</label>
+                                <select className="ui-input" value={scopeType} onChange={(e) => setScopeType(e.target.value as "GLOBAL" | "REGIONAL")}>
+                                    <option value="REGIONAL">Regional (scoped to region)</option>
+                                    <option value="GLOBAL">Global (sees all regions)</option>
+                                </select>
+                            </div>
                             <ActionButton onClick={handleCreate} disabled={saving} className="inline-flex items-center gap-2">
                                 <Plus className="h-4 w-4" />
                                 {saving ? "Creating..." : "Add Role"}
                             </ActionButton>
                         </div>
+                        <p className="mt-3 text-xs text-[var(--text-muted)]">
+                            Global roles see all data across regions. Regional roles only see data for the region and office assigned to the user.
+                        </p>
                     </div>
 
                     {/* Roles table */}
@@ -118,18 +134,27 @@ export default function RolesManager({ initialRoles }: Props) {
                             <table className="min-w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
-                                        {["#", "Role", "Description", "Actions"].map((h) => (
+                                        {["#", "Role", "Scope", "Description", "Actions"].map((h) => (
                                             <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {roles.length === 0 ? (
-                                        <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No roles defined.</td></tr>
+                                        <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No roles defined.</td></tr>
                                     ) : roles.map((r, idx) => (
                                         <tr key={r.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-muted)] transition-colors">
                                             <td className="px-4 py-3 text-[var(--text-muted)]">{idx + 1}</td>
                                             <td className="px-4 py-3 font-medium text-[var(--text)]">{r.name}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                    r.scopeType === "GLOBAL"
+                                                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                                                }`}>
+                                                    {r.scopeType === "GLOBAL" ? "Global" : "Regional"}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 text-[var(--text-muted)]">{r.description || "—"}</td>
                                             <td className="px-4 py-3 flex items-center gap-2">
                                                 <button
@@ -165,6 +190,8 @@ export default function RolesManager({ initialRoles }: Props) {
                     ? <p className="text-sm text-[var(--text-muted)]">Create a role first to configure its permissions.</p>
                     : <RolePermissionsManager roles={roles} />
             )}
+
+            {activeTab === "overrides" && <UserPermissionsManager />}
         </div>
     )
 }
