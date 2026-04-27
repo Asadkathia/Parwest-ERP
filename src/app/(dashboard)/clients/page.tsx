@@ -10,7 +10,7 @@ import FilterBar from "@/components/ui/filter-bar"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { Suspense } from "react"
@@ -51,8 +51,14 @@ export default async function ClientsPage({
 
   if (!needsRegionGate) try {
     // Resolve the active regionId filter: explicit URL param (SuperAdmin picker)
-    // or the user's scoped region (regional users).
-    const activeRegionId = regionId || scope?.regionId || undefined
+    // or the user's scoped region (regional users). If a regional user tries
+    // to override their scope via the URL param, ignore the param and pin to
+    // their assigned region — keeps the UI usable while preventing leakage.
+    const requestedRegionId = regionId || undefined
+    const paramDenied = managerScopeDenied(scope, { regionId: requestedRegionId })
+    const activeRegionId = paramDenied
+      ? scope?.regionId ?? undefined
+      : requestedRegionId || scope?.regionId || undefined
     const regionFilter = activeRegionId ? { regionId: activeRegionId } : {}
 
     const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
@@ -161,12 +167,6 @@ export default async function ClientsPage({
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-      <section className="ui-card p-5">
-        <Suspense>
-          <RegionUrlPicker regions={pickerRegions} locked={Boolean(scope?.regionId)} />
-        </Suspense>
-      </section>
-
       {needsRegionGate ? (
         <div className="ui-card p-10 text-center">
           <Users className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
@@ -184,14 +184,18 @@ export default async function ClientsPage({
 
       <FilterBar>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Suspense>
+            <RegionUrlPicker
+              regions={pickerRegions}
+              locked={Boolean(scope?.regionId)}
+              includeGlobalOption={!scope?.regionId}
+            />
+          </Suspense>
           <input type="text" placeholder="Search by client name or code..." className="ui-input" />
           <select className="ui-select">
             <option value="">All Status</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
-          </select>
-          <select className="ui-select">
-            <option value="">All Regions</option>
           </select>
         </div>
       </FilterBar>

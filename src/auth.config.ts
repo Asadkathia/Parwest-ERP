@@ -42,6 +42,8 @@ export const authConfig = {
                 token.roleScopeType = user.roleScopeType
                 token.regionId = user.regionId ?? null
                 token.regionalOfficeId = user.regionalOfficeId ?? null
+                token.regionName = user.regionName ?? null
+                token.regionalOfficeName = user.regionalOfficeName ?? null
                 token.permissions = user.permissions ?? []
             }
             return token
@@ -54,6 +56,8 @@ export const authConfig = {
                 session.user.roleScopeType = token.roleScopeType as "GLOBAL" | "REGIONAL" | undefined
                 session.user.regionId = (token.regionId as string | null) ?? null
                 session.user.regionalOfficeId = (token.regionalOfficeId as string | null) ?? null
+                session.user.regionName = (token.regionName as string | null) ?? null
+                session.user.regionalOfficeName = (token.regionalOfficeName as string | null) ?? null
                 session.user.permissions = (token.permissions as string[]) ?? []
             }
             return session

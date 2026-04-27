@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
     const guardId = searchParams.get("guardId") || undefined
     const monthRaw = searchParams.get("month")
     const search = searchParams.get("search") || undefined
+    const regionIdParam = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
+
+    if (managerScope && managerScopeDenied(managerScope, {
+      regionId: regionIdParam,
+      regionalOfficeId: regionalOfficeIdParam,
+    })) {
+      return forbidden("Forbidden: cannot query extra-hours outside your scope.")
+    }
 
     const where: Prisma.PayrollWhereInput = {}
     if (guardId) where.guardId = guardId
@@ -38,14 +47,18 @@ export async function GET(request: NextRequest) {
         { guard: { parwestId: { contains: search, mode: "insensitive" } } },
       ]
     }
-    if (managerScope) {
-      const isFilter: Record<string, unknown> = {}
-      if (managerScope.regionId) isFilter.regionId = managerScope.regionId
-      if (managerScope.regionalOfficeIds.length > 0) {
-        isFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
-      }
-      if (Object.keys(isFilter).length > 0) where.guard = { is: isFilter }
+
+    // Payroll has both regionId and regionalOfficeId directly on the row, but
+    // guard is the authoritative source. Filter through the guard relation so
+    // that rows with null regionId on Payroll (pre-migration) still get scoped.
+    const guardFilter: Record<string, unknown> = {}
+    if (managerScope?.regionId) guardFilter.regionId = managerScope.regionId
+    if (managerScope && managerScope.regionalOfficeIds.length > 0) {
+      guardFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
     }
+    if (regionIdParam) guardFilter.regionId = regionIdParam
+    if (regionalOfficeIdParam) guardFilter.regionalOfficeId = regionalOfficeIdParam
+    if (Object.keys(guardFilter).length > 0) where.guard = { is: guardFilter }
 
     const rows = await prisma.payroll.findMany({
       where,

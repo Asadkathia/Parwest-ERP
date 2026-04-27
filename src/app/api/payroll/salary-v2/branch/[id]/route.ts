@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 import { parseMonthRange as parseMonth } from "@/lib/payroll/date-helpers"
 
@@ -24,10 +25,17 @@ export async function GET(
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
       include: {
-        client: { select: { id: true, name: true } },
+        client: { select: { id: true, name: true, regionId: true } },
       },
     })
     if (!branch) return notFound("Branch not found.")
+    const scope = deriveManagerScope(session)
+    if (managerScopeDenied(scope, {
+      regionId: branch.client?.regionId ?? null,
+      regionalOfficeId: branch.regionalOfficeId ?? null,
+    })) {
+      return notFound("Branch not found.")
+    }
 
     const [managerUser, supervisorAssignment] = await Promise.all([
       branch.assignedManagerId

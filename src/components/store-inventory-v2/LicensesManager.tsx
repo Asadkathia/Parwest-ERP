@@ -1,14 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string }
+type RegionOption = { id: string; name: string }
 
 type LicenseRow = {
   id: string
@@ -53,7 +57,21 @@ const EMPTY_FORM: FormState = {
 
 const VALIDITY_OPTIONS = ["Pakistan wide", "Province wide", "District wide", "City wide"]
 
-export default function LicensesManager() {
+export default function LicensesManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
+  const scopeQuery = useScopeQuery()
+  const { data: session } = useSession()
+  const sessionUser = session?.user as
+    | { roleScopeType?: "GLOBAL" | "REGIONAL"; regionId?: string | null }
+    | undefined
+  const callerRegionId =
+    sessionUser?.roleScopeType === "REGIONAL" ? sessionUser.regionId ?? null : null
+
   const [rows, setRows] = useState<LicenseRow[]>([])
   const [clients, setClients] = useState<Option[]>([])
   const [weaponTypes, setWeaponTypes] = useState<Option[]>([])
@@ -69,9 +87,13 @@ export default function LicensesManager() {
     setLoading(true)
     setNotice(null)
     try {
+      const effectiveRegionId = scopeQuery.regionId || callerRegionId
+      const clientsUrl = effectiveRegionId
+        ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
+        : "/api/clients"
       const [licenseRows, clientRows, weaponTypeRows, calibreRows] = await Promise.all([
-        apiGet<LicenseRow[]>("/api/store-inventory/v2/licenses"),
-        apiGet<Option[]>("/api/clients"),
+        apiGet<LicenseRow[]>(`/api/store-inventory/v2/licenses${scopeQuery.query}`),
+        apiGet<Option[]>(clientsUrl),
         apiGet<Option[]>("/api/store-inventory/v2/masters/weapon-types"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/calibres"),
       ])
@@ -86,7 +108,7 @@ export default function LicensesManager() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [callerRegionId, scopeQuery.query, scopeQuery.regionId])
 
   useEffect(() => {
     void load()
@@ -232,9 +254,14 @@ export default function LicensesManager() {
       </FilterBar>
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by license/client/weapon" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by license/client/weapon" />
+          </div>
         </div>
       </FilterBar>
 

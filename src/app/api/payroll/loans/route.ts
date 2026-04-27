@@ -23,6 +23,17 @@ export async function GET(request: NextRequest) {
     const guardId = searchParams.get("guardId") || undefined
     const month = searchParams.get("month") || undefined
     const search = searchParams.get("search") || undefined
+    const regionIdParam = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
+
+    // Reject cross-scope requests early so a regional user can't request
+    // another region's data even with a crafted URL.
+    if (managerScope && managerScopeDenied(managerScope, {
+      regionId: regionIdParam,
+      regionalOfficeId: regionalOfficeIdParam,
+    })) {
+      return forbidden("Forbidden: cannot query loans outside your scope.")
+    }
 
     const where: Prisma.LoanWhereInput = {}
     if (status && !ALLOWED_LOAN_STATUSES.has(status)) {
@@ -41,14 +52,19 @@ export async function GET(request: NextRequest) {
         { guard: { parwestId: { contains: search, mode: "insensitive" } } },
       ]
     }
-    if (managerScope) {
-      const isFilter: Record<string, unknown> = {}
-      if (managerScope.regionId) isFilter.regionId = managerScope.regionId
-      if (managerScope.regionalOfficeIds.length > 0) {
-        isFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
-      }
-      if (Object.keys(isFilter).length > 0) where.guard = { is: isFilter }
+
+    // Build the guard-scope filter. Loan has its own `regionId`, but guard is
+    // the authoritative source (Loan.regionId is a denormalized copy at create
+    // time). Filter through the guard relation for both URL params and the
+    // caller's manager scope.
+    const guardFilter: Record<string, unknown> = {}
+    if (managerScope?.regionId) guardFilter.regionId = managerScope.regionId
+    if (managerScope && managerScope.regionalOfficeIds.length > 0) {
+      guardFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
     }
+    if (regionIdParam) guardFilter.regionId = regionIdParam
+    if (regionalOfficeIdParam) guardFilter.regionalOfficeId = regionalOfficeIdParam
+    if (Object.keys(guardFilter).length > 0) where.guard = { is: guardFilter }
 
     const loans = await prisma.loan.findMany({
       where,

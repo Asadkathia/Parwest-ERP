@@ -1,12 +1,16 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import ActionButton from "@/components/ui/action-button"
 import EmptyState from "@/components/ui/empty-state"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+type RegionOption = { id: string; name: string }
 
 type RateRow = {
   id: string
@@ -34,7 +38,15 @@ type ApiBranch = { id: string; name: string }
 const TABS = ["Default Rates", "Client Provinces", "Client Cities", "Guard Types", "Invoice Header"] as const
 const GUARD_TYPE_OPTIONS = ["Guard", "Supervisor", "CPO", "SO", "ASO", "LSO", "Receptionist", "CCTV Operator", "Complaint Receiver"]
 
-export default function InvoicePrerequisitesManager() {
+export default function InvoicePrerequisitesManager({
+  regions: regionOptions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
+  const searchParams = useSearchParams()
+  const urlRegionId = searchParams?.get("regionId") || ""
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Default Rates")
   const [province, setProvince] = useState("")
   const [city, setCity] = useState("")
@@ -56,10 +68,14 @@ export default function InvoicePrerequisitesManager() {
     let isMounted = true
     const load = async () => {
       try {
+        const regionQs = urlRegionId ? `?regionId=${encodeURIComponent(urlRegionId)}` : ""
         const [ratesRes, regionsRes, branchesRes] = await Promise.all([
           fetch("/api/deployment-rates", { cache: "no-store" }),
+          // /api/regions auto-scopes to user's region for REGIONAL users.
           fetch("/api/regions", { cache: "no-store" }),
-          fetch("/api/branches", { cache: "no-store" }),
+          // /api/branches accepts regionId — pass URL regionId so SuperAdmin's
+          // selection narrows the dropdown; REGIONAL users are auto-scoped server-side.
+          fetch(`/api/branches${regionQs}`, { cache: "no-store" }),
         ])
 
         const [ratesData, regionsData, branchesData] = await Promise.all([ratesRes.json(), regionsRes.json(), branchesRes.json()])
@@ -92,7 +108,7 @@ export default function InvoicePrerequisitesManager() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [urlRegionId])
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -233,6 +249,11 @@ export default function InvoicePrerequisitesManager() {
         <>
           <FilterBar className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <RegionUrlPicker
+                regions={regionOptions}
+                locked={locked}
+                includeGlobalOption={!locked}
+              />
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Province</label>
                 <select value={province} onChange={(e) => setProvince(e.target.value)} className="ui-select">

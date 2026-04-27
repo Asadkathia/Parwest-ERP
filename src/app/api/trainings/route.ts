@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { hasAction } from "@/lib/api/permissions"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) {
@@ -13,7 +13,23 @@ export async function GET() {
         }
         if (!hasAction(session, "GUARDS", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
+        const managerScope = deriveManagerScope(session)
+        const { searchParams } = new URL(request.url)
+        const regionId = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
+
+        const scopeFilter = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
+        const guardFilter = {
+            ...(regionId ? { regionId } : {}),
+            ...(regionalOfficeId ? { regionalOfficeId } : {}),
+            ...scopeFilter,
+        }
         const trainings = await prisma.training.findMany({
+            where: Object.keys(guardFilter).length > 0 ? { guard: { is: guardFilter } } : {},
             orderBy: { completedAt: "desc" },
             include: {
                 guard: {

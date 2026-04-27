@@ -2,7 +2,9 @@ import { NextRequest } from "next/server"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureClientInScope, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { buildManagerScopeWhere } from "@/lib/access/scope"
+import type { Prisma } from "@prisma/client"
 
 function parseDate(value: unknown): Date | null {
   if (value == null || value === "") return null
@@ -11,12 +13,35 @@ function parseDate(value: unknown): Date | null {
   return date
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
+  // Licenses scope through Client (the model has clientId only with no relation),
+  // so resolve scoped client IDs first then filter via clientId in (...).
+  // Layer URL-supplied filters on top of session scope so a regional-office user
+  // sees only their office's clients, and SuperAdmin can narrow via the picker.
+  const clientWhere: Prisma.ClientWhereInput = {
+    ...buildManagerScopeWhere(session.scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
+    ...(scopeParams.regionalOfficeId ? { regionalOfficeId: scopeParams.regionalOfficeId } : {}),
+    ...(scopeParams.regionId && !scopeParams.regionalOfficeId ? { regionId: scopeParams.regionId } : {}),
+  }
+
+  let clientIdFilter: { clientId: { in: string[] } } | Record<string, never> = {}
+  if (Object.keys(clientWhere).length > 0) {
+    const scopedClients = await prisma.client.findMany({
+      where: clientWhere,
+      select: { id: true },
+    })
+    clientIdFilter = { clientId: { in: scopedClients.map((c) => c.id) } }
+  }
+
   try {
     const rows = await prisma.storeInventoryLicense.findMany({
+      where: clientIdFilter,
       orderBy: { createdAt: "desc" },
       take: 500,
     })
@@ -76,11 +101,21 @@ export async function POST(request: NextRequest) {
       return badRequest("validity and licenseNumber are required.")
     }
 
+    const clientId = asText(body.clientId)
+    if (clientId) {
+      const clientDenied = await ensureClientInScope(clientId, session.scope)
+      if (clientDenied) return clientDenied
+    } else if (session.scope?.regionId) {
+      // Regional users must always associate a license with a client they can
+      // see — refuse to create unattached licenses they wouldn't otherwise list.
+      return badRequest("clientId is required for regionally-scoped users.")
+    }
+
     const created = await prisma.storeInventoryLicense.create({
       data: {
         validity,
         licenseNumber,
-        clientId: asText(body.clientId),
+        clientId,
         weaponNumber: asText(body.weaponNumber),
         weaponTypeId: asText(body.weaponTypeId),
         calibreId: asText(body.calibreId),

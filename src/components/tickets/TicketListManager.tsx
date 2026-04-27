@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Plus, Search, RefreshCw, Tag, AlertCircle, CheckCircle2, Clock } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Lookup = { id: string; name: string; color?: string | null }
 type TicketRow = {
@@ -47,7 +48,17 @@ function StatusBadge({ status }: { status?: Lookup | null }) {
   )
 }
 
-export default function TicketListManager({ canCreate = true }: { canCreate?: boolean }) {
+type RegionOption = { id: string; name: string }
+
+export default function TicketListManager({
+  canCreate = true,
+  regions = [],
+  locked = false,
+}: {
+  canCreate?: boolean
+  regions?: RegionOption[]
+  locked?: boolean
+}) {
   const [tickets, setTickets] = useState<TicketRow[]>([])
   const [categories, setCategories] = useState<Lookup[]>([])
   const [priorities, setPriorities] = useState<Lookup[]>([])
@@ -130,7 +141,10 @@ export default function TicketListManager({ canCreate = true }: { canCreate?: bo
 
       {/* Filters */}
       <div className="ui-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} />
+          </Suspense>
           <div className="lg:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <input className="ui-input pl-9" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&void load()} placeholder="Search subject or description..." />

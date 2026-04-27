@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionalOffice = { id: string; name: string }
 type Client = { id: string; name: string }
@@ -19,12 +20,24 @@ type ClientAttendanceRow = {
     regionalOffice: { id: string; name: string } | null
 }
 
-export default function ClientAttendanceManager() {
+type Props = {
+    effectiveRegionId?: string | null
+    lockedOfficeId?: string | null
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function ClientAttendanceManager({
+    effectiveRegionId = null,
+    lockedOfficeId = null,
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
     const [clients, setClients] = useState<Client[]>([])
     const [branches, setBranches] = useState<Branch[]>([])
 
-    const [regionalOfficeId, setRegionalOfficeId] = useState("")
+    const [regionalOfficeId, setRegionalOfficeId] = useState(lockedOfficeId ?? "")
     const [clientId, setClientId] = useState("")
     const [branchId, setBranchId] = useState("")
     const [startDate, setStartDate] = useState("")
@@ -38,9 +51,14 @@ export default function ClientAttendanceManager() {
 
     const loadMasterData = useCallback(async () => {
         try {
+            const officeParams = new URLSearchParams()
+            if (effectiveRegionId) officeParams.set("regionId", effectiveRegionId)
+            const clientParams = new URLSearchParams()
+            clientParams.set("status", "ACTIVE")
+            if (effectiveRegionId) clientParams.set("regionId", effectiveRegionId)
             const [officesRes, clientsRes] = await Promise.all([
-                fetch("/api/regional-offices"),
-                fetch("/api/clients?status=ACTIVE"),
+                fetch(`/api/regional-offices?${officeParams.toString()}`),
+                fetch(`/api/clients?${clientParams.toString()}`),
             ])
 
             if (officesRes.ok) {
@@ -56,7 +74,7 @@ export default function ClientAttendanceManager() {
             setRegionalOffices([])
             setClients([])
         }
-    }, [])
+    }, [effectiveRegionId])
 
     const loadBranches = useCallback(async (selectedClientId: string) => {
         if (!selectedClientId) {
@@ -110,6 +128,11 @@ export default function ClientAttendanceManager() {
         void loadClientAttendance()
     }, [loadClientAttendance, loadMasterData])
 
+    // If a regional user is locked to a single office, force the filter value.
+    useEffect(() => {
+        if (lockedOfficeId) setRegionalOfficeId(lockedOfficeId)
+    }, [lockedOfficeId])
+
     useEffect(() => {
         void loadBranches(clientId)
         setBranchId("")
@@ -125,13 +148,20 @@ export default function ClientAttendanceManager() {
             <div className="bg-white rounded-lg border p-6">
                 <h2 className="font-semibold mb-4">Filters</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-sm text-gray-600 mb-1">Regional Offices</label>
-                        <select name="edit_regional_office" value={regionalOfficeId} onChange={(e) => setRegionalOfficeId(e.target.value)} className="w-full border rounded-md px-3 py-2">
-                            <option value="">--Select Regional Office--</option>
-                            {regionalOffices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
-                        </select>
-                    </div>
+                    <RegionUrlPicker
+                        regions={regions}
+                        locked={regionLocked}
+                        includeGlobalOption={!regionLocked}
+                    />
+                    {!lockedOfficeId && (
+                        <div>
+                            <label className="block text-sm text-gray-600 mb-1">Regional Offices</label>
+                            <select name="edit_regional_office" value={regionalOfficeId} onChange={(e) => setRegionalOfficeId(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                                <option value="">--Select Regional Office--</option>
+                                {regionalOffices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
                         <select name="selected_client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full border rounded-md px-3 py-2">

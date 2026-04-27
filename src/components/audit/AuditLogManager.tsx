@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type LogRow = {
   id: string
@@ -18,7 +19,17 @@ type LogRow = {
   user?: { id: string; name: string; email?: string } | null
 }
 
-export default function AuditLogManager() {
+type RegionOption = { id: string; name: string }
+
+export default function AuditLogManager({
+  regionId,
+  regions = [],
+  locked = false,
+}: {
+  regionId?: string
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
   const [rows, setRows] = useState<LogRow[]>([])
   const [moduleFilter, setModuleFilter] = useState("")
   const [eventFilter, setEventFilter] = useState("")
@@ -47,6 +58,7 @@ export default function AuditLogManager() {
       if (search.trim()) params.set("search", search.trim())
       if (dateFrom) params.set("dateFrom", dateFrom)
       if (dateTo) params.set("dateTo", dateTo)
+      if (regionId) params.set("regionId", regionId)
       const response = await fetch(`/api/audit-logs?${params.toString()}`, { cache: "no-store" })
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to load audit logs.")
@@ -57,7 +69,7 @@ export default function AuditLogManager() {
     } finally {
       setLoading(false)
     }
-  }, [dateFrom, dateTo, eventFilter, moduleFilter, search])
+  }, [dateFrom, dateTo, eventFilter, moduleFilter, regionId, search])
 
   useEffect(() => {
     void load()
@@ -69,7 +81,10 @@ export default function AuditLogManager() {
       {error ? <InlineAlert type="error" message={error} /> : null}
 
       <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} />
+          </Suspense>
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Module</label>
             <select className="ui-select" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>

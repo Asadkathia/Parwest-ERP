@@ -15,6 +15,13 @@ type Props = {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /**
+   * When set, the autocomplete only searches guards within this region.
+   * The `/api/guards` route already enforces REGIONAL scope server-side,
+   * but for SuperAdmins this lets the caller pin the search to whatever
+   * region the page-level region gate has selected.
+   */
+  regionId?: string | null
 }
 
 export default function GuardAutocomplete({
@@ -24,6 +31,7 @@ export default function GuardAutocomplete({
   placeholder = "Parwest ID",
   disabled,
   className,
+  regionId = null,
 }: Props) {
   const [options, setOptions] = useState<GuardOption[]>([])
   const [open, setOpen] = useState(false)
@@ -42,7 +50,9 @@ export default function GuardAutocomplete({
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/guards?search=${encodeURIComponent(value)}&take=10`)
+        const params = new URLSearchParams({ search: value, take: "10" })
+        if (regionId) params.set("regionId", regionId)
+        const res = await fetch(`/api/guards?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
           const rows: GuardOption[] = Array.isArray(data) ? data : data.rows ?? data.guards ?? []
@@ -63,7 +73,7 @@ export default function GuardAutocomplete({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [value])
+  }, [value, regionId])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

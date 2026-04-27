@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
+import { deriveRegionalScope } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import UserEditForm from "./form"
@@ -12,6 +13,12 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
     if (!hasAction(session, "USERS", "UPDATE")) redirect("/users")
 
     const { id } = await params
+    const scope = deriveRegionalScope(session)
+    const superAdmin = isSuperAdmin(session)
+
+    // Regional users only see their own region/offices in the dropdowns; SuperAdmin sees all.
+    const regionWhere = scope?.regionId ? { id: scope.regionId } : {}
+    const officeWhere = scope?.regionId ? { regionId: scope.regionId } : {}
 
     const [user, roles, regions, offices] = await Promise.all([
         prisma.user.findUnique({
@@ -28,9 +35,9 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
             },
         }),
         prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, scopeType: true } }),
-        prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        prisma.region.findMany({ where: regionWhere, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         prisma.regionalOffice
-            .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, regionId: true } })
+            .findMany({ where: officeWhere, orderBy: { name: "asc" }, select: { id: true, name: true, regionId: true } })
             .catch(() => []),
     ])
 
@@ -58,7 +65,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
                 roles={roles}
                 regions={regions}
                 offices={offices.map((o) => ({ ...o, regionId: o.regionId ?? null }))}
-                isSuperAdmin={isSuperAdmin(session)}
+                isSuperAdmin={superAdmin}
+                lockedRegionId={!superAdmin && scope?.regionId ? scope.regionId : null}
+                lockedOfficeId={
+                    !superAdmin && scope?.regionalOfficeIds?.length === 1 ? scope.regionalOfficeIds[0] : null
+                }
             />
         </div>
     )

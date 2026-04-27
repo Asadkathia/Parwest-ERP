@@ -41,6 +41,8 @@ type Props = {
     regions: Region[]
     initialBranchless?: boolean
     isSuperAdmin?: boolean
+    viewerRegionId?: string | null
+    viewerRegionalOfficeId?: string | null
 }
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -52,9 +54,11 @@ function readFileAsBase64(file: File): Promise<string> {
     })
 }
 
-export default function ClientEnrollmentForm({ regions, initialBranchless = true, isSuperAdmin = false }: Props) {
+export default function ClientEnrollmentForm({ regions, initialBranchless = true, isSuperAdmin = false, viewerRegionId = null, viewerRegionalOfficeId = null }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
+    const isRegionalViewer = !isSuperAdmin && Boolean(viewerRegionId)
+    const lockedRegionalOffice = isRegionalViewer ? viewerRegionalOfficeId : null
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [isBranchless, setIsBranchless] = useState(initialBranchless)
@@ -64,8 +68,8 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [contactNumbers, setContactNumbers] = useState<string[]>([""])
     const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
     const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
-    const [selectedRegionId, setSelectedRegionId] = useState("")
-    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
+    const [selectedRegionId, setSelectedRegionId] = useState(isRegionalViewer ? (viewerRegionId ?? "") : "")
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(lockedRegionalOffice ?? "")
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
     const [contractFile, setContractFile] = useState<string | null>(null)
     const [contractFileName, setContractFileName] = useState("")
@@ -77,8 +81,8 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
     const [, setLngManual] = useState("")
 
     // Branch-specific state (branch section in branch-client mode)
-    const [branchRegionId, setBranchRegionId] = useState("")
-    const [branchRegionalOfficeId, setBranchRegionalOfficeId] = useState("")
+    const [branchRegionId, setBranchRegionId] = useState(isRegionalViewer ? (viewerRegionId ?? "") : "")
+    const [branchRegionalOfficeId, setBranchRegionalOfficeId] = useState(lockedRegionalOffice ?? "")
     const [branchRegionalOffices, setBranchRegionalOffices] = useState<{ id: string; name: string }[]>([])
     const [branchManagerUsers, setBranchManagerUsers] = useState<{ id: string; name: string }[]>([])
     const [branchSupervisorUsers, setBranchSupervisorUsers] = useState<{ id: string; name: string }[]>([])
@@ -594,22 +598,25 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                 className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionId}
                                 onChange={(e) => setSelectedRegionId(e.target.value)}
-                                disabled={!selectedProvince}
+                                disabled={!selectedProvince || isRegionalViewer}
                             >
                                 <option value="">— Select Region —</option>
                                 {regions.map((r) => (
                                     <option key={r.id} value={r.id}>{r.name}</option>
                                 ))}
                             </select>
+                            {isRegionalViewer && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
                             <select
                                 name="regionalOfficeId"
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionalOfficeId}
                                 onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId}
+                                disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
                             >
                                 <option value="">
                                     {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
@@ -618,6 +625,9 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                     <option key={o.id} value={o.id}>{o.name}</option>
                                 ))}
                             </select>
+                            {lockedRegionalOffice && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+                            )}
                         </div>
 
                         {/* Manager & Supervisor — only for branchless clients */}
@@ -723,21 +733,29 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Region</label>
-                                <select className="ui-input" value={branchRegionId} onChange={(e) => setBranchRegionId(e.target.value)}>
+                                <select
+                                    className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
+                                    value={branchRegionId}
+                                    onChange={(e) => setBranchRegionId(e.target.value)}
+                                    disabled={isRegionalViewer}
+                                >
                                     <option value="">— Select Region —</option>
                                     {regions.map((r) => (
                                         <option key={r.id} value={r.id}>{r.name}</option>
                                     ))}
                                 </select>
+                                {isRegionalViewer && (
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
                                 <select
                                     name="branchRegionalOfficeId"
-                                    className="ui-input"
+                                    className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={branchRegionalOfficeId}
                                     onChange={(e) => setBranchRegionalOfficeId(e.target.value)}
-                                    disabled={!branchRegionId}
+                                    disabled={!branchRegionId || Boolean(lockedRegionalOffice)}
                                 >
                                     <option value="">
                                         {!branchRegionId ? "— Select Region First —" : branchRegionalOffices.length === 0 ? "No offices" : "— Select Office —"}
@@ -746,6 +764,9 @@ export default function ClientEnrollmentForm({ regions, initialBranchless = true
                                         <option key={o.id} value={o.id}>{o.name}</option>
                                     ))}
                                 </select>
+                                {lockedRegionalOffice && (
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>

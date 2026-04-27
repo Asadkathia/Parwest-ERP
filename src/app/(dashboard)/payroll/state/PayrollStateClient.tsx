@@ -13,6 +13,7 @@ import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import PayrollStateBadge from "@/components/payroll/PayrollStateBadge"
 import PayrollStateActions from "@/components/payroll/PayrollStateActions"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Region = { id: string; name: string }
 type Office = { id: string; name: string }
@@ -65,20 +66,44 @@ function asNumber(v: number | string | null | undefined): number {
 type PayrollStateClientProps = {
   isSuperAdmin?: boolean
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  /**
+   * Region options pre-filtered by the region gate (already scoped to the
+   * caller's regional access). Threaded through so we don't re-fetch
+   * `/api/regions` on the client and accidentally show every region to a
+   * regional admin.
+   */
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollStateClient({
   isSuperAdmin = false,
   canCreate = false,
+  effectiveRegionId = null,
+  regions: regionsProp = [],
+  locked = false,
 }: PayrollStateClientProps = {}) {
   // State mutations all POST through /api/payroll/state/*, so gating uses
   // PAYROLL:CREATE (see task spec: HTTP method determines action).
 
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
-  const [regionId, setRegionId] = useState("")
+  // Region is owned by the page-level gate — no in-tab override.
+  const regionId = effectiveRegionId ?? ""
   const [regionalOfficeId, setRegionalOfficeId] = useState("")
-  const [regions, setRegions] = useState<Region[]>([])
+  const [regions, setRegions] = useState<Region[]>(regionsProp)
   const [offices, setOffices] = useState<Office[]>([])
+
+  // Keep local regions list in sync if the gate-provided prop changes.
+  useEffect(() => {
+    setRegions(regionsProp)
+  }, [regionsProp])
+
+  // Reset office selection when the gate-selected region changes — old office
+  // ids don't apply across regions.
+  useEffect(() => {
+    setRegionalOfficeId("")
+  }, [effectiveRegionId])
 
   const [rows, setRows] = useState<PayrollRow[]>([])
   const [loadingRows, setLoadingRows] = useState(false)
@@ -90,11 +115,15 @@ export default function PayrollStateClient({
   const [resultMessage, setResultMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/regions")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setRegions(Array.isArray(data) ? data : []))
-      .catch(() => {})
-    fetch("/api/regional-offices")
+    // Regions come pre-filtered from the page-level region gate (see
+    // `regionsProp`); fetching `/api/regions` here would leak unscoped data
+    // to regional admins. Regional offices are scoped server-side for
+    // REGIONAL users, but for SuperAdmin we forward `?regionId=` so the
+    // dropdown only contains offices for the picked region.
+    const url = effectiveRegionId
+      ? `/api/regional-offices?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/regional-offices"
+    fetch(url)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.offices ?? data.rows ?? []
@@ -103,7 +132,7 @@ export default function PayrollStateClient({
         )
       })
       .catch(() => {})
-  }, [])
+  }, [effectiveRegionId])
 
   const loadPayrolls = useCallback(async () => {
     setLoadingRows(true)
@@ -114,6 +143,8 @@ export default function PayrollStateClient({
       // and reserveAmount (via default findMany).
       const params = new URLSearchParams()
       params.set("month", `${month}-01`)
+      if (regionId) params.set("regionId", regionId)
+      if (regionalOfficeId) params.set("regionalOfficeId", regionalOfficeId)
       const res = await fetch(`/api/payroll/salary?${params.toString()}`)
       if (!res.ok) {
         setRowsError(`HTTP ${res.status}`)
@@ -122,13 +153,7 @@ export default function PayrollStateClient({
       }
       const data = (await res.json()) as PayrollRow[] | { rows: PayrollRow[] }
       const list = Array.isArray(data) ? data : data.rows ?? []
-      // Apply client-side region/office filter
-      const filtered = list.filter((r) => {
-        if (regionId && r.regionId !== regionId) return false
-        if (regionalOfficeId && r.regionalOfficeId !== regionalOfficeId) return false
-        return true
-      })
-      setRows(filtered)
+      setRows(list)
     } catch (e) {
       setRowsError((e as Error).message ?? "Failed to load payrolls.")
     } finally {
@@ -141,6 +166,7 @@ export default function PayrollStateClient({
     try {
       const params = new URLSearchParams()
       params.set("month", month)
+      if (regionId) params.set("regionId", regionId)
       const res = await fetch(
         `/api/payroll/state/finalization-history?${params.toString()}`
       )
@@ -154,7 +180,7 @@ export default function PayrollStateClient({
     } finally {
       setLoadingHistory(false)
     }
-  }, [month])
+  }, [month, regionId])
 
   useEffect(() => {
     loadPayrolls()
@@ -218,7 +244,14 @@ export default function PayrollStateClient({
       subtitle="Lock regions, globally finalize, and review state-change history."
     >
       <section className="ui-card p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_1fr_auto] gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr_auto] gap-3 items-end">
+          <div>
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Month *
@@ -229,23 +262,6 @@ export default function PayrollStateClient({
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Region
-            </label>
-            <select
-              className="ui-select"
-              value={regionId}
-              onChange={(e) => setRegionId(e.target.value)}
-            >
-              <option value="">All regions</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">

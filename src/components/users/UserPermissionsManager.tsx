@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSession } from "next-auth/react"
 import ActionButton from "@/components/ui/action-button"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
-import { ChevronDown, Info, X } from "lucide-react"
+import { ChevronDown, Info, Trash2, X } from "lucide-react"
 import { ACTIONS, MODULES } from "@/lib/constants/permissions"
 
 type ActionName = (typeof ACTIONS)[number]
@@ -95,6 +96,12 @@ function UserSearchSelect({ users, value, onChange }: { users: UserRow[]; value:
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function UserPermissionsManager() {
+    const { data: sessionData } = useSession()
+    const sessionUser = sessionData?.user as
+        | { regionId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
+        | undefined
+    const sessionRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
+
     const [users, setUsers] = useState<UserRow[]>([])
     const [selectedUser, setSelectedUser] = useState("")
     const [merged, setMerged] = useState<MergedPerm[]>([])
@@ -106,9 +113,12 @@ export default function UserPermissionsManager() {
     const [notice, setNotice] = useState("")
     const [error, setError] = useState("")
 
-    // Load users
+    // Load users (scoped by session region for regional admins)
     useEffect(() => {
-        fetch("/api/users", { cache: "no-store" })
+        const url = sessionRegionId
+            ? `/api/users?regionId=${encodeURIComponent(sessionRegionId)}`
+            : "/api/users"
+        fetch(url, { cache: "no-store" })
             .then((r) => r.ok ? r.json() : [])
             .then((data) => {
                 const mapped = (Array.isArray(data) ? data : []).map((u: { id?: string; name?: string; email?: string }) => ({
@@ -118,7 +128,7 @@ export default function UserPermissionsManager() {
                 if (mapped.length > 0) setSelectedUser(mapped[0].id)
             })
             .catch(() => {})
-    }, [])
+    }, [sessionRegionId])
 
     // Load permissions when user changes
     useEffect(() => {
@@ -180,6 +190,50 @@ export default function UserPermissionsManager() {
         } finally { setSaving(false) }
     }
 
+    const refetchPermissions = async () => {
+        if (!selectedUser) return
+        const res = await fetch(`/api/user-permissions?userId=${selectedUser}`, { cache: "no-store" })
+        const data: MergedPerm[] = res.ok ? await res.json() : []
+        setMerged(Array.isArray(data) ? data : [])
+        const overrides: Record<string, ActionMap> = {}
+        for (const row of Array.isArray(data) ? data : []) {
+            overrides[row.module] = row.fromUser ?? emptyMap()
+        }
+        setUserOverrides(overrides)
+    }
+
+    const clearAll = async () => {
+        if (!selectedUser) return
+        if (!confirm("Remove all additional permissions for this user? Role-granted permissions will remain.")) return
+        setSaving(true); setNotice(""); setError("")
+        try {
+            const res = await fetch(`/api/user-permissions?userId=${selectedUser}`, { method: "DELETE" })
+            const payload = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(payload?.message || "Failed to clear overrides")
+            await refetchPermissions()
+            setNotice(`All additional permissions removed (${payload?.deleted ?? 0} rows).`)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to clear overrides")
+        } finally { setSaving(false) }
+    }
+
+    const clearModule = async (module: string) => {
+        if (!selectedUser) return
+        setSaving(true); setNotice(""); setError("")
+        try {
+            const res = await fetch(
+                `/api/user-permissions?userId=${selectedUser}&module=${encodeURIComponent(module)}`,
+                { method: "DELETE" }
+            )
+            const payload = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(payload?.message || "Failed to clear module")
+            await refetchPermissions()
+            setNotice(`Removed additional permissions for ${module}.`)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to clear module")
+        } finally { setSaving(false) }
+    }
+
     const selectedUserName = users.find((u) => u.id === selectedUser)?.name ?? "No user selected"
 
     // Get effective (merged) value for display
@@ -219,6 +273,13 @@ export default function UserPermissionsManager() {
                     <ActionButton onClick={save} disabled={saving || loading || !selectedUser}>
                         {saving ? "Saving..." : "Save Additional Permissions"}
                     </ActionButton>
+                    <ActionButton
+                        variant="danger"
+                        onClick={clearAll}
+                        disabled={saving || loading || !selectedUser}
+                    >
+                        Clear All Additional
+                    </ActionButton>
                     <ActionButton variant="secondary" onClick={() => setQuery("")}>Reset Filter</ActionButton>
                     <span className="text-sm font-medium text-[var(--text)]">{selectedUserName}</span>
                 </div>
@@ -249,6 +310,7 @@ export default function UserPermissionsManager() {
                             {ACTIONS.map((a) => (
                                 <th key={a} className="px-4 py-3 text-center text-xs font-semibold text-[var(--text-muted)] uppercase">{a}</th>
                             ))}
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--text-muted)] uppercase w-16">Clear</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
@@ -261,6 +323,7 @@ export default function UserPermissionsManager() {
                                             <div className="h-4 w-4 bg-gray-100 rounded mx-auto" />
                                         </td>
                                     ))}
+                                    <td className="px-4 py-3" />
                                 </tr>
                             ))
                         ) : visibleModules.map((module) => {
@@ -289,7 +352,7 @@ export default function UserPermissionsManager() {
                                                         onChange={() => toggleUser(module, action)}
                                                         disabled={fromRole} // can't remove what role already grants
                                                         className={`h-4 w-4 rounded accent-green-600 ${fromRole ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
-                                                        title={fromRole ? "Already granted by role" : "Additional user permission"}
+                                                        title={fromRole ? "Already granted by role" : "Additional user permission (uncheck to remove)"}
                                                     />
                                                     {/* Effective indicator */}
                                                     {effective && (
@@ -299,6 +362,26 @@ export default function UserPermissionsManager() {
                                             </td>
                                         )
                                     })}
+                                    <td className="px-4 py-3 text-center">
+                                        {(() => {
+                                            const hasOverride = ACTIONS.some((a) => userOverrides[module]?.[a])
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => clearModule(module)}
+                                                    disabled={!hasOverride || saving}
+                                                    title={hasOverride ? `Remove all additional permissions for ${module}` : "No additional permissions to remove"}
+                                                    className={`inline-flex items-center justify-center rounded p-1.5 transition-colors ${
+                                                        hasOverride
+                                                            ? "text-red-600 hover:bg-red-50 cursor-pointer"
+                                                            : "text-[var(--text-muted)] opacity-30 cursor-not-allowed"
+                                                    }`}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )
+                                        })()}
+                                    </td>
                                 </tr>
                             )
                         })}

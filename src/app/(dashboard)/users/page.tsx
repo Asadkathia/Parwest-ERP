@@ -11,9 +11,7 @@ import StatCard from "@/components/ui/stat-card"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import UsersTable from "@/components/users/UsersTable"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { GLOBAL_REGION_VALUE } from "@/components/access/region-sentinels"
-import { Suspense } from "react"
 
 export default async function UsersPage({
   searchParams,
@@ -116,24 +114,24 @@ export default async function UsersPage({
       />
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-      <section className="ui-card p-5">
-        <Suspense>
-          <RegionUrlPicker
+      {needsRegionGate ? (
+        <>
+          <UsersTable
+            initialUsers={[]}
+            isAdmin={superAdmin}
+            canUpdate={canUpdateUser}
+            canDelete={canDeleteUser}
             regions={pickerRegions}
             locked={Boolean(scope?.regionId)}
-            includeGlobalOption={superAdmin}
           />
-        </Suspense>
-      </section>
-
-      {needsRegionGate ? (
-        <div className="ui-card p-10 text-center">
-          <UsersIcon className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-          <p className="text-base font-medium text-[var(--text)]">Select a region to view users.</p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Users are region-scoped. Choose a region above to load its users.
-          </p>
-        </div>
+          <div className="ui-card p-10 text-center">
+            <UsersIcon className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
+            <p className="text-base font-medium text-[var(--text)]">Select a region to view users.</p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Users are region-scoped. Choose a region above to load its users.
+            </p>
+          </div>
+        </>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -150,6 +148,8 @@ export default async function UsersPage({
             isAdmin={superAdmin}
             canUpdate={canUpdateUser}
             canDelete={canDeleteUser}
+            regions={pickerRegions}
+            locked={Boolean(scope?.regionId)}
           />
         </>
       )}

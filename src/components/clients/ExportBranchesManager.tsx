@@ -1,21 +1,19 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Filter } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+type RegionOption = { id: string; name: string }
 
 type Client = { id: string; name: string }
 type ExportRow = { id: string; name: string; supervisor: string; manager: string; clientId: string }
-const fallbackClients: Client[] = [
-  { id: "National Bank of Pakistan", name: "National Bank of Pakistan" },
-  { id: "Standard Chartered Bank Limited Pakistan", name: "Standard Chartered Bank Limited Pakistan" },
-  { id: "United Bank Limited", name: "United Bank Limited" },
-  { id: "MCB Bank Ltd", name: "MCB Bank Ltd" },
-]
 
 const managers = [
   "Anayat Ullah MT",
@@ -49,7 +47,15 @@ const baseRows: Array<Omit<ExportRow, "clientId"> & { clientName: string }> = [
   { id: "5", name: "MCB Gulberg", supervisor: "Imtiaz Hussain", manager: "Muhammad Tayyab", clientName: "MCB Bank Ltd" },
 ]
 
-export default function ExportBranchesManager() {
+export default function ExportBranchesManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
+  const searchParams = useSearchParams()
+  const urlRegionId = searchParams?.get("regionId") || ""
   const [clients, setClients] = useState<Client[]>([])
   const [selectedManager, setSelectedManager] = useState("")
   const [selectedClient, setSelectedClient] = useState("")
@@ -63,38 +69,42 @@ export default function ExportBranchesManager() {
     const load = async () => {
       try {
         setError("")
-        const response = await fetch("/api/clients")
+        const url = urlRegionId
+          ? `/api/clients?regionId=${encodeURIComponent(urlRegionId)}`
+          : "/api/clients"
+        const response = await fetch(url)
         if (!response.ok) throw new Error("Failed to load clients")
         const data = (await response.json()) as Client[]
         setClients(data)
         setRows(
-          baseRows.map((row, index) => ({
-            id: row.id,
-            name: row.name,
-            supervisor: row.supervisor,
-            manager: row.manager,
-            clientId:
-              data.find((client) => client.name === row.clientName)?.id ||
-              data[index % Math.max(1, data.length)]?.id ||
-              "",
-          }))
+          baseRows
+            .map((row, index) => {
+              const matchedClientId =
+                data.find((client) => client.name === row.clientName)?.id ||
+                data[index % Math.max(1, data.length)]?.id ||
+                ""
+              return matchedClientId
+                ? {
+                    id: row.id,
+                    name: row.name,
+                    supervisor: row.supervisor,
+                    manager: row.manager,
+                    clientId: matchedClientId,
+                  }
+                : null
+            })
+            .filter((r): r is ExportRow => r !== null)
         )
       } catch {
-        setClients(fallbackClients)
-        setRows(
-          baseRows.map((row) => ({
-            id: row.id,
-            name: row.name,
-            supervisor: row.supervisor,
-            manager: row.manager,
-            clientId: fallbackClients.find((client) => client.name === row.clientName)?.id || row.clientName,
-          }))
-        )
-        setError("Could not load clients. Showing available mock rows.")
+        // Don't fall back to hardcoded LEGACY clients — that would leak names
+        // from outside the user's region. Just surface the error.
+        setClients([])
+        setRows([])
+        setError("Could not load clients.")
       }
     }
     load()
-  }, [])
+  }, [urlRegionId])
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -128,7 +138,12 @@ export default function ExportBranchesManager() {
         className="space-y-4"
       >
         <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
             <div>
               <label className="block text-sm text-[var(--text-muted)] mb-1">Select Manager</label>
               <select name="Select Manager" value={selectedManager} onChange={(e) => setSelectedManager(e.target.value)} className="ui-select">

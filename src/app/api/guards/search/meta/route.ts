@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 // Static options derived from schema definitions
 const GUARD_STATUSES = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "INACTIVE", "TERMINATED"]
@@ -19,11 +20,23 @@ const VERIFICATION_STATUSES = [
 ]
 const PREREQUISITE_STATUSES = ["PENDING", "VERIFIED", "REJECTED"]
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) return unauthorized()
         if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
+
+        const { searchParams } = new URL(request.url)
+        const requestedRegionId = searchParams.get("regionId")
+        const scope = deriveManagerScope(session)
+        if (managerScopeDenied(scope, { regionId: requestedRegionId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
+        // SuperAdmin filters by URL ?regionId=. Regional users always use their
+        // own scope (any URL value is ignored / rejected above).
+        const activeRegionId = scope?.regionId ?? requestedRegionId ?? null
+        const officeScopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "id" })
+        const clientScopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId" })
 
         const [docTypes, clients, offices, educations, religions] = await Promise.all([
             // Verification types — only VERIFICATION category doc types
@@ -35,18 +48,26 @@ export async function GET() {
                 })
                 .then((rows) => rows.map((r) => r.name)),
 
-            // Clients for filter
+            // Clients for filter — region-scoped
             prisma.client
                 .findMany({
+                    where: {
+                        ...(activeRegionId ? { regionId: activeRegionId } : {}),
+                        ...clientScopeWhere,
+                    },
                     select: { id: true, name: true },
                     orderBy: { name: "asc" },
                     take: 200,
                 })
                 .catch(() => [] as { id: string; name: string }[]),
 
-            // Regional offices
+            // Regional offices — region-scoped
             prisma.regionalOffice
                 .findMany({
+                    where: {
+                        ...(activeRegionId ? { regionId: activeRegionId } : {}),
+                        ...officeScopeWhere,
+                    },
                     select: { id: true, name: true },
                     orderBy: { name: "asc" },
                 })

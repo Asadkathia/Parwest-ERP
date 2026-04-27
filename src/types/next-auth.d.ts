@@ -10,6 +10,8 @@ declare module "next-auth" {
             roleScopeType?: RoleScopeType
             regionId?: string | null
             regionalOfficeId?: string | null
+            regionName?: string | null
+            regionalOfficeName?: string | null
             permissions?: string[]
         } & DefaultSession["user"]
     }
@@ -19,6 +21,8 @@ declare module "next-auth" {
         roleScopeType?: RoleScopeType
         regionId?: string | null
         regionalOfficeId?: string | null
+        regionName?: string | null
+        regionalOfficeName?: string | null
         permissions?: string[]
     }
 }
@@ -30,6 +34,8 @@ declare module "next-auth/jwt" {
         roleScopeType?: "GLOBAL" | "REGIONAL"
         regionId?: string | null
         regionalOfficeId?: string | null
+        regionName?: string | null
+        regionalOfficeName?: string | null
         permissions?: string[]
     }
 }

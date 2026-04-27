@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
         const take = Math.min(parseInt(searchParams.get("take") || "200", 10) || 200, 200)
         const skip = Math.max(parseInt(searchParams.get("skip") || "0", 10) || 0, 0)
 
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
+
         const where: Prisma.GuardWhereInput = {}
         if (regionId) where.regionId = regionId
         if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId

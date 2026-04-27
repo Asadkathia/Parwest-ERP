@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 const EARNINGS = [
   { key: "basicSalary", label: "Basic Salary" },
@@ -70,12 +71,20 @@ function parseCsvRows(text: string): Record<string, string>[] {
   })
 }
 
+type Region = { id: string; name: string }
+
 type PayrollBulkSalarySlipsManagerProps = {
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollBulkSalarySlipsManager({
   canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollBulkSalarySlipsManagerProps = {}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([])
@@ -89,10 +98,13 @@ export default function PayrollBulkSalarySlipsManager({
 
   const loadSlips = useCallback(async () => {
     setLoadingSlips(true)
-    const res = await fetch(`/api/payroll/salary-slips?month=${month}`)
+    const params = new URLSearchParams()
+    params.set("month", month)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+    const res = await fetch(`/api/payroll/salary-slips?${params.toString()}`)
     if (res.ok) setSlips(await res.json())
     setLoadingSlips(false)
-  }, [month])
+  }, [month, effectiveRegionId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by month filter via callback
@@ -180,7 +192,14 @@ export default function PayrollBulkSalarySlipsManager({
     >
       <section className="ui-card p-4 space-y-4">
         <h3 className="text-base font-semibold">Upload Settings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr] gap-4 items-end">
+          <div>
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Salary Month *

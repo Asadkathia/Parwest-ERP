@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryDemandResponseStatus, StoreInventoryDemandStatus,
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 
 type Params = { params: Promise<{ id: string }> }
@@ -79,6 +79,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!responderStoreId || !lines) {
       return badRequest("responderStoreId and non-empty lines are required.")
     }
+
+    // Responder warehouse must be in the user's scope to issue stock from it.
+    const responderDenied = await ensureStoreInScope(responderStoreId, session.scope)
+    if (responderDenied) return responderDenied
 
     const result = await prisma.$transaction(
       async (tx) => {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -34,6 +35,14 @@ const defaultForm: FormState = {
 }
 
 export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
+  const { data: sessionData } = useSession()
+  // REGIONAL users (anyone with a regionId) are locked to their region/office.
+  // SuperAdmin / GLOBAL roles can pick any region.
+  const sessionRegionId = sessionData?.user?.regionId ?? null
+  const sessionOfficeId = sessionData?.user?.regionalOfficeId ?? null
+  const lockedToRegion = Boolean(sessionRegionId) && !isSuperAdmin
+  const lockedToOffice = Boolean(sessionOfficeId) && !isSuperAdmin
+
   const [form, setForm] = useState<FormState>(defaultForm)
   const [roles, setRoles] = useState<RoleOption[]>([])
   const [regions, setRegions] = useState<RegionOption[]>([])
@@ -42,15 +51,29 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
+  // Hardcode region/office for regional admins on first render.
+  useEffect(() => {
+    if (lockedToRegion && sessionRegionId && !form.regionId) {
+      setForm((prev) => ({
+        ...prev,
+        regionId: sessionRegionId,
+        regionalOfficeId: lockedToOffice && sessionOfficeId ? sessionOfficeId : prev.regionalOfficeId,
+      }))
+    }
+  }, [lockedToRegion, lockedToOffice, sessionRegionId, sessionOfficeId, form.regionId])
+
   useEffect(() => {
     let cancelled = false
 
     async function loadDependencies() {
       try {
+        const officesUrl = sessionRegionId
+          ? `/api/regional-offices?regionId=${encodeURIComponent(sessionRegionId)}`
+          : "/api/regional-offices"
         const [rolesRes, regionsRes, officesRes] = await Promise.all([
           fetch("/api/roles", { cache: "no-store" }),
           fetch("/api/regions", { cache: "no-store" }),
-          fetch("/api/regional-offices", { cache: "no-store" }),
+          fetch(officesUrl, { cache: "no-store" }),
         ])
 
         if (!rolesRes.ok || !regionsRes.ok || !officesRes.ok) {
@@ -77,7 +100,7 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sessionRegionId])
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === form.roleId) || null,
@@ -187,11 +210,11 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
           <SelectField
             label="Select Region"
             required={isRegionalRole}
-            disabled={isGlobalRole}
+            disabled={isGlobalRole || lockedToRegion}
             value={isGlobalRole ? "__GLOBAL__" : form.regionId}
             onChange={(v) => {
               setField("regionId", v)
-              setField("regionalOfficeId", "")
+              if (!lockedToOffice) setField("regionalOfficeId", "")
             }}
             options={
               isGlobalRole
@@ -205,7 +228,7 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
           <SelectField
             label="Regional Office"
             required={isRegionalRole}
-            disabled={isGlobalRole}
+            disabled={isGlobalRole || lockedToOffice}
             value={isGlobalRole ? "__GLOBAL__" : form.regionalOfficeId}
             onChange={(v) => setField("regionalOfficeId", v)}
             options={

@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryAssignmentStatus, StoreInventoryMovementType } fr
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -29,6 +29,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     const result = await prisma.$transaction(async (tx) => {
       const current = await tx.storeInventoryAssignment.findUnique({ where: { id } })
       if (!current) throw new Error("ASSIGNMENT_NOT_FOUND")
+      const denied = await ensureStoreInScope(current.storeId, session.scope, "Assignment not found.")
+      if (denied) throw Object.assign(new Error("ASSIGNMENT_OUT_OF_SCOPE"), { response: denied })
       if (current.status !== StoreInventoryAssignmentStatus.ASSIGNED) {
         throw new Error("ASSIGNMENT_NOT_OPEN")
       }
@@ -114,6 +116,11 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (error instanceof Error && error.message === "ASSIGNMENT_NOT_FOUND") {
       return notFound("Assignment not found.")
+    }
+
+    if (error instanceof Error && error.message === "ASSIGNMENT_OUT_OF_SCOPE") {
+      const response = (error as Error & { response?: Response }).response
+      if (response) return response
     }
 
     if (error instanceof Error && error.message === "ASSIGNMENT_NOT_OPEN") {

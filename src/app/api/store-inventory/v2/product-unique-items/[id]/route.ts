@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureRegionalOfficeInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -24,6 +24,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     })
     if (!row) return notFound("Product unique item not found.")
 
+    const denied = await ensureRegionalOfficeInScope(row.regionalOfficeId, session.scope)
+    if (denied) return denied
+
     return ok(row)
   } catch (error) {
     console.error(`store-inventory v2 product unique items GET (${id}) failed`, error)
@@ -41,6 +44,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params
 
   try {
+    const existing = await prisma.inventoryItem.findUnique({
+      where: { id },
+      select: { regionalOfficeId: true },
+    })
+    if (!existing) return notFound("Product unique item not found.")
+
+    const existingDenied = await ensureRegionalOfficeInScope(existing.regionalOfficeId, session.scope)
+    if (existingDenied) return existingDenied
+
     const body = (await request.json()) as Record<string, unknown>
     const data: Record<string, unknown> = {}
 
@@ -50,7 +62,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (body.categoryId != null) data.categoryId = asText(body.categoryId)
     if (body.conditionId != null) data.conditionId = asText(body.conditionId)
     if (body.vendorId != null) data.vendorId = asText(body.vendorId)
-    if (body.regionalOfficeId != null) data.regionalOfficeId = asText(body.regionalOfficeId)
+    if (body.regionalOfficeId != null) {
+      const newOffice = asText(body.regionalOfficeId)
+      const targetDenied = await ensureRegionalOfficeInScope(newOffice, session.scope)
+      if (targetDenied) return targetDenied
+      data.regionalOfficeId = newOffice
+    }
 
     if (Object.keys(data).length === 0) {
       return badRequest("No valid fields provided for update.")
@@ -95,6 +112,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params
 
   try {
+    const existing = await prisma.inventoryItem.findUnique({
+      where: { id },
+      select: { regionalOfficeId: true },
+    })
+    if (!existing) return notFound("Product unique item not found.")
+
+    const denied = await ensureRegionalOfficeInScope(existing.regionalOfficeId, session.scope)
+    if (denied) return denied
+
     await prisma.inventoryItem.delete({ where: { id } })
 
     await emitInventoryV2Audit({

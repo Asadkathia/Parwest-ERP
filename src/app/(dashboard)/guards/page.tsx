@@ -12,14 +12,14 @@ import GuardAvatar from "@/components/guards/GuardAvatar"
 import GuardsFilterBar from "@/components/guards/GuardsFilterBar"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { applyManagerScope, deriveManagerScope } from "@/lib/access/scope"
+import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { Suspense } from "react"
 
 export default async function GuardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; officeId?: string }>
+  searchParams: Promise<{ q?: string; status?: string; officeId?: string; regionId?: string }>
 }) {
   const session = await auth()
   if (!session) redirect("/login")
@@ -27,11 +27,11 @@ export default async function GuardsPage({
   const canCreateGuard = hasAction(session, "GUARDS", "CREATE")
   const isSuperAdminUser = isSuperAdmin(session)
 
-  const { q = "", status = "", officeId = "" } = await searchParams
+  const { q = "", status = "", officeId = "", regionId: regionIdParam = "" } = await searchParams
 
-  // SuperAdmin must pick an office before the full guard list loads. Regional
+  // SuperAdmin must pick a region before the full guard list loads. Regional
   // users are auto-scoped, so they don't hit this gate.
-  const needsOfficeGate = isSuperAdminUser && !officeId && !q && !status
+  const needsRegionGate = isSuperAdminUser && !regionIdParam && !q && !status && !officeId
 
   let guards: Array<{
     id: string
@@ -52,12 +52,33 @@ export default async function GuardsPage({
   const scope = deriveManagerScope(session)
 
   let offices: { id: string; name: string }[] = []
+  let regions: { id: string; name: string }[] = []
+  try {
+    regions = await prisma.region.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    })
+  } catch {
+    regions = []
+  }
+  const pickerRegions = scope?.regionId
+    ? regions.filter((r) => r.id === scope.regionId)
+    : regions
+  const regionLocked = Boolean(scope?.regionId)
 
-  // Skip expensive queries when SuperAdmin hasn't picked an office yet. We
+  // If a regional user manually puts a different region in the URL, ignore it
+  // and fall back to their scoped region.
+  const paramDenied = managerScopeDenied(scope, { regionId: regionIdParam || undefined })
+  const activeRegionId = paramDenied
+    ? scope?.regionId ?? undefined
+    : regionIdParam || scope?.regionId || undefined
+
+  // Skip expensive queries when SuperAdmin hasn't picked a region yet. We
   // still load the offices list so the filter dropdown is usable.
-  if (needsOfficeGate) {
+  if (needsRegionGate) {
     try {
       offices = await prisma.regionalOffice.findMany({
+        where: activeRegionId ? { regionId: activeRegionId } : {},
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       })
@@ -78,7 +99,8 @@ export default async function GuardsPage({
     }
     if (status) where.status = status
     if (officeId) where.regionalOfficeId = officeId
-    // Apply manager scope restrictions
+    if (activeRegionId) where.regionId = activeRegionId
+    // Apply manager scope restrictions (overrides URL params for regional users)
     if (scope?.regionId) where.regionId = scope.regionId
     if (scope?.regionalOfficeIds?.length) where.regionalOfficeId = scope.regionalOfficeIds[0]
 
@@ -100,7 +122,11 @@ export default async function GuardsPage({
       prisma.guard.count({ where: { status: "ACTIVE", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
       prisma.guard.count({ where: { status: "PENDING", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
       prisma.guard.count({ where: { status: "INACTIVE", ...(scope?.regionId ? { regionId: scope.regionId } : scope?.regionalOfficeIds?.length ? { regionalOfficeId: { in: scope.regionalOfficeIds } } : {}) } }),
-      prisma.regionalOffice.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      prisma.regionalOffice.findMany({
+        where: activeRegionId ? { regionId: activeRegionId } : {},
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
     ])
 
     guards = guardRows.map((guard) => ({
@@ -182,16 +208,21 @@ export default async function GuardsPage({
 
       <FilterBar>
         <Suspense>
-          <GuardsFilterBar offices={offices} />
+          <GuardsFilterBar
+            offices={offices}
+            regions={pickerRegions}
+            regionLocked={regionLocked}
+            hideOfficePicker={Boolean(scope?.regionalOfficeIds?.length === 1)}
+          />
         </Suspense>
       </FilterBar>
 
-      {needsOfficeGate ? (
+      {needsRegionGate ? (
         <div className="ui-card p-10 text-center">
           <Shield className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-          <p className="text-base font-medium text-[var(--text)]">Select an office to view guards.</p>
+          <p className="text-base font-medium text-[var(--text)]">Select a region to view guards.</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Guards are region-scoped. Pick an office from the filter above, or search by name / CNIC / Parwest ID to see results across all offices.
+            Guards are region-scoped. Pick a region above, or search by name / CNIC / Parwest ID.
           </p>
         </div>
       ) : (
@@ -205,7 +236,7 @@ export default async function GuardsPage({
 
       <div className="text-xs text-gray-500 -mt-4">
         {guards.length} guard{guards.length !== 1 ? "s" : ""} found
-        {q || status || officeId ? " (filtered)" : ""}
+        {q || status || officeId || regionIdParam ? " (filtered)" : ""}
       </div>
 
       <section className="ui-card overflow-x-auto">

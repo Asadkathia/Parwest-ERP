@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const clientId = searchParams.get("clientId") || undefined
     const status = searchParams.get("status") || undefined
+    const regionId = searchParams.get("regionId")
+    const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+    if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+      return forbidden("Forbidden: requested scope is outside your assigned region.")
+    }
 
     const where: Record<string, unknown> = {}
     if (clientId) where.clientId = clientId
@@ -22,8 +28,13 @@ export async function GET(request: NextRequest) {
     const scopeWhere = managerScope
       ? buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
       : {}
-    if (Object.keys(scopeWhere).length > 0) {
-      where.client = scopeWhere
+    const clientFilter = {
+      ...(regionId ? { regionId } : {}),
+      ...(regionalOfficeId ? { regionalOfficeId } : {}),
+      ...scopeWhere,
+    }
+    if (Object.keys(clientFilter).length > 0) {
+      where.client = clientFilter
     }
 
     const insurances = await (prisma.clientInsurance as unknown as {

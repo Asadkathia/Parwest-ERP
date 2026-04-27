@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft, Edit, Building, User, Calendar, FileText } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
@@ -28,6 +29,14 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
   })
 
   if (!deployment) notFound()
+
+  const scope = deriveManagerScope(session)
+  if (managerScopeDenied(scope, {
+    regionId: deployment.client.regionId ?? deployment.guard.regionId,
+    regionalOfficeId: deployment.regionalOfficeId ?? deployment.guard.regionalOfficeId,
+  })) {
+    notFound()
+  }
 
   const formatDate = (date: Date | null) => {
     if (!date) return "—"

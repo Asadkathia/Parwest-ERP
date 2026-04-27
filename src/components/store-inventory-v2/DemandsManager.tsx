@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -8,8 +8,11 @@ import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 import { parseDemandResponseMeta, totalReceivedForMeta, type DemandResponseMeta } from "@/lib/inventory/demand-response-meta"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string; type?: string | null }
+type RegionOption = { id: string; name: string }
 type Product = { id: string; sku: string; name: string; category?: { id: string; name: string } | null; variation?: { id: string; name: string } | null }
 type DemandLine = { id: string; product: Product; requestedQty: number; approvedQty?: number | null; fulfilledQty: number }
 type DemandResponseRow = {
@@ -138,7 +141,16 @@ function badgeClass(status: string): string {
   return "bg-slate-100 text-slate-700"
 }
 
-export default function DemandsManager({ responseMode = false }: { responseMode?: boolean }) {
+export default function DemandsManager({
+  responseMode = false,
+  regions = [],
+  locked = false,
+}: {
+  responseMode?: boolean
+  regions?: RegionOption[]
+  locked?: boolean
+}) {
+  const scopeQuery = useScopeQuery()
   const [rows, setRows] = useState<Demand[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -163,10 +175,10 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
     setNotice(null)
     try {
       const [demandRows, storeRows, productRows, inventoryRows] = await Promise.all([
-        apiGet<Demand[]>("/api/store-inventory/v2/demands"),
-        apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
+        apiGet<Demand[]>(`/api/store-inventory/v2/demands${scopeQuery.query}`),
+        apiGet<Option[]>(`/api/store-inventory/v2/masters/stores${scopeQuery.query}`),
         apiGet<Product[]>("/api/store-inventory/v2/products"),
-        apiGet<Array<InventoryBalance & { store: { id: string }; product: { id: string } }>>("/api/store-inventory/v2/inventories"),
+        apiGet<Array<InventoryBalance & { store: { id: string }; product: { id: string } }>>(`/api/store-inventory/v2/inventories${scopeQuery.query}`),
       ])
 
       setRows(demandRows)
@@ -188,7 +200,7 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [scopeQuery.query])
 
   useEffect(() => {
     void load()
@@ -878,9 +890,14 @@ export default function DemandsManager({ responseMode = false }: { responseMode?
       ) : null}
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" placeholder="Search by status/store/request" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" placeholder="Search by status/store/request" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </FilterBar>
 

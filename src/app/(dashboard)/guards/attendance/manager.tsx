@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type AttendanceRecord = {
     id: string
@@ -24,7 +25,15 @@ type GuardOption = {
     name: string
 }
 
-export default function GuardAttendanceManager() {
+type Props = {
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function GuardAttendanceManager({
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     const [parwestId, setParwestId] = useState("")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
@@ -232,7 +241,12 @@ export default function GuardAttendanceManager() {
                 <p className="text-gray-600 mt-1">Filter attendance by Secure Ops ID and date range</p>
             </div>
 
-            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-5 gap-4">
+                <RegionUrlPicker
+                    regions={regions}
+                    locked={regionLocked}
+                    includeGlobalOption={!regionLocked}
+                />
                 <div><label className="block text-sm text-gray-600 mb-1">Secure Ops ID*</label><input name="Secure Ops ID*" value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Secure Ops ID" /></div>
                 <div><label className="block text-sm text-gray-600 mb-1">Strat Date*</label><input name="Strat Date*" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                 <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input name="End Date*" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>

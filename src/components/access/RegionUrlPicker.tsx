@@ -19,6 +19,7 @@ export default function RegionUrlPicker({
     paramName = "regionId",
     label = "Region",
     includeGlobalOption = false,
+    defaultToGlobal = false,
 }: {
     regions: RegionOption[]
     locked?: boolean
@@ -26,22 +27,39 @@ export default function RegionUrlPicker({
     label?: string
     /** When true, prepend a "Global" option that filters to users with no region. */
     includeGlobalOption?: boolean
+    /**
+     * When true (and `includeGlobalOption` is also true), an empty URL param
+     * displays as "Global" rather than the unselected placeholder. Used for
+     * SuperAdmin so the picker reflects the active "all regions" state.
+     */
+    defaultToGlobal?: boolean
 }) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const [isPending, startTransition] = useTransition()
 
-    const current = searchParams.get(paramName) ?? ""
+    const urlValue = searchParams.get(paramName) ?? ""
+    // Display-value precedence:
+    //   1. URL param (user picked something)
+    //   2. Locked → user's assigned region id
+    //   3. Global default for SuperAdmin (defaultToGlobal)
+    //   4. Empty placeholder
+    const current =
+        urlValue ||
+        (locked && regions.length === 1 ? regions[0].id : "") ||
+        (defaultToGlobal && includeGlobalOption ? GLOBAL_REGION_VALUE : "")
 
     const handleChange = (value: string) => {
         const params = new URLSearchParams(searchParams.toString())
-        if (value) params.set(paramName, value)
+        if (value && value !== GLOBAL_REGION_VALUE) params.set(paramName, value)
         else params.delete(paramName)
         startTransition(() => {
             router.push(`${pathname}?${params.toString()}`)
         })
     }
+
+    const showPlaceholder = !(defaultToGlobal && includeGlobalOption)
 
     return (
         <div>
@@ -54,7 +72,7 @@ export default function RegionUrlPicker({
                 disabled={locked || isPending}
                 onChange={(e) => handleChange(e.target.value)}
             >
-                <option value="">-- Select {label} --</option>
+                {showPlaceholder && <option value="">-- Select {label} --</option>}
                 {includeGlobalOption && (
                     <option value={GLOBAL_REGION_VALUE}>Global</option>
                 )}

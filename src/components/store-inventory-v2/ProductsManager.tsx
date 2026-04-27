@@ -1,14 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Option = { id: string; name: string }
+type RegionOption = { id: string; name: string }
 type CategoryOption = Option & { parent?: Option | null }
 
 type Product = {
@@ -45,7 +47,15 @@ const EMPTY_FORM = {
   serialRequired: false,
 }
 
-export default function ProductsManager({ createMode = false }: { createMode?: boolean }) {
+export default function ProductsManager({
+  createMode = false,
+  regions = [],
+  locked = false,
+}: {
+  createMode?: boolean
+  regions?: RegionOption[]
+  locked?: boolean
+}) {
   const [products, setProducts] = useState<Product[]>([])
   const [brands, setBrands] = useState<Option[]>([])
   const [units, setUnits] = useState<Option[]>([])
@@ -318,9 +328,14 @@ export default function ProductsManager({ createMode = false }: { createMode?: b
       {!createMode ? (
         <>
           <FilterBar>
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-              <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by sku/name/brand" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Suspense>
+                <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+              </Suspense>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+                <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by sku/name/brand" />
+              </div>
             </div>
           </FilterBar>
 

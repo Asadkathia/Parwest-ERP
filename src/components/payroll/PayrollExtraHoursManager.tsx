@@ -5,6 +5,7 @@ import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
 type Row = {
@@ -17,13 +18,20 @@ type Row = {
 
 type Client = { id: string; name: string }
 type Branch = { id: string; name: string; clientId: string }
+type Region = { id: string; name: string }
 
 type PayrollExtraHoursManagerProps = {
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollExtraHoursManager({
   canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollExtraHoursManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -50,6 +58,7 @@ export default function PayrollExtraHoursManager({
     const params = new URLSearchParams()
     params.set("month", `${month}-01`)
     if (search) params.set("search", search)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     try {
       const res = await fetch(`/api/payroll/extra-hours?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -60,7 +69,7 @@ export default function PayrollExtraHoursManager({
     } finally {
       setLoading(false)
     }
-  }, [month, search])
+  }, [month, search, effectiveRegionId])
 
   useEffect(() => {
     loadRows()
@@ -68,14 +77,19 @@ export default function PayrollExtraHoursManager({
 
   useEffect(() => {
     if (!formOpen) return
-    fetch("/api/clients")
+    // Scope clients to the gate-selected region for SuperAdmin; REGIONAL users
+    // are scoped server-side already.
+    const url = effectiveRegionId
+      ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/clients"
+    fetch(url)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
         setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
       })
       .catch(() => {})
-  }, [formOpen])
+  }, [formOpen, effectiveRegionId])
 
   useEffect(() => {
     if (!selectClientId) {
@@ -145,6 +159,13 @@ export default function PayrollExtraHoursManager({
     >
       <section className="ui-card p-4 space-y-4">
         <div className="flex gap-3 flex-wrap items-end">
+          <div className="min-w-[180px]">
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Month
@@ -241,6 +262,7 @@ export default function PayrollExtraHoursManager({
                   value={parwestIdInput}
                   onChange={setParwestIdInput}
                   onSelect={handleGuardSelect}
+                  regionId={effectiveRegionId}
                 />
               </div>
               <div>

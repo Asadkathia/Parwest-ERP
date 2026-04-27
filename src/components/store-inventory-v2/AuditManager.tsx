@@ -1,11 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Row = {
   id: string
@@ -17,7 +18,15 @@ type Row = {
   user?: { id: string; name: string; email: string } | null
 }
 
-export default function AuditManager() {
+type RegionOption = { id: string; name: string }
+
+export default function AuditManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
@@ -54,9 +63,14 @@ export default function AuditManager() {
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by event/user/description" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by event/user/description" />
+          </div>
         </div>
       </FilterBar>
 

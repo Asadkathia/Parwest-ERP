@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 // PATCH /api/guard-age-approvals/[id] - approve or reject
 export async function PATCH(
@@ -17,8 +18,20 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const approval = await prisma.guardAgeApproval.findUnique({ where: { id } })
+    const approval = await prisma.guardAgeApproval.findUnique({
+      where: { id },
+      include: { guard: { select: { regionId: true, regionalOfficeId: true } } },
+    })
     if (!approval) return notFound("Approval request not found")
+
+    const scope = deriveManagerScope(session)
+    if (managerScopeDenied(scope, {
+      regionId: approval.guard?.regionId ?? null,
+      regionalOfficeId: approval.guard?.regionalOfficeId ?? null,
+    })) {
+      return forbidden("Forbidden: this approval is outside your scope.")
+    }
+
     if (approval.status !== "PENDING") return badRequest("This request has already been reviewed")
 
     const action = String(body.action || "").toUpperCase()

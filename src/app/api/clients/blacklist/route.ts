@@ -5,14 +5,23 @@ import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasAction(session, "CLIENTS", "VIEW")) return forbidden("Access denied.")
     const managerScope = deriveManagerScope(session)
 
+    const { searchParams } = new URL(request.url)
+    const regionId = searchParams.get("regionId")
+    const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+    if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+      return forbidden("Forbidden: requested scope is outside your assigned region.")
+    }
+
     const where: Record<string, unknown> = { status: "BLACKLISTED" }
+    if (regionId) where.regionId = regionId
     Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
 
     const rows = await prisma.client.findMany({

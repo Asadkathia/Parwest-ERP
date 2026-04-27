@@ -48,7 +48,11 @@ function fmt(date?: string | null) {
     return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
-export default function AssignResidenceForm() {
+type AssignResidenceFormProps = {
+    lockedRegionId?: string | null
+}
+
+export default function AssignResidenceForm({ lockedRegionId = null }: AssignResidenceFormProps = {}) {
     const [guards, setGuards] = useState<Guard[]>([])
     const [residences, setResidences] = useState<Residence[]>([])
     const [users, setUsers] = useState<User[]>([])
@@ -84,10 +88,14 @@ export default function AssignResidenceForm() {
     useEffect(() => {
         const loadStatic = async () => {
             try {
+                const guardsUrl = lockedRegionId ? `/api/guards?regionId=${lockedRegionId}` : "/api/guards"
+                const usersUrl = lockedRegionId
+                    ? `/api/users?status=ACTIVE&regionId=${lockedRegionId}`
+                    : "/api/users?status=ACTIVE"
                 const [guardsRes, residencesRes, usersRes] = await Promise.all([
-                    fetch("/api/guards"),
+                    fetch(guardsUrl),
                     fetch("/api/residences"),
-                    fetch("/api/users?status=ACTIVE"),
+                    fetch(usersUrl),
                 ])
                 if (guardsRes.ok) setGuards(await guardsRes.json())
                 if (residencesRes.ok) setResidences(await residencesRes.json())
@@ -96,7 +104,7 @@ export default function AssignResidenceForm() {
         }
         void loadStatic()
         void loadAssignments()
-    }, [loadAssignments])
+    }, [loadAssignments, lockedRegionId])
 
     const supervisorOptions = useMemo<SearchSelectOption[]>(
         () => users

@@ -8,6 +8,7 @@ import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
 import GuardInfoCard from "@/components/payroll/shared/GuardInfoCard"
 import AttendanceDetailsTable from "@/components/payroll/shared/AttendanceDetailsTable"
 import Base64FileUpload from "@/components/payroll/shared/Base64FileUpload"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 import { parseCsvToLoanRows, type BulkLoanDraftRow } from "@/lib/payroll/loans-bulk"
 
@@ -17,6 +18,22 @@ type PayrollLoansClientProps = {
   canCreate?: boolean
   canUpdate?: boolean
   canView?: boolean
+  /**
+   * Effective region filter from the region gate. Non-null when a SuperAdmin
+   * has picked a region or when the caller is region-scoped. The server-side
+   * API enforces this, but we pass the value through so list fetches can
+   * include it up front and avoid a flicker with global data.
+   */
+  effectiveRegionId?: string | null
+  /**
+   * Region options pre-filtered by the region gate (already scoped to the
+   * caller's regional access). Threaded through so we don't re-fetch
+   * `/api/regions` on the client and accidentally show every region to a
+   * regional admin.
+   */
+  regions?: Region[]
+  /** True when the caller is region-locked (REGIONAL scope). */
+  locked?: boolean
 }
 
 type LoanRow = {
@@ -57,6 +74,9 @@ export default function PayrollLoansClient({
   canCreate = false,
   canUpdate = false,
   canView = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollLoansClientProps = {}) {
   const initialTab: TabId = canCreate
     ? "add"
@@ -83,8 +103,21 @@ export default function PayrollLoansClient({
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as TabId)}
     >
-      {activeTab === "add" && canCreate && <AddLoansTab />}
-      {activeTab === "finalize" && <FinalizeLoansTab canCreate={canCreate} />}
+      {activeTab === "add" && canCreate && (
+        <AddLoansTab
+          effectiveRegionId={effectiveRegionId}
+          regions={regions}
+          locked={locked}
+        />
+      )}
+      {activeTab === "finalize" && (
+        <FinalizeLoansTab
+          canCreate={canCreate}
+          effectiveRegionId={effectiveRegionId}
+          regions={regions}
+          locked={locked}
+        />
+      )}
       {activeTab === "history" &&
         (canView ? (
           <HistoryTab />
@@ -99,7 +132,15 @@ export default function PayrollLoansClient({
 
 // ───────────────────────────── ADD LOANS TAB ─────────────────────────────
 
-function AddLoansTab() {
+function AddLoansTab({
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
+}: {
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
+} = {}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
@@ -122,14 +163,24 @@ function AddLoansTab() {
   const [bulkResult, setBulkResult] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/clients")
+    // Scope clients + supervisors to the gate-selected region. The server
+    // enforces REGIONAL scope regardless; for SuperAdmin we forward the
+    // selected regionId so dropdown options match what the rest of the page
+    // will accept.
+    const clientsUrl = effectiveRegionId
+      ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/clients"
+    const usersUrl = effectiveRegionId
+      ? `/api/users?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/users"
+    fetch(clientsUrl)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
         setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
       })
       .catch(() => {})
-    fetch("/api/users")
+    fetch(usersUrl)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.users ?? data.rows ?? []
@@ -140,7 +191,7 @@ function AddLoansTab() {
         )
       })
       .catch(() => {})
-  }, [])
+  }, [effectiveRegionId])
 
   useEffect(() => {
     if (!selectClientId) {
@@ -298,7 +349,14 @@ function AddLoansTab() {
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
       <div className="space-y-6">
         <section className="ui-card p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <RegionUrlPicker
+                regions={regions}
+                locked={locked}
+                includeGlobalOption={!locked}
+              />
+            </div>
             <div>
               <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
                 Month *
@@ -318,6 +376,7 @@ function AddLoansTab() {
                 value={parwestIdInput}
                 onChange={setParwestIdInput}
                 onSelect={handleGuardSelect}
+                regionId={effectiveRegionId}
               />
             </div>
             <div>
@@ -570,37 +629,36 @@ function AddLoansTab() {
 
 // ─────────────────────────── FINALIZE LOANS TAB ───────────────────────────
 
-function FinalizeLoansTab({ canCreate = false }: { canCreate?: boolean }) {
+function FinalizeLoansTab({
+  canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
+}: {
+  canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
+}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
-  const [regionId, setRegionId] = useState("")
-  const [regions, setRegions] = useState<Region[]>([])
+  // Region is fully driven by the page-level gate (URL or REGIONAL scope).
+  const regionId = effectiveRegionId ?? ""
   const [rows, setRows] = useState<LoanRow[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [search, setSearch] = useState("")
 
-  useEffect(() => {
-    fetch("/api/regions")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setRegions(Array.isArray(data) ? data : []))
-      .catch(() => {})
-  }, [])
-
   const loadLoans = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set("month", `${month}-01`)
     if (search) params.set("search", search)
+    if (regionId) params.set("regionId", regionId)
     const res = await fetch(`/api/payroll/loans?${params.toString()}`)
     if (res.ok) {
       const data = await res.json()
-      let list: LoanRow[] = Array.isArray(data) ? data : []
-      if (regionId) {
-        list = list.filter(
-          (l) => l.regionId === regionId || l.guard?.regionId === regionId
-        )
-      }
+      const list: LoanRow[] = Array.isArray(data) ? data : []
       setRows(list)
     }
     setLoading(false)
@@ -704,6 +762,13 @@ function FinalizeLoansTab({ canCreate = false }: { canCreate?: boolean }) {
     <section className="ui-card p-4 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr_auto_auto_auto] gap-3 items-end">
         <div>
+          <RegionUrlPicker
+            regions={regions}
+            locked={locked}
+            includeGlobalOption={!locked}
+          />
+        </div>
+        <div>
           <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
             Month
           </label>
@@ -713,19 +778,6 @@ function FinalizeLoansTab({ canCreate = false }: { canCreate?: boolean }) {
             value={month}
             onChange={(e) => setMonth(e.target.value)}
           />
-        </div>
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-            Region
-          </label>
-          <select className="ui-select" value={regionId} onChange={(e) => setRegionId(e.target.value)}>
-            <option value="">All</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">

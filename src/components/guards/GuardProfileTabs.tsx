@@ -109,7 +109,13 @@ export default function GuardProfileTabs({
             case "residence-history":
                 return <ResidenceHistoryTab residenceHistory={guard.residenceHistory || []} />
             case "ojt":
-                return <OnJobTrainingsTab guardId={guard.id || ""} canCreate={canCreate} canDelete={canDelete} />
+                return <OnJobTrainingsTab
+                    guardId={guard.id || ""}
+                    canCreate={canCreate}
+                    canDelete={canDelete}
+                    guardRegionId={(guard as { regionId?: string | null }).regionId ?? null}
+                    guardRegionalOfficeId={(guard as { regionalOfficeId?: string | null }).regionalOfficeId ?? null}
+                />
             case "store-inventory":
                 return <StoreInventoryTab guardId={guard.id || ""} canCreate={canCreate} />
             case "service-history":

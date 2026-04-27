@@ -5,16 +5,24 @@ import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
 type ClearanceStep = { step: string; ok: boolean; count?: number; message?: string }
+type Region = { id: string; name: string }
 
 type PayrollClearanceManagerProps = {
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollClearanceManager({
   canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollClearanceManagerProps = {}) {
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
@@ -77,15 +85,25 @@ export default function PayrollClearanceManager({
       subtitle="Reverse cycle for deployment: revoke deployment, return inventory, return pledged documents, finalize payroll."
     >
       <section className="ui-card p-4 space-y-4">
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-            Secure Ops ID *
-          </label>
-          <GuardAutocomplete
-            value={parwestIdInput}
-            onChange={setParwestIdInput}
-            onSelect={handleGuardSelect}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-end">
+          <div>
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Secure Ops ID *
+            </label>
+            <GuardAutocomplete
+              value={parwestIdInput}
+              onChange={setParwestIdInput}
+              onSelect={handleGuardSelect}
+              regionId={effectiveRegionId}
+            />
+          </div>
         </div>
 
         <GuardContextFields

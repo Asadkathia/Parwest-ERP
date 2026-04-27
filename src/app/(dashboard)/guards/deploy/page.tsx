@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { hasAction } from "@/lib/api/permissions"
 import DeployGuardForm from "./form"
+import { deriveManagerScope } from "@/lib/access/scope"
 
 export default async function DeployGuardPage() {
     const session = await auth()
@@ -15,5 +16,14 @@ export default async function DeployGuardPage() {
         redirect("/guards")
     }
 
-    return <DeployGuardForm />
+    const scope = deriveManagerScope(session)
+    const lockedRegionalOfficeId =
+        scope && scope.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
+
+    return (
+        <DeployGuardForm
+            lockedRegionId={scope?.regionId ?? null}
+            lockedRegionalOfficeId={lockedRegionalOfficeId}
+        />
+    )
 }

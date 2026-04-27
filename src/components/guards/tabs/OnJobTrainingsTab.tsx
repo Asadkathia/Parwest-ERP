@@ -20,6 +20,9 @@ interface OnJobTrainingsTabProps {
     guardId: string
     canCreate?: boolean
     canDelete?: boolean
+    /** Region/office of the guard — used to filter modal client/RO dropdowns. Server still enforces. */
+    guardRegionId?: string | null
+    guardRegionalOfficeId?: string | null
 }
 
 function parseNotes(raw: string | null): Record<string, string> {
@@ -51,7 +54,7 @@ const EMPTY_FORM = {
     supervisorWithUniform: false,
 }
 
-export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelete = false }: OnJobTrainingsTabProps) {
+export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelete = false, guardRegionId = null, guardRegionalOfficeId = null }: OnJobTrainingsTabProps) {
     const [trainings, setTrainings] = useState<Training[]>([])
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
@@ -75,14 +78,28 @@ export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelet
 
     useEffect(() => { fetchTrainings() }, [fetchTrainings])
 
-    // Load regional offices once on modal open
+    // Load regional offices once on modal open. When the guard is region-scoped,
+    // pass ?regionId= so REGIONAL users only see offices under the guard's region.
     useEffect(() => {
         if (!showModal || regionalOffices.length > 0) return
-        fetch("/api/regional-offices")
+        const url = guardRegionId
+            ? `/api/regional-offices?regionId=${guardRegionId}`
+            : "/api/regional-offices"
+        fetch(url)
             .then(r => r.ok ? r.json() : [])
-            .then(setRegionalOffices)
+            .then((data: RegionalOffice[]) => {
+                setRegionalOffices(data)
+                // Pre-select the guard's regional office (locked) so the user
+                // doesn't have to pick it themselves.
+                if (guardRegionalOfficeId) {
+                    const office = data.find(o => o.id === guardRegionalOfficeId)
+                    if (office) {
+                        setForm(f => ({ ...f, regionalOfficeId: office.id, regionalOfficeName: office.name }))
+                    }
+                }
+            })
             .catch(() => {})
-    }, [showModal, regionalOffices.length])
+    }, [showModal, regionalOffices.length, guardRegionId, guardRegionalOfficeId])
 
     // Load clients when regional office changes
     useEffect(() => {
@@ -270,19 +287,36 @@ export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelet
                             </div>
 
                             {/* Regional Office */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Regional Office</label>
-                                <select
-                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={form.regionalOfficeId}
-                                    onChange={e => handleRegionalOfficeChange(e.target.value)}
-                                >
-                                    <option value="">— Select Regional Office —</option>
-                                    {regionalOffices.map(o => (
-                                        <option key={o.id} value={o.id}>{o.name}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            {guardRegionalOfficeId ? (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Regional Office</label>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={
+                                            regionalOffices.find(o => o.id === guardRegionalOfficeId)?.name
+                                            || form.regionalOfficeName
+                                            || "Locked to guard's office"
+                                        }
+                                        className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">Locked to this guard&apos;s regional office.</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Regional Office</label>
+                                    <select
+                                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={form.regionalOfficeId}
+                                        onChange={e => handleRegionalOfficeChange(e.target.value)}
+                                    >
+                                        <option value="">— Select Regional Office —</option>
+                                        {regionalOffices.map(o => (
+                                            <option key={o.id} value={o.id}>{o.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Client */}
                             <div>

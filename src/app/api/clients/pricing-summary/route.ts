@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
@@ -23,9 +23,18 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim() || undefined
     const status = searchParams.get("status") || undefined
     const guardType = searchParams.get("guardType") || undefined
+    const regionId = searchParams.get("regionId")
+    const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+    if (managerScopeDenied(scope, { regionId, regionalOfficeId })) {
+      return forbidden("Forbidden: requested scope is outside your assigned region.")
+    }
 
     const scopeWhere = scope ? buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }) : {}
-    const where: Prisma.ClientWhereInput = { ...scopeWhere }
+    const where: Prisma.ClientWhereInput = {
+      ...(regionId ? { regionId } : {}),
+      ...scopeWhere,
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

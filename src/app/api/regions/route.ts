@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope } from "@/lib/access/scope"
 
 const MOCK_REGIONS = [
     { id: "mock-region-punjab", name: "Punjab", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
@@ -16,11 +17,17 @@ export async function GET() {
         if (!session) return unauthorized()
         if (!hasAction(session, "SETTINGS", "VIEW")) return forbidden()
 
+        const scope = deriveManagerScope(session)
+
         if (isRuntimeMockEnabled()) {
-            return NextResponse.json(MOCK_REGIONS, { status: 200 })
+            const filtered = scope?.regionId
+                ? MOCK_REGIONS.filter((r) => r.id === scope.regionId)
+                : MOCK_REGIONS
+            return NextResponse.json(filtered, { status: 200 })
         }
 
         const regions = await prisma.region.findMany({
+            where: scope?.regionId ? { id: scope.regionId } : undefined,
             orderBy: { name: "asc" },
         })
         return NextResponse.json(regions, { status: 200 })

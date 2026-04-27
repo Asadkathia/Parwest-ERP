@@ -3,6 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Search, RotateCcw } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
 import FilterBar from "@/components/ui/filter-bar"
@@ -10,6 +11,9 @@ import InlineAlert from "@/components/ui/inline-alert"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+type RegionOption = { id: string; name: string }
 
 type ClientRow = {
   id: string
@@ -26,46 +30,18 @@ type ClientRow = {
 }
 
 const LEGACY_CLIENT_TYPE_OPTIONS = ["bank", "manufacturer", "other"]
-const LEGACY_CITY_OPTIONS = [
-  "All Cities",
-  "Lahore",
-  "Gujranwala",
-  "Sahiwal",
-  "Multan",
-  "Karachi",
-  "Faisalabad",
-  "Khanpur",
-  "Chichawatni",
-  "Bahawalpur",
-  "Mian Channu",
-  "Khanewal",
-  "Ahmedpur East",
-  "Ahmed Nager Chatha",
-  "Ali Pur",
-  "Arifwala",
-  "Attock",
-  "Basti Malook",
-  "Bhagalchur",
-  "Bhalwal",
-  "Bahawalnagar",
-  "Bhaipheru",
-  "Bhakkar",
-  "Burewala",
-  "Chailianwala",
-  "Chakwal",
-  "Chiniot",
-  "Chowk Azam",
-  "Chowk Sarwar Shaheed",
-  "Daska",
-]
 
 type Props = {
   title: string
   subtitle: string
   variant?: "legacy" | "v2"
+  regions?: RegionOption[]
+  locked?: boolean
 }
 
-export default function ClientSearchManager({ title, subtitle, variant = "legacy" }: Props) {
+export default function ClientSearchManager({ title, subtitle, variant = "legacy", regions = [], locked = false }: Props) {
+  const searchParams = useSearchParams()
+  const urlRegionId = searchParams?.get("regionId") || ""
   const [rows, setRows] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -101,7 +77,10 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
     try {
       setLoading(true)
       setError("")
-      const response = await fetch("/api/clients")
+      const url = urlRegionId
+        ? `/api/clients?regionId=${encodeURIComponent(urlRegionId)}`
+        : "/api/clients"
+      const response = await fetch(url)
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.message || "Failed to fetch clients")
@@ -118,7 +97,21 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
 
   useEffect(() => {
     loadRows()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlRegionId])
+
+  // Derive the City filter options from rows actually returned by the API.
+  // The API is region-scoped server-side, so this list automatically respects
+  // the user's locked region (no leak of out-of-region cities) and updates
+  // when a SuperAdmin changes the URL regionId.
+  const cityOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const row of rows) {
+      const c = (row.city || "").trim()
+      if (c) set.add(c)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [rows])
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -142,6 +135,11 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <RegionUrlPicker
+            regions={regions}
+            locked={locked}
+            includeGlobalOption={!locked}
+          />
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
             <input
@@ -167,7 +165,7 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
             <select name="Select City" value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
               <option value="">--Select City--</option>
-              {LEGACY_CITY_OPTIONS.map((option) => (
+              {cityOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -235,38 +233,6 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             <option>bank</option>
             <option>manufacturer</option>
             <option>other</option>
-          </select>
-          <select name="legacy_city_options">
-            <option>All Cities</option>
-            <option>Lahore</option>
-            <option>Gujranwala</option>
-            <option>Sahiwal</option>
-            <option>Multan</option>
-            <option>Karachi</option>
-            <option>Faisalabad</option>
-            <option>Khanpur</option>
-            <option>Chichawatni</option>
-            <option>Bahawalpur</option>
-            <option>Mian Channu</option>
-            <option>Khanewal</option>
-            <option>Ahmedpur East</option>
-            <option>Ahmed Nager Chatha</option>
-            <option>Ali Pur</option>
-            <option>Arifwala</option>
-            <option>Attock</option>
-            <option>Basti Malook</option>
-            <option>Bhagalchur</option>
-            <option>Bhalwal</option>
-            <option>Bahawalnagar</option>
-            <option>Bhaipheru</option>
-            <option>Bhakkar</option>
-            <option>Burewala</option>
-            <option>Chailianwala</option>
-            <option>Chakwal</option>
-            <option>Chiniot</option>
-            <option>Chowk Azam</option>
-            <option>Chowk Sarwar Shaheed</option>
-            <option>Daska</option>
           </select>
         </div>
       </FilterBar>

@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
 import GuardEditForm from "./form"
+import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
 export default async function EditGuardPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
@@ -11,14 +12,24 @@ export default async function EditGuardPage({ params }: { params: Promise<{ id: 
 
     const { id } = await params
 
+    const scope = deriveManagerScope(session)
+    const lockedRegionId = scope?.regionId ?? null
+    const lockedRegionalOfficeId =
+        scope && scope.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
+
+    const regionWhere = scope?.regionId ? { id: scope.regionId } : {}
+    const officeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "id" })
+
     const [guard, regions, regionalOffices, currentAssignment] = await Promise.all([
         prisma.guard.findUnique({
             where: { id },
         }),
         prisma.region.findMany({
+            where: regionWhere,
             orderBy: { name: "asc" },
         }),
         prisma.regionalOffice.findMany({
+            where: officeWhere,
             include: { region: true },
             orderBy: { name: "asc" },
         }),
@@ -42,6 +53,8 @@ export default async function EditGuardPage({ params }: { params: Promise<{ id: 
                 regions={regions}
                 regionalOffices={regionalOffices}
                 currentSupervisorId={currentAssignment?.supervisorId ?? null}
+                lockedRegionId={lockedRegionId}
+                lockedRegionalOfficeId={lockedRegionalOfficeId}
             />
         </div>
     )

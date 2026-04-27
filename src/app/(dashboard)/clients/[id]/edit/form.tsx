@@ -26,20 +26,6 @@ const PROVINCE_OPTIONS = [
     { value: "All Pakistan", label: "All Pakistan" },
 ]
 
-const DESIGNATION_OPTIONS = [
-    { value: "Guard", label: "Guard" },
-    { value: "Supervisor", label: "Supervisor" },
-    { value: "CPO", label: "CPO" },
-    { value: "Armed Guard", label: "Armed Guard" },
-    { value: "Unarmed Guard", label: "Unarmed Guard" },
-]
-
-const EX_SERVICE_OPTIONS = [
-    { value: "Yes", label: "Yes" },
-    { value: "No", label: "No" },
-    { value: "Other", label: "Other" },
-]
-
 type Client = {
     id: string
     name: string
@@ -93,6 +79,8 @@ type Props = {
     regions: Region[]
     currentSupervisorId?: string | null
     isSuperAdmin?: boolean
+    viewerRegionId?: string | null
+    viewerRegionalOfficeId?: string | null
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
@@ -106,15 +94,21 @@ function initContactNumbers(raw: unknown): string[] {
     return [""]
 }
 
-export default function ClientEditForm({ client, regions, currentSupervisorId, isSuperAdmin = false }: Props) {
+export default function ClientEditForm({ client, regions, currentSupervisorId, isSuperAdmin = false, viewerRegionId = null, viewerRegionalOfficeId = null }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
+    const isRegionalViewer = !isSuperAdmin && Boolean(viewerRegionId)
+    const lockedRegionalOffice = isRegionalViewer ? viewerRegionalOfficeId : null
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
     // Region / Regional Office (dynamic cascade)
-    const [selectedRegionId, setSelectedRegionId] = useState(client.regionId ?? "")
-    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(client.regionalOfficeId ?? "")
+    const [selectedRegionId, setSelectedRegionId] = useState(
+        isRegionalViewer ? (viewerRegionId ?? "") : (client.regionId ?? "")
+    )
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(
+        lockedRegionalOffice ?? (client.regionalOfficeId ?? "")
+    )
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
 
     // Manager / Supervisor (filtered by region)
@@ -123,6 +117,29 @@ export default function ClientEditForm({ client, regions, currentSupervisorId, i
 
     // Client types
     const [clientTypes, setClientTypes] = useState<{ value: string; label: string }[]>([])
+
+    // Designation / ex-service options (dynamic — no hardcoded LEGACY fallbacks)
+    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
+    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
+
+    useEffect(() => {
+        fetch("/api/guard-designation-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setDesignationOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                }
+            })
+            .catch(() => {})
+        fetch("/api/guard-ex-service-types")
+            .then((r) => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setExServiceOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     // Contact numbers
     const [contactNumbers, setContactNumbers] = useState<string[]>(initContactNumbers(client.contactNumbers))
@@ -470,27 +487,31 @@ export default function ClientEditForm({ client, regions, currentSupervisorId, i
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
                             <select
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionId}
                                 onChange={(e) => {
                                     setSelectedRegionId(e.target.value)
                                     setSelectedRegionalOfficeId("")
                                 }}
+                                disabled={isRegionalViewer}
                             >
                                 <option value="">— Select Region —</option>
                                 {regions.map((r) => (
                                     <option key={r.id} value={r.id}>{r.name}</option>
                                 ))}
                             </select>
+                            {isRegionalViewer && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
                             <select
                                 name="regionalOfficeId"
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionalOfficeId}
                                 onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId}
+                                disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
                             >
                                 <option value="">
                                     {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
@@ -499,6 +520,9 @@ export default function ClientEditForm({ client, regions, currentSupervisorId, i
                                     <option key={o.id} value={o.id}>{o.name}</option>
                                 ))}
                             </select>
+                            {lockedRegionalOffice && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
@@ -583,11 +607,11 @@ export default function ClientEditForm({ client, regions, currentSupervisorId, i
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractDayGuardDesignation" options={DESIGNATION_OPTIONS} defaultValue={client.contractDayGuardDesignation || ""} placeholder="Select designation" />
+                                    <SearchSelect name="contractDayGuardDesignation" options={designationOptions} defaultValue={client.contractDayGuardDesignation || ""} placeholder={designationOptions.length === 0 ? "Loading…" : "Select designation"} />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractDayGuardExService" options={EX_SERVICE_OPTIONS} defaultValue={client.contractDayGuardExService || ""} placeholder="Select" />
+                                    <SearchSelect name="contractDayGuardExService" options={exServiceOptions} defaultValue={client.contractDayGuardExService || ""} placeholder={exServiceOptions.length === 0 ? "Loading…" : "Select"} />
                                 </div>
                             </div>
                         </div>
@@ -598,11 +622,11 @@ export default function ClientEditForm({ client, regions, currentSupervisorId, i
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractNightGuardDesignation" options={DESIGNATION_OPTIONS} defaultValue={client.contractNightGuardDesignation || ""} placeholder="Select designation" />
+                                    <SearchSelect name="contractNightGuardDesignation" options={designationOptions} defaultValue={client.contractNightGuardDesignation || ""} placeholder={designationOptions.length === 0 ? "Loading…" : "Select designation"} />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractNightGuardExService" options={EX_SERVICE_OPTIONS} defaultValue={client.contractNightGuardExService || ""} placeholder="Select" />
+                                    <SearchSelect name="contractNightGuardExService" options={exServiceOptions} defaultValue={client.contractNightGuardExService || ""} placeholder={exServiceOptions.length === 0 ? "Loading…" : "Select"} />
                                 </div>
                             </div>
                         </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -21,6 +22,12 @@ type RelationshipRow = {
 }
 
 export default function CsRelationshipManager() {
+  const { data: sessionData } = useSession()
+  const sessionUser = sessionData?.user as
+    | { regionId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
+    | undefined
+  const sessionRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
+
   const [rows, setRows] = useState<RelationshipRow[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -50,11 +57,12 @@ export default function CsRelationshipManager() {
     setLoading(true)
     setError("")
     try {
+      const regionParam = sessionRegionId ? `?regionId=${encodeURIComponent(sessionRegionId)}` : ""
       const [rolesRes, usersRes, clientsRes, branchesRes, relRes] = await Promise.all([
         fetch("/api/roles", { cache: "no-store" }),
-        fetch("/api/users", { cache: "no-store" }),
-        fetch("/api/clients", { cache: "no-store" }),
-        fetch("/api/branches", { cache: "no-store" }),
+        fetch(`/api/users${regionParam}`, { cache: "no-store" }),
+        fetch(`/api/clients${regionParam}`, { cache: "no-store" }),
+        fetch(`/api/branches${regionParam}`, { cache: "no-store" }),
         fetch("/api/users/cs-relationships", { cache: "no-store" }),
       ])
       const [rolesJson, usersJson, clientsJson, branchesJson, relJson] = await Promise.all([
@@ -82,7 +90,8 @@ export default function CsRelationshipManager() {
 
   useEffect(() => {
     void load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionRegionId])
 
   const assign = async () => {
     setNotice("")

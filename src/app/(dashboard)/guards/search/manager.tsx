@@ -10,6 +10,7 @@ import InlineAlert from "@/components/ui/inline-alert"
 import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
 import SearchSelect from "@/components/ui/SearchSelect"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,8 +110,23 @@ const STATUS_COLORS: Record<string, "success" | "warning" | "neutral" | "danger"
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function SearchGuardsManager() {
-    const [filters, setFilters] = useState<Filters>(defaultFilters)
+type Props = {
+    effectiveRegionId?: string | null
+    lockedOfficeId?: string | null
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function SearchGuardsManager({
+    effectiveRegionId = null,
+    lockedOfficeId = null,
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
+    const [filters, setFilters] = useState<Filters>(() => ({
+        ...defaultFilters,
+        officeId: lockedOfficeId ?? "",
+    }))
     const [guards, setGuards] = useState<Guard[]>([])
     const [meta, setMeta] = useState<Meta>({
         statuses: [],
@@ -130,17 +146,27 @@ export default function SearchGuardsManager() {
     const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
         setFilters((prev) => ({ ...prev, [key]: value }))
 
-    const resetFilters = () => setFilters(defaultFilters)
+    const resetFilters = () => setFilters({ ...defaultFilters, officeId: lockedOfficeId ?? "" })
 
-    // Load meta (dynamic options) once on mount
+    // Keep officeId synced when scope locks change.
+    useEffect(() => {
+        if (lockedOfficeId) {
+            setFilters((prev) => ({ ...prev, officeId: lockedOfficeId }))
+        }
+    }, [lockedOfficeId])
+
+    // Load meta (dynamic options) — refetch when active region changes so
+    // SuperAdmin's office/client lists narrow with the picker.
     useEffect(() => {
         setMetaLoading(true)
-        fetch("/api/guards/search/meta")
+        const params = new URLSearchParams()
+        if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+        fetch(`/api/guards/search/meta?${params.toString()}`)
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => { if (data) setMeta(data) })
             .catch(() => {})
             .finally(() => setMetaLoading(false))
-    }, [])
+    }, [effectiveRegionId])
 
     // Build server-side params and fetch
     const loadGuards = async () => {
@@ -158,6 +184,7 @@ export default function SearchGuardsManager() {
             if (filters.clientId)     params.set("clientId", filters.clientId)
             if (filters.createdFrom)  params.set("createdFrom", filters.createdFrom)
             if (filters.createdTo)    params.set("createdTo", filters.createdTo)
+            if (effectiveRegionId)    params.set("regionId", effectiveRegionId)
 
             const res = await fetch(`/api/guards/search?${params.toString()}`)
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Failed to fetch guards")
@@ -170,8 +197,8 @@ export default function SearchGuardsManager() {
         }
     }
 
-    // Initial load
-    useEffect(() => { loadGuards() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // Initial load + refresh when active region changes (SuperAdmin region picker).
+    useEffect(() => { loadGuards() }, [effectiveRegionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Client-side refinement filters (applied on top of server-filtered data)
     const filteredRows = useMemo(() => {
@@ -239,6 +266,11 @@ export default function SearchGuardsManager() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <RegionUrlPicker
+                            regions={regions}
+                            locked={regionLocked}
+                            includeGlobalOption={!regionLocked}
+                        />
                         <Input label="Parwest ID"    value={filters.parwestId}   onChange={(v) => setFilter("parwestId", v)}   placeholder="Parwest ID" />
                         <Input label="Name"          value={filters.name}        onChange={(v) => setFilter("name", v)}        placeholder="Name" />
                         <Input label="CNIC#"         value={filters.cnic}        onChange={(v) => setFilter("cnic", v)}        placeholder="CNIC#" />
@@ -255,7 +287,11 @@ export default function SearchGuardsManager() {
                         <LabeledSearchSelect label="Verification Status" value={filters.verificationStatus} onChange={(v) => setFilter("verificationStatus", v)} options={meta.verificationStatuses.map((s) => ({ value: s, label: s }))} placeholder="--Select Verification Status--" />
 
                         <LabeledSearchSelect label="Prerequisite Status" value={filters.prereqStatus} onChange={(v) => setFilter("prereqStatus", v)} options={meta.prerequisiteStatuses.map((s) => ({ value: s, label: s }))} placeholder="--Select Prereq Status--" />
-                        <LabeledSearchSelect label="Region / Office"     value={filters.officeId}     onChange={(v) => setFilter("officeId", v)}     options={meta.offices.map((o) => ({ value: o.id, label: o.name }))}           placeholder="--All Regions--" />
+                        {lockedOfficeId ? (
+                            <div />
+                        ) : (
+                            <LabeledSearchSelect label="Office"          value={filters.officeId}     onChange={(v) => setFilter("officeId", v)}     options={meta.offices.map((o) => ({ value: o.id, label: o.name }))}           placeholder="--All Offices--" />
+                        )}
 
                         <Input label="Created From" type="date" value={filters.createdFrom} onChange={(v) => setFilter("createdFrom", v)} />
                         <Input label="Created To"   type="date" value={filters.createdTo}   onChange={(v) => setFilter("createdTo", v)} />

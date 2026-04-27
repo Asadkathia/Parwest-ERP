@@ -1,8 +1,34 @@
 import { NextRequest } from "next/server"
 import { getPrismaCode } from "@/lib/prisma-errors"
-import { badRequest, conflict, internalServerError, notFound, ok } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, ok } from "@/lib/api/response"
 import { emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { getMasterConfig, isValidMasterResource } from "@/lib/inventory/store-v2-masters"
+import { prisma } from "@/lib/db"
+import type { ManagerScope } from "@/lib/access/scope"
+
+/**
+ * Verify a store is within the user's regional scope before mutating it.
+ * Returns null if allowed (or if user is not regionally scoped), or a
+ * forbidden Response if the store is outside scope.
+ */
+async function ensureStoreInScope(id: string, scope: ManagerScope | null): Promise<Response | null> {
+  if (!scope) return null
+  const store = await prisma.store.findUnique({
+    where: { id },
+    select: { regionalOfficeId: true, regionalOffice: { select: { regionId: true } } },
+  })
+  if (!store) return notFound("Master record not found.")
+  if (scope.regionalOfficeIds.length > 0) {
+    if (!store.regionalOfficeId || !scope.regionalOfficeIds.includes(store.regionalOfficeId)) {
+      return forbidden("Forbidden: store is outside your assigned regional office.")
+    }
+  } else if (scope.regionId) {
+    if (!store.regionalOffice || store.regionalOffice.regionId !== scope.regionId) {
+      return forbidden("Forbidden: store is outside your assigned region.")
+    }
+  }
+  return null
+}
 
 function parseParams(request: NextRequest) {
   const pathname = new URL(request.url).pathname
@@ -21,6 +47,11 @@ export async function GET(request: NextRequest) {
   if (!isValidMasterResource(resource)) return notFound("Master resource not found.")
 
   try {
+    if (resource === "stores") {
+      const denied = await ensureStoreInScope(id, session.scope)
+      if (denied) return denied
+    }
+
     const config = getMasterConfig(resource)
     const row = await config.delegate.findUnique({
       where: { id },
@@ -46,10 +77,34 @@ export async function PATCH(request: NextRequest) {
   if (!isValidMasterResource(resource)) return notFound("Master resource not found.")
 
   try {
+    if (resource === "stores") {
+      const denied = await ensureStoreInScope(id, session.scope)
+      if (denied) return denied
+    }
+
     const body = (await request.json()) as Record<string, unknown>
     const config = getMasterConfig(resource)
     const data = config.buildUpdateData(body)
     if (Object.keys(data).length === 0) return badRequest("No valid fields provided for update.")
+
+    // For stores, also block reassignment to an out-of-scope regional office.
+    if (resource === "stores" && session.scope && "regionalOfficeId" in data) {
+      const newOfficeId = data.regionalOfficeId ? String(data.regionalOfficeId) : null
+      const allowedOffices = session.scope.regionalOfficeIds
+      if (allowedOffices.length > 0) {
+        if (!newOfficeId || !allowedOffices.includes(newOfficeId)) {
+          return forbidden("Forbidden: cannot move a store outside your assigned regional office.")
+        }
+      } else if (session.scope.regionId && newOfficeId) {
+        const office = await prisma.regionalOffice.findUnique({
+          where: { id: newOfficeId },
+          select: { regionId: true },
+        })
+        if (!office || office.regionId !== session.scope.regionId) {
+          return forbidden("Forbidden: cannot move a store outside your assigned region.")
+        }
+      }
+    }
 
     const updated = await config.delegate.update({
       where: { id },
@@ -87,6 +142,11 @@ export async function DELETE(request: NextRequest) {
   if (!isValidMasterResource(resource)) return notFound("Master resource not found.")
 
   try {
+    if (resource === "stores") {
+      const denied = await ensureStoreInScope(id, session.scope)
+      if (denied) return denied
+    }
+
     await getMasterConfig(resource).delegate.delete({ where: { id } })
 
     await emitInventoryV2Audit({

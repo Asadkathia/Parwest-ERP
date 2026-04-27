@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { GLOBAL_REGION_VALUE } from "@/components/access/region-sentinels"
 import type { Prisma } from "@prisma/client"
 
 const MOCK_AUDIT_LOGS = [
@@ -40,6 +42,27 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim()
     const dateFromRaw = searchParams.get("dateFrom")
     const dateToRaw = searchParams.get("dateTo")
+    const regionIdParamRaw = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
+
+    // "__GLOBAL__" sentinel means "only un-regioned records" — keep it separate
+    // from the scope-denied check (a regional user can never pick Global via the
+    // picker because we don't show the option to them).
+    const regionIdIsGlobal = regionIdParamRaw === GLOBAL_REGION_VALUE
+    const regionIdParam = regionIdIsGlobal ? null : regionIdParamRaw
+
+    // Reject cross-scope requests early so a regional user can't request
+    // another region's audit logs even with a crafted URL.
+    const managerScope = deriveManagerScope(session)
+    if (
+      managerScope &&
+      managerScopeDenied(managerScope, {
+        regionId: regionIdParam,
+        regionalOfficeId: regionalOfficeIdParam,
+      })
+    ) {
+      return forbidden("Forbidden: cannot query audit logs outside your scope.")
+    }
 
     if (isRuntimeMockEnabled()) {
       let rows = [...MOCK_AUDIT_LOGS]
@@ -57,10 +80,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(rows)
     }
 
-    const where: Prisma.AuditLogWhereInput = {}
+    const where: Prisma.AuditLogWhereInput = {
+      ...buildManagerScopeWhere(managerScope, {
+        regionId: "targetRegionId",
+        regionalOfficeId: "targetRegionalOfficeId",
+      }),
+    }
     if (moduleFilter) where.module = moduleFilter
     if (eventFilter) where.event = eventFilter
     if (userId) where.userId = userId
+    // Super User filter-picker path — regional users already have the scope
+    // clause above and are rejected earlier if the params disagree.
+    if (regionIdIsGlobal) {
+      where.targetRegionId = null
+    } else if (regionIdParam) {
+      where.targetRegionId = regionIdParam
+    }
+    if (regionalOfficeIdParam) where.targetRegionalOfficeId = regionalOfficeIdParam
     if (search) {
       where.OR = [
         { module: { contains: search, mode: "insensitive" } },

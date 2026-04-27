@@ -458,6 +458,8 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
                             currentSupervisorName={guardWithTabs.managerName ?? null}
                             isSuperAdmin={isSuperAdmin(session)}
                             canUpdate={canUpdateGuard}
+                            guardRegionId={(guard as { regionId?: string | null }).regionId ?? null}
+                            guardRegionalOfficeId={(guard as { regionalOfficeId?: string | null }).regionalOfficeId ?? null}
                         />
                         <MentalHealthBadge guardId={guard.id} />
                     </div>

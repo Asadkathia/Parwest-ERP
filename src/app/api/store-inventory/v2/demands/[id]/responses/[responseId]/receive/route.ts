@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryDemandResponseStatus, StoreInventoryDemandStatus,
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, parseNonNegativeInt, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, parseNonNegativeInt, emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parseDemandResponseMeta, serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 
 type Params = { params: Promise<{ id: string; responseId: string }> }
@@ -72,6 +72,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         if (!demand.fromStoreId) {
           throw new Error("DEMAND_FROM_STORE_MISSING")
         }
+
+        // Receiving deposits stock into demand.fromStore — gate on scope over
+        // that store (the receiving site).
+        const denied = await ensureStoreInScope(demand.fromStoreId, session.scope, "Demand not found.")
+        if (denied) throw Object.assign(new Error("RECEIVE_OUT_OF_SCOPE"), { response: denied })
 
         const response = await tx.storeInventoryDemandResponse.findFirst({
           where: { id: responseId, demandId },
@@ -223,6 +228,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (error instanceof Error) {
       if (error.message === "DEMAND_NOT_FOUND") return notFound("Demand not found.")
+      if (error.message === "RECEIVE_OUT_OF_SCOPE") {
+        const response = (error as Error & { response?: Response }).response
+        if (response) return response
+      }
       if (error.message === "RESPONSE_NOT_FOUND") return notFound("Demand response not found.")
       if (error.message === "DEMAND_FROM_STORE_MISSING") {
         return badRequest("Demand from-store is missing.")

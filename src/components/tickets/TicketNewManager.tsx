@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { ArrowLeft, Ticket, Send } from "lucide-react"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -10,6 +11,12 @@ type Lookup = { id: string; name: string; color?: string | null }
 type User = { id: string; name: string; email?: string | null }
 
 export default function TicketNewManager() {
+  const { data: session } = useSession()
+  const sessionUser = session?.user as
+    | { roleScopeType?: "GLOBAL" | "REGIONAL"; regionId?: string | null }
+    | undefined
+  const callerRegionId =
+    sessionUser?.roleScopeType === "REGIONAL" ? sessionUser.regionId ?? null : null
   const router = useRouter()
   const [categories, setCategories] = useState<Lookup[]>([])
   const [priorities, setPriorities] = useState<Lookup[]>([])
@@ -28,11 +35,18 @@ export default function TicketNewManager() {
   const [notice, setNotice] = useState("")
 
   useEffect(() => {
+    // Scope the assignee picker to the caller's region. The /api/users route
+    // already enforces REGIONAL scope server-side, but for SuperAdmins we
+    // forward whatever scope the session has (which is null = global) so the
+    // assignee list is consistent with what the rest of the app shows.
+    const usersUrl = callerRegionId
+      ? `/api/users?regionId=${encodeURIComponent(callerRegionId)}`
+      : "/api/users"
     Promise.all([
       fetch("/api/tickets/categories").then(r=>r.json()).catch(()=>[]),
       fetch("/api/tickets/priorities").then(r=>r.json()).catch(()=>[]),
       fetch("/api/tickets/statuses").then(r=>r.json()).catch(()=>[]),
-      fetch("/api/users").then(r=>r.json()).catch(()=>[]),
+      fetch(usersUrl).then(r=>r.json()).catch(()=>[]),
     ]).then(([c,p,s,u]) => {
       const cats = Array.isArray(c) ? c : []
       const prios = Array.isArray(p) ? p : []
@@ -49,7 +63,7 @@ export default function TicketNewManager() {
       const defaultPrio = prios.find(p2 => p2.name.toLowerCase() === "normal") || prios[0]
       if (defaultPrio) setPriorityId(defaultPrio.id)
     })
-  }, [])
+  }, [callerRegionId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

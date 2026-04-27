@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import UserProfileClient from "./UserProfileClient"
@@ -41,6 +42,14 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     ])
 
     if (!user) notFound()
+
+    const viewerScope = deriveManagerScope(session)
+    if (managerScopeDenied(viewerScope, {
+        regionId: user.region?.id ?? null,
+        regionalOfficeId: user.regionalOffice?.id ?? null,
+    })) {
+        notFound()
+    }
 
     const isAdmin = isSuperAdmin(session)
     const canUpdateUser = hasAction(session, "USERS", "UPDATE")

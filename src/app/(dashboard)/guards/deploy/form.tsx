@@ -203,7 +203,12 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block h-2 w-2 rounded-full ${cls}`} />
 }
 
-export default function DeployGuardForm() {
+type DeployGuardFormProps = {
+  lockedRegionId?: string | null
+  lockedRegionalOfficeId?: string | null
+}
+
+export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalOfficeId = null }: DeployGuardFormProps = {}) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -219,7 +224,7 @@ export default function DeployGuardForm() {
   const [selectedClient, setSelectedClient] = useState("")
   const [selectedBranch, setSelectedBranch] = useState("")
   const [selectedGuard, setSelectedGuard] = useState("")
-  const [selectedRegionalOffice, setSelectedRegionalOffice] = useState("")
+  const [selectedRegionalOffice, setSelectedRegionalOffice] = useState(lockedRegionalOfficeId || "")
   const [guardSupervisor, setGuardSupervisor] = useState<string>("—")
 
   const [clientGuardTypes, setClientGuardTypes] = useState<string[]>([])
@@ -256,6 +261,7 @@ export default function DeployGuardForm() {
   useEffect(() => {
     loadRegionalOffices()
     loadAllDeployments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fetch; loaders are stable
   }, [])
 
   useEffect(() => {
@@ -411,7 +417,10 @@ export default function DeployGuardForm() {
 
   const loadRegionalOffices = async () => {
     try {
-      const res = await fetch("/api/regional-offices")
+      const params = new URLSearchParams()
+      if (lockedRegionId) params.set("regionId", lockedRegionId)
+      const url = params.toString() ? `/api/regional-offices?${params.toString()}` : "/api/regional-offices"
+      const res = await fetch(url)
       const data = await res.json()
       setRegionalOffices(Array.isArray(data) ? data : [])
     } catch {
@@ -601,14 +610,31 @@ export default function DeployGuardForm() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SearchableCombobox
-              label="Regional Office"
-              required
-              value={selectedRegionalOffice}
-              onChange={setSelectedRegionalOffice}
-              options={regionalOfficeOptions}
-              placeholder="Select regional office..."
-            />
+            {lockedRegionalOfficeId ? (
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                  Regional Office <span className="text-red-500">*</span>
+                </label>
+                <div className="ui-input bg-slate-50 text-slate-600 text-sm flex items-center justify-between gap-2 cursor-not-allowed">
+                  <span>
+                    {(() => {
+                      const o = regionalOfficeOptions.find((opt) => opt.id === lockedRegionalOfficeId)
+                      return o ? o.name : "Locked regional office"
+                    })()}
+                  </span>
+                  <span className="text-xs text-slate-400">Locked</span>
+                </div>
+              </div>
+            ) : (
+              <SearchableCombobox
+                label="Regional Office"
+                required
+                value={selectedRegionalOffice}
+                onChange={setSelectedRegionalOffice}
+                options={regionalOfficeOptions}
+                placeholder="Select regional office..."
+              />
+            )}
 
             <SearchableCombobox
               label="Select Client"

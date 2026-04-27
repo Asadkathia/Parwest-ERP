@@ -27,16 +27,16 @@ type ActionRow = {
  * keys (e.g. `"GUARDS"`, `"GUARDS:VIEW"`, `"GUARDS:CREATE"`).
  */
 function addRowPermissions(set: Set<string>, row: ActionRow): void {
-    const module = row.module
+    const moduleName = row.module
     const any =
         row.canCreate || row.canView || row.canUpdate || row.canDelete || row.canRequisition
     if (!any) return
-    set.add(module)
-    if (row.canCreate) set.add(permissionKey(module, "CREATE"))
-    if (row.canView) set.add(permissionKey(module, "VIEW"))
-    if (row.canUpdate) set.add(permissionKey(module, "UPDATE"))
-    if (row.canDelete) set.add(permissionKey(module, "DELETE"))
-    if (row.canRequisition) set.add(permissionKey(module, "REQUISITIONS"))
+    set.add(moduleName)
+    if (row.canCreate) set.add(permissionKey(moduleName, "CREATE"))
+    if (row.canView) set.add(permissionKey(moduleName, "VIEW"))
+    if (row.canUpdate) set.add(permissionKey(moduleName, "UPDATE"))
+    if (row.canDelete) set.add(permissionKey(moduleName, "DELETE"))
+    if (row.canRequisition) set.add(permissionKey(moduleName, "REQUISITIONS"))
 }
 
 /**
@@ -79,7 +79,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     },
                     include: {
                         role: true,
-                        regionalOffice: true,
+                        region: { select: { name: true } },
+                        regionalOffice: { select: { name: true } },
                     },
                 })
 
@@ -145,6 +146,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     roleScopeType: user.role.scopeType,
                     regionId: user.regionId,
                     regionalOfficeId: user.regionalOfficeId,
+                    regionName: user.region?.name ?? null,
+                    regionalOfficeName: user.regionalOffice?.name ?? null,
                     permissions,
                 }
             },
@@ -160,6 +163,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.roleScopeType = user.roleScopeType
                 token.regionId = user.regionId ?? null
                 token.regionalOfficeId = user.regionalOfficeId ?? null
+                token.regionName = user.regionName ?? null
+                token.regionalOfficeName = user.regionalOfficeName ?? null
                 token.permissions = user.permissions ?? []
             } else if (token.id) {
                 // On subsequent requests, refresh effective permissions.
@@ -181,11 +186,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     } as const
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.id as string },
-                        select: { roleId: true, role: { select: { scopeType: true } } },
+                        select: {
+                            roleId: true,
+                            regionId: true,
+                            regionalOfficeId: true,
+                            role: { select: { scopeType: true } },
+                            region: { select: { name: true } },
+                            regionalOffice: { select: { name: true } },
+                        },
                     })
                     if (dbUser?.role?.scopeType) {
                         token.roleScopeType = dbUser.role.scopeType
                     }
+                    token.regionId = dbUser?.regionId ?? null
+                    token.regionalOfficeId = dbUser?.regionalOfficeId ?? null
+                    token.regionName = dbUser?.region?.name ?? null
+                    token.regionalOfficeName = dbUser?.regionalOffice?.name ?? null
                     const [userPerms, rolePerms] = await Promise.all([
                         prisma.userPermission.findMany({
                             where: { userId: token.id as string, OR: anyEnabled },
@@ -210,8 +226,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (session.user) {
                 session.user.id = token.id as string
                 session.user.role = token.role as string
+                session.user.roleScopeType = (token.roleScopeType as "GLOBAL" | "REGIONAL" | undefined) ?? undefined
                 session.user.regionId = (token.regionId as string | null) ?? null
                 session.user.regionalOfficeId = (token.regionalOfficeId as string | null) ?? null
+                session.user.regionName = (token.regionName as string | null) ?? null
+                session.user.regionalOfficeName = (token.regionalOfficeName as string | null) ?? null
                 session.user.permissions = (token.permissions as string[]) ?? []
             }
             return session

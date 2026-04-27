@@ -1,14 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string }
+type RegionOption = { id: string; name: string }
 
 type UniqueItem = {
   id: string
@@ -32,13 +36,35 @@ const EMPTY_FORM = {
   status: "AVAILABLE",
 }
 
-export default function ProductUniqueItemsManager() {
+export default function ProductUniqueItemsManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
+  const scopeQuery = useScopeQuery()
+  const { data: session } = useSession()
+  const sessionUser = session?.user as
+    | {
+        roleScopeType?: "GLOBAL" | "REGIONAL"
+        regionId?: string | null
+        regionalOfficeId?: string | null
+      }
+    | undefined
+  const isRegional = sessionUser?.roleScopeType === "REGIONAL"
+  const callerRegionId = isRegional ? sessionUser?.regionId ?? null : null
+  const callerRegionalOfficeId = isRegional ? sessionUser?.regionalOfficeId ?? null : null
+
   const [rows, setRows] = useState<UniqueItem[]>([])
   const [categories, setCategories] = useState<Option[]>([])
   const [conditions, setConditions] = useState<Option[]>([])
   const [vendors, setVendors] = useState<Option[]>([])
   const [offices, setOffices] = useState<Option[]>([])
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState<typeof EMPTY_FORM>({
+    ...EMPTY_FORM,
+    regionalOfficeId: callerRegionalOfficeId ?? "",
+  })
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -48,12 +74,16 @@ export default function ProductUniqueItemsManager() {
     setLoading(true)
     setNotice(null)
     try {
+      const effectiveRegionId = scopeQuery.regionId || callerRegionId
+      const officesUrl = effectiveRegionId
+        ? `/api/regional-offices?regionId=${encodeURIComponent(effectiveRegionId)}`
+        : "/api/regional-offices"
       const [items, categoryRows, conditionRows, vendorRows, officeRows] = await Promise.all([
-        apiGet<UniqueItem[]>("/api/store-inventory/v2/product-unique-items"),
+        apiGet<UniqueItem[]>(`/api/store-inventory/v2/product-unique-items${scopeQuery.query}`),
         apiGet<Option[]>("/api/store-inventory/v2/masters/categories"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/conditions"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/vendors"),
-        apiGet<Option[]>("/api/regional-offices"),
+        apiGet<Option[]>(officesUrl),
       ])
 
       setRows(items)
@@ -68,7 +98,7 @@ export default function ProductUniqueItemsManager() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [callerRegionId, scopeQuery.query, scopeQuery.regionId])
 
   useEffect(() => {
     void load()
@@ -101,7 +131,7 @@ export default function ProductUniqueItemsManager() {
         status: form.status,
       })
       setNotice({ type: "success", message: "Unique item created successfully." })
-      setForm(EMPTY_FORM)
+      setForm({ ...EMPTY_FORM, regionalOfficeId: callerRegionalOfficeId ?? "" })
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create unique item."
@@ -143,7 +173,9 @@ export default function ProductUniqueItemsManager() {
           <Select label="Category *" value={form.categoryId} onChange={(value) => setForm((prev) => ({ ...prev, categoryId: value }))} options={categories} />
           <Select label="Condition" value={form.conditionId} onChange={(value) => setForm((prev) => ({ ...prev, conditionId: value }))} options={conditions} />
           <Select label="Vendor" value={form.vendorId} onChange={(value) => setForm((prev) => ({ ...prev, vendorId: value }))} options={vendors} />
-          <Select label="Regional Office" value={form.regionalOfficeId} onChange={(value) => setForm((prev) => ({ ...prev, regionalOfficeId: value }))} options={offices} />
+          {callerRegionalOfficeId ? null : (
+            <Select label="Regional Office" value={form.regionalOfficeId} onChange={(value) => setForm((prev) => ({ ...prev, regionalOfficeId: value }))} options={offices} />
+          )}
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Status</label>
             <select className="ui-select" value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}>
@@ -157,16 +189,21 @@ export default function ProductUniqueItemsManager() {
           <ActionButton onClick={() => void createItem()} disabled={saving}>
             {saving ? "Saving..." : "Create Unique Item"}
           </ActionButton>
-          <ActionButton variant="secondary" onClick={() => setForm(EMPTY_FORM)}>
+          <ActionButton variant="secondary" onClick={() => setForm({ ...EMPTY_FORM, regionalOfficeId: callerRegionalOfficeId ?? "" })}>
             Reset
           </ActionButton>
         </div>
       </FilterBar>
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by unique/serial/status/vendor" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by unique/serial/status/vendor" />
+          </div>
         </div>
       </FilterBar>
 

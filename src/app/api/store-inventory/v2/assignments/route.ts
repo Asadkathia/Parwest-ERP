@@ -8,7 +8,7 @@ import {
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureClientInScope, ensureGuardInScope, ensureStoreInScope, ensureUserInScope, parsePositiveInt, readScopedRegionParams, rejectCrossOffice, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +73,9 @@ export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")?.trim() || undefined
   const assignedToType = searchParams.get("assignedToType")?.trim().toUpperCase() || undefined
@@ -81,6 +84,8 @@ export async function GET(request: NextRequest) {
   const assignedToClientId = searchParams.get("assignedToClientId")?.trim() || undefined
   const storeId = searchParams.get("storeId")?.trim() || undefined
   const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
+
+  const storeOfficeFilter = buildStoreScopeWhere(session.scope, scopeParams.regionalOfficeId, scopeParams.regionId)
 
   try {
     const rows = await prisma.storeInventoryAssignment.findMany({
@@ -91,6 +96,7 @@ export async function GET(request: NextRequest) {
         assignedToGuardId,
         assignedToClientId,
         storeId,
+        ...(storeOfficeFilter ? { store: { is: storeOfficeFilter } } : {}),
         ...(categoryScope === "WEAPON"
           ? {
               product: {
@@ -169,6 +175,25 @@ export async function POST(request: NextRequest) {
       return badRequest("assignedToClientId is required for client assignments.")
     }
 
+    // Source store must be within the user's scope.
+    const storeDenied = await ensureStoreInScope(storeId, session.scope)
+    if (storeDenied) return storeDenied
+
+    // Target guard/employee/client must also be within the user's scope.
+    if (assignedToType === StoreInventoryAssignmentTargetType.GUARD && assignedToGuardId) {
+      const guardDenied = await ensureGuardInScope(assignedToGuardId, session.scope)
+      if (guardDenied) return guardDenied
+    } else if (assignedToType === StoreInventoryAssignmentTargetType.CLIENT && assignedToClientId) {
+      const clientDenied = await ensureClientInScope(assignedToClientId, session.scope)
+      if (clientDenied) return clientDenied
+    } else if (assignedToType === StoreInventoryAssignmentTargetType.EMPLOYEE && assignedToUserId) {
+      const userDenied = await ensureUserInScope(assignedToUserId, session.scope)
+      if (userDenied) return userDenied
+    }
+
+    // Cross-region assignment guard: source store and target entity must share
+    // a regional office. Enforced for ALL users (incl. SuperAdmin) — inventory
+    // cannot move between regions even for unrestricted operators.
     if (assignedToType === StoreInventoryAssignmentTargetType.GUARD && assignedToGuardId) {
       const [assignStore, assignGuard] = await Promise.all([
         prisma.store.findUnique({
@@ -180,18 +205,54 @@ export async function POST(request: NextRequest) {
           select: { regionalOfficeId: true, name: true },
         }),
       ])
-      if (!assignGuard) {
-        return badRequest("Guard not found.")
-      }
-      if (
-        assignStore?.regionalOfficeId &&
-        assignGuard.regionalOfficeId &&
-        assignStore.regionalOfficeId !== assignGuard.regionalOfficeId
-      ) {
-        return badRequest(
-          `Cross-region assignment not allowed: store belongs to a different regional office than guard "${assignGuard.name}". Inventory can only be assigned to guards within the same regional office.`
-        )
-      }
+      if (!assignGuard) return badRequest("Guard not found.")
+      const reason = rejectCrossOffice(
+        assignStore?.regionalOfficeId,
+        assignGuard.regionalOfficeId,
+        assignGuard.name,
+        "guard",
+      )
+      if (reason) return badRequest(reason)
+    }
+    if (assignedToType === StoreInventoryAssignmentTargetType.CLIENT && assignedToClientId) {
+      const [assignStore, assignClient] = await Promise.all([
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { regionalOfficeId: true },
+        }),
+        prisma.client.findUnique({
+          where: { id: assignedToClientId },
+          select: { regionalOfficeId: true, name: true },
+        }),
+      ])
+      if (!assignClient) return badRequest("Client not found.")
+      const reason = rejectCrossOffice(
+        assignStore?.regionalOfficeId,
+        assignClient.regionalOfficeId,
+        assignClient.name,
+        "client",
+      )
+      if (reason) return badRequest(reason)
+    }
+    if (assignedToType === StoreInventoryAssignmentTargetType.EMPLOYEE && assignedToUserId) {
+      const [assignStore, assignUser] = await Promise.all([
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { regionalOfficeId: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: assignedToUserId },
+          select: { regionalOfficeId: true, name: true },
+        }),
+      ])
+      if (!assignUser) return badRequest("Employee not found.")
+      const reason = rejectCrossOffice(
+        assignStore?.regionalOfficeId,
+        assignUser.regionalOfficeId,
+        assignUser.name ?? assignedToUserId,
+        "employee",
+      )
+      if (reason) return badRequest(reason)
     }
 
     const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))

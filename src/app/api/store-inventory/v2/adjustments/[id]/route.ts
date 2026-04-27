@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server"
 import { internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { requireInventorySession } from "@/lib/inventory/store-v2-api"
+import { ensureStoreInScope, requireInventorySession } from "@/lib/inventory/store-v2-api"
 
 const adjustmentInclude = {
   store: true,
@@ -27,6 +27,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       include: adjustmentInclude,
     })
     if (!row) return notFound("Adjustment not found.")
+
+    const denied = await ensureStoreInScope(row.storeId, session.scope, "Adjustment not found.")
+    if (denied) return denied
 
     return ok(row)
   } catch (error) {

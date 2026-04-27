@@ -2,18 +2,36 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
+import { Suspense } from "react"
 import { Building, MapPin, Building2, BriefcaseBusiness } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import StatusChip from "@/components/ui/status-chip"
+import FilterBar from "@/components/ui/filter-bar"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { deriveBranchModel } from "@/lib/branches/model"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
-export default async function BranchesPage({ searchParams }: { searchParams?: Promise<{ type?: string }> }) {
+export default async function BranchesPage({ searchParams }: { searchParams?: Promise<{ type?: string; regionId?: string }> }) {
   const session = await auth()
   if (!session) redirect("/login")
   const params = (await searchParams) || {}
 
+  const scope = deriveManagerScope(session)
+  const paramDenied = managerScopeDenied(scope, { regionId: params.regionId })
+  const activeRegionId = paramDenied
+    ? scope?.regionId ?? undefined
+    : params.regionId || scope?.regionId || undefined
+
+  const regions = await prisma.region
+    .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+    .catch(() => [] as { id: string; name: string }[])
+  const pickerRegions = scope?.regionId
+    ? regions.filter((r) => r.id === scope.regionId)
+    : regions
+
   const branches = await prisma.branch.findMany({
+    where: activeRegionId ? { client: { is: { regionId: activeRegionId } } } : {},
     include: {
       client: true,
       deployments: {
@@ -44,21 +62,32 @@ export default async function BranchesPage({ searchParams }: { searchParams?: Pr
         subtitle="Manage all client branches across the system"
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {[
-          { label: "All", type: "ALL" },
-          { label: "Islamic", type: "ISLAMIC" },
-          { label: "Conventional", type: "CONVENTIONAL" },
-        ].map((item) => (
-          <Link
-            key={item.type}
-            href={item.type === "ALL" ? "/clients/branches" : `/clients/branches?type=${item.type}`}
-            className={`ui-chip ${(params.type || "ALL") === item.type ? "ui-chip-success" : "ui-chip-neutral"}`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </div>
+      <FilterBar>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Suspense>
+            <RegionUrlPicker
+              regions={pickerRegions}
+              locked={Boolean(scope?.regionId)}
+              includeGlobalOption={!scope?.regionId}
+            />
+          </Suspense>
+          <div className="flex flex-wrap items-end gap-2">
+            {[
+              { label: "All", type: "ALL" },
+              { label: "Islamic", type: "ISLAMIC" },
+              { label: "Conventional", type: "CONVENTIONAL" },
+            ].map((item) => (
+              <Link
+                key={item.type}
+                href={item.type === "ALL" ? "/clients/branches" : `/clients/branches?type=${item.type}`}
+                className={`ui-chip ${(params.type || "ALL") === item.type ? "ui-chip-success" : "ui-chip-neutral"}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </FilterBar>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard label="Total Branches" value={stats.total} icon={<Building className="h-5 w-5" />} tone="brand" />

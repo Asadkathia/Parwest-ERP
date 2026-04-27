@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryMovementType, StoreInventoryPurchaseStatus } from
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { emitInventoryV2Audit, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
 
 type Params = { params: Promise<{ id: string }> }
@@ -60,6 +60,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         include: { lines: { include: { product: true } }, store: true },
       })
       if (!purchase) throw new Error("PURCHASE_NOT_FOUND")
+      const denied = await ensureStoreInScope(purchase.storeId, session.scope, "Purchase not found.")
+      if (denied) throw Object.assign(new Error("PURCHASE_OUT_OF_SCOPE"), { response: denied })
       if (purchase.status === StoreInventoryPurchaseStatus.CANCELLED) throw new Error("PURCHASE_REJECTED")
 
       const decoded = parsePurchaseNotes(purchase.notes)
@@ -205,6 +207,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (code === "P2025") return notFound("Purchase not found.")
     if (code === "P2003") return badRequest("Invalid reference in receiving payload.")
     if (error instanceof Error && error.message === "PURCHASE_NOT_FOUND") return notFound("Purchase not found.")
+    if (error instanceof Error && error.message === "PURCHASE_OUT_OF_SCOPE") {
+      const response = (error as Error & { response?: Response }).response
+      if (response) return response
+    }
     if (error instanceof Error && error.message === "PURCHASE_REJECTED") return badRequest("Rejected purchase cannot be received.")
     if (error instanceof Error && error.message.startsWith("LINE_NOT_FOUND:")) return badRequest("One or more receiving lines are invalid.")
     if (error instanceof Error && error.message.startsWith("RECEIVE_EXCEEDS_REQUESTED:")) return badRequest("Receiving quantity exceeds requested quantity.")

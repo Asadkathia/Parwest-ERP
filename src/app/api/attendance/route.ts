@@ -19,6 +19,12 @@ export async function GET(request: NextRequest) {
         const guardId = searchParams.get("guardId")?.trim()
         const startDate = searchParams.get("startDate")
         const endDate = searchParams.get("endDate")
+        const regionId = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
 
         let resolvedGuardId = guardId || undefined
 
@@ -68,7 +74,17 @@ export async function GET(request: NextRequest) {
                         },
                     }
                     : {}),
-                ...(Object.keys(scopeFilter).length > 0 ? { guard: { is: scopeFilter } } : {}),
+                ...(regionId || regionalOfficeId || Object.keys(scopeFilter).length > 0
+                    ? {
+                          guard: {
+                              is: {
+                                  ...(regionId ? { regionId } : {}),
+                                  ...(regionalOfficeId ? { regionalOfficeId } : {}),
+                                  ...scopeFilter,
+                              },
+                          },
+                      }
+                    : {}),
             },
             orderBy: { date: "desc" },
             include: {

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { hasAction } from "@/lib/api/permissions"
 import SectionTitle from '@/components/ui/section-title'
 import { Card, CardBody } from '@/components/ui/card'
+import RegionFilterCard from '@/components/access/RegionFilterCard'
 
 type InventoryAction = "VIEW" | "CREATE" | "REQUISITIONS"
 
@@ -34,12 +35,13 @@ export default async function StoreInventoryDashboardPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  // Middleware maps /store-inventory → INVENTORY module permissions.
   const visibleLinks = links.filter((l) => hasAction(session, "INVENTORY", l.requiredAction))
 
   return (
     <div className="space-y-6">
       <SectionTitle title="Store Inventory" subtitle="Inventory V2 namespace (add-first migration foundation)." />
+
+      <RegionFilterCard session={session} />
 
       <Card>
         <CardBody>

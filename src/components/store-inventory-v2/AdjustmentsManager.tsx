@@ -1,14 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string }
+type RegionOption = { id: string; name: string }
 type ProductScope = "NON_WEAPON" | "WEAPON_AMMO"
 type AdjustmentType = "INCREASE" | "DECREASE"
 
@@ -65,10 +68,15 @@ const INITIAL_FORM = {
 export default function AdjustmentsManager({
   createMode = false,
   productScope = "NON_WEAPON",
+  regions = [],
+  locked = false,
 }: {
   createMode?: boolean
   productScope?: ProductScope
+  regions?: RegionOption[]
+  locked?: boolean
 }) {
+  const scopeQuery = useScopeQuery()
   const [rows, setRows] = useState<Adjustment[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -85,12 +93,12 @@ export default function AdjustmentsManager({
     setNotice(null)
     try {
       const [adjustmentRows, storeRows, productRows, conditionRows, inventoryRows] = await Promise.all([
-        apiGet<Adjustment[]>(`/api/store-inventory/v2/adjustments?categoryScope=${productScope}`),
-        apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
+        apiGet<Adjustment[]>(`/api/store-inventory/v2/adjustments?categoryScope=${productScope}${scopeQuery.suffix}`),
+        apiGet<Option[]>(`/api/store-inventory/v2/masters/stores${scopeQuery.query}`),
         apiGet<Product[]>("/api/store-inventory/v2/products"),
         apiGet<Condition[]>("/api/store-inventory/v2/masters/conditions"),
         apiGet<Array<InventoryBalance & { store: { id: string }; product: { id: string } }>>(
-          `/api/store-inventory/v2/inventories?includeZero=true&categoryScope=${productScope === "WEAPON_AMMO" ? "WEAPON" : "NON_WEAPON"}`
+          `/api/store-inventory/v2/inventories?includeZero=true&categoryScope=${productScope === "WEAPON_AMMO" ? "WEAPON" : "NON_WEAPON"}${scopeQuery.suffix}`
         ),
       ])
       setRows(adjustmentRows)
@@ -119,7 +127,7 @@ export default function AdjustmentsManager({
     } finally {
       setLoading(false)
     }
-  }, [productScope])
+  }, [productScope, scopeQuery.suffix, scopeQuery.query])
 
   useEffect(() => {
     void load()
@@ -306,9 +314,14 @@ export default function AdjustmentsManager({
       {!createMode ? (
         <>
           <FilterBar>
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-              <input className="ui-input" placeholder="Search by store/type/reason" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Suspense>
+                <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+              </Suspense>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+                <input className="ui-input" placeholder="Search by store/type/reason" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
             </div>
           </FilterBar>
 

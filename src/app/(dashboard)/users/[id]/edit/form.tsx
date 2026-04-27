@@ -25,15 +25,25 @@ type Props = {
     regions: RegionOption[]
     offices: OfficeOption[]
     isSuperAdmin?: boolean
+    lockedRegionId?: string | null
+    lockedOfficeId?: string | null
 }
 
-export default function UserEditForm({ user, roles, regions, offices, isSuperAdmin = false }: Props) {
+export default function UserEditForm({
+    user,
+    roles,
+    regions,
+    offices,
+    isSuperAdmin = false,
+    lockedRegionId = null,
+    lockedOfficeId = null,
+}: Props) {
     const router = useRouter()
     const [name, setName] = useState(user.name ?? "")
     const [contactNumber, setContactNumber] = useState(user.contactNumber ?? "")
     const [roleId, setRoleId] = useState(user.roleId ?? "")
-    const [regionId, setRegionId] = useState(user.regionId ?? "")
-    const [regionalOfficeId, setRegionalOfficeId] = useState(user.regionalOfficeId ?? "")
+    const [regionId, setRegionId] = useState(lockedRegionId ?? user.regionId ?? "")
+    const [regionalOfficeId, setRegionalOfficeId] = useState(lockedOfficeId ?? user.regionalOfficeId ?? "")
     const [status, setStatus] = useState(user.status ?? "ACTIVE")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -165,10 +175,10 @@ export default function UserEditForm({ user, roles, regions, offices, isSuperAdm
                     <select
                         className="ui-select"
                         value={isGlobalRole ? "__GLOBAL__" : regionId}
-                        disabled={isGlobalRole}
+                        disabled={isGlobalRole || Boolean(lockedRegionId)}
                         onChange={(e) => {
                             setRegionId(e.target.value)
-                            setRegionalOfficeId("")
+                            if (!lockedOfficeId) setRegionalOfficeId("")
                         }}
                     >
                         {isGlobalRole ? (
@@ -193,7 +203,7 @@ export default function UserEditForm({ user, roles, regions, offices, isSuperAdm
                     <select
                         className="ui-select"
                         value={isGlobalRole ? "__GLOBAL__" : regionalOfficeId}
-                        disabled={isGlobalRole}
+                        disabled={isGlobalRole || Boolean(lockedOfficeId)}
                         onChange={(e) => setRegionalOfficeId(e.target.value)}
                     >
                         {isGlobalRole ? (

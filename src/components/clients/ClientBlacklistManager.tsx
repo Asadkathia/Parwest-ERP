@@ -6,6 +6,9 @@ import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+type RegionOption = { id: string; name: string }
 
 type Row = {
   id: string
@@ -22,7 +25,13 @@ type ApiBlacklistRow = {
   updatedAt?: string | null
 }
 
-export default function ClientBlacklistManager() {
+export default function ClientBlacklistManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [email, setEmail] = useState("")
   const [entries, setEntries] = useState("10")
@@ -137,6 +146,11 @@ export default function ClientBlacklistManager() {
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RegionUrlPicker
+            regions={regions}
+            locked={locked}
+            includeGlobalOption={!locked}
+          />
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
             <input

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
@@ -96,6 +97,12 @@ function SearchableSelect({
 }
 
 export default function MsRelationshipManager() {
+  const { data: sessionData } = useSession()
+  const sessionUser = sessionData?.user as
+    | { regionId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
+    | undefined
+  const sessionRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
+
   const [rows, setRows] = useState<RelationshipRow[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -142,9 +149,10 @@ export default function MsRelationshipManager() {
     setLoading(true)
     setError("")
     try {
+      const regionParam = sessionRegionId ? `?regionId=${encodeURIComponent(sessionRegionId)}` : ""
       const [rolesRes, usersRes, relRes] = await Promise.all([
         fetch("/api/roles", { cache: "no-store" }),
-        fetch("/api/users", { cache: "no-store" }),
+        fetch(`/api/users${regionParam}`, { cache: "no-store" }),
         fetch("/api/users/ms-relationships", { cache: "no-store" }),
       ])
       const [rolesJson, usersJson, relJson] = await Promise.all([
@@ -168,7 +176,8 @@ export default function MsRelationshipManager() {
 
   useEffect(() => {
     void load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionRegionId])
 
   const assign = async () => {
     setNotice("")

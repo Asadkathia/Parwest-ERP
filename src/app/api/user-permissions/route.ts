@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 import { MODULES } from "@/lib/constants/permissions"
 
 type PermissionPayload = {
@@ -87,12 +88,38 @@ export async function GET(request: NextRequest) {
     }
 }
 
+// DELETE /api/user-permissions?userId=xxx[&module=YYY]
+// Removes ADDITIONAL user-level permissions. With no `module` param, clears
+// all overrides for the user. With `module`, clears overrides for that module
+// only.
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await auth()
+        if (!session) return unauthorized()
+        if (!hasAction(session, "USERS", "UPDATE")) return forbidden()
+
+        const { searchParams } = new URL(request.url)
+        const userId = searchParams.get("userId")
+        const moduleName = searchParams.get("module") ?? undefined
+        if (!userId) return badRequest("userId is required.")
+
+        const where = moduleName ? { userId, module: moduleName } : { userId }
+        const result = await prisma.userPermission.deleteMany({ where })
+
+        return NextResponse.json({ success: true, deleted: result.count })
+    } catch (error) {
+        console.error("Error deleting user permissions:", error)
+        return internalServerError("Failed to delete user permissions")
+    }
+}
+
 // PUT /api/user-permissions
 // Saves ADDITIONAL user-level permissions (does not touch role permissions)
 export async function PUT(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        if (!hasAction(session, "USERS", "UPDATE")) return forbidden()
 
         const body = await request.json()
         const userId = String(body?.userId || "").trim()

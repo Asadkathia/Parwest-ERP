@@ -30,9 +30,17 @@ const EMPTY = {
     supervisorWithUniform: false,
 }
 
-export default function NewTrainingForm() {
+type NewTrainingFormProps = {
+    lockedRegionId?: string | null
+    lockedRegionalOfficeId?: string | null
+}
+
+export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalOfficeId = null }: NewTrainingFormProps = {}) {
     const router = useRouter()
-    const [form, setForm] = useState(EMPTY)
+    const [form, setForm] = useState(() => ({
+        ...EMPTY,
+        regionalOfficeId: lockedRegionalOfficeId || "",
+    }))
     const [guards, setGuards] = useState<GuardOption[]>([])
     const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
     const [clients, setClients] = useState<Client[]>([])
@@ -43,15 +51,30 @@ export default function NewTrainingForm() {
     const [error, setError] = useState("")
 
     useEffect(() => {
-        fetch("/api/guards?status=ACTIVE")
+        const guardsUrl = lockedRegionId
+            ? `/api/guards?status=ACTIVE&regionId=${lockedRegionId}`
+            : "/api/guards?status=ACTIVE"
+        fetch(guardsUrl)
             .then(r => r.ok ? r.json() : [])
             .then(setGuards)
             .catch(() => {})
-        fetch("/api/regional-offices")
+        const officesUrl = lockedRegionId
+            ? `/api/regional-offices?regionId=${lockedRegionId}`
+            : "/api/regional-offices"
+        fetch(officesUrl)
             .then(r => r.ok ? r.json() : [])
-            .then(setRegionalOffices)
+            .then((data: RegionalOffice[]) => {
+                setRegionalOffices(data)
+                // Pre-fill regional office name display when locked
+                if (lockedRegionalOfficeId) {
+                    const office = data.find(o => o.id === lockedRegionalOfficeId)
+                    if (office) {
+                        setForm(f => ({ ...f, regionalOfficeId: office.id, regionalOfficeName: office.name }))
+                    }
+                }
+            })
             .catch(() => {})
-    }, [])
+    }, [lockedRegionId, lockedRegionalOfficeId])
 
     useEffect(() => {
         setClients([])
@@ -161,15 +184,32 @@ export default function NewTrainingForm() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                         {/* Regional Office */}
-                        <div>
-                            <label className={lbl}>Regional Office</label>
-                            <select className={sel} value={form.regionalOfficeId} onChange={e => handleRegionalOfficeChange(e.target.value)}>
-                                <option value="">— Select Regional Office —</option>
-                                {regionalOffices.map(o => (
-                                    <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {lockedRegionalOfficeId ? (
+                            <div>
+                                <label className={lbl}>Regional Office</label>
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={
+                                        regionalOffices.find(o => o.id === lockedRegionalOfficeId)?.name
+                                        || form.regionalOfficeName
+                                        || "Locked regional office"
+                                    }
+                                    className={`${inp} bg-gray-50 text-gray-600`}
+                                />
+                                <p className="mt-1 text-xs text-gray-500">Locked to your assigned regional office.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className={lbl}>Regional Office</label>
+                                <select className={sel} value={form.regionalOfficeId} onChange={e => handleRegionalOfficeChange(e.target.value)}>
+                                    <option value="">— Select Regional Office —</option>
+                                    {regionalOffices.map(o => (
+                                        <option key={o.id} value={o.id}>{o.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         {/* Client */}
                         <div>

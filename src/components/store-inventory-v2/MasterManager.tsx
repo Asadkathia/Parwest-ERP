@@ -1,12 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
+
+type RegionOption = { id: string; name: string }
 
 type MasterResource =
   | "stores"
@@ -66,6 +71,8 @@ type Props = {
   supportsCategoryFields?: boolean
   supportsVendorFields?: boolean
   supportsStatusCategory?: boolean
+  regions?: RegionOption[]
+  locked?: boolean
 }
 
 type FormState = {
@@ -159,8 +166,23 @@ export default function MasterManager({
   supportsCategoryFields = false,
   supportsVendorFields = false,
   supportsStatusCategory = false,
+  regions = [],
+  locked = false,
 }: Props) {
   const isVendorResource = resource === "vendors"
+  const scopeQuery = useScopeQuery()
+  const { data: session } = useSession()
+  const sessionUser = session?.user as
+    | {
+        roleScopeType?: "GLOBAL" | "REGIONAL"
+        regionId?: string | null
+        regionalOfficeId?: string | null
+      }
+    | undefined
+  const isRegional = sessionUser?.roleScopeType === "REGIONAL"
+  const callerRegionId = isRegional ? sessionUser?.regionId ?? null : null
+  const callerRegionalOfficeId = isRegional ? sessionUser?.regionalOfficeId ?? null : null
+
   const [rows, setRows] = useState<Row[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
   const [categories, setCategories] = useState<Option[]>([])
@@ -169,10 +191,17 @@ export default function MasterManager({
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [query, setQuery] = useState("")
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  // Stores belong to a regional office. When a REGIONAL user with a single
+  // assigned office creates a store, hardcode that office instead of letting
+  // them pick an arbitrary one (which would also be rejected by the server).
+  const lockedOfficeId = supportsStoreFields ? callerRegionalOfficeId : null
+  const [form, setForm] = useState<FormState>({
+    ...EMPTY_FORM,
+    regionalOfficeId: lockedOfficeId ?? "",
+  })
 
   const resetForm = () => {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, regionalOfficeId: lockedOfficeId ?? "" })
     setEditingId(null)
   }
 
@@ -181,9 +210,18 @@ export default function MasterManager({
     setNotice(null)
 
     try {
+      const effectiveRegionId = scopeQuery.regionId || callerRegionId
+      const officesUrl = effectiveRegionId
+        ? `/api/regional-offices?regionId=${encodeURIComponent(effectiveRegionId)}`
+        : "/api/regional-offices"
+      // Region/office filter only applies to scoped resources (currently 'stores').
+      // Other masters (brands, units, categories, …) are global taxonomies.
+      const masterUrl = resource === "stores"
+        ? `/api/store-inventory/v2/masters/${resource}${scopeQuery.query}`
+        : `/api/store-inventory/v2/masters/${resource}`
       const [masterRows, officeRows, categoryRows] = await Promise.all([
-        apiGet<Row[]>(`/api/store-inventory/v2/masters/${resource}`),
-        supportsStoreFields ? apiGet<RegionalOffice[]>("/api/regional-offices") : Promise.resolve([]),
+        apiGet<Row[]>(masterUrl),
+        supportsStoreFields ? apiGet<RegionalOffice[]>(officesUrl) : Promise.resolve([]),
         supportsStatusCategory ? apiGet<Option[]>("/api/store-inventory/v2/masters/categories") : Promise.resolve([]),
       ])
 
@@ -199,7 +237,7 @@ export default function MasterManager({
     } finally {
       setLoading(false)
     }
-  }, [resource, supportsStatusCategory, supportsStoreFields, title])
+  }, [resource, supportsStatusCategory, supportsStoreFields, title, callerRegionId, scopeQuery.query, scopeQuery.regionId])
 
   useEffect(() => {
     void loadRows()
@@ -424,17 +462,19 @@ export default function MasterManager({
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Regional Office</label>
-                <select className="ui-select" value={form.regionalOfficeId} onChange={(e) => setForm((prev) => ({ ...prev, regionalOfficeId: e.target.value }))}>
-                  <option value="">Select office</option>
-                  {regionalOffices.map((office) => (
-                    <option key={office.id} value={office.id}>
-                      {office.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {lockedOfficeId ? null : (
+                <div>
+                  <label className="mb-1 block text-sm text-[var(--text-muted)]">Regional Office</label>
+                  <select className="ui-select" value={form.regionalOfficeId} onChange={(e) => setForm((prev) => ({ ...prev, regionalOfficeId: e.target.value }))}>
+                    <option value="">Select office</option>
+                    {regionalOffices.map((office) => (
+                      <option key={office.id} value={office.id}>
+                        {office.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Number</label>
                 <input className="ui-input" value={form.contactNumber} onChange={(e) => setForm((prev) => ({ ...prev, contactNumber: e.target.value }))} />
@@ -534,9 +574,14 @@ export default function MasterManager({
       </FilterBar>
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" placeholder="Search by name/code/office" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" placeholder="Search by name/code/office" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
         </div>
       </FilterBar>
 

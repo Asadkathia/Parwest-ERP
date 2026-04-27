@@ -1,22 +1,38 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) return unauthorized()
 
+        const managerScope = deriveManagerScope(session)
         const { searchParams } = new URL(request.url)
         const location = searchParams.get("location")?.trim()
         const status = searchParams.get("status")?.trim()
         const guardId = searchParams.get("guardId")?.trim()
+        const regionId = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
+
+        const scopeFilter = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
+        const guardFilter = {
+            ...(regionId ? { regionId } : {}),
+            ...(regionalOfficeId ? { regionalOfficeId } : {}),
+            ...scopeFilter,
+        }
 
         const assignments = await prisma.residenceAssignment.findMany({
             where: {
                 ...(status ? { status } : {}),
                 ...(guardId ? { guardId } : {}),
+                ...(Object.keys(guardFilter).length > 0 ? { guard: { is: guardFilter } } : {}),
                 ...(location
                     ? {
                         OR: [
@@ -54,6 +70,18 @@ export async function POST(request: NextRequest) {
 
         if (!body.guardId || (!body.location && !body.residenceId)) {
             return badRequest("guardId and either location or residenceId are required")
+        }
+
+        const postScope = deriveManagerScope(session)
+        if (postScope) {
+            const guard = await prisma.guard.findUnique({
+                where: { id: String(body.guardId) },
+                select: { regionId: true, regionalOfficeId: true },
+            })
+            if (!guard) return notFound("Guard not found")
+            if (managerScopeDenied(postScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
+                return forbidden("Forbidden: guard is outside your scope.")
+            }
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

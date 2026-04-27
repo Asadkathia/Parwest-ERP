@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, notFound, ok } from "@/lib/api/response"
-import { emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { buildStoreScopeWhere, emitInventoryV2Audit, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { getMasterConfig, isValidMasterResource } from "@/lib/inventory/store-v2-masters"
 import { prisma } from "@/lib/db"
 
@@ -81,9 +81,26 @@ export async function GET(request: NextRequest) {
 
   try {
     const config = getMasterConfig(resource)
+
+    // Scope `stores` to the user's assigned region/regional office AND honor the
+    // URL `regionId` / `regionalOfficeId` filter set by the page-level region
+    // picker. Stores belong to a regional office; regional users see only stores
+    // attached to their assigned office (or region), while SuperAdmin can narrow
+    // via the picker. Other masters are global taxonomies (categories, brands,
+    // units, vendors, weapon-types, calibres, license-types, variations,
+    // repairings, conditions, statuses) — they are intentionally not scoped.
+    let where: Record<string, unknown> | undefined
+    if (resource === "stores") {
+      const scopeParams = readScopedRegionParams(request, session.scope)
+      if (scopeParams instanceof Response) return scopeParams
+      const storeWhere = buildStoreScopeWhere(session.scope, scopeParams.regionalOfficeId, scopeParams.regionId)
+      if (storeWhere) where = storeWhere as Record<string, unknown>
+    }
+
     let rows: unknown
     try {
       rows = await config.delegate.findMany({
+        ...(where ? { where } : {}),
         include: config.include,
         orderBy: config.orderBy,
       })
@@ -130,6 +147,28 @@ export async function POST(request: NextRequest) {
     const payloadBody: Record<string, unknown> = { ...body }
     if (resource === "stores" && !String(payloadBody.code ?? "").trim()) {
       payloadBody.code = await buildRegionBasedStoreCode(payloadBody)
+    }
+
+    // Block regional users from creating a store outside their assigned office.
+    if (resource === "stores" && session.scope) {
+      const officeId = String(payloadBody.regionalOfficeId ?? "").trim() || null
+      const allowedOffices = session.scope.regionalOfficeIds
+      if (allowedOffices.length > 0) {
+        if (!officeId || !allowedOffices.includes(officeId)) {
+          return badRequest("Forbidden: cannot create a store outside your assigned regional office.")
+        }
+      } else if (session.scope.regionId) {
+        if (!officeId) {
+          return badRequest("Regional office is required for stores in your region.")
+        }
+        const office = await prisma.regionalOffice.findUnique({
+          where: { id: officeId },
+          select: { regionId: true },
+        })
+        if (!office || office.regionId !== session.scope.regionId) {
+          return badRequest("Forbidden: cannot create a store outside your assigned region.")
+        }
+      }
     }
 
     const config = getMasterConfig(resource)

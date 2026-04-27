@@ -6,6 +6,7 @@ import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type TrainingRow = {
     id: string
@@ -35,6 +36,13 @@ type ParsedNotes = {
 }
 
 type RegionalOffice = { id: string; name: string }
+
+type Props = {
+    effectiveRegionId?: string | null
+    lockedOfficeId?: string | null
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
 
 function parseNotes(raw: string | null): ParsedNotes {
     if (!raw) return {}
@@ -101,7 +109,12 @@ function exportCsv(rows: TrainingRow[], filename: string) {
     URL.revokeObjectURL(url)
 }
 
-export default function TrainingsManager() {
+export default function TrainingsManager({
+    effectiveRegionId = null,
+    lockedOfficeId = null,
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     const [rows, setRows] = useState<TrainingRow[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -117,32 +130,39 @@ export default function TrainingsManager() {
     const [armorer, setArmorer] = useState("No")
     const [supervisorUniform, setSupervisorUniform] = useState("Yes")
 
-    const loadTrainings = async () => {
-        try {
-            setLoading(true)
-            setError("")
-            const response = await fetch("/api/trainings")
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}))
-                throw new Error(data.message || "Failed to fetch trainings")
-            }
-            const data = await response.json()
-            setRows(data)
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Unexpected error")
-            setRows([])
-        } finally {
-            setLoading(false)
-        }
-    }
-
     useEffect(() => {
-        loadTrainings()
-        fetch("/api/regional-offices")
+        let cancelled = false
+        const loadTrainings = async () => {
+            try {
+                setLoading(true)
+                setError("")
+                const params = new URLSearchParams()
+                if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+                const response = await fetch(`/api/trainings?${params.toString()}`)
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}))
+                    throw new Error(data.message || "Failed to fetch trainings")
+                }
+                const data = await response.json()
+                if (!cancelled) setRows(data)
+            } catch (err: unknown) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : "Unexpected error")
+                    setRows([])
+                }
+            } finally {
+                if (!cancelled) setLoading(false)
+            }
+        }
+        void loadTrainings()
+        const officeParams = new URLSearchParams()
+        if (effectiveRegionId) officeParams.set("regionId", effectiveRegionId)
+        fetch(`/api/regional-offices?${officeParams.toString()}`)
             .then(r => r.ok ? r.json() : [])
-            .then((data: RegionalOffice[]) => setRegionalOffices(data))
+            .then((data: RegionalOffice[]) => { if (!cancelled) setRegionalOffices(data) })
             .catch(() => {})
-    }, [])
+        return () => { cancelled = true }
+    }, [effectiveRegionId])
 
     const uniqueClients = useMemo(() => {
         const seen = new Set<string>()
@@ -220,15 +240,22 @@ export default function TrainingsManager() {
 
             <FilterBar className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div>
-                        <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
-                        <select name="regional_office_id" value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
-                            <option value="">--Select Regional Office--</option>
-                            {regionalOffices.map((office) => (
-                                <option key={office.id} value={office.name}>{office.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <RegionUrlPicker
+                        regions={regions}
+                        locked={regionLocked}
+                        includeGlobalOption={!regionLocked}
+                    />
+                    {!lockedOfficeId && (
+                        <div>
+                            <label className="block text-sm text-gray-600 mb-1">Select Regional Office</label>
+                            <select name="regional_office_id" value={regionalOfficeFilter} onChange={(e) => setRegionalOfficeFilter(e.target.value)} className="ui-select">
+                                <option value="">--Select Regional Office--</option>
+                                {regionalOffices.map((office) => (
+                                    <option key={office.id} value={office.name}>{office.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm text-gray-600 mb-1">Select Client</label>
                         <select name="client_id" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="ui-select">

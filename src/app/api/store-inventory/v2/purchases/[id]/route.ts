@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { StoreInventoryPurchaseStatus } from "@prisma/client"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
 
 const purchaseInclude = {
@@ -31,6 +31,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       include: purchaseInclude,
     })
     if (!row) return notFound("Purchase not found.")
+
+    const denied = await ensureStoreInScope(row.storeId, session.scope, "Purchase not found.")
+    if (denied) return denied
 
     const decoded = parsePurchaseNotes(row.notes)
     return ok({
@@ -61,6 +64,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const current = await prisma.storeInventoryPurchase.findUnique({ where: { id } })
     if (!current) return notFound("Purchase not found.")
+
+    const denied = await ensureStoreInScope(current.storeId, session.scope, "Purchase not found.")
+    if (denied) return denied
+
     if (current.status === StoreInventoryPurchaseStatus.RECEIVED) {
       return badRequest("Received purchase cannot be rejected.")
     }

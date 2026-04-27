@@ -5,6 +5,7 @@ import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import PayrollStateBadge from "@/components/payroll/PayrollStateBadge"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Row = {
   id: string
@@ -19,12 +20,20 @@ type Row = {
   guard: { id: string; parwestId: string; name: string }
 }
 
+type Region = { id: string; name: string }
+
 type PayrollUnpaidSalariesManagerProps = {
   canUpdate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollUnpaidSalariesManager({
   canUpdate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollUnpaidSalariesManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
@@ -44,10 +53,11 @@ export default function PayrollUnpaidSalariesManager({
     const params = new URLSearchParams()
     params.set("month", `${month}-01`)
     if (search) params.set("search", search)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     const res = await fetch(`/api/payroll/unpaid?${params}`)
     if (res.ok) setRows(await res.json())
     setLoading(false)
-  }, [month, search])
+  }, [month, search, effectiveRegionId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
@@ -60,6 +70,7 @@ export default function PayrollUnpaidSalariesManager({
     const params = new URLSearchParams()
     params.set("month", `${month}-01`)
     params.set("guardId", opt.id)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     const res = await fetch(`/api/payroll/salary?${params}`)
     if (res.ok) {
       const all: Row[] = await res.json()
@@ -189,6 +200,13 @@ export default function PayrollUnpaidSalariesManager({
 
       <section className="ui-card p-4 mt-6 space-y-4">
         <div className="flex gap-3 items-end flex-wrap">
+          <div className="min-w-[180px]">
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Month

@@ -1,9 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import FilterBar from "@/components/ui/filter-bar"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import InvoiceComposer from "./InvoiceComposer"
 import InvoiceList from "./InvoiceList"
 import InvoiceDetailModal from "./InvoiceDetailModal"
@@ -11,10 +14,20 @@ import InvoiceSummaryTiles from "./InvoiceSummaryTiles"
 import AdvancesPanel from "./AdvancesPanel"
 import { currentMonth, type InvoiceRow } from "./types"
 
+type RegionOption = { id: string; name: string }
+
 type ApiClientRow = { id: string; name?: string | null }
 type BranchRow = { id: string; name: string }
 
-export default function ClientInvoicingManager() {
+export default function ClientInvoicingManager({
+  regions = [],
+  locked = false,
+}: {
+  regions?: RegionOption[]
+  locked?: boolean
+} = {}) {
+  const searchParams = useSearchParams()
+  const urlRegionId = searchParams?.get("regionId") || ""
   const [period, setPeriod] = useState(currentMonth())
   const [clientId, setClientId] = useState("")
   const [branchId, setBranchId] = useState("")
@@ -29,12 +42,16 @@ export default function ClientInvoicingManager() {
   const [detail, setDetail] = useState<InvoiceRow | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
 
-  // Load clients
+  // Load clients (scoped to URL regionId for SuperAdmin; REGIONAL users are
+  // auto-scoped server-side).
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
-        const res = await fetch("/api/clients", { cache: "no-store" })
+        const url = urlRegionId
+          ? `/api/clients?regionId=${encodeURIComponent(urlRegionId)}`
+          : "/api/clients"
+        const res = await fetch(url, { cache: "no-store" })
         const data = await res.json()
         if (!res.ok) { if (alive) setError(data?.message || "Failed to load clients."); return }
         const rows = Array.isArray(data)
@@ -42,7 +59,9 @@ export default function ClientInvoicingManager() {
           : []
         if (alive) {
           setClients(rows)
-          if (!clientId && rows[0]) setClientId(rows[0].id)
+          // Reset selection if previously chosen client is no longer in scope.
+          if (rows.length === 0) setClientId("")
+          else if (!rows.some((r) => r.id === clientId)) setClientId(rows[0].id)
         }
       } catch {
         if (alive) setError("Failed to load clients.")
@@ -50,7 +69,7 @@ export default function ClientInvoicingManager() {
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [urlRegionId])
 
   // Load branches when client changes
   useEffect(() => {
@@ -129,6 +148,16 @@ export default function ClientInvoicingManager() {
 
       {error ? <InlineAlert type="error" message={error} /> : null}
       {notice ? <InlineAlert type="success" message={notice} /> : null}
+
+      <FilterBar>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <RegionUrlPicker
+            regions={regions}
+            locked={locked}
+            includeGlobalOption={!locked}
+          />
+        </div>
+      </FilterBar>
 
       <InvoiceSummaryTiles rows={invoices} />
 

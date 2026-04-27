@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
@@ -8,8 +8,11 @@ import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string; type?: string | null }
+type RegionOption = { id: string; name: string }
 
 type PurchaseLine = {
   id: string
@@ -143,11 +146,16 @@ function lineProduct(products: ProductOption[], id: string): ProductOption | nul
 export default function PurchasesManager({
   createMode = false,
   productScope = "NON_WEAPON",
+  regions = [],
+  locked = false,
 }: {
   createMode?: boolean
   productScope?: ProductScope
+  regions?: RegionOption[]
+  locked?: boolean
 }) {
   const router = useRouter()
+  const scopeQuery = useScopeQuery()
   const [rows, setRows] = useState<Purchase[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [vendors, setVendors] = useState<Option[]>([])
@@ -185,8 +193,8 @@ export default function PurchasesManager({
     setNotice(null)
     try {
       const [purchaseRows, storeRows, productRows, vendorRows] = await Promise.all([
-        apiGet<Purchase[]>(`/api/store-inventory/v2/purchases?categoryScope=${productScope}`),
-        apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
+        apiGet<Purchase[]>(`/api/store-inventory/v2/purchases?categoryScope=${productScope}${scopeQuery.suffix}`),
+        apiGet<Option[]>(`/api/store-inventory/v2/masters/stores${scopeQuery.query}`),
         apiGet<ProductOption[]>("/api/store-inventory/v2/products"),
         apiGet<Option[]>("/api/store-inventory/v2/masters/vendors"),
       ])
@@ -201,7 +209,7 @@ export default function PurchasesManager({
     } finally {
       setLoading(false)
     }
-  }, [productScope])
+  }, [productScope, scopeQuery.suffix, scopeQuery.query])
 
   useEffect(() => {
     void load()
@@ -552,9 +560,14 @@ export default function PurchasesManager({
       ) : (
         <>
           <FilterBar>
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-              <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by store/vendor/user/date/invoice" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Suspense>
+                <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+              </Suspense>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+                <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by store/vendor/user/date/invoice" />
+              </div>
             </div>
           </FilterBar>
 

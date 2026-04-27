@@ -19,6 +19,12 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const clientId = searchParams.get("clientId") || undefined
         const search = searchParams.get("search")?.trim()
+        const regionId = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
 
         const where: Prisma.BranchWhereInput = {}
         if (clientId) where.clientId = clientId
@@ -30,8 +36,12 @@ export async function GET(request: NextRequest) {
         }
 
         const clientScope = buildManagerScopeWhere(managerScope, { regionId: "regionId" })
-        if (Object.keys(clientScope).length > 0) {
-            where.client = { is: clientScope }
+        const clientFilter = {
+            ...(regionId ? { regionId } : {}),
+            ...clientScope,
+        }
+        if (Object.keys(clientFilter).length > 0) {
+            where.client = { is: clientFilter }
         }
 
         const branches = await prisma.branch.findMany({

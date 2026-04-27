@@ -4,9 +4,11 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Client = { id: string; name: string }
 type Office = { id: string; name: string }
+type Region = { id: string; name: string }
 type BranchRow = {
   sr: number
   branchId: string | null
@@ -50,10 +52,16 @@ const ALL_COLUMNS = [
 
 type PayrollSalaryV2ManagerProps = {
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollSalaryV2Manager({
   canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollSalaryV2ManagerProps = {}) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [regionalOfficeId, setRegionalOfficeId] = useState("")
@@ -68,21 +76,33 @@ export default function PayrollSalaryV2Manager({
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(ALL_COLUMNS.map((c) => c.id)))
 
   useEffect(() => {
-    fetch("/api/regional-offices")
+    // Scope option lists to the gate-selected region. For REGIONAL users the
+    // server enforces scope regardless; for SuperAdmin we forward `?regionId=`
+    // so the dropdowns only contain offices/clients for the picked region.
+    const officesUrl = effectiveRegionId
+      ? `/api/regional-offices?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/regional-offices"
+    const clientsUrl = effectiveRegionId
+      ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/clients"
+    fetch(officesUrl)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.offices ?? data.rows ?? []
         setOffices(list.map((o: { id: string; name: string }) => ({ id: o.id, name: o.name })))
       })
       .catch(() => {})
-    fetch("/api/clients")
+    fetch(clientsUrl)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
         setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
       })
       .catch(() => {})
-  }, [])
+    // Reset stale selections that may not exist in the new region.
+    setRegionalOfficeId("")
+    setClientId("")
+  }, [effectiveRegionId])
 
   const generate = useCallback(async () => {
     setLoading(true)
@@ -92,6 +112,7 @@ export default function PayrollSalaryV2Manager({
     params.set("month", `${month}-01`)
     if (regionalOfficeId) params.set("regionalOfficeId", regionalOfficeId)
     if (clientId) params.set("clientId", clientId)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     try {
       const res = await fetch(`/api/payroll/salary-v2/summary?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -101,7 +122,7 @@ export default function PayrollSalaryV2Manager({
     } finally {
       setLoading(false)
     }
-  }, [month, regionalOfficeId, clientId])
+  }, [month, regionalOfficeId, clientId, effectiveRegionId])
 
   useEffect(() => {
     generate()
@@ -117,6 +138,7 @@ export default function PayrollSalaryV2Manager({
         month: `${month}-01`,
         regionalOfficeId: regionalOfficeId || undefined,
         clientId: clientId || undefined,
+        regionId: effectiveRegionId || undefined,
       }),
     })
     const data = await res.json()
@@ -172,7 +194,14 @@ export default function PayrollSalaryV2Manager({
       subtitle="Salary dashboard and per-branch rollup."
     >
       <section className="ui-card p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_1fr_auto_auto_auto] gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr_1fr_auto_auto_auto] gap-3 items-end">
+          <div>
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Salary Month *

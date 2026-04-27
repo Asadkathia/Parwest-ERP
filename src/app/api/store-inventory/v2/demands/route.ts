@@ -3,7 +3,7 @@ import { StoreInventoryDemandStatus } from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureStoreInScope, parsePositiveInt, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 
 const demandInclude = {
   fromStore: true,
@@ -80,10 +80,15 @@ export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")?.trim() || undefined
   const fromStoreId = searchParams.get("fromStoreId")?.trim() || undefined
   const toStoreId = searchParams.get("toStoreId")?.trim() || undefined
+
+  const storeOfficeFilter = buildStoreScopeWhere(session.scope, scopeParams.regionalOfficeId, scopeParams.regionId)
 
   try {
     const rows = await prisma.storeInventoryDemand.findMany({
@@ -91,6 +96,14 @@ export async function GET(request: NextRequest) {
         status: status ? (status as StoreInventoryDemandStatus) : undefined,
         fromStoreId,
         toStoreId,
+        ...(storeOfficeFilter
+          ? {
+              OR: [
+                { fromStore: { is: storeOfficeFilter } },
+                { toStore: { is: storeOfficeFilter } },
+              ],
+            }
+          : {}),
       },
       include: demandInclude,
       orderBy: { createdAt: "desc" },
@@ -122,6 +135,12 @@ export async function POST(request: NextRequest) {
     if (!fromStoreId || !toStoreId) {
       return badRequest("fromStoreId and toStoreId are required.")
     }
+
+    // Demand creator must have scope over BOTH source store and destination warehouse.
+    const fromDenied = await ensureStoreInScope(fromStoreId, session.scope)
+    if (fromDenied) return fromDenied
+    const toDenied = await ensureStoreInScope(toStoreId, session.scope)
+    if (toDenied) return toDenied
 
     const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
     const selectedProducts = await prisma.storeInventoryProduct.findMany({

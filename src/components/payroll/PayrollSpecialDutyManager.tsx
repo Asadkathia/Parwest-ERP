@@ -6,6 +6,7 @@ import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
 import Base64FileUpload from "@/components/payroll/shared/Base64FileUpload"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
 type Row = {
@@ -25,15 +26,22 @@ type Row = {
 
 type ClientOption = { id: string; name: string }
 type BranchOption = { id: string; name: string; city?: string | null }
+type Region = { id: string; name: string }
 
 type PayrollSpecialDutyManagerProps = {
   canCreate?: boolean
   canDelete?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollSpecialDutyManager({
   canCreate = false,
   canDelete = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollSpecialDutyManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [search, setSearch] = useState("")
@@ -60,10 +68,11 @@ export default function PayrollSpecialDutyManager({
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set("search", search)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     const res = await fetch(`/api/payroll/special-duty-records?${params}`)
     if (res.ok) setRows(await res.json())
     setLoading(false)
-  }, [search])
+  }, [search, effectiveRegionId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
@@ -71,7 +80,12 @@ export default function PayrollSpecialDutyManager({
   }, [loadRows])
 
   useEffect(() => {
-    fetch("/api/clients")
+    // Scope clients to the gate-selected region for SuperAdmin; for REGIONAL
+    // users the server applies their scope regardless.
+    const url = effectiveRegionId
+      ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
+      : "/api/clients"
+    fetch(url)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
@@ -80,7 +94,10 @@ export default function PayrollSpecialDutyManager({
         )
       })
       .catch(() => setClients([]))
-  }, [])
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing dependent dropdowns when region changes
+    setClientId("")
+    setBranchId("")
+  }, [effectiveRegionId])
 
   useEffect(() => {
     if (!clientId) {
@@ -176,12 +193,26 @@ export default function PayrollSpecialDutyManager({
       }
     >
       <section className="ui-card p-4 space-y-4">
-        <input
-          className="ui-input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by Parwest ID or name"
-        />
+        <div className="flex gap-3 flex-wrap items-end">
+          <div className="min-w-[180px]">
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+              Search
+            </label>
+            <input
+              className="ui-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by Parwest ID or name"
+            />
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px] text-sm">
@@ -283,6 +314,7 @@ export default function PayrollSpecialDutyManager({
                 value={parwestIdInput}
                 onChange={setParwestIdInput}
                 onSelect={handleGuardSelect}
+                regionId={effectiveRegionId}
               />
             </div>
 

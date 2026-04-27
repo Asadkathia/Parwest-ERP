@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Trash2, X } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type BlacklistedGuard = {
     id: string
@@ -26,7 +27,15 @@ type MatchingActiveGuard = {
 const TERMINATION_REASON_OPTIONS = ["RESIGNED", "FIRED", "ABSCONDED", "DECEASED", "OTHER"] as const
 type TerminationReasonOption = (typeof TERMINATION_REASON_OPTIONS)[number]
 
-export default function BlacklistManager() {
+type Props = {
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function BlacklistManager({
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     // --- Search / select state ---
     const [cnicQuery, setCnicQuery] = useState("")
     const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -428,26 +437,31 @@ export default function BlacklistManager() {
 
             {/* Blacklisted records table */}
             <div className="bg-white rounded-lg border overflow-x-auto">
-                <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">
-                    <div>
-                        <label className="mb-1 block text-xs text-gray-600">Show</label>
-                        <select
-                            value={rowCountSelect}
-                            onChange={(e) => setRowCountSelect(e.target.value)}
-                            className="rounded-md border px-2 py-1 text-sm"
-                        >
-                            {["10 rows", "25 rows", "50 rows", "100 rows"].map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <div className="border-b bg-gray-50 px-4 py-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <RegionUrlPicker
+                            regions={regions}
+                            locked={regionLocked}
+                            includeGlobalOption={!regionLocked}
+                        />
+                        <div>
+                            <label className="mb-1 block text-xs text-gray-600">Show</label>
+                            <select
+                                value={rowCountSelect}
+                                onChange={(e) => setRowCountSelect(e.target.value)}
+                                className="rounded-md border px-2 py-1 text-sm w-full"
+                            >
+                                {["10 rows", "25 rows", "50 rows", "100 rows"].map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                        </div>
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Search:</label>
                             <input
                                 value={tableSearch}
                                 onChange={(e) => setTableSearch(e.target.value)}
-                                className="rounded-md border px-2 py-1 text-sm"
+                                className="rounded-md border px-2 py-1 text-sm w-full"
                             />
                         </div>
                         <div>
@@ -456,7 +470,7 @@ export default function BlacklistManager() {
                                 type="date"
                                 value={selectDate}
                                 onChange={(e) => setSelectDate(e.target.value)}
-                                className="rounded-md border px-2 py-1 text-sm"
+                                className="rounded-md border px-2 py-1 text-sm w-full"
                             />
                         </div>
                     </div>

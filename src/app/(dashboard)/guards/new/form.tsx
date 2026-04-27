@@ -22,6 +22,10 @@ type RegionalOffice = {
 type Props = {
   regionalOffices: RegionalOffice[]
   currentUserName: string
+  /** When set, the user is locked to a single regional office — selector is hidden and value hardcoded. */
+  lockedRegionalOfficeId?: string | null
+  /** When set, the user is regionally scoped — informational; office list is already pre-filtered server-side. */
+  lockedRegionId?: string | null
 }
 
 type SectionConfig = {
@@ -97,7 +101,8 @@ function calculateAge(dateOfBirth: string, referenceDate?: string) {
   return age >= 0 ? String(age) : ""
 }
 
-export default function GuardEnrollmentForm({ regionalOffices, currentUserName }: Props) {
+export default function GuardEnrollmentForm({ regionalOffices, currentUserName, lockedRegionalOfficeId = null, lockedRegionId: _lockedRegionId = null }: Props) {
+  void _lockedRegionId
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
   const [loading, setLoading] = useState(false)
@@ -135,7 +140,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
   const nearestCounterRef = useRef(1)
   const [contactRows, setContactRows] = useState<number[]>([])
   const contactCounterRef = useRef(2)
-  const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState("")
+  const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(lockedRegionalOfficeId || "")
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [joiningDate, setJoiningDate] = useState(() => new Date().toISOString().split("T")[0])
   const [maritalStatus, setMaritalStatus] = useState("")
@@ -557,25 +562,44 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName }
           onToggle={() => toggleSectionCollapse("general")}
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Regional Office <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="regionalOfficeId"
-                required
-                className="ui-input"
-                value={selectedRegionalOfficeId}
-                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-              >
-                <option value="">Select regional office</option>
-                {regionalOffices.map((office) => (
-                  <option key={`regionalOffice-${office.id}`} value={office.id}>
-                    {office.name} ({office.region.name})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {lockedRegionalOfficeId ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Regional Office <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="regionalOfficeId" value={lockedRegionalOfficeId} />
+                <input
+                  type="text"
+                  readOnly
+                  value={(() => {
+                    const office = regionalOffices.find((o) => o.id === lockedRegionalOfficeId)
+                    return office ? `${office.name} (${office.region.name})` : "Locked to your regional office"
+                  })()}
+                  className="ui-input bg-slate-50 text-slate-600"
+                />
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Regional Office <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="regionalOfficeId"
+                  required
+                  className="ui-input"
+                  value={selectedRegionalOfficeId}
+                  onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+                >
+                  <option value="">Select regional office</option>
+                  {regionalOffices.map((office) => (
+                    <option key={`regionalOffice-${office.id}`} value={office.id}>
+                      {office.name} ({office.region.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Parwest ID</label>
               <input

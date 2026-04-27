@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function PATCH(
   request: NextRequest,
@@ -16,8 +17,18 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const existing = await prisma.payrollSpecialDuty.findUnique({ where: { id } })
+    const existing = await prisma.payrollSpecialDuty.findUnique({
+      where: { id },
+      include: { guard: { select: { regionId: true, regionalOfficeId: true } } },
+    })
     if (!existing) return notFound("Record not found.")
+    const scope = deriveManagerScope(session)
+    if (managerScopeDenied(scope, {
+      regionId: existing.guard.regionId,
+      regionalOfficeId: existing.guard.regionalOfficeId,
+    })) {
+      return notFound("Record not found.")
+    }
 
     const hours = body.hours != null ? Number(body.hours) : existing.hours
     const hourRate = body.hourRate != null ? Number(body.hourRate) : existing.hourRate
@@ -114,8 +125,18 @@ export async function DELETE(
     if (!hasAction(session, "PAYROLL", "DELETE")) return forbidden("Access denied.")
 
     const { id } = await params
-    const existing = await prisma.payrollSpecialDuty.findUnique({ where: { id } })
+    const existing = await prisma.payrollSpecialDuty.findUnique({
+      where: { id },
+      include: { guard: { select: { regionId: true, regionalOfficeId: true } } },
+    })
     if (!existing) return notFound("Record not found.")
+    const scope = deriveManagerScope(session)
+    if (managerScopeDenied(scope, {
+      regionId: existing.guard.regionId,
+      regionalOfficeId: existing.guard.regionalOfficeId,
+    })) {
+      return notFound("Record not found.")
+    }
 
     await prisma.payrollSpecialDuty.update({
       where: { id },

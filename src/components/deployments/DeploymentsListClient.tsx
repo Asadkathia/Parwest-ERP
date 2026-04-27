@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Plus, MapPin, Activity, PauseCircle, Clock, RefreshCw, ShieldOff, Lock } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/ui/stat-card"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
 type OfficeOption = { id: string; name: string; regionId: string | null }
@@ -46,8 +48,16 @@ export default function DeploymentsListClient({
     const isRegionLocked = Boolean(scopedRegionId)
     const isOfficeLocked = Boolean(scopedOfficeId)
 
-    const [regionId, setRegionId] = useState<string>(scopedRegionId ?? "")
+    const searchParams = useSearchParams()
+    const urlRegionId = searchParams.get("regionId") ?? ""
+    const regionId = scopedRegionId ?? urlRegionId
     const [officeId, setOfficeId] = useState<string>(scopedOfficeId ?? "")
+
+    // Reset office whenever region changes (and a fresh region is picked).
+    useEffect(() => {
+        if (!isOfficeLocked) setOfficeId("")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [regionId])
     const [rows, setRows] = useState<DeploymentRow[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -120,28 +130,9 @@ export default function DeploymentsListClient({
             {/* Scope picker */}
             <section className="ui-card p-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                        <label className="mb-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                            Region {isRegionLocked && <Lock className="h-3.5 w-3.5" />}
-                        </label>
-                        <select
-                            className="ui-select"
-                            value={regionId}
-                            disabled={isRegionLocked}
-                            onChange={(e) => {
-                                setRegionId(e.target.value)
-                                setOfficeId("")
-                            }}
-                        >
-                            <option value="">-- Select a region --</option>
-                            {regions.map((r) => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                        </select>
-                        {isRegionLocked && (
-                            <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
-                        )}
-                    </div>
+                    <Suspense>
+                        <RegionUrlPicker regions={regions} locked={isRegionLocked} includeGlobalOption={false} />
+                    </Suspense>
                     <div>
                         <label className="mb-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
                             Regional Office {isOfficeLocked && <Lock className="h-3.5 w-3.5" />}

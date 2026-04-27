@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
+import { deriveManagerScope } from "@/lib/access/scope"
 import ClientEditForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
@@ -12,9 +13,16 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
     const { id } = await params
 
+    const scope = deriveManagerScope(session)
+    const viewerRegionId = scope?.regionId ?? null
+    const viewerRegionalOfficeId = scope?.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
+
     const [client, regions, supervisorAssignment] = await Promise.all([
         prisma.client.findUnique({ where: { id } }),
-        prisma.region.findMany({ orderBy: { name: "asc" } }),
+        prisma.region.findMany({
+            where: viewerRegionId ? { id: viewerRegionId } : undefined,
+            orderBy: { name: "asc" },
+        }),
         prisma.clientSupervisorAssignment.findFirst({
             where: { clientId: id, branchId: null, status: "ACTIVE" },
             orderBy: { createdAt: "desc" },
@@ -33,6 +41,8 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                 regions={regions}
                 currentSupervisorId={supervisorAssignment?.supervisorId ?? null}
                 isSuperAdmin={isSuperAdmin(session)}
+                viewerRegionId={viewerRegionId}
+                viewerRegionalOfficeId={viewerRegionalOfficeId}
             />
         </div>
     )

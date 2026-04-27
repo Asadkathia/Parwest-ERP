@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryAdjustmentType, StoreInventoryMovementType } from
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureStoreInScope, parseNumberOrNull, parsePositiveInt, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 
 const adjustmentInclude = {
   store: true,
@@ -71,16 +71,22 @@ export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get("storeId")?.trim() || undefined
   const adjustmentType = searchParams.get("adjustmentType")?.trim() || undefined
   const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
+
+  const storeOfficeFilter = buildStoreScopeWhere(session.scope, scopeParams.regionalOfficeId, scopeParams.regionId)
 
   try {
     const rows = await prisma.storeInventoryAdjustment.findMany({
       where: {
         storeId,
         adjustmentType: adjustmentType ? (adjustmentType as StoreInventoryAdjustmentType) : undefined,
+        ...(storeOfficeFilter ? { store: { is: storeOfficeFilter } } : {}),
         ...(categoryScope === "WEAPON_AMMO"
           ? {
               lines: {
@@ -146,6 +152,9 @@ export async function POST(request: NextRequest) {
     if (!storeId || !adjustmentType || !lines) {
       return badRequest("storeId, adjustmentType, and non-empty lines are required.")
     }
+
+    const storeDenied = await ensureStoreInScope(storeId, session.scope)
+    if (storeDenied) return storeDenied
 
     const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
     const selectedProducts = await prisma.storeInventoryProduct.findMany({

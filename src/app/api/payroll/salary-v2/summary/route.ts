@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { deriveManagerScope } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
     const monthRaw = searchParams.get("month")
     const regionalOfficeId = searchParams.get("regionalOfficeId") || undefined
     const clientId = searchParams.get("clientId") || undefined
+    const regionIdParam = searchParams.get("regionId")?.trim() || null
+
+    if (scope && managerScopeDenied(scope, {
+      regionId: regionIdParam,
+      regionalOfficeId: regionalOfficeId ?? null,
+    })) {
+      return forbidden("Forbidden: cannot query salary summary outside your scope.")
+    }
 
     if (!monthRaw) return badRequest("month is required (YYYY-MM).")
     const month = parseMonth(monthRaw)
@@ -28,12 +36,20 @@ export async function GET(request: NextRequest) {
       deploymentDate: { gte: month.start, lt: month.end },
     }
     if (clientId) deploymentWhere.clientId = clientId
-    if (regionalOfficeId) deploymentWhere.regionalOfficeId = regionalOfficeId
-    if (scope?.regionalOfficeIds.length) {
+    // Caller-provided regionalOfficeId wins over scope's set if the scope
+    // includes that office; scope filter is applied only when no URL override.
+    if (regionalOfficeId) {
+      deploymentWhere.regionalOfficeId = regionalOfficeId
+    } else if (scope?.regionalOfficeIds.length) {
       deploymentWhere.regionalOfficeId = { in: scope.regionalOfficeIds }
     }
-    if (scope?.regionId) {
-      deploymentWhere.guard = { is: { regionId: scope.regionId } }
+    // Merge regionId filter across scope + URL param into a single guard.is
+    // filter so both constraints apply simultaneously.
+    const guardIs: Record<string, string> = {}
+    if (scope?.regionId) guardIs.regionId = scope.regionId
+    if (regionIdParam) guardIs.regionId = regionIdParam
+    if (Object.keys(guardIs).length > 0) {
+      deploymentWhere.guard = { is: guardIs }
     }
 
     const [deployments, payrollRows] = await Promise.all([
@@ -58,17 +74,28 @@ export async function GET(request: NextRequest) {
           guard: { select: { id: true } },
         },
       }),
-      prisma.payroll.findMany({
-        where: {
-          month: { gte: month.start, lt: month.end },
-          year: month.year,
-        },
-        select: {
-          guardId: true,
-          netSalary: true,
-          baseSalary: true,
-        },
-      }),
+      (async () => {
+        const payrollGuardIs: Record<string, unknown> = { ...guardIs }
+        if (regionalOfficeId) {
+          payrollGuardIs.regionalOfficeId = regionalOfficeId
+        } else if (scope?.regionalOfficeIds.length) {
+          payrollGuardIs.regionalOfficeId = { in: scope.regionalOfficeIds }
+        }
+        return prisma.payroll.findMany({
+          where: {
+            month: { gte: month.start, lt: month.end },
+            year: month.year,
+            ...(Object.keys(payrollGuardIs).length > 0
+              ? { guard: { is: payrollGuardIs } }
+              : {}),
+          },
+          select: {
+            guardId: true,
+            netSalary: true,
+            baseSalary: true,
+          },
+        })
+      })(),
     ])
 
     // Aggregate by branch

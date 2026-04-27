@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type InactiveGuard = {
     id: string
@@ -16,13 +17,27 @@ type InactiveGuard = {
 
 type RegionalOffice = { id: string; name: string; region: { id: string; name: string } }
 
-export default function InactiveGuardsManager() {
+type Props = {
+    /** Region currently in scope (URL `?regionId=` for SuperAdmin or session region for REGIONAL). */
+    effectiveRegionId?: string | null
+    /** When the user is locked to a single office, hide the office picker. */
+    lockedOfficeId?: string | null
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function InactiveGuardsManager({
+    effectiveRegionId = null,
+    lockedOfficeId = null,
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     const [guards, setGuards] = useState<InactiveGuard[]>([])
     const [entries, setEntries] = useState("10")
     const [search, setSearch] = useState("")
     const [dateFrom, setDateFrom] = useState("")
     const [dateTo, setDateTo] = useState("")
-    const [regionalOfficeId, setRegionalOfficeId] = useState("")
+    const [regionalOfficeId, setRegionalOfficeId] = useState(lockedOfficeId ?? "")
     const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -30,11 +45,13 @@ export default function InactiveGuardsManager() {
     const [confirmReactivateId, setConfirmReactivateId] = useState<string | null>(null)
     const [reactivateReason, setReactivateReason] = useState("")
 
-    const loadInactiveGuards = async () => {
+    const loadInactiveGuards = useCallback(async () => {
         try {
             setLoading(true)
             setError("")
-            const response = await fetch("/api/guards/inactive")
+            const params = new URLSearchParams()
+            if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+            const response = await fetch(`/api/guards/inactive?${params.toString()}`)
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}))
                 throw new Error(data.message || "Failed to fetch inactive guards")
@@ -46,15 +63,22 @@ export default function InactiveGuardsManager() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [effectiveRegionId])
+
+    // Keep selected office in sync if the lock changes (rare).
+    useEffect(() => {
+        if (lockedOfficeId) setRegionalOfficeId(lockedOfficeId)
+    }, [lockedOfficeId])
 
     useEffect(() => {
-        loadInactiveGuards()
-        fetch("/api/regional-offices")
+        void loadInactiveGuards()
+        const params = new URLSearchParams()
+        if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+        fetch(`/api/regional-offices?${params.toString()}`)
             .then((r) => r.ok ? r.json() : [])
             .then((data: RegionalOffice[]) => setRegionalOffices(data))
             .catch(() => {})
-    }, [])
+    }, [effectiveRegionId, loadInactiveGuards])
 
     const reactivateGuard = async (guardId: string, reason: string) => {
         setError("")
@@ -116,6 +140,14 @@ export default function InactiveGuardsManager() {
                 {/* Filter bar */}
                 <div className="border-b bg-gray-50 px-4 py-3 space-y-3">
                     <div className="flex flex-wrap items-end gap-3">
+                        {/* Region */}
+                        <div className="w-52">
+                            <RegionUrlPicker
+                                regions={regions}
+                                locked={regionLocked}
+                                includeGlobalOption={!regionLocked}
+                            />
+                        </div>
                         {/* Show entries */}
                         <div>
                             <label className="mb-1 block text-xs text-gray-600">Show entries</label>
@@ -142,21 +174,23 @@ export default function InactiveGuardsManager() {
                         </div>
 
                         {/* Regional Office */}
-                        <div>
-                            <label className="mb-1 block text-xs text-gray-600">Regional Office</label>
-                            <select
-                                value={regionalOfficeId}
-                                onChange={(e) => setRegionalOfficeId(e.target.value)}
-                                className="rounded-md border px-2 py-1.5 text-sm w-52"
-                            >
-                                <option value="">-- All Offices --</option>
-                                {regionalOffices.map((o) => (
-                                    <option key={o.id} value={o.id}>
-                                        {o.name} ({o.region.name})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        {!lockedOfficeId && (
+                            <div>
+                                <label className="mb-1 block text-xs text-gray-600">Regional Office</label>
+                                <select
+                                    value={regionalOfficeId}
+                                    onChange={(e) => setRegionalOfficeId(e.target.value)}
+                                    className="rounded-md border px-2 py-1.5 text-sm w-52"
+                                >
+                                    <option value="">-- All Offices --</option>
+                                    {regionalOffices.map((o) => (
+                                        <option key={o.id} value={o.id}>
+                                            {o.name}{o.region ? ` (${o.region.name})` : ""}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         {/* Date From */}
                         <div>

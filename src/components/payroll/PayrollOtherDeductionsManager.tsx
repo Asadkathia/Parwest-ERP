@@ -5,6 +5,7 @@ import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 
 type Row = {
@@ -14,12 +15,20 @@ type Row = {
   guard: { id: string; name: string; parwestId: string }
 }
 
+type Region = { id: string; name: string }
+
 type PayrollOtherDeductionsManagerProps = {
   canCreate?: boolean
+  effectiveRegionId?: string | null
+  regions?: Region[]
+  locked?: boolean
 }
 
 export default function PayrollOtherDeductionsManager({
   canCreate = false,
+  effectiveRegionId = null,
+  regions = [],
+  locked = false,
 }: PayrollOtherDeductionsManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -39,10 +48,11 @@ export default function PayrollOtherDeductionsManager({
     const params = new URLSearchParams()
     params.set("month", `${month}-01`)
     if (search) params.set("search", search)
+    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
     const res = await fetch(`/api/payroll/other-deductions?${params}`)
     if (res.ok) setRows(await res.json())
     setLoading(false)
-  }, [month, search])
+  }, [month, search, effectiveRegionId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
@@ -100,6 +110,13 @@ export default function PayrollOtherDeductionsManager({
     >
       <section className="ui-card p-4 space-y-4">
         <div className="flex gap-3 flex-wrap items-end">
+          <div className="min-w-[180px]">
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
               Month
@@ -187,6 +204,7 @@ export default function PayrollOtherDeductionsManager({
                 value={parwestIdInput}
                 onChange={setParwestIdInput}
                 onSelect={handleGuardSelect}
+                regionId={effectiveRegionId}
               />
             </div>
 

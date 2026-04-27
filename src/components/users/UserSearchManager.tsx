@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
@@ -25,6 +26,12 @@ function formatRegionalOffice(row: UserRow): string {
 }
 
 export default function UserSearchManager() {
+  const { data: sessionData } = useSession()
+  const sessionUser = sessionData?.user as
+    | { regionId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
+    | undefined
+  const sessionRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
+
   const [rows, setRows] = useState<UserRow[]>([])
   const [roles, setRoles] = useState<RoleOption[]>([])
   const [search, setSearch] = useState("")
@@ -41,6 +48,7 @@ export default function UserSearchManager() {
       if (search.trim()) params.set("search", search.trim())
       if (roleId) params.set("roleId", roleId)
       if (status) params.set("status", status)
+      if (sessionRegionId) params.set("regionId", sessionRegionId)
 
       const response = await fetch(`/api/users?${params.toString()}`, { cache: "no-store" })
       const payload = await response.json().catch(() => [])
@@ -54,7 +62,7 @@ export default function UserSearchManager() {
     } finally {
       setLoading(false)
     }
-  }, [roleId, search, status])
+  }, [roleId, search, status, sessionRegionId])
 
   useEffect(() => {
     let cancelled = false

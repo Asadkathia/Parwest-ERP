@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import ActionButton from "@/components/ui/action-button"
 import SectionTitle from "@/components/ui/section-title"
 import StatusChip from "@/components/ui/status-chip"
@@ -23,12 +24,19 @@ type ImpactedGuard = {
 }
 
 export default function SwitchSupervisorManager() {
+  const { data: sessionData } = useSession()
+  const sessionUser = sessionData?.user as
+    | { regionId?: string | null; regionalOfficeId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
+    | undefined
+  const lockedRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
+  const lockedOfficeId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionalOfficeId ?? null : null
+
   const [regions, setRegions] = useState<Region[]>([])
   const [offices, setOffices] = useState<Office[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
-  const [regionId, setRegionId] = useState("")
-  const [officeId, setOfficeId] = useState("")
+  const [regionId, setRegionId] = useState(lockedRegionId ?? "")
+  const [officeId, setOfficeId] = useState(lockedOfficeId ?? "")
   const [fromSupervisorId, setFromSupervisorId] = useState("")
   const [toSupervisorId, setToSupervisorId] = useState("")
   const [reason, setReason] = useState("")
@@ -43,10 +51,13 @@ export default function SwitchSupervisorManager() {
     let cancelled = false
     async function loadDependencies() {
       try {
+        const regionParam = lockedRegionId
+          ? `?regionId=${encodeURIComponent(lockedRegionId)}`
+          : ""
         const [regionsRes, officesRes, usersRes, rolesRes] = await Promise.all([
           fetch("/api/regions", { cache: "no-store" }),
-          fetch("/api/regional-offices", { cache: "no-store" }),
-          fetch("/api/users", { cache: "no-store" }),
+          fetch(`/api/regional-offices${regionParam}`, { cache: "no-store" }),
+          fetch(`/api/users${regionParam}`, { cache: "no-store" }),
           fetch("/api/roles", { cache: "no-store" }),
         ])
         const [regionsJson, officesJson, usersJson, rolesJson] = await Promise.all([
@@ -73,7 +84,7 @@ export default function SwitchSupervisorManager() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [lockedRegionId])
 
   const officeOptions = useMemo(() => offices.filter((office) => !regionId || office.regionId === regionId), [offices, regionId])
   const supervisorRoleIds = useMemo(
@@ -156,20 +167,24 @@ export default function SwitchSupervisorManager() {
       {error ? <InlineAlert type="error" message={error} /> : null}
 
       <section className="ui-card p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm mb-1 text-[var(--text-muted)]">region</label>
-          <select value={regionId} onChange={(e) => { setRegionId(e.target.value); setOfficeId(""); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
-            <option value="">Select region</option>
-            {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-[var(--text-muted)]">reigional office</label>
-          <select value={officeId} onChange={(e) => { setOfficeId(e.target.value); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
-            <option value="">Select office</option>
-            {officeOptions.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
-          </select>
-        </div>
+        {!lockedRegionId && (
+          <div>
+            <label className="block text-sm mb-1 text-[var(--text-muted)]">region</label>
+            <select value={regionId} onChange={(e) => { setRegionId(e.target.value); setOfficeId(""); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
+              <option value="">Select region</option>
+              {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+            </select>
+          </div>
+        )}
+        {!lockedOfficeId && (
+          <div>
+            <label className="block text-sm mb-1 text-[var(--text-muted)]">reigional office</label>
+            <select value={officeId} onChange={(e) => { setOfficeId(e.target.value); setFromSupervisorId(""); setToSupervisorId("") }} className="ui-select">
+              <option value="">Select office</option>
+              {officeOptions.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm mb-1 text-[var(--text-muted)]">From Supervisor</label>
           <select value={fromSupervisorId} onChange={(e) => setFromSupervisorId(e.target.value)} className="ui-select">

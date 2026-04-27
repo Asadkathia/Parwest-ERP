@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Residence = {
     id: string
@@ -50,7 +51,15 @@ const defaultForm = {
     contractAttachment: "",
 }
 
-export default function ResidencesManager() {
+type Props = {
+    regions?: { id: string; name: string }[]
+    regionLocked?: boolean
+}
+
+export default function ResidencesManager({
+    regions = [],
+    regionLocked = false,
+}: Props = {}) {
     const [query, setQuery] = useState("")
     const [entries, setEntries] = useState("10")
     const [selectDate, setSelectDate] = useState("")
@@ -283,7 +292,12 @@ export default function ResidencesManager() {
             </form>
 
             {/* Listing Filters */}
-            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+            <div className="bg-white rounded-lg border p-4 grid grid-cols-1 gap-3 md:grid-cols-6">
+                <RegionUrlPicker
+                    regions={regions}
+                    locked={regionLocked}
+                    includeGlobalOption={!regionLocked}
+                />
                 <div>
                     <label className="block text-sm text-gray-600 mb-1">Show entries</label>
                     <select value={entries} onChange={(e) => setEntries(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm">

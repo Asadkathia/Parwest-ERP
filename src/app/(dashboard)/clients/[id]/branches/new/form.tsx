@@ -21,6 +21,8 @@ type Props = {
     defaultRegionalOfficeId?: string | null
     defaultManagerId?: string | null
     isSuperAdmin?: boolean
+    viewerRegionId?: string | null
+    viewerRegionalOfficeId?: string | null
 }
 
 const OFFICE_TYPE_OPTIONS = [
@@ -51,14 +53,20 @@ const BRANCH_MODEL_OPTIONS = [
 
 // Loaded dynamically from /api/guard-designation-types and /api/guard-ex-service-types
 
-export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId, isSuperAdmin = false }: Props) {
+export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId, isSuperAdmin = false, viewerRegionId = null, viewerRegionalOfficeId = null }: Props) {
     const router = useRouter()
+    const isRegionalViewer = !isSuperAdmin && Boolean(viewerRegionId)
+    const lockedRegionalOffice = isRegionalViewer ? viewerRegionalOfficeId : null
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
     // Region / Regional Office (dynamic cascade)
-    const [selectedRegionId, setSelectedRegionId] = useState(defaultRegionId ?? "")
-    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(defaultRegionalOfficeId ?? "")
+    const [selectedRegionId, setSelectedRegionId] = useState(
+        isRegionalViewer ? (viewerRegionId ?? "") : (defaultRegionId ?? "")
+    )
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(
+        lockedRegionalOffice ?? (defaultRegionalOfficeId ?? "")
+    )
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
 
     // Manager / Supervisor (filtered by region)
@@ -348,24 +356,28 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Region</label>
                             <select
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionId}
                                 onChange={(e) => setSelectedRegionId(e.target.value)}
+                                disabled={isRegionalViewer}
                             >
                                 <option value="">— Select Region —</option>
                                 {regions.map((r) => (
                                     <option key={r.id} value={r.id}>{r.name}</option>
                                 ))}
                             </select>
+                            {isRegionalViewer && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
                             <select
                                 name="regionalOfficeId"
-                                className="ui-input"
+                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={selectedRegionalOfficeId}
                                 onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId}
+                                disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
                             >
                                 <option value="">
                                     {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
@@ -374,6 +386,9 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
                                     <option key={o.id} value={o.id}>{o.name}</option>
                                 ))}
                             </select>
+                            {lockedRegionalOffice && (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>

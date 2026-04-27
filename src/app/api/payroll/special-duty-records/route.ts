@@ -17,6 +17,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const guardId = searchParams.get("guardId") || undefined
     const search = searchParams.get("search") || undefined
+    const regionIdParam = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
+
+    if (scope && managerScopeDenied(scope, {
+      regionId: regionIdParam,
+      regionalOfficeId: regionalOfficeIdParam,
+    })) {
+      return forbidden("Forbidden: cannot query special-duty records outside your scope.")
+    }
 
     const where: Prisma.PayrollSpecialDutyWhereInput = { status: "ACTIVE" }
     if (guardId) where.guardId = guardId
@@ -32,6 +41,8 @@ export async function GET(request: NextRequest) {
     if (scope && scope.regionalOfficeIds.length > 0) {
       guardFilter.regionalOfficeId = { in: scope.regionalOfficeIds }
     }
+    if (regionIdParam) guardFilter.regionId = regionIdParam
+    if (regionalOfficeIdParam) guardFilter.regionalOfficeId = regionalOfficeIdParam
     if (Object.keys(guardFilter).length > 0) where.guard = { is: guardFilter }
 
     const rows = await prisma.payrollSpecialDuty.findMany({

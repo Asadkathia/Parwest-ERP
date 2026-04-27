@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server"
 import { internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { requireInventorySession } from "@/lib/inventory/store-v2-api"
+import { ensureStoreInScope, requireInventorySession } from "@/lib/inventory/store-v2-api"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -27,6 +27,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
     })
 
     if (!row) return notFound("Assignment not found.")
+
+    const denied = await ensureStoreInScope(row.storeId, session.scope, "Assignment not found.")
+    if (denied) return denied
+
     return ok(row)
   } catch (error) {
     console.error(`store-inventory v2 assignments GET (${id}) failed`, error)

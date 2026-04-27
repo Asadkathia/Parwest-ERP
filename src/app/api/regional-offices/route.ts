@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, buildManagerScopeWhere, managerScopeDenied } from "@/lib/access/scope"
 
 const MOCK_OFFICES = [
     {
@@ -43,13 +44,30 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const regionId = searchParams.get("regionId") || undefined
 
+        const scope = deriveManagerScope(session)
+        // Reject cross-scope URL requests outright (e.g. a regional user passing
+        // ?regionId= for a different region). Without this, the request would
+        // silently fall back to the user's own region — confusing for clients.
+        if (managerScopeDenied(scope, { regionId: regionId ?? null })) {
+            return forbidden("Forbidden: requested region is outside your assigned scope.")
+        }
+        const scopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "id" })
+
         if (isRuntimeMockEnabled()) {
-            const filtered = regionId ? MOCK_OFFICES.filter((o) => o.regionId === regionId) : MOCK_OFFICES
+            const filtered = MOCK_OFFICES.filter((o) => {
+                if (regionId && o.regionId !== regionId) return false
+                if (scope?.regionId && o.regionId !== scope.regionId) return false
+                if (scope?.regionalOfficeIds.length && !scope.regionalOfficeIds.includes(o.id)) return false
+                return true
+            })
             return NextResponse.json(filtered, { status: 200 })
         }
 
         const regionalOffices = await prisma.regionalOffice.findMany({
-            where: regionId ? { regionId } : undefined,
+            where: {
+                ...(regionId ? { regionId } : {}),
+                ...scopeWhere,
+            },
             include: { region: true },
             orderBy: { name: "asc" },
         })

@@ -80,6 +80,8 @@ type Props = {
     regions: Region[]
     regionalOffices: RegionalOffice[]
     currentSupervisorId: string | null
+    lockedRegionId?: string | null
+    lockedRegionalOfficeId?: string | null
 }
 
 const emptyEmployment = (): PreviousEmployment => ({
@@ -435,14 +437,14 @@ function NearestRelativesEditor({
     )
 }
 
-export default function GuardEditForm({ guard, regions, regionalOffices, currentSupervisorId }: Props) {
+export default function GuardEditForm({ guard, regions, regionalOffices, currentSupervisorId, lockedRegionId = null, lockedRegionalOfficeId = null }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
     // Dynamic supervisor list based on selected regional office
-    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(guard.regionalOfficeId || "")
+    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(lockedRegionalOfficeId || guard.regionalOfficeId || "")
     const [dobValue, setDobValue] = useState(() => {
         if (!guard.dateOfBirth) return ""
         return new Date(guard.dateOfBirth).toISOString().split("T")[0]
@@ -453,12 +455,14 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
     useEffect(() => {
         if (!selectedRegionalOfficeId) { setSupervisors([]); return }
         setSupervisorsLoading(true)
-        fetch(`/api/users?status=ACTIVE&regionalOfficeId=${selectedRegionalOfficeId}`)
+        const params = new URLSearchParams({ status: "ACTIVE", regionalOfficeId: selectedRegionalOfficeId })
+        if (lockedRegionId) params.set("regionId", lockedRegionId)
+        fetch(`/api/users?${params.toString()}`)
             .then((r) => r.ok ? r.json() : [])
             .then((data: Array<{ id: string; name: string; email: string }>) => setSupervisors(data))
             .catch(() => setSupervisors([]))
             .finally(() => setSupervisorsLoading(false))
-    }, [selectedRegionalOfficeId])
+    }, [selectedRegionalOfficeId, lockedRegionId])
 
     const formatDateForInput = (date: Date | null) => {
         if (!date) return ""
@@ -849,42 +853,73 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                 <div>
                     <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Employment Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Region
-                            </label>
-                            <select
-                                name="regionId"
-                                defaultValue={guard.regionId || ""}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select region</option>
-                                {regions.map((region) => (
-                                    <option key={region.id} value={region.id}>
-                                        {region.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        {lockedRegionId ? (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Region</label>
+                                <input type="hidden" name="regionId" value={lockedRegionId} />
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={regions.find((r) => r.id === lockedRegionId)?.name || "Locked region"}
+                                    className="w-full px-4 py-2 border rounded-md bg-gray-50 text-gray-600"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">Locked to your assigned region.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Region
+                                </label>
+                                <select
+                                    name="regionId"
+                                    defaultValue={guard.regionId || ""}
+                                    className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="">Select region</option>
+                                    {regions.map((region) => (
+                                        <option key={region.id} value={region.id}>
+                                            {region.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Regional Office
-                            </label>
-                            <select
-                                name="regionalOfficeId"
-                                value={selectedRegionalOfficeId}
-                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="">Select office</option>
-                                {regionalOffices.map((office) => (
-                                    <option key={office.id} value={office.id}>
-                                        {office.name} ({office.region.name})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        {lockedRegionalOfficeId ? (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Regional Office</label>
+                                <input type="hidden" name="regionalOfficeId" value={lockedRegionalOfficeId} />
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={(() => {
+                                        const office = regionalOffices.find((o) => o.id === lockedRegionalOfficeId)
+                                        return office ? `${office.name} (${office.region.name})` : "Locked regional office"
+                                    })()}
+                                    className="w-full px-4 py-2 border rounded-md bg-gray-50 text-gray-600"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">Locked to your assigned regional office.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Regional Office
+                                </label>
+                                <select
+                                    name="regionalOfficeId"
+                                    value={selectedRegionalOfficeId}
+                                    onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="">Select office</option>
+                                    {regionalOffices.map((office) => (
+                                        <option key={office.id} value={office.id}>
+                                            {office.name} ({office.region.name})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">

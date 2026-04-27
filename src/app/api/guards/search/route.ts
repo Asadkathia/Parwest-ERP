@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
@@ -21,9 +21,15 @@ export async function GET(request: NextRequest) {
         const religion      = searchParams.get("religion")
         const exServiceType = searchParams.get("exServiceType")
         const officeId      = searchParams.get("officeId")
+        const regionId      = searchParams.get("regionId")
+        const regionalOfficeId = searchParams.get("regionalOfficeId")
         const clientId      = searchParams.get("clientId")
         const createdFrom   = searchParams.get("createdFrom")
         const createdTo     = searchParams.get("createdTo")
+
+        if (managerScopeDenied(managerScope, { regionId, regionalOfficeId: regionalOfficeId ?? officeId })) {
+            return forbidden("Forbidden: requested scope is outside your assigned region.")
+        }
 
         const where: Prisma.GuardWhereInput = {
             ...(status        ? { status } : {}),
@@ -31,6 +37,8 @@ export async function GET(request: NextRequest) {
             ...(religion      ? { religion } : {}),
             ...(exServiceType ? { exServiceType } : {}),
             ...(officeId      ? { regionalOfficeId: officeId } : {}),
+            ...(regionalOfficeId && !officeId ? { regionalOfficeId } : {}),
+            ...(regionId      ? { regionId } : {}),
             ...(createdFrom || createdTo
                 ? {
                       createdAt: {
@@ -93,13 +101,8 @@ export async function GET(request: NextRequest) {
             },
         })
 
-        const scopedGuards = applyManagerScope(guards, managerScope, {
-            regionId:          () => null,
-            regionalOfficeId:  (g) => g.regionalOffice?.id ?? null,
-        })
-
         return NextResponse.json(
-            scopedGuards.map((g) => ({
+            guards.map((g) => ({
                 id:             g.id,
                 parwestId:      g.parwestId,
                 name:           g.name,

@@ -1,12 +1,27 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
+
+type RegionOption = { id: string; name: string }
+
+/**
+ * Build a `?regionId=…` querystring suffix when the caller is REGIONAL.
+ * SuperAdmins (roleScopeType !== "REGIONAL") get an empty suffix and see
+ * everything the underlying APIs return.
+ */
+function regionScopeQuery(regionId: string | null, leading = "?"): string {
+  if (!regionId) return ""
+  return `${leading}regionId=${encodeURIComponent(regionId)}`
+}
 
 type AssignmentType = "GUARD" | "EMPLOYEE" | "CLIENT"
 type ProductScope = "NON_WEAPON" | "WEAPON"
@@ -141,10 +156,22 @@ function lineProduct(products: Product[], productId: string): Product | null {
 export default function AssignmentsManager({
   assignmentType = "GUARD",
   productScope = "NON_WEAPON",
+  regions = [],
+  locked = false,
 }: {
   assignmentType?: AssignmentType
   productScope?: ProductScope
+  regions?: RegionOption[]
+  locked?: boolean
 }) {
+  const scopeQuery = useScopeQuery()
+  const { data: session } = useSession()
+  const sessionUser = session?.user as
+    | { roleScopeType?: "GLOBAL" | "REGIONAL"; regionId?: string | null }
+    | undefined
+  const callerRegionId =
+    sessionUser?.roleScopeType === "REGIONAL" ? sessionUser.regionId ?? null : null
+
   const [rows, setRows] = useState<Assignment[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -190,17 +217,23 @@ export default function AssignmentsManager({
     setLoading(true)
     setNotice(null)
     try {
+      // The URL picker (`scopeQuery`) takes precedence for SuperAdmin; fall back
+      // to the regional user's session region when no URL filter is set.
+      const effectiveRegionId = scopeQuery.regionId || callerRegionId
+      const peopleRegionSuffix = effectiveRegionId
+        ? `&regionId=${encodeURIComponent(effectiveRegionId)}`
+        : ""
       const [assignmentRows, storeRows, productRows, conditionRows, userRows, guardRows, clientRows, inventoryRows] = await Promise.all([
         apiGet<Assignment[]>(
-          `/api/store-inventory/v2/assignments?assignedToType=${assignmentType}&categoryScope=${productScope}`
+          `/api/store-inventory/v2/assignments?assignedToType=${assignmentType}&categoryScope=${productScope}${scopeQuery.suffix}`
         ),
-        apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
+        apiGet<Option[]>(`/api/store-inventory/v2/masters/stores${scopeQuery.query}`),
         apiGet<Product[]>("/api/store-inventory/v2/products"),
         apiGet<Condition[]>("/api/store-inventory/v2/masters/conditions"),
-        apiGet<Employee[]>("/api/users?status=ACTIVE"),
-        apiGet<Guard[]>("/api/guards?status=DEFAULT,PRESENT,ACTIVE"),
-        apiGet<Client[]>("/api/clients?status=ACTIVE"),
-        apiGet<Array<InventoryBalance & { store?: { id?: string }; product?: { id?: string } }>>("/api/store-inventory/v2/inventories"),
+        apiGet<Employee[]>(`/api/users?status=ACTIVE${peopleRegionSuffix}`),
+        apiGet<Guard[]>(`/api/guards?status=DEFAULT,PRESENT,ACTIVE${peopleRegionSuffix}`),
+        apiGet<Client[]>(`/api/clients?status=ACTIVE${peopleRegionSuffix}`),
+        apiGet<Array<InventoryBalance & { store?: { id?: string }; product?: { id?: string } }>>(`/api/store-inventory/v2/inventories${scopeQuery.query}`),
       ])
 
       setRows(assignmentRows)
@@ -226,7 +259,7 @@ export default function AssignmentsManager({
     } finally {
       setLoading(false)
     }
-  }, [assignmentType, productScope])
+  }, [assignmentType, productScope, callerRegionId, scopeQuery.suffix, scopeQuery.query, scopeQuery.regionId])
 
   useEffect(() => {
     void load()
@@ -276,7 +309,7 @@ export default function AssignmentsManager({
     ;(async () => {
       try {
         const [deploymentRows, csRows] = await Promise.all([
-          apiGet<Deployment[]>("/api/deployments"),
+          apiGet<Deployment[]>(`/api/deployments${regionScopeQuery(callerRegionId)}`),
           apiGet<Array<{ supervisor?: { id?: string; name?: string } | null }>>(
             `/api/users/cs-relationships?clientId=${encodeURIComponent(form.assignedToId)}&branchId=${encodeURIComponent(form.branchId)}`
           ),
@@ -313,7 +346,7 @@ export default function AssignmentsManager({
     return () => {
       cancelled = true
     }
-  }, [assignmentType, form.assignedToId, form.branchId])
+  }, [assignmentType, form.assignedToId, form.branchId, callerRegionId])
 
   useEffect(() => {
     if (assignmentType !== "GUARD") return
@@ -326,7 +359,7 @@ export default function AssignmentsManager({
     ;(async () => {
       try {
         const [deploymentRows, supervisorRows] = await Promise.all([
-          apiGet<Deployment[]>("/api/deployments"),
+          apiGet<Deployment[]>(`/api/deployments${regionScopeQuery(callerRegionId)}`),
           apiGet<{ supervisorName?: string | null }>(
             `/api/guards/${encodeURIComponent(form.assignedToId)}/supervisor`
           ).catch(() => ({ supervisorName: null })),
@@ -348,7 +381,7 @@ export default function AssignmentsManager({
     return () => {
       cancelled = true
     }
-  }, [assignmentType, form.assignedToId])
+  }, [assignmentType, form.assignedToId, callerRegionId])
 
 
 
@@ -691,9 +724,14 @@ export default function AssignmentsManager({
       </FilterBar>
 
       <FilterBar>
-        <div>
-          <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-          <input className="ui-input" placeholder="Search by store/product/assignee/status" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+            <input className="ui-input" placeholder="Search by store/product/assignee/status" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </FilterBar>
 

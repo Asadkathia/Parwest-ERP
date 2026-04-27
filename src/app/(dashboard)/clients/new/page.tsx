@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
+import { deriveManagerScope } from "@/lib/access/scope"
 import ClientEnrollmentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -19,10 +20,15 @@ export default async function NewClientPage({
     const mode = params?.mode === "branch" ? "branch" : "branchless"
     const initialBranchless = mode !== "branch"
 
+    const scope = deriveManagerScope(session)
+    const viewerRegionId = scope?.regionId ?? null
+    const viewerRegionalOfficeId = scope?.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
+
     let regions: Array<{ id: string; name: string }> = []
     let dbWarning = ""
     try {
         regions = await prisma.region.findMany({
+            where: viewerRegionId ? { id: viewerRegionId } : undefined,
             orderBy: { name: "asc" },
         })
     } catch (error) {
@@ -39,7 +45,13 @@ export default async function NewClientPage({
             <SectionTitle title="Add New Client" subtitle="Enroll a new client into the system" />
             {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
-            <ClientEnrollmentForm regions={regions} initialBranchless={initialBranchless} isSuperAdmin={isSuperAdmin(session)} />
+            <ClientEnrollmentForm
+                regions={regions}
+                initialBranchless={initialBranchless}
+                isSuperAdmin={isSuperAdmin(session)}
+                viewerRegionId={viewerRegionId}
+                viewerRegionalOfficeId={viewerRegionalOfficeId}
+            />
         </div>
     )
 }

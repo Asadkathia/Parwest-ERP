@@ -1,13 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet } from "@/components/store-inventory-v2/api"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string }
+type RegionOption = { id: string; name: string }
 type InventoryCategoryScope = "NON_WEAPON" | "WEAPON" | "AMMO"
 
 type Row = {
@@ -27,7 +30,16 @@ type Row = {
   }
 }
 
-export default function InventoriesManager({ categoryScope = "NON_WEAPON" }: { categoryScope?: InventoryCategoryScope }) {
+export default function InventoriesManager({
+  categoryScope = "NON_WEAPON",
+  regions = [],
+  locked = false,
+}: {
+  categoryScope?: InventoryCategoryScope
+  regions?: RegionOption[]
+  locked?: boolean
+}) {
+  const scopeQuery = useScopeQuery()
   const [rows, setRows] = useState<Row[]>([])
   const [stores, setStores] = useState<Option[]>([])
   const [products, setProducts] = useState<Option[]>([])
@@ -51,10 +63,12 @@ export default function InventoriesManager({ categoryScope = "NON_WEAPON" }: { c
       params.set("categoryScope", categoryScope)
 
       params.set("includeZero", "true")
+      if (scopeQuery.regionId) params.set("regionId", scopeQuery.regionId)
+      if (scopeQuery.regionalOfficeId) params.set("regionalOfficeId", scopeQuery.regionalOfficeId)
 
       const [data, storeRows, productRows] = await Promise.all([
         apiGet<Row[]>(`/api/store-inventory/v2/inventories?${params.toString()}`),
-        apiGet<Option[]>("/api/store-inventory/v2/masters/stores"),
+        apiGet<Option[]>(`/api/store-inventory/v2/masters/stores${scopeQuery.query}`),
         apiGet<
           Array<{
             id: string
@@ -87,7 +101,7 @@ export default function InventoriesManager({ categoryScope = "NON_WEAPON" }: { c
     } finally {
       setLoading(false)
     }
-  }, [categoryScope, productId, query, storeId, variantId])
+  }, [categoryScope, productId, query, storeId, variantId, scopeQuery.query, scopeQuery.regionId, scopeQuery.regionalOfficeId])
 
   useEffect(() => {
     void load()
@@ -111,7 +125,10 @@ export default function InventoriesManager({ categoryScope = "NON_WEAPON" }: { c
       {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
       <FilterBar>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
+          </Suspense>
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Store</label>
             <select className="ui-select" value={storeId} onChange={(e) => setStoreId(e.target.value)}>

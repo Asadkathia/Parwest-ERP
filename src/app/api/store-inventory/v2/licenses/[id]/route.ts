@@ -1,8 +1,23 @@
 import { NextRequest } from "next/server"
-import { badRequest, conflict, internalServerError, notFound, ok } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, ok } from "@/lib/api/response"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureClientInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import type { ManagerScope } from "@/lib/access/scope"
+
+async function ensureLicenseInScope(licenseId: string, scope: ManagerScope | null): Promise<Response | null> {
+  if (!scope) return null
+  const license = await prisma.storeInventoryLicense.findUnique({
+    where: { id: licenseId },
+    select: { clientId: true },
+  })
+  if (!license) return notFound("License not found.")
+  if (!license.clientId) {
+    // Unattached licenses: deny regional users; SuperAdmin already returns null above.
+    return forbidden("Forbidden: license is not attached to a client in your region.")
+  }
+  return ensureClientInScope(license.clientId, scope)
+}
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -39,6 +54,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (Object.keys(data).length === 0) return badRequest("No valid fields provided for update.")
 
+    const denied = await ensureLicenseInScope(id, session.scope)
+    if (denied) return denied
+
+    // Reassigning to a different client must also stay within scope.
+    if (body.clientId != null) {
+      const newClientId = asText(body.clientId)
+      if (newClientId) {
+        const targetDenied = await ensureClientInScope(newClientId, session.scope)
+        if (targetDenied) return targetDenied
+      } else if (session.scope) {
+        return forbidden("Forbidden: cannot detach license from client.")
+      }
+    }
+
     const updated = await prisma.storeInventoryLicense.update({
       where: { id },
       data,
@@ -73,6 +102,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params
 
   try {
+    const denied = await ensureLicenseInScope(id, session.scope)
+    if (denied) return denied
+
     await prisma.storeInventoryLicense.delete({ where: { id } })
 
     await emitInventoryV2Audit({

@@ -3,7 +3,7 @@ import { StoreInventoryDemandStatus } from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 
 const demandInclude = {
   fromStore: true,
@@ -61,6 +61,15 @@ export async function GET(_request: NextRequest, { params }: Params) {
     })
     if (!row) return notFound("Demand not found.")
 
+    // Allow access if user has scope over either source or destination store.
+    const fromDenied = row.fromStoreId
+      ? await ensureStoreInScope(row.fromStoreId, session.scope, "Demand not found.")
+      : null
+    const toDenied = row.toStoreId
+      ? await ensureStoreInScope(row.toStoreId, session.scope, "Demand not found.")
+      : null
+    if (fromDenied && toDenied) return fromDenied
+
     return ok(row)
   } catch (error) {
     console.error(`store-inventory v2 demands GET (${id}) failed`, error)
@@ -85,6 +94,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       include: { lines: true },
     })
     if (!current) return notFound("Demand not found.")
+
+    // Mutating the demand requires scope over either side; downstream fulfilment
+    // (warehouse approval) needs `toStore` access, while cancellation needs source.
+    const fromDenied = current.fromStoreId
+      ? await ensureStoreInScope(current.fromStoreId, session.scope, "Demand not found.")
+      : null
+    const toDenied = current.toStoreId
+      ? await ensureStoreInScope(current.toStoreId, session.scope, "Demand not found.")
+      : null
+    if (fromDenied && toDenied) return fromDenied
 
     const nextStatus = body.status != null ? normalizeStatus(body.status) : null
     if (body.status != null && !nextStatus) {

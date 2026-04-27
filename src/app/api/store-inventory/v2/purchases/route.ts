@@ -3,7 +3,7 @@ import { Prisma, StoreInventoryMovementType, StoreInventoryPurchaseStatus } from
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, parseNumberOrNull, parsePositiveInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureStoreInScope, parseNumberOrNull, parsePositiveInt, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
 import { isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
 
@@ -86,16 +86,23 @@ export async function GET(request: NextRequest) {
   const session = await requireInventorySession()
   if (session instanceof Response) return session
 
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get("storeId")?.trim() || undefined
   const status = searchParams.get("status")?.trim() || undefined
   const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
   const take = Math.min(Number(searchParams.get("take") ?? "100") || 100, 500)
 
+  // Stores hold `regionalOfficeId` only — region scope flows through that relation.
+  const storeOfficeFilter = buildStoreScopeWhere(session.scope, scopeParams.regionalOfficeId, scopeParams.regionId)
+
   try {
     const where: Prisma.StoreInventoryPurchaseWhereInput = {
       storeId,
       status: status ? (status as StoreInventoryPurchaseStatus) : undefined,
+      ...(storeOfficeFilter ? { store: { is: storeOfficeFilter } } : {}),
       ...(categoryScope === "WEAPON"
         ? {
             lines: {
@@ -202,6 +209,9 @@ export async function POST(request: NextRequest) {
     if (!storeId || !lines) {
       return badRequest("storeId and a non-empty lines array are required.")
     }
+
+    const storeDenied = await ensureStoreInScope(storeId, session.scope)
+    if (storeDenied) return storeDenied
 
     const lineProductIds = Array.from(new Set(lines.map((line) => line.productId)))
     const selectedProducts = await prisma.storeInventoryProduct.findMany({

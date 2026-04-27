@@ -52,9 +52,12 @@ interface Props {
     currentSupervisorName?: string | null
     isSuperAdmin?: boolean
     canUpdate?: boolean
+    /** Guard's region/office — used to scope supervisor list. Server still enforces. */
+    guardRegionId?: string | null
+    guardRegionalOfficeId?: string | null
 }
 
-export default function GuardStatusSupervisorEditor({ guardId, currentStatus, currentSupervisorName, isSuperAdmin = false, canUpdate = false }: Props) {
+export default function GuardStatusSupervisorEditor({ guardId, currentStatus, currentSupervisorName, isSuperAdmin = false, canUpdate = false, guardRegionId = null, guardRegionalOfficeId = null }: Props) {
     const [status, setStatus] = useState(currentStatus)
     const [supervisorName, setSupervisorName] = useState(currentSupervisorName ?? null)
 
@@ -93,7 +96,10 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
         if (!supFetched.current) {
             supFetched.current = true
             try {
-                const res = await fetch("/api/users?status=ACTIVE")
+                const params = new URLSearchParams({ status: "ACTIVE" })
+                if (guardRegionalOfficeId) params.set("regionalOfficeId", guardRegionalOfficeId)
+                else if (guardRegionId) params.set("regionId", guardRegionId)
+                const res = await fetch(`/api/users?${params.toString()}`)
                 if (res.ok) setUsers(await res.json())
             } catch { /* ignore */ }
         }

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
 import StatusChip from "@/components/ui/status-chip"
 import { Trash2 } from "lucide-react"
+import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type UserRow = {
   id: string
@@ -14,16 +15,22 @@ type UserRow = {
   role: { name: string } | null
 }
 
+type RegionOption = { id: string; name: string }
+
 export default function UsersTable({
   initialUsers,
   isAdmin,
   canUpdate,
   canDelete,
+  regions = [],
+  locked = false,
 }: {
   initialUsers: UserRow[]
   isAdmin: boolean
   canUpdate?: boolean
   canDelete?: boolean
+  regions?: RegionOption[]
+  locked?: boolean
 }) {
   // Default to the legacy isAdmin gate for backward compatibility when capability props aren't passed.
   const showEdit = canUpdate ?? isAdmin
@@ -52,10 +59,18 @@ export default function UsersTable({
   }
 
   return (
-    <section className="ui-card overflow-x-auto space-y-0">
+    <section className="ui-card space-y-0">
+      <div className="border-b border-[var(--border)] p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Suspense>
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} />
+          </Suspense>
+        </div>
+      </div>
       {error && (
         <div className="px-6 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">{error}</div>
       )}
+      <div className="overflow-x-auto">
       <table className="w-full min-w-[960px]">
         <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
           <tr>
@@ -121,6 +136,7 @@ export default function UsersTable({
           )}
         </tbody>
       </table>
+      </div>
     </section>
   )
 }

@@ -3,7 +3,7 @@ import { StoreInventoryDemandResponseStatus } from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { asText, emitInventoryV2Audit, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { asText, emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parseDemandResponseMeta, serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 
 type Params = { params: Promise<{ id: string; responseId: string }> }
@@ -28,6 +28,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       where: { id: responseId, demandId },
     })
     if (!response) return notFound("Demand response not found.")
+
+    // Adding transport metadata is performed by the responder warehouse — gate it
+    // on scope over the responder store.
+    const denied = await ensureStoreInScope(response.responderStoreId, session.scope, "Demand response not found.")
+    if (denied) return denied
 
     const meta = parseDemandResponseMeta(response.notes)
     if (meta.receive?.receivedAt) {

@@ -6,6 +6,7 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { isSuperAdmin } from "@/lib/payroll/state-permissions"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 const MOCK_TICKETS = [
   {
@@ -29,11 +30,18 @@ export async function GET(request: NextRequest) {
     }
     if (!hasAction(session, "TICKETING", "VIEW")) return forbidden("Access denied.")
 
+    const managerScope = deriveManagerScope(session)
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")?.trim()
     const statusId = searchParams.get("statusId") || undefined
     const priorityId = searchParams.get("priorityId") || undefined
     const categoryId = searchParams.get("categoryId") || undefined
+    const regionId = searchParams.get("regionId")
+    const regionalOfficeId = searchParams.get("regionalOfficeId")
+
+    if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
+      return forbidden("Forbidden: requested scope is outside your assigned region.")
+    }
 
     if (isRuntimeMockEnabled()) {
       const rows = MOCK_TICKETS.filter((ticket) => {
@@ -53,6 +61,18 @@ export async function GET(request: NextRequest) {
     if (statusId) where.statusId = statusId
     if (priorityId) where.priorityId = priorityId
     if (categoryId) where.categoryId = categoryId
+
+    // Tickets have no direct region; scope through the sender (User) relation.
+    const senderScope = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
+    const senderFilter = {
+      ...(regionId ? { regionId } : {}),
+      ...(regionalOfficeId ? { regionalOfficeId } : {}),
+      ...senderScope,
+    }
+    if (Object.keys(senderFilter).length > 0) {
+      where.sender = { is: senderFilter }
+    }
+
     if (search) {
       where.OR = [
         { subject: { contains: search, mode: "insensitive" } },

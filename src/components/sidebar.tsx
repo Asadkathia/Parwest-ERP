@@ -20,7 +20,7 @@ import {
     X,
     ShieldAlert,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import SidebarNav, { NavNode } from "@/components/ui/sidebar-nav"
@@ -397,13 +397,57 @@ export function Sidebar() {
         ? [] // show nothing while loading to avoid flash
         : filterNavByPermissions(allNavItems, permissions, isUnrestricted)
 
+    // Derive the scope indicator. Names come from the JWT (baked at sign-in),
+    // so this works for users without SETTINGS:VIEW. Super User → Global pill.
+    // Otherwise → "Region / Office" pill.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sUser = session?.user as any
+    const regionId: string | null = sUser?.regionId ?? null
+    const officeId: string | null = sUser?.regionalOfficeId ?? null
+    const regionName: string | null = sUser?.regionName ?? null
+    const officeName: string | null = sUser?.regionalOfficeName ?? null
+
+    let scopeIndicator: ReactNode = null
+    if (status === "authenticated") {
+        if (isUnrestricted || (!regionId && !officeId)) {
+            scopeIndicator = (
+                <span
+                    className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+                    title="Unscoped — sees all regions"
+                >
+                    Global
+                </span>
+            )
+        } else {
+            const label = [regionName ?? (regionId ? "—" : null), officeName ?? (officeId ? "—" : null)]
+                .filter(Boolean)
+                .join(" / ")
+            if (label) {
+                scopeIndicator = (
+                    <span
+                        className="inline-flex max-w-full items-center truncate rounded-full border border-[var(--brand)]/40 bg-[var(--brand)]/10 px-2 py-0.5 text-[11px] font-medium text-sky-200"
+                        title={`Scoped to ${label}`}
+                    >
+                        {label}
+                    </span>
+                )
+            }
+        }
+    }
+
     const sidebarContent = (
         <div className="flex h-full flex-col">
-            <div className="flex h-16 items-center border-b border-[var(--sidebar-border)] px-6">
+            <div className="flex flex-col justify-center gap-1 border-b border-[var(--sidebar-border)] px-6 py-3">
                 <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Parwest</p>
                     <h2 className="text-lg font-semibold text-white">ERP Console</h2>
                 </div>
+                {scopeIndicator && (
+                    <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-400">
+                        <span className="shrink-0">Scope:</span>
+                        <span className="min-w-0 flex-1 truncate">{scopeIndicator}</span>
+                    </div>
+                )}
             </div>
             <nav className="flex-1 overflow-y-auto p-4">
                 {status === "loading" ? (

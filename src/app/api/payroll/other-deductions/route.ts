@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
     const guardId = searchParams.get("guardId") || undefined
     const monthRaw = searchParams.get("month")
     const search = searchParams.get("search") || undefined
+    const regionIdParam = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
+
+    if (managerScope && managerScopeDenied(managerScope, {
+      regionId: regionIdParam,
+      regionalOfficeId: regionalOfficeIdParam,
+    })) {
+      return forbidden("Forbidden: cannot query other-deductions outside your scope.")
+    }
 
     const payrollWhere: Prisma.PayrollWhereInput = {}
     if (guardId) payrollWhere.guardId = guardId
@@ -45,14 +54,15 @@ export async function GET(request: NextRequest) {
         { guard: { parwestId: { contains: search, mode: "insensitive" } } },
       ]
     }
-    if (managerScope) {
-      const isFilter: Record<string, unknown> = {}
-      if (managerScope.regionId) isFilter.regionId = managerScope.regionId
-      if (managerScope.regionalOfficeIds.length > 0) {
-        isFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
-      }
-      if (Object.keys(isFilter).length > 0) payrollWhere.guard = { is: isFilter }
+
+    const guardFilter: Record<string, unknown> = {}
+    if (managerScope?.regionId) guardFilter.regionId = managerScope.regionId
+    if (managerScope && managerScope.regionalOfficeIds.length > 0) {
+      guardFilter.regionalOfficeId = { in: managerScope.regionalOfficeIds }
     }
+    if (regionIdParam) guardFilter.regionId = regionIdParam
+    if (regionalOfficeIdParam) guardFilter.regionalOfficeId = regionalOfficeIdParam
+    if (Object.keys(guardFilter).length > 0) payrollWhere.guard = { is: guardFilter }
 
     // Find MISC deduction type id (may not yet exist).
     const miscType = await prisma.payrollDeductionType.findUnique({
