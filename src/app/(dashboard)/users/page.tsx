@@ -27,7 +27,6 @@ export default async function UsersPage({
   const canDeleteUser = hasAction(session, "USERS", "DELETE")
 
   const { regionId: urlRegionId = "" } = await searchParams
-  const needsRegionGate = superAdmin && !urlRegionId
 
   const regions = await prisma.region
     .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
@@ -51,19 +50,15 @@ export default async function UsersPage({
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0 }
 
-  if (!needsRegionGate) try {
-    // Resolve the active regionId filter: explicit URL param (SuperAdmin picker)
-    // or the user's scoped region (regional users via scope helpers).
-    //   - GLOBAL sentinel → filter to users with no region (e.g., Super Users)
-    //   - real id          → filter to that region
+  try {
+    // Resolve the active regionId filter:
+    //   - SuperAdmin: empty/Global → no region filter (see all users).
+    //                 real id      → filter to that region.
+    //   - Regional users: scope helper locks to their assigned region.
     const scopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
     const where: Prisma.UserWhereInput = { ...scopeWhere }
-    if (superAdmin && urlRegionId) {
-      if (urlRegionId === GLOBAL_REGION_VALUE) {
-        where.regionId = null
-      } else {
-        where.regionId = urlRegionId
-      }
+    if (superAdmin && urlRegionId && urlRegionId !== GLOBAL_REGION_VALUE) {
+      where.regionId = urlRegionId
     }
 
     const [rows, total, active, inactive] = await Promise.all([
@@ -115,45 +110,23 @@ export default async function UsersPage({
       </div>
       {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
-      {needsRegionGate ? (
-        <>
-          <UsersTable
-            initialUsers={[]}
-            isAdmin={superAdmin}
-            canUpdate={canUpdateUser}
-            canDelete={canDeleteUser}
-            regions={pickerRegions}
-            locked={Boolean(scope?.regionId)}
-          />
-          <div className="ui-card p-10 text-center">
-            <UsersIcon className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-            <p className="text-base font-medium text-[var(--text)]">Select a region to view users.</p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Users are region-scoped. Choose a region above to load its users.
-            </p>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <StatCard label="Total Users" value={stats.total} icon={<UsersIcon className="h-5 w-5" />} tone="brand" />
-            <StatCard label="Active" value={stats.active} icon={<UserCheck className="h-5 w-5" />} tone="success" />
-            <StatCard label="Inactive" value={stats.inactive} icon={<UserX className="h-5 w-5" />} tone="warning" />
-          </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Total Users" value={stats.total} icon={<UsersIcon className="h-5 w-5" />} tone="brand" />
+        <StatCard label="Active" value={stats.active} icon={<UserCheck className="h-5 w-5" />} tone="success" />
+        <StatCard label="Inactive" value={stats.inactive} icon={<UserX className="h-5 w-5" />} tone="warning" />
+      </div>
 
-          <UsersTable
-            initialUsers={users.map((u) => ({
-              ...u,
-              lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
-            }))}
-            isAdmin={superAdmin}
-            canUpdate={canUpdateUser}
-            canDelete={canDeleteUser}
-            regions={pickerRegions}
-            locked={Boolean(scope?.regionId)}
-          />
-        </>
-      )}
+      <UsersTable
+        initialUsers={users.map((u) => ({
+          ...u,
+          lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+        }))}
+        isAdmin={superAdmin}
+        canUpdate={canUpdateUser}
+        canDelete={canDeleteUser}
+        regions={pickerRegions}
+        locked={Boolean(scope?.regionId)}
+      />
     </div>
   )
 }

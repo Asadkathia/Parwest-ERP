@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/shadcn/button"
 import { Badge } from "@/components/shadcn/badge"
 import { Card, CardContent } from "@/components/shadcn/card"
@@ -27,18 +28,37 @@ function formatRegionalOffice(row: UserRow): string {
 
 export default function UserSearchManager() {
   const { data: sessionData } = useSession()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const sessionUser = sessionData?.user as
     | { regionId?: string | null; roleScopeType?: "GLOBAL" | "REGIONAL" }
     | undefined
   const sessionRegionId = sessionUser?.roleScopeType === "REGIONAL" ? sessionUser?.regionId ?? null : null
 
+  // Filters are seeded from the URL so a list refresh / back-nav preserves them.
   const [rows, setRows] = useState<UserRow[]>([])
   const [roles, setRoles] = useState<RoleOption[]>([])
-  const [search, setSearch] = useState("")
-  const [roleId, setRoleId] = useState("")
-  const [status, setStatus] = useState("")
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "")
+  const [roleId, setRoleId] = useState(() => searchParams.get("roleId") ?? "")
+  const [status, setStatus] = useState(() => searchParams.get("status") ?? "")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const syncFiltersToUrl = useCallback(
+    (next: { search: string; roleId: string; status: string }) => {
+      const params = new URLSearchParams(searchParams.toString())
+      const setOrDelete = (key: string, value: string) => {
+        if (value) params.set(key, value)
+        else params.delete(key)
+      }
+      setOrDelete("search", next.search.trim())
+      setOrDelete("roleId", next.roleId)
+      setOrDelete("status", next.status)
+      const qs = params.toString()
+      router.replace(qs ? `?${qs}` : "?", { scroll: false })
+    },
+    [router, searchParams],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -64,9 +84,12 @@ export default function UserSearchManager() {
     }
   }, [roleId, search, status, sessionRegionId])
 
+  // Roles load once on mount — keeping this independent of filter changes
+  // prevents the role <select> from briefly losing its selected option while
+  // /api/roles is in flight on every keystroke.
   useEffect(() => {
     let cancelled = false
-    async function loadDependencies() {
+    async function loadRoles() {
       try {
         const response = await fetch("/api/roles", { cache: "no-store" })
         const payload = await response.json().catch(() => [])
@@ -78,11 +101,14 @@ export default function UserSearchManager() {
         // no-op: search works without role options
       }
     }
-    void loadDependencies()
-    void load()
+    void loadRoles()
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    void load()
   }, [load])
 
   const rowsForExport = useMemo(
@@ -131,14 +157,21 @@ export default function UserSearchManager() {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={load} disabled={loading}>
+          <Button
+            onClick={() => {
+              syncFiltersToUrl({ search, roleId, status })
+              void load()
+            }}
+            disabled={loading}
+          >
             {loading ? "Searching..." : "Search"}
           </Button>
-          <Button 
+          <Button
             variant="secondary" onClick={() => {
               setSearch("")
               setRoleId("")
               setStatus("")
+              syncFiltersToUrl({ search: "", roleId: "", status: "" })
               void load()
             }}>
             Clear

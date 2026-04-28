@@ -223,9 +223,16 @@ export default function VerificationTab({
                 return
             }
             const data: PrereqRow[] = await res.json()
+            // Keep deactivated doc types visible when the guard has an existing
+            // prerequisite record (with or without attachment). Active doc types
+            // are always shown so new uploads can still be made.
             setRows(
                 Array.isArray(data)
-                    ? data.filter((r) => r.docCategory === "VERIFICATION" && r.isActive)
+                    ? data.filter(
+                          (r) =>
+                              r.docCategory === "VERIFICATION" &&
+                              (r.isActive || !!r.prereqId),
+                      )
                     : []
             )
         } catch {

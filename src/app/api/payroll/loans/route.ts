@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     const guard = await prisma.guard.findUnique({
       where: { id: String(body.guardId) },
-      select: { id: true, regionId: true, regionalOfficeId: true },
+      select: { id: true, regionId: true, regionalOfficeId: true, lifecycleStatus: true },
     })
 
     if (!guard) {
@@ -113,6 +113,11 @@ export async function POST(request: NextRequest) {
     }
     if (managerScope && managerScopeDenied(managerScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
       return forbidden("Forbidden: guard is outside your scope.")
+    }
+    if (guard.lifecycleStatus === "TERMINATED" || guard.lifecycleStatus === "INACTIVE") {
+      return badRequest(
+        `Cannot create a loan for a ${String(guard.lifecycleStatus).toLowerCase()} guard.`,
+      )
     }
 
     const month = parseMonthStart(String(body.month))

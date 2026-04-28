@@ -128,6 +128,29 @@ export async function POST(request: NextRequest) {
                 return badRequest("Guard age must be between 18 and 65.")
             }
         }
+        const cnicIssueStr = body?.cnicIssueDate ? String(body.cnicIssueDate).trim() : ""
+        const cnicExpiryStr = body?.cnicExpiryDate ? String(body.cnicExpiryDate).trim() : ""
+        if (cnicIssueStr) {
+            const issue = new Date(cnicIssueStr)
+            if (Number.isNaN(issue.getTime())) {
+                return badRequest("CNIC issue date is invalid.")
+            }
+            if (issue.getTime() > Date.now()) {
+                return badRequest("CNIC issue date cannot be in the future.")
+            }
+        }
+        if (cnicExpiryStr) {
+            const expiry = new Date(cnicExpiryStr)
+            if (Number.isNaN(expiry.getTime())) {
+                return badRequest("CNIC expiry date is invalid.")
+            }
+            if (cnicIssueStr) {
+                const issue = new Date(cnicIssueStr)
+                if (!Number.isNaN(issue.getTime()) && expiry.getTime() <= issue.getTime()) {
+                    return badRequest("CNIC expiry date must be after the issue date.")
+                }
+            }
+        }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
         let officeSeriesCode: string | null = null

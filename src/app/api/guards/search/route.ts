@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         const clientId      = searchParams.get("clientId")
         const createdFrom   = searchParams.get("createdFrom")
         const createdTo     = searchParams.get("createdTo")
+        const policeVerified = searchParams.get("policeVerified") === "true"
 
         if (managerScopeDenied(managerScope, { regionId, regionalOfficeId: regionalOfficeId ?? officeId })) {
             return forbidden("Forbidden: requested scope is outside your assigned region.")
@@ -51,6 +52,16 @@ export async function GET(request: NextRequest) {
                 ? {
                       deployments: {
                           some: { clientId, status: "ACTIVE" },
+                      },
+                  }
+                : {}),
+            ...(policeVerified
+                ? {
+                      prerequisites: {
+                          some: {
+                              docTypeName: { contains: "police", mode: "insensitive" },
+                              status: "VERIFIED",
+                          },
                       },
                   }
                 : {}),

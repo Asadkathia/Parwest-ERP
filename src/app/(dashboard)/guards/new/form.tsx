@@ -146,6 +146,8 @@ export default function GuardEnrollmentForm({
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [successInfo, setSuccessInfo] = useState<{ id: string | null; parwestId: string } | null>(null)
+  const [errorInfo, setErrorInfo] = useState<{ title: string; message: string; cleared: boolean } | null>(null)
 
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], [])
 
@@ -347,7 +349,22 @@ export default function GuardEnrollmentForm({
           (data && typeof data === "object" && "message" in data && typeof data.message === "string"
             ? data.message
             : null) || "Failed to create guard."
-        toast.error(msg)
+        const lower = msg.toLowerCase()
+        const isBlacklisted = lower.includes("blacklist")
+        const isDuplicateCnic = lower.includes("cnic already exists") || lower.includes("already exists")
+        const isCnicProblem = isBlacklisted || isDuplicateCnic
+        let title = "Enrollment failed"
+        if (isBlacklisted) title = "CNIC is blacklisted"
+        else if (isDuplicateCnic) title = "CNIC already enrolled"
+        if (isCnicProblem) {
+          // Clear the offending CNIC and bounce the user back to step 1 so they
+          // can correct it without hunting for the field.
+          form.setValue("cnic", "", { shouldDirty: true, shouldValidate: false })
+          form.setFocus("cnic")
+          setStep(0)
+        }
+        toast.error(title, { description: msg })
+        setErrorInfo({ title, message: msg, cleared: isCnicProblem })
         setSubmitting(false)
         return
       }
@@ -359,18 +376,17 @@ export default function GuardEnrollmentForm({
         (data && typeof data === "object" && "parwestId" in data && typeof data.parwestId === "string"
           ? data.parwestId
           : null) ?? "—"
-      toast.success(`Guard created — Parwest ID: ${parwestId}`)
+      toast.success("Guard enrolled successfully", {
+        description: `Parwest ID: ${parwestId}`,
+      })
       // Reset dirty so the cancel-with-dirty guard doesn't fire on redirect.
       form.reset(values, { keepValues: true })
-      if (newId) {
-        router.push(`/guards/${newId}`)
-      } else {
-        router.push("/guards")
-      }
-      router.refresh()
+      setSuccessInfo({ id: newId, parwestId })
+      setSubmitting(false)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unexpected error."
-      toast.error(msg)
+      toast.error("Enrollment failed", { description: msg })
+      setErrorInfo({ title: "Enrollment failed", message: msg, cleared: false })
       setSubmitting(false)
     }
   }
@@ -506,6 +522,63 @@ export default function GuardEnrollmentForm({
             <AlertDialogAction onClick={() => router.push("/guards")}>
               Discard
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Enrollment success popup */}
+      <AlertDialog open={!!successInfo} onOpenChange={(open) => { if (!open) setSuccessInfo(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-emerald-600" />
+              Guard enrolled successfully
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The new guard has been added to the system.
+              <span className="mt-3 block rounded-md border bg-muted px-3 py-2 font-mono text-sm text-foreground">
+                Parwest ID: <strong>{successInfo?.parwestId}</strong>
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setSuccessInfo(null); router.push("/guards"); router.refresh() }}>
+              Back to guards list
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = successInfo?.id ?? null
+                setSuccessInfo(null)
+                if (id) {
+                  router.push(`/guards/${id}`)
+                } else {
+                  router.push("/guards")
+                }
+                router.refresh()
+              }}
+            >
+              View profile
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Enrollment error popup — surfaces blacklist / duplicate CNIC clearly */}
+      <AlertDialog open={!!errorInfo} onOpenChange={(open) => { if (!open) setErrorInfo(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">{errorInfo?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorInfo?.message}
+              {errorInfo?.cleared ? (
+                <span className="mt-3 block text-sm text-muted-foreground">
+                  The CNIC field has been cleared. Please verify and re-enter the correct CNIC.
+                </span>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorInfo(null)}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

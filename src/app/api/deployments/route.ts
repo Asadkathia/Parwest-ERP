@@ -326,10 +326,21 @@ export async function POST(request: NextRequest) {
                     .filter((entry) => entry.length > 0)
                 : []
 
+            // Region-scope guard: only count assignments where the source store
+            // is in the same regional office as the guard. Prevents legacy/injected
+            // cross-region rows from satisfying the deployment inventory rule.
+            const guardForInventoryScope = await prisma.guard.findUnique({
+                where: { id: guardId },
+                select: { regionalOfficeId: true },
+            })
+
             const assignedInventoryCount = await prisma.storeInventoryAssignment.count({
                 where: {
                     assignedToGuardId: guardId,
                     status: StoreInventoryAssignmentStatus.ASSIGNED,
+                    ...(guardForInventoryScope?.regionalOfficeId
+                        ? { store: { regionalOfficeId: guardForInventoryScope.regionalOfficeId } }
+                        : {}),
                     ...(allowedCategoryIds.length > 0
                         ? {
                             product: {

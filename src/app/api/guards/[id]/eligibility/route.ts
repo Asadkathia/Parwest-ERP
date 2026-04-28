@@ -31,7 +31,7 @@ export async function GET(
 
     const ruleDelegate = prisma.guardDeploymentInventoryRule
 
-    const [guard, docTypes, prereqs, pledgedDocs, deploymentInventoryRule] = await Promise.all([
+    const [guard, docTypes, prereqs, pledgedDocs, deploymentInventoryRule, activeDeployments] = await Promise.all([
       prisma.guard.findUnique({
         where: { id: guardId },
         select: { id: true, lifecycleStatus: true },
@@ -54,6 +54,16 @@ export async function GET(
             select: { isActive: true, minimumAssignedItems: true, allowedCategoryIds: true },
           })
         : Promise.resolve(null),
+      prisma.deployment.findMany({
+        where: { guardId, status: "ACTIVE" },
+        select: {
+          id: true,
+          shiftType: true,
+          deploymentDate: true,
+          client: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
+        },
+      }),
     ])
 
     if (!guard) return notFound("Guard not found")
@@ -138,16 +148,46 @@ export async function GET(
           : "No pledged documents submitted",
     }
 
+    // ── Check 5: Existing Deployment ──────────────────────────────────────
+    // Surfaces existing active deployments so the deploy form can prompt the
+    // user to revoke before redeploying (or accept double-duty when allowed).
+    const hasBoth = activeDeployments.some((d) => d.shiftType === "BOTH")
+    const deploymentCheck: EligibilityCheck = {
+      pass: activeDeployments.length === 0 || (!hasBoth && activeDeployments.length < 2),
+      label: "Deployment Slot",
+      message:
+        activeDeployments.length === 0
+          ? "No active deployment"
+          : hasBoth
+          ? `Already deployed on BOTH shifts at ${activeDeployments[0]?.client?.name ?? "—"} — revoke first`
+          : `Already deployed at ${activeDeployments
+              .map((d) => `${d.client?.name ?? "—"}${d.branch?.name ? " / " + d.branch.name : ""} (${d.shiftType})`)
+              .join("; ")} — revoke or use double-duty`,
+    }
+
     const checks = {
       status: statusCheck,
       verified: verificationCheck,
       inventory: inventoryCheck,
       pledgedDocs: pledgedCheck,
+      deployment: deploymentCheck,
     }
 
     const eligible = Object.values(checks).every((c) => c.pass)
 
-    return NextResponse.json({ eligible, checks })
+    return NextResponse.json({
+      eligible,
+      checks,
+      activeDeployments: activeDeployments.map((d) => ({
+        id: d.id,
+        shiftType: d.shiftType,
+        deploymentDate: d.deploymentDate?.toISOString() ?? null,
+        clientId: d.client?.id ?? null,
+        clientName: d.client?.name ?? null,
+        branchId: d.branch?.id ?? null,
+        branchName: d.branch?.name ?? null,
+      })),
+    })
   } catch (error) {
     console.error("Guard eligibility check failed:", error)
     return internalServerError("Failed to check guard eligibility")

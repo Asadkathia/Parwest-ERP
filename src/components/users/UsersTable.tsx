@@ -63,7 +63,7 @@ export default function UsersTable({
       <div className="border-b border-[var(--border)] p-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Suspense>
-            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} />
+            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} defaultToGlobal={!locked} />
           </Suspense>
         </div>
       </div>

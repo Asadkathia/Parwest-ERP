@@ -229,7 +229,6 @@ export default function SearchGuardsManager({
                 if (!blob.includes(lc(filters.tableSearch))) return false
             }
 
-            if (!filters.terminatedRecords && lc(guard.status) === "terminated") return false
             if (filters.terminatedRecords && lc(guard.status) !== "terminated") return false
 
             return true
