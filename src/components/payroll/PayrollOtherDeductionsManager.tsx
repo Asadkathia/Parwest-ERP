@@ -1,12 +1,65 @@
+/**
+ * Parwest ERP — Payroll: Other Deductions (canonical-template reskin)
+ * ────────────────────────────────────────────────────────────────────
+ * Mirrors the canonical loans manager template:
+ *   - List → `<DataTable>` with `<ParwestCurrency>` for amounts
+ *   - Create form → shadcn `<Form>` (RHF + zodResolver) inside `<Dialog>`
+ *   - Toasts via sonner; reads `data.message` per the API envelope
+ *   - Permission gating via `<PermissionGate>` around create button
+ *   - Empty state rendered via shadcn `<Card>`
+ *
+ * Reskin only — data flow and API endpoints are unchanged.
+ *
+ * Region picker: this manager round-trips `?regionId` to
+ * /api/payroll/other-deductions server-side. The global topbar picker
+ * is the canonical source of `?regionId`, so the inline
+ * `RegionUrlPicker` was removed.
+ *
+ * Shared widgets retained as-is (out of scope): `GuardAutocomplete`,
+ * `GuardContextFields`.
+ */
+
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { type ColumnDef } from "@tanstack/react-table"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
+
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { DataTable } from "@/components/shadcn/data-table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+
+import {
+  payrollOtherDeductionCreateSchema,
+  type PayrollOtherDeductionCreateInput,
+} from "@/lib/schemas/payroll-other-deduction"
 
 type Row = {
   id: string
@@ -27,8 +80,6 @@ type PayrollOtherDeductionsManagerProps = {
 export default function PayrollOtherDeductionsManager({
   canCreate = false,
   effectiveRegionId = null,
-  regions = [],
-  locked = false,
 }: PayrollOtherDeductionsManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -38,65 +89,144 @@ export default function PayrollOtherDeductionsManager({
   const [formOpen, setFormOpen] = useState(false)
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
-  const [dated, setDated] = useState("")
-  const [amount, setAmount] = useState("")
   const [saving, setSaving] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
+
+  const form = useForm<PayrollOtherDeductionCreateInput>({
+    resolver: zodResolver(payrollOtherDeductionCreateSchema),
+    defaultValues: {
+      guardId: "",
+      month,
+      amount: undefined as unknown as number,
+      dated: "",
+      notes: "",
+    },
+    mode: "onChange",
+  })
+
+  // Keep RHF month in sync with the local filter month while the form is
+  // open (matches legacy: month is shared between filter and form).
+  useEffect(() => {
+    form.setValue("month", month)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month])
 
   const loadRows = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
-    params.set("month", `${month}-01`)
-    if (search) params.set("search", search)
-    if (effectiveRegionId) params.set("regionId", effectiveRegionId)
-    const res = await fetch(`/api/payroll/other-deductions?${params}`)
-    if (res.ok) setRows(await res.json())
-    setLoading(false)
+    try {
+      const params = new URLSearchParams()
+      params.set("month", `${month}-01`)
+      if (search) params.set("search", search)
+      if (effectiveRegionId) params.set("regionId", effectiveRegionId)
+      const res = await fetch(`/api/payroll/other-deductions?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setRows(Array.isArray(data) ? data : [])
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [month, search, effectiveRegionId])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
     loadRows()
   }, [loadRows])
 
   const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
     setParwestIdInput(opt.parwestId)
-    const res = await fetch(`/api/guards/${opt.id}/current-context?month=${month}`)
-    if (res.ok) setContext(await res.json())
+    const res = await fetch(
+      `/api/guards/${opt.id}/current-context?month=${month}`
+    )
+    if (res.ok) {
+      const ctx = (await res.json()) as GuardCurrentContext
+      setContext(ctx)
+      form.setValue("guardId", ctx.guardId)
+    }
   }
 
   const resetForm = () => {
     setParwestIdInput("")
     setContext(null)
-    setDated("")
-    setAmount("")
-    setResult(null)
+    form.reset({
+      guardId: "",
+      month,
+      amount: undefined as unknown as number,
+      dated: "",
+      notes: "",
+    })
   }
 
-  const submit = async () => {
-    if (!context || !amount) return
+  const onSubmit = async (values: PayrollOtherDeductionCreateInput) => {
+    if (!context) {
+      toast.error("Select a guard first.")
+      return
+    }
     setSaving(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/other-deductions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        guardId: context.guardId,
-        month: `${month}-01`,
-        amount: Number(amount),
-      }),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (res.ok) {
-      setResult(`Saved.`)
-      resetForm()
-      setFormOpen(false)
-      loadRows()
-    } else {
-      setResult(`Error: ${data.error ?? "Failed."}`)
+    try {
+      const res = await fetch("/api/payroll/other-deductions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guardId: context.guardId,
+          month: `${values.month}-01`,
+          amount: Number(values.amount),
+          notes: values.notes || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success(`Deduction saved for ${context.name}.`)
+        setFormOpen(false)
+        resetForm()
+        loadRows()
+      } else {
+        toast.error(data?.message ?? "Failed to save deduction.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setSaving(false)
     }
   }
+
+  const columns = useMemo<ColumnDef<Row>[]>(
+    () => [
+      {
+        id: "parwestId",
+        accessorFn: (r) => r.guard.parwestId,
+        header: "Secure Ops ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.guard.parwestId}
+          </span>
+        ),
+      },
+      {
+        id: "guardName",
+        accessorFn: (r) => r.guard.name,
+        header: "Name",
+        cell: ({ row }) => row.original.guard.name,
+      },
+      {
+        id: "month",
+        accessorFn: (r) => r.month.slice(0, 7),
+        header: "Month",
+        cell: ({ row }) => row.original.month.slice(0, 7),
+      },
+      {
+        id: "amount",
+        accessorFn: (r) => r.otherDeductions,
+        header: () => <span className="block text-end">Amount</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency
+              value={Number(row.original.otherDeductions ?? 0)}
+            />
+          </div>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <PayrollPageShell
@@ -104,160 +234,177 @@ export default function PayrollOtherDeductionsManager({
       subtitle="Record ad-hoc deductions per guard per month."
       actions={
         canCreate ? (
-          <ActionButton onClick={() => setFormOpen(true)}>+ Add Deduction</ActionButton>
+          <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+            <Button onClick={() => setFormOpen(true)}>+ Add Deduction</Button>
+          </PermissionGate>
         ) : undefined
       }
     >
-      <section className="ui-card p-4 space-y-4">
-        <div className="flex gap-3 flex-wrap items-end">
-          <div className="min-w-[180px]">
-            <RegionUrlPicker
-              regions={regions}
-              locked={locked}
-              includeGlobalOption={!locked}
-            />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Month
-            </label>
-            <input
-              type="month"
-              className="ui-input"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Search
-            </label>
-            <input
-              className="ui-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Parwest ID or name"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left">Secure Ops ID</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Month</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!loading && rows.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    No records.
-                  </td>
-                </tr>
-              )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
-                  <td className="px-3 py-2">{r.guard.name}</td>
-                  <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
-                  <td className="px-3 py-2 text-right">{r.otherDeductions?.toFixed(0) ?? 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="ui-card w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Add Other Deductions</h2>
-              <button
-                type="button"
-                className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]"
-                onClick={() => {
-                  setFormOpen(false)
-                  resetForm()
-                }}
-              >
-                ×
-              </button>
-            </div>
-
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-3 items-end">
             <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Secure Ops ID *
-              </label>
-              <GuardAutocomplete
-                value={parwestIdInput}
-                onChange={setParwestIdInput}
-                onSelect={handleGuardSelect}
-                regionId={effectiveRegionId}
+              <Label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Month
+              </Label>
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
               />
             </div>
-
-            <GuardContextFields
-              context={context}
-              showRows={["name", "status", "type", "location"]}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Dated
-                </label>
-                <input
-                  type="date"
-                  className="ui-input"
-                  value={dated}
-                  onChange={(e) => setDated(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Amount *
-                </label>
-                <input
-                  type="number"
-                  className="ui-input"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
+            <div>
+              <Label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Search
+              </Label>
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Parwest ID or name"
+              />
             </div>
+          </div>
 
-            <div className="flex justify-between items-center pt-2">
-              {result && <span className="text-sm">{result}</span>}
-              <div className="ml-auto flex gap-2">
-                <ActionButton
-                  variant="secondary"
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Loading…
+              </CardContent>
+            </Card>
+          ) : rows.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="text-base font-semibold">No records</div>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  No other-deduction records for this month/region.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={rows}
+              searchKey="guardName"
+              searchPlaceholder="Filter visible rows by name…"
+              pageSize={25}
+              emptyMessage="No deductions match the on-page filter."
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) resetForm()
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Other Deductions</DialogTitle>
+            <DialogDescription>
+              Record an ad-hoc deduction for a guard for the selected month.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+            >
+              {/*
+               * Shared widget — kept as-is (out of scope). Drives the
+               * `guardId` RHF field via `handleGuardSelect`.
+               */}
+              <div>
+                <Label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  Secure Ops ID *
+                </Label>
+                <GuardAutocomplete
+                  value={parwestIdInput}
+                  onChange={setParwestIdInput}
+                  onSelect={handleGuardSelect}
+                  regionId={effectiveRegionId}
+                />
+                {form.formState.errors.guardId && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.guardId.message as string}
+                  </p>
+                )}
+              </div>
+
+              <GuardContextFields
+                context={context}
+                showRows={["name", "status", "type", "location"]}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dated"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dated</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            field.value === undefined || field.value === null
+                              ? ""
+                              : String(field.value)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === "" ? undefined : Number(v))
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
                     setFormOpen(false)
                     resetForm()
                   }}
+                  disabled={saving}
                 >
                   Cancel
-                </ActionButton>
-                <ActionButton onClick={submit} disabled={!context || !amount || saving}>
-                  {saving ? "Saving…" : "Save"}
-                </ActionButton>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                </Button>
+                <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                  <Button type="submit" disabled={!context || saving}>
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </PermissionGate>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </PayrollPageShell>
   )
 }

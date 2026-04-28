@@ -1,21 +1,74 @@
+/**
+ * Parwest ERP — Client Edit Form (Phase 4B follow-up reskin)
+ * ─────────────────────────────────────────────────────────────────────────
+ * RHF + zod + shadcn primitives. Reskin only — same fields, same validation
+ * rules, same `PUT /api/clients/[id]` payload as the legacy form.
+ *
+ * Auxiliary widgets that are NOT migrated (legacy preserved):
+ *   - <PhoneInput>     — uncontrolled +92-XXX-XXXXXXX formatter
+ *   - <CnicInput>      — uncontrolled XXXXX-XXXXXXX-X formatter
+ *   - <SearchSelect>   — searchable native select
+ *   - <OcrUploadPanel> — OCR-driven autofill
+ * They expose only `name` (no controlled value/onChange), so they're wrapped
+ * in <FormControl> via a hidden RHF input bridge — same pattern Phase 3b's
+ * guard form established for legacy widget integration.
+ */
+
 "use client"
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useForm, useWatch } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
 import { ArrowLeft, Save, Plus, X } from "lucide-react"
-import Link from "next/link"
+
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
-import { isValidCnic, isValidPhone } from "@/lib/validation/formats"
+import { isValidPhone } from "@/lib/validation/formats"
+import { clientEditSchema, type ClientEditForm } from "@/lib/schemas/client"
 
+import { Button } from "@/components/shadcn/button"
+import { Input } from "@/components/shadcn/input"
+import { Textarea } from "@/components/shadcn/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/shadcn/select"
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/shadcn/form"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+
+// ── Constants ───────────────────────────────────────────────────────────────
 const CITY_OPTIONS = [
-    "All Cities","Lahore","Gujranwala","Sahiwal","Islamabad","Karachi","Multan","Faisalabad",
-    "Khanpur","Chichawatni","Bahawalpur","Mian Channu","Khanewal","Ahmedpur East",
-    "Ahmed Nager Chatha","Ali Pur","Arifwala","Attock","Basti Malook","Bhagalchur",
-    "Bhalwal","Bahawalnagar","Bhaipheru","Bhakkar","Burewala","Chailianwala","Chakwal",
-    "Chiniot","Chowk Azam","Chowk Sarwar Shaheed","Daska",
+    "All Cities", "Lahore", "Gujranwala", "Sahiwal", "Islamabad", "Karachi", "Multan", "Faisalabad",
+    "Khanpur", "Chichawatni", "Bahawalpur", "Mian Channu", "Khanewal", "Ahmedpur East",
+    "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Basti Malook", "Bhagalchur",
+    "Bhalwal", "Bahawalnagar", "Bhaipheru", "Bhakkar", "Burewala", "Chailianwala", "Chakwal",
+    "Chiniot", "Chowk Azam", "Chowk Sarwar Shaheed", "Daska",
 ].map((c) => ({ value: c, label: c }))
 
 const PROVINCE_OPTIONS = [
@@ -26,6 +79,7 @@ const PROVINCE_OPTIONS = [
     { value: "All Pakistan", label: "All Pakistan" },
 ]
 
+// ── Types ────────────────────────────────────────────────────────────────────
 type Client = {
     id: string
     name: string
@@ -42,22 +96,17 @@ type Client = {
     strn: string | null
     contractUrl: string | null
     logoUrl: string | null
-    // Contact
     contactPerson: string | null
     contactPersonDesignation: string | null
     phone: string | null
     contactNumbers: unknown
     postalCode: string | null
-    // Introducer
     introducerName: string | null
     introducerContactNumber: string | null
     introducerAddress: string | null
     introducerCnic: string | null
-    // Operational
     operationalProvinces: string | null
-    // Assigned
     assignedManagerId: string | null
-    // Contract
     contractStart: Date | string | null
     contractEnd: Date | string | null
     contractRateStart: Date | string | null
@@ -83,6 +132,7 @@ type Props = {
     viewerRegionalOfficeId?: string | null
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
 function fmtDate(d: Date | string | null | undefined): string {
     if (!d) return ""
     const date = typeof d === "string" ? new Date(d) : d
@@ -90,579 +140,1212 @@ function fmtDate(d: Date | string | null | undefined): string {
 }
 
 function initContactNumbers(raw: unknown): string[] {
-    if (Array.isArray(raw) && raw.length > 0) return raw as string[]
+    if (Array.isArray(raw) && (raw as string[]).length > 0) return raw as string[]
     return [""]
 }
 
-export default function ClientEditForm({ client, regions, currentSupervisorId, isSuperAdmin = false, viewerRegionId = null, viewerRegionalOfficeId = null }: Props) {
+// ── Form ────────────────────────────────────────────────────────────────────
+export default function ClientEditForm({
+    client,
+    regions,
+    currentSupervisorId,
+    isSuperAdmin = false,
+    viewerRegionId = null,
+    viewerRegionalOfficeId = null,
+}: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
     const isRegionalViewer = !isSuperAdmin && Boolean(viewerRegionId)
     const lockedRegionalOffice = isRegionalViewer ? viewerRegionalOfficeId : null
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState("")
+    const [submitting, setSubmitting] = useState(false)
+    const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
 
-    // Region / Regional Office (dynamic cascade)
-    const [selectedRegionId, setSelectedRegionId] = useState(
-        isRegionalViewer ? (viewerRegionId ?? "") : (client.regionId ?? "")
-    )
-    const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(
-        lockedRegionalOffice ?? (client.regionalOfficeId ?? "")
-    )
+    // Auxiliary cascading data
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
-
-    // Manager / Supervisor (filtered by region)
     const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
     const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
-
-    // Client types
     const [clientTypes, setClientTypes] = useState<{ value: string; label: string }[]>([])
-
-    // Designation / ex-service options (dynamic — no hardcoded LEGACY fallbacks)
     const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
     const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
 
-    useEffect(() => {
-        fetch("/api/guard-designation-types")
-            .then((r) => r.ok ? r.json() : [])
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setDesignationOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
-                }
-            })
-            .catch(() => {})
-        fetch("/api/guard-ex-service-types")
-            .then((r) => r.ok ? r.json() : [])
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setExServiceOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
-                }
-            })
-            .catch(() => {})
-    }, [])
+    // Reserve % is stored as decimal (0..1) in DB; edited as % (0..100) in UI
+    const initialReservePct =
+        client.reservePct != null ? String(Math.round(client.reservePct * 10000) / 100) : ""
 
-    // Contact numbers
+    // Multi-contact numbers (legacy contactNumbers JSON column)
     const [contactNumbers, setContactNumbers] = useState<string[]>(initContactNumbers(client.contactNumbers))
 
-    // Branchless toggle
-    const [isBranchless, setIsBranchless] = useState(client.isBranchless)
+    // Mode toggle (Branch / Branchless) — kept as form field but rendered as button group
+    const form = useForm<ClientEditForm>({
+        resolver: zodResolver(clientEditSchema),
+        mode: "onBlur",
+        defaultValues: {
+            name: client.name ?? "",
+            type: client.type ?? "",
+            email: client.email ?? "",
+            enrollmentDate: fmtDate(client.enrollmentDate),
+            isBranchless: client.isBranchless,
+            status:
+                client.status === "BLACKLISTED" ? "BLACKLISTED" :
+                client.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
 
-    // Reserve % override — stored as decimal (0..1) in DB, edited as % (0..100) in UI
-    const [reservePctInput, setReservePctInput] = useState<string>(
-        client.reservePct != null ? String(Math.round(client.reservePct * 10000) / 100) : ""
-    )
+            contactPerson: client.contactPerson ?? "",
+            contactPersonDesignation: client.contactPersonDesignation ?? "",
+            contactNumbers: initContactNumbers(client.contactNumbers),
+            clientLocation: client.city ?? "",
+            clientPostalCode: client.postalCode ?? "",
+            headOfficeAddress: client.headOfficeAddress ?? "",
 
+            introducerName: client.introducerName ?? "",
+            introducerContactNumber: client.introducerContactNumber ?? "",
+            introducerAddress: client.introducerAddress ?? "",
+            introducerCnicNumber: client.introducerCnic ?? "",
+
+            operationalProvinces: client.operationalProvinces ?? "",
+
+            regionId: isRegionalViewer ? (viewerRegionId ?? "") : (client.regionId ?? ""),
+            regionalOfficeId: lockedRegionalOffice ?? (client.regionalOfficeId ?? ""),
+            assignedManagerId: client.assignedManagerId ?? "",
+            assignedSupervisorId: currentSupervisorId ?? "",
+
+            ntn: client.ntn ?? "",
+            strn: client.strn ?? "",
+            logoUrl: client.logoUrl ?? "",
+            reservePctInput: initialReservePct,
+
+            contractStart: fmtDate(client.contractStart),
+            contractEnd: fmtDate(client.contractEnd),
+            contractRateStart: fmtDate(client.contractRateStart),
+            contractRateEnd: fmtDate(client.contractRateEnd),
+            contractDayGuardDesignation: client.contractDayGuardDesignation ?? "",
+            contractDayGuardExService: client.contractDayGuardExService ?? "",
+            contractNightGuardDesignation: client.contractNightGuardDesignation ?? "",
+            contractNightGuardExService: client.contractNightGuardExService ?? "",
+            contractAdditionalDayGuards:
+                client.contractAdditionalDayGuards != null ? String(client.contractAdditionalDayGuards) : "",
+            contractAdditionalNightGuards:
+                client.contractAdditionalNightGuards != null ? String(client.contractAdditionalNightGuards) : "",
+            contractPrice: client.contractPrice != null ? String(client.contractPrice) : "",
+        },
+    })
+
+    const watchedRegionId = useWatch({ control: form.control, name: "regionId" })
+    const isBranchless = useWatch({ control: form.control, name: "isBranchless" }) ?? true
+
+    // Cascade: regional offices
     useEffect(() => {
-        fetch("/api/client-types")
-            .then((r) => r.ok ? r.json() : [])
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setClientTypes((data as { name: string; label: string }[]).map((t) => ({ value: t.name, label: t.label })))
-                }
-            })
-            .catch(() => {})
-    }, [])
-
-    // Load regional offices when region changes
-    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent async-loaded list when region changes
         setRegionalOffices([])
-        if (!selectedRegionId) return
-        fetch(`/api/regional-offices?regionId=${selectedRegionId}`)
-            .then((r) => r.ok ? r.json() : [])
+        if (!watchedRegionId) return
+        fetch(`/api/regional-offices?regionId=${watchedRegionId}`)
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
-                    setRegionalOffices((data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })))
+                    setRegionalOffices(
+                        (data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })),
+                    )
                 }
             })
             .catch(() => {})
-    }, [selectedRegionId])
+    }, [watchedRegionId])
 
-    // Load managers/supervisors when region changes
+    // Cascade: managers + supervisors
     useEffect(() => {
-        const url = selectedRegionId
-            ? `/api/users?limit=500&regionId=${selectedRegionId}`
+        const url = watchedRegionId
+            ? `/api/users?limit=500&regionId=${watchedRegionId}`
             : "/api/users?limit=500"
         fetch(url)
-            .then((r) => r.ok ? r.json() : [])
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
                     const users = data as { id: string; name?: string | null; role?: { name?: string | null } }[]
                     const toOption = (u: typeof users[0]) => ({ id: u.id, name: u.name as string })
-                    setManagerUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption))
-                    setSupervisorUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption))
+                    setManagerUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption),
+                    )
+                    setSupervisorUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption),
+                    )
                 }
             })
             .catch(() => {})
-    }, [selectedRegionId])
+    }, [watchedRegionId])
 
+    // Lookup catalogs
+    useEffect(() => {
+        fetch("/api/client-types")
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setClientTypes(
+                        (data as { name: string; label: string }[]).map((t) => ({ value: t.name, label: t.label })),
+                    )
+                }
+            })
+            .catch(() => {})
+        fetch("/api/guard-designation-types")
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setDesignationOptions(
+                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
+                    )
+                }
+            })
+            .catch(() => {})
+        fetch("/api/guard-ex-service-types")
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data: unknown) => {
+                if (Array.isArray(data)) {
+                    setExServiceOptions(
+                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
+                    )
+                }
+            })
+            .catch(() => {})
+    }, [])
+
+    // OCR autofill — bridges legacy form-field-name based panel into RHF setValue.
     const applyOcrFields = (fields: Record<string, string>) => {
-        const form = formRef.current
-        if (!form) return
+        const formEl = formRef.current
+        if (!formEl) return
         Object.entries(fields).forEach(([name, value]) => {
-            const input = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
-            if (input) input.value = value
+            // Push into RHF if we own the field; otherwise fall back to DOM input.
+            if (name in form.getValues()) {
+                form.setValue(name as keyof ClientEditForm, value as never, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                })
+            } else {
+                const el = formEl.elements.namedItem(name) as
+                    | HTMLInputElement
+                    | HTMLTextAreaElement
+                    | HTMLSelectElement
+                    | null
+                if (el) el.value = value
+            }
         })
     }
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setLoading(true)
-        setError("")
-
-        const formData = new FormData(e.currentTarget)
+    // Submit
+    const onSubmit = async (values: ClientEditForm) => {
+        // Multi-contact phone format check (mirrors legacy)
         const filled = contactNumbers.filter((n) => n.trim())
-
-        // CNIC validation
-        const introCnic = String(formData.get("introducerCnicNumber") ?? "").trim()
-        if (introCnic && !isValidCnic(introCnic)) {
-            setError("Introducer CNIC format is invalid. Expected XXXXX-XXXXXXX-X.")
-            setLoading(false)
-            return
-        }
-
-        // Phone validation
-        const introPhone = String(formData.get("introducerContactNumber") ?? "").trim()
-        if (introPhone && !isValidPhone(introPhone)) {
-            setError("Introducer contact number must be in format +92-XXX-XXXXXXX.")
-            setLoading(false)
-            return
-        }
         for (const num of filled) {
             if (!isValidPhone(num)) {
-                setError(`Contact number "${num}" must be in format +92-XXX-XXXXXXX.`)
-                setLoading(false)
+                toast.error(`Contact number "${num}" must be in format +92-XXX-XXXXXXX.`)
                 return
             }
         }
 
-        // Contract dates consistency
-        const cStart = String(formData.get("contractStart") ?? "").trim()
-        const cEnd = String(formData.get("contractEnd") ?? "").trim()
-        if (cStart && cEnd && new Date(cEnd).getTime() <= new Date(cStart).getTime()) {
-            setError("Contract end date must be after the contract start date.")
-            setLoading(false)
-            return
-        }
-
-        // Validate + convert reserve % (UI 0-100) -> decimal (0-1) for API
+        // Reserve % decimal conversion
         let reservePctDecimal: number | null = null
-        const rpTrim = reservePctInput.trim()
+        const rpTrim = (values.reservePctInput ?? "").trim()
         if (rpTrim !== "") {
             const pct = parseFloat(rpTrim)
-            if (Number.isNaN(pct) || pct < 0 || pct > 100) {
-                setError("Reserve Salary % must be between 0 and 100.")
-                setLoading(false)
-                return
+            // (zod refine already validated range, but stay defensive)
+            if (!Number.isNaN(pct) && pct >= 0 && pct <= 100) {
+                reservePctDecimal = Math.round((pct / 100) * 10000) / 10000
             }
-            reservePctDecimal = Math.round((pct / 100) * 10000) / 10000
         }
 
-        const data = {
-            ...Object.fromEntries(formData.entries()),
-            isBranchless,
-            contactNumber: filled[0] ?? "",
-            contactNumbers: filled,
-            regionId: selectedRegionId || null,
-            regionalOfficeId: selectedRegionalOfficeId || null,
-            reservePct: reservePctDecimal,
-        }
-
+        setSubmitting(true)
         try {
+            const payload = {
+                ...values,
+                isBranchless: values.isBranchless,
+                contactNumber: filled[0] ?? "",
+                contactNumbers: filled,
+                regionId: values.regionId || null,
+                regionalOfficeId: values.regionalOfficeId || null,
+                reservePct: reservePctDecimal,
+            }
+
             const response = await fetch(`/api/clients/${client.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+                body: JSON.stringify(payload),
             })
+            const data = await response.json().catch(() => ({}))
 
             if (!response.ok) {
-                const err = await response.json()
-                throw new Error(err.message || "Failed to update client")
+                const msg =
+                    (data && typeof data === "object" && "message" in data && typeof data.message === "string"
+                        ? data.message
+                        : null) || "Failed to update client"
+                toast.error(msg)
+                setSubmitting(false)
+                return
             }
 
+            toast.success("Client updated")
+            // Reset dirty so the discard guard doesn't trigger after redirect
+            form.reset(values, { keepValues: true })
             router.push(`/clients/${client.id}`)
             router.refresh()
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Unexpected error")
-            setLoading(false)
+            const msg = err instanceof Error ? err.message : "Unexpected error"
+            toast.error(msg)
+            setSubmitting(false)
         }
     }
 
+    const handleCancel = () => {
+        if (form.formState.isDirty) {
+            setConfirmDiscardOpen(true)
+            return
+        }
+        router.push("/clients")
+    }
+
     return (
-        <form ref={formRef} onSubmit={handleSubmit} className="ui-card p-6">
-            {error && (
-                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                </div>
-            )}
-
-            <div className="mb-6">
-                <OcrUploadPanel target="client" onApply={applyOcrFields} />
-            </div>
-
-            <div className="space-y-8">
+        <Form {...form}>
+            <form
+                ref={formRef}
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+            >
+                <Card>
+                    <CardContent className="pt-6">
+                        <OcrUploadPanel target="client" onApply={applyOcrFields} />
+                    </CardContent>
+                </Card>
 
                 {/* Basic Information */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Basic Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client&apos;s Name <span className="text-red-500">*</span>
-                            </label>
-                            <input type="text" name="name" required defaultValue={client.name} className="ui-input" placeholder="Enter client name" />
-                        </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Client&apos;s Name <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Enter client name" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Client Type <span className="text-red-500">*</span>
-                            </label>
-                            <SearchSelect
+                            <FormField
+                                control={form.control}
                                 name="type"
-                                options={clientTypes}
-                                defaultValue={client.type}
-                                placeholder={clientTypes.length === 0 ? "Loading types…" : "Select client type"}
-                                required
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Client Type <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            {/* Legacy SearchSelect bridged via name + defaultValue */}
+                                            <div>
+                                                <SearchSelect
+                                                    name="type"
+                                                    options={clientTypes}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder={
+                                                        clientTypes.length === 0 ? "Loading types…" : "Select client type"
+                                                    }
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client&apos;s Email</label>
-                            <input type="email" name="email" defaultValue={client.email || ""} className="ui-input" placeholder="Client's Email" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Enrollment Date</label>
-                            <input
-                                type="date"
-                                name="enrollmentDate"
-                                defaultValue={fmtDate(client.enrollmentDate)}
-                                className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
-                                readOnly={!isSuperAdmin}
-                            />
-                            {!isSuperAdmin && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Only Super Admin can change the enrollment date.</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Status</label>
-                            <select name="status" defaultValue={client.status} className="ui-input">
-                                <option value="ACTIVE">Active</option>
-                                <option value="INACTIVE">Inactive</option>
-                                <option value="BLACKLISTED">Blacklisted</option>
-                            </select>
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-2">Client Add Mode</label>
-                            <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsBranchless(false)}
-                                    className={`px-4 py-2 text-sm font-medium transition-colors ${!isBranchless ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"}`}
-                                >
-                                    Branch Client
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsBranchless(true)}
-                                    className={`px-4 py-2 text-sm font-medium transition-colors border-l border-[var(--border)] ${isBranchless ? "bg-[var(--brand)] text-white" : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"}`}
-                                >
-                                    Branchless Client
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Contact Information */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person</label>
-                            <input type="text" name="contactPerson" defaultValue={client.contactPerson || ""} className="ui-input" placeholder="Contact person" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Person Designation</label>
-                            <input type="text" name="contactPersonDesignation" defaultValue={client.contactPersonDesignation || ""} className="ui-input" placeholder="e.g., Manager, Director, Officer" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <div className="space-y-2">
-                                {contactNumbers.map((num, idx) => {
-                                    const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
-                                    return (
-                                    <div key={idx} className="flex items-start gap-2">
-                                        <div className="flex-1">
-                                            <input
-                                                type="text"
-                                                value={num}
-                                                onChange={(e) => {
-                                                    const updated = [...contactNumbers]
-                                                    updated[idx] = e.target.value
-                                                    setContactNumbers(updated)
-                                                }}
-                                                className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
-                                                placeholder={idx === 0 ? "+92-300-1234567" : `Contact number ${idx + 1}`}
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Client&apos;s Email</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="email"
+                                                placeholder="Client's Email"
+                                                {...field}
+                                                value={field.value ?? ""}
                                             />
-                                            {invalid && (
-                                                <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
-                                            )}
-                                        </div>
-                                        {contactNumbers.length > 1 && (
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="enrollmentDate"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Enrollment Date</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="date"
+                                                readOnly={!isSuperAdmin}
+                                                className={!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        {!isSuperAdmin && (
+                                            <FormDescription>
+                                                Only Super Admin can change the enrollment date.
+                                            </FormDescription>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Status</FormLabel>
+                                        <Select
+                                            value={field.value ?? "ACTIVE"}
+                                            onValueChange={field.onChange}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="ACTIVE">Active</SelectItem>
+                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                                <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="isBranchless"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Client Add Mode</FormLabel>
+                                        <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden">
                                             <button
                                                 type="button"
-                                                onClick={() => setContactNumbers(contactNumbers.filter((_, i) => i !== idx))}
-                                                className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500"
+                                                onClick={() => field.onChange(false)}
+                                                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                                                    !field.value
+                                                        ? "bg-[var(--brand)] text-white"
+                                                        : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"
+                                                }`}
                                             >
-                                                <X size={16} />
+                                                Branch Client
                                             </button>
-                                        )}
-                                    </div>
-                                    )
-                                })}
-                                <button
-                                    type="button"
-                                    onClick={() => setContactNumbers([...contactNumbers, ""])}
-                                    className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1"
-                                >
-                                    <Plus size={13} /> Add another number
-                                </button>
-                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => field.onChange(true)}
+                                                className={`px-4 py-2 text-sm font-medium transition-colors border-l border-[var(--border)] ${
+                                                    field.value
+                                                        ? "bg-[var(--brand)] text-white"
+                                                        : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-muted)]"
+                                                }`}
+                                            >
+                                                Branchless Client
+                                            </button>
+                                        </div>
+                                        {/* Reference watched value to satisfy lint when not used elsewhere */}
+                                        <span className="sr-only">{isBranchless ? "branchless" : "branch"}</span>
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client Location</label>
-                            <SearchSelect name="clientLocation" options={CITY_OPTIONS} defaultValue={client.city || ""} placeholder="Select city" />
+                    </CardContent>
+                </Card>
+
+                {/* Contact Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="contactPerson"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contact Person</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Contact person" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="contactPersonDesignation"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contact Person Designation</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="e.g., Manager, Director, Officer"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormItem>
+                                <FormLabel>Contact Number</FormLabel>
+                                <div className="space-y-2">
+                                    {contactNumbers.map((num, idx) => {
+                                        const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                        return (
+                                            <div key={idx} className="flex items-start gap-2">
+                                                <div className="flex-1">
+                                                    <Input
+                                                        type="text"
+                                                        value={num}
+                                                        onChange={(e) => {
+                                                            const updated = [...contactNumbers]
+                                                            updated[idx] = e.target.value
+                                                            setContactNumbers(updated)
+                                                        }}
+                                                        className={invalid ? "border-destructive" : ""}
+                                                        placeholder={
+                                                            idx === 0 ? "+92-300-1234567" : `Contact number ${idx + 1}`
+                                                        }
+                                                    />
+                                                    {invalid && (
+                                                        <p className="mt-1 text-[11px] text-destructive">
+                                                            Format must be +92-300-1234567
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                {contactNumbers.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setContactNumbers(contactNumbers.filter((_, i) => i !== idx))
+                                                        }
+                                                        className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-destructive"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setContactNumbers([...contactNumbers, ""])}
+                                        className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1"
+                                    >
+                                        <Plus size={13} /> Add another number
+                                    </button>
+                                </div>
+                            </FormItem>
+
+                            <FormField
+                                control={form.control}
+                                name="clientLocation"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Client Location</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="clientLocation"
+                                                    options={CITY_OPTIONS}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder="Select city"
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="clientPostalCode"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Client&apos;s Postal Code</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Postal code" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="headOfficeAddress"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Head Office Address</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                rows={2}
+                                                placeholder="Head Office Address"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Client&apos;s Postal Code</label>
-                            <input type="text" name="clientPostalCode" defaultValue={client.postalCode || ""} className="ui-input" placeholder="Postal code" />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Head Office Address</label>
-                            <textarea name="headOfficeAddress" rows={2} defaultValue={client.headOfficeAddress || ""} className="ui-textarea" placeholder="Head Office Address" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Introducer/Referral */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Introducer/Referral</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-                            <input type="text" name="introducerName" defaultValue={client.introducerName || ""} className="ui-input" placeholder="Name" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Introducer / Referral</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="introducerName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Name" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="introducerContactNumber"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contact Number</FormLabel>
+                                        <FormControl>
+                                            {/* Bridge legacy PhoneInput: it owns its own DOM input via `name`,
+                                                we shadow-bridge the value into RHF on change. */}
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = (e.target as HTMLInputElement)
+                                                    if (target?.name === "introducerContactNumber") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "introducerContactNumber") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <PhoneInput
+                                                    name="introducerContactNumber"
+                                                    defaultValue={field.value ?? ""}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="introducerAddress"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Address</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Address" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="introducerCnicNumber"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>CNIC Number</FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "introducerCnicNumber") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "introducerCnicNumber") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <CnicInput
+                                                    name="introducerCnicNumber"
+                                                    defaultValue={field.value ?? ""}
+                                                    placeholder="CNIC number"
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <PhoneInput name="introducerContactNumber" defaultValue={client.introducerContactNumber || ""} />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
-                            <input type="text" name="introducerAddress" defaultValue={client.introducerAddress || ""} className="ui-input" placeholder="Address" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC Number</label>
-                            <CnicInput name="introducerCnicNumber" defaultValue={client.introducerCnic || ""} placeholder="CNIC number" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Operational Territory */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Operational Territory</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Operational Provinces</label>
-                            <SearchSelect name="operationalProvinces" options={PROVINCE_OPTIONS} defaultValue={client.operationalProvinces || ""} placeholder="Select Operational Territory" />
-                        </div>
-                    </div>
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Operational Territory</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <FormField
+                            control={form.control}
+                            name="operationalProvinces"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Operational Provinces</FormLabel>
+                                    <FormControl>
+                                        <div>
+                                            <SearchSelect
+                                                name="operationalProvinces"
+                                                options={PROVINCE_OPTIONS}
+                                                defaultValue={field.value || ""}
+                                                placeholder="Select Operational Territory"
+                                                onChange={(v) => field.onChange(v)}
+                                            />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
 
                 {/* Region & Assignment */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
-                            <select
-                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
-                                value={selectedRegionId}
-                                onChange={(e) => {
-                                    setSelectedRegionId(e.target.value)
-                                    setSelectedRegionalOfficeId("")
-                                }}
-                                disabled={isRegionalViewer}
-                            >
-                                <option value="">— Select Region —</option>
-                                {regions.map((r) => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                            {isRegionalViewer && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Regional Office</label>
-                            <select
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Region &amp; Assignment</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="regionId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Region</FormLabel>
+                                        <Select
+                                            value={field.value ?? ""}
+                                            onValueChange={(v) => {
+                                                field.onChange(v)
+                                                form.setValue("regionalOfficeId", "", { shouldDirty: true })
+                                            }}
+                                            disabled={isRegionalViewer}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="— Select Region —" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {regions.map((r) => (
+                                                    <SelectItem key={r.id} value={r.id}>
+                                                        {r.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {isRegionalViewer && (
+                                            <FormDescription>Locked to your assigned region.</FormDescription>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
                                 name="regionalOfficeId"
-                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
-                                value={selectedRegionalOfficeId}
-                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
-                            >
-                                <option value="">
-                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
-                                </option>
-                                {regionalOffices.map((o) => (
-                                    <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                            </select>
-                            {lockedRegionalOffice && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
-                            <SearchSelect
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Regional Office</FormLabel>
+                                        <Select
+                                            value={field.value ?? ""}
+                                            onValueChange={field.onChange}
+                                            disabled={!watchedRegionId || Boolean(lockedRegionalOffice)}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue
+                                                        placeholder={
+                                                            !watchedRegionId
+                                                                ? "— Select Region First —"
+                                                                : regionalOffices.length === 0
+                                                                  ? "No offices in this region"
+                                                                  : "— Select Regional Office —"
+                                                        }
+                                                    />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {regionalOffices.map((o) => (
+                                                    <SelectItem key={o.id} value={o.id}>
+                                                        {o.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {lockedRegionalOffice && (
+                                            <FormDescription>
+                                                Locked to your assigned regional office.
+                                            </FormDescription>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
                                 name="assignedManagerId"
-                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                defaultValue={client.assignedManagerId || ""}
-                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Assigned Manager</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="assignedManagerId"
+                                                    options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder={
+                                                        watchedRegionId ? "— Select Manager —" : "— Select Region First —"
+                                                    }
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Supervisor</label>
-                            <SearchSelect
+
+                            <FormField
+                                control={form.control}
                                 name="assignedSupervisorId"
-                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                defaultValue={currentSupervisorId || ""}
-                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Assigned Supervisor</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="assignedSupervisorId"
+                                                    options={supervisorUsers.map((u) => ({
+                                                        value: u.id,
+                                                        label: u.name,
+                                                    }))}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder={
+                                                        watchedRegionId
+                                                            ? "— Select Supervisor —"
+                                                            : "— Select Region First —"
+                                                    }
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Tax & Legal */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Tax &amp; Legal</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">NTN (National Tax Number)</label>
-                            <input type="text" name="ntn" defaultValue={client.ntn || ""} className="ui-input" placeholder="Enter NTN" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">STRN (Sales Tax Registration)</label>
-                            <input type="text" name="strn" defaultValue={client.strn || ""} className="ui-input" placeholder="Enter STRN" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Logo URL</label>
-                            <input type="url" name="logoUrl" defaultValue={client.logoUrl || ""} className="ui-input" placeholder="https://example.com/logo.png" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Reserve Salary % (override)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.01"
-                                value={reservePctInput}
-                                onChange={(e) => setReservePctInput(e.target.value)}
-                                className="ui-input"
-                                placeholder="e.g. 30"
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Tax &amp; Legal</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="ntn"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>NTN (National Tax Number)</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Enter NTN" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                            <p className="mt-1 text-xs text-[var(--text-muted)]">
-                                Optional. % of net pay withheld monthly as reserve balance. Leave blank to use the regional office or global default (30%).
-                            </p>
+
+                            <FormField
+                                control={form.control}
+                                name="strn"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>STRN (Sales Tax Registration)</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Enter STRN" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="logoUrl"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Logo URL</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="url"
+                                                placeholder="https://example.com/logo.png"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="reservePctInput"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Reserve Salary % (override)</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step="0.01"
+                                                placeholder="e.g. 30"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>
+                                            Optional. % of net pay withheld monthly as reserve balance. Leave blank to
+                                            use the regional office or global default (30%).
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Contract Details */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contract Details</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Start</label>
-                            <input type="date" name="contractStart" defaultValue={fmtDate(client.contractStart)} className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract End</label>
-                            <input type="date" name="contractEnd" defaultValue={fmtDate(client.contractEnd)} className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate Start</label>
-                            <input type="date" name="contractRateStart" defaultValue={fmtDate(client.contractRateStart)} className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate End</label>
-                            <input type="date" name="contractRateEnd" defaultValue={fmtDate(client.contractRateEnd)} className="ui-input" />
-                        </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Contract Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="contractStart"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Start</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        {/* Day Guards */}
-                        <div className="md:col-span-2">
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractDayGuardDesignation" options={designationOptions} defaultValue={client.contractDayGuardDesignation || ""} placeholder={designationOptions.length === 0 ? "Loading…" : "Select designation"} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractDayGuardExService" options={exServiceOptions} defaultValue={client.contractDayGuardExService || ""} placeholder={exServiceOptions.length === 0 ? "Loading…" : "Select"} />
+                            <FormField
+                                control={form.control}
+                                name="contractEnd"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract End</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="contractRateStart"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Rate Start</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="contractRateEnd"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Rate End</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <div className="md:col-span-2">
+                                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="contractDayGuardDesignation"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Guard Designation</FormLabel>
+                                                <FormControl>
+                                                    <div>
+                                                        <SearchSelect
+                                                            name="contractDayGuardDesignation"
+                                                            options={designationOptions}
+                                                            defaultValue={field.value || ""}
+                                                            placeholder={
+                                                                designationOptions.length === 0
+                                                                    ? "Loading…"
+                                                                    : "Select designation"
+                                                            }
+                                                            onChange={(v) => field.onChange(v)}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="contractDayGuardExService"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Guard Ex Service</FormLabel>
+                                                <FormControl>
+                                                    <div>
+                                                        <SearchSelect
+                                                            name="contractDayGuardExService"
+                                                            options={exServiceOptions}
+                                                            defaultValue={field.value || ""}
+                                                            placeholder={
+                                                                exServiceOptions.length === 0 ? "Loading…" : "Select"
+                                                            }
+                                                            onChange={(v) => field.onChange(v)}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Night Guards */}
-                        <div className="md:col-span-2">
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <SearchSelect name="contractNightGuardDesignation" options={designationOptions} defaultValue={client.contractNightGuardDesignation || ""} placeholder={designationOptions.length === 0 ? "Loading…" : "Select designation"} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <SearchSelect name="contractNightGuardExService" options={exServiceOptions} defaultValue={client.contractNightGuardExService || ""} placeholder={exServiceOptions.length === 0 ? "Loading…" : "Select"} />
+                            <div className="md:col-span-2">
+                                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="contractNightGuardDesignation"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Guard Designation</FormLabel>
+                                                <FormControl>
+                                                    <div>
+                                                        <SearchSelect
+                                                            name="contractNightGuardDesignation"
+                                                            options={designationOptions}
+                                                            defaultValue={field.value || ""}
+                                                            placeholder={
+                                                                designationOptions.length === 0
+                                                                    ? "Loading…"
+                                                                    : "Select designation"
+                                                            }
+                                                            onChange={(v) => field.onChange(v)}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="contractNightGuardExService"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Guard Ex Service</FormLabel>
+                                                <FormControl>
+                                                    <div>
+                                                        <SearchSelect
+                                                            name="contractNightGuardExService"
+                                                            options={exServiceOptions}
+                                                            defaultValue={field.value || ""}
+                                                            placeholder={
+                                                                exServiceOptions.length === 0 ? "Loading…" : "Select"
+                                                            }
+                                                            onChange={(v) => field.onChange(v)}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Day Guards</label>
-                            <input type="number" name="contractAdditionalDayGuards" defaultValue={client.contractAdditionalDayGuards ?? ""} className="ui-input" placeholder="0" min={0} />
+                            <FormField
+                                control={form.control}
+                                name="contractAdditionalDayGuards"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Additional Day Guards</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                placeholder="0"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="contractAdditionalNightGuards"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Additional Night Guards</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                placeholder="0"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="contractPrice"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Price</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                placeholder="Price"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Night Guards</label>
-                            <input type="number" name="contractAdditionalNightGuards" defaultValue={client.contractAdditionalNightGuards ?? ""} className="ui-input" placeholder="0" min={0} />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Price</label>
-                            <input type="number" name="contractPrice" defaultValue={client.contractPrice ?? ""} className="ui-input" placeholder="Price" />
-                        </div>
-                    </div>
+                    </CardContent>
+                </Card>
+
+                {/* Form Actions */}
+                <div className="flex items-center gap-3">
+                    <Button type="button" variant="ghost" onClick={handleCancel} disabled={submitting}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Cancel
+                    </Button>
+                    <PermissionGate module="CLIENTS" action="UPDATE" mode="disable">
+                        <Button
+                            type="submit"
+                            disabled={submitting || !form.formState.isDirty}
+                        >
+                            <Save className="mr-2 h-4 w-4" />
+                            {submitting ? "Saving…" : "Save Changes"}
+                        </Button>
+                    </PermissionGate>
                 </div>
+            </form>
 
-            </div>
-
-            {/* Form Actions */}
-            <div className="flex items-center gap-4 mt-8 pt-6 border-t">
-                <Link href={`/clients/${client.id}`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Cancel
-                </Link>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Save className="h-4 w-4" />
-                    {loading ? "Updating..." : "Update Client"}
-                </button>
-            </div>
-        </form>
+            {/* Discard confirmation */}
+            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Unsaved changes will be lost.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep editing</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => router.push("/clients")}>
+                            Discard
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </Form>
     )
 }

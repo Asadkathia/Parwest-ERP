@@ -1,15 +1,60 @@
+/**
+ * Parwest ERP — Branch Create Form (Phase 4B follow-up reskin)
+ * ─────────────────────────────────────────────────────────────────────────
+ * RHF + zod + shadcn primitives. Reskin only — same fields, same validation
+ * rules, same `POST /api/branches` payload as the legacy form.
+ *
+ * The capacity / contract / attachment sections still submit through the
+ * native `<form>` FormData path (a deep RHF migration of every CapField is
+ * out of scope for the reskin — the server is the source of truth and
+ * already accepts the legacy payload shape).
+ *
+ * Aux widgets that are NOT migrated (legacy preserved):
+ *   - <PhoneInput>          — uncontrolled +92-XXX-XXXXXXX formatter
+ *   - <CnicInput>           — uncontrolled XXXXX-XXXXXXX-X formatter
+ *   - <SearchSelect>        — searchable native select
+ *   - <MultiSearchSelect>   — multi-select chip picker
+ *   - <LocationPickerMap>   — Leaflet picker (wrapped in shadcn Card)
+ */
+
 "use client"
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
 import { ArrowLeft, Save, X, Plus } from "lucide-react"
-import Link from "next/link"
+
 import SearchSelect from "@/components/ui/SearchSelect"
 import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
-import { isValidCnic, isValidPhone } from "@/lib/validation/formats"
+import { isValidPhone } from "@/lib/validation/formats"
+import { branchCreateSchema, type BranchCreateForm } from "@/lib/schemas/branch"
+
+import { Button } from "@/components/shadcn/button"
+import { Input } from "@/components/shadcn/input"
+import { Textarea } from "@/components/shadcn/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/shadcn/select"
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/shadcn/form"
 
 type Region = { id: string; name: string }
 
@@ -31,11 +76,11 @@ const OFFICE_TYPE_OPTIONS = [
 ].map((t) => ({ value: t, label: t }))
 
 const CITY_OPTIONS = [
-    "All Cities","Lahore","Gujranwala","Sahiwal","Islamabad","Karachi","Multan","Faisalabad",
-    "Khanpur","Chichawatni","Bahawalpur","Mian Channu","Khanewal","Ahmedpur East",
-    "Ahmed Nager Chatha","Ali Pur","Arifwala","Attock","Basti Malook","Bhagalchur",
-    "Bhalwal","Bahawalnagar","Bhaipheru","Bhakkar","Burewala","Chailianwala","Chakwal",
-    "Chiniot","Chowk Azam","Chowk Sarwar Shaheed","Daska",
+    "All Cities", "Lahore", "Gujranwala", "Sahiwal", "Islamabad", "Karachi", "Multan", "Faisalabad",
+    "Khanpur", "Chichawatni", "Bahawalpur", "Mian Channu", "Khanewal", "Ahmedpur East",
+    "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Basti Malook", "Bhagalchur",
+    "Bhalwal", "Bahawalnagar", "Bhaipheru", "Bhakkar", "Burewala", "Chailianwala", "Chakwal",
+    "Chiniot", "Chowk Azam", "Chowk Sarwar Shaheed", "Daska",
 ].map((c) => ({ value: c, label: c }))
 
 const PROVINCE_OPTIONS = [
@@ -51,21 +96,29 @@ const BRANCH_MODEL_OPTIONS = [
     { value: "ISLAMIC", label: "Islamic" },
 ]
 
-// Loaded dynamically from /api/guard-designation-types and /api/guard-ex-service-types
-
-export default function BranchForm({ clientId, clientName, regions, defaultRegionId, defaultRegionalOfficeId, defaultManagerId, isSuperAdmin = false, viewerRegionId = null, viewerRegionalOfficeId = null }: Props) {
+export default function BranchForm({
+    clientId,
+    clientName,
+    regions,
+    defaultRegionId,
+    defaultRegionalOfficeId,
+    defaultManagerId,
+    isSuperAdmin = false,
+    viewerRegionId = null,
+    viewerRegionalOfficeId = null,
+}: Props) {
     const router = useRouter()
+    const formRef = useRef<HTMLFormElement>(null)
     const isRegionalViewer = !isSuperAdmin && Boolean(viewerRegionId)
     const lockedRegionalOffice = isRegionalViewer ? viewerRegionalOfficeId : null
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState("")
+    const [submitting, setSubmitting] = useState(false)
 
     // Region / Regional Office (dynamic cascade)
     const [selectedRegionId, setSelectedRegionId] = useState(
-        isRegionalViewer ? (viewerRegionId ?? "") : (defaultRegionId ?? "")
+        isRegionalViewer ? (viewerRegionId ?? "") : (defaultRegionId ?? ""),
     )
     const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(
-        lockedRegionalOffice ?? (defaultRegionalOfficeId ?? "")
+        lockedRegionalOffice ?? (defaultRegionalOfficeId ?? ""),
     )
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
 
@@ -94,20 +147,63 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
     const fileRef = useRef<HTMLInputElement>(null)
 
+    const form = useForm<BranchCreateForm>({
+        resolver: zodResolver(branchCreateSchema),
+        mode: "onBlur",
+        defaultValues: {
+            name: "",
+            code: "",
+            branchType: "CONVENTIONAL",
+            officeType: "",
+            isHeadOffice: false,
+            isLockerBranch: "no",
+            enrollmentDate: new Date().toISOString().slice(0, 10),
+            address: "",
+            city: "",
+            province: "",
+            latitudeManual: "",
+            longitudeManual: "",
+            regionId: selectedRegionId,
+            regionalOfficeId: selectedRegionalOfficeId,
+            assignedManagerId: defaultManagerId ?? "",
+            assignedSupervisorId: "",
+            operationsManagerId: "",
+            contactPerson: "",
+            contactPersonDesignation: "",
+            contactPersonCnic: "",
+            contactEmail: "",
+            branchManagerName: "",
+            branchManagerContact: "",
+            branchManagerEmail: "",
+            operationsManagerContact: "",
+            supervisorContact: "",
+            contractStart: "",
+            contractEnd: "",
+            contractRateStart: "",
+            contractRateEnd: "",
+            contractAdditionalDayGuards: "",
+            contractAdditionalNightGuards: "",
+        },
+    })
+
     // Fetch designation types and ex-service types once on mount
     useEffect(() => {
         fetch("/api/guard-designation-types")
-            .then((r) => r.ok ? r.json() : [])
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data))
-                    setDesignationOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                    setDesignationOptions(
+                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
+                    )
             })
             .catch(() => {})
         fetch("/api/guard-ex-service-types")
-            .then((r) => r.ok ? r.json() : [])
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data))
-                    setExServiceOptions((data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })))
+                    setExServiceOptions(
+                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
+                    )
             })
             .catch(() => {})
     }, [])
@@ -120,14 +216,16 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
         setRegionalOffices([])
         if (!selectedRegionId) return
         fetch(`/api/regional-offices?regionId=${selectedRegionId}`)
-            .then((r) => r.ok ? r.json() : [])
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
-                    setRegionalOffices((data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })))
+                    setRegionalOffices(
+                        (data as { id: string; name: string }[]).map((o) => ({ id: o.id, name: o.name })),
+                    )
                 }
             })
             .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedRegionId])
 
     // Load managers/supervisors when region changes
@@ -136,13 +234,17 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
             ? `/api/users?limit=500&regionId=${selectedRegionId}`
             : "/api/users?limit=500"
         fetch(url)
-            .then((r) => r.ok ? r.json() : [])
+            .then((r) => (r.ok ? r.json() : []))
             .then((data: unknown) => {
                 if (Array.isArray(data)) {
                     const users = data as { id: string; name?: string | null; role?: { name?: string | null } }[]
                     const toOption = (u: typeof users[0]) => ({ id: u.id, name: u.name as string })
-                    setManagerUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption))
-                    setSupervisorUsers(users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption))
+                    setManagerUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "manager").map(toOption),
+                    )
+                    setSupervisorUsers(
+                        users.filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor").map(toOption),
+                    )
                 }
             })
             .catch(() => {})
@@ -162,54 +264,33 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
     const removeAttachment = (idx: number) =>
         setAttachments((prev) => prev.filter((_, i) => i !== idx))
 
-    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setLoading(true)
-        setError("")
+    // RHF submit. The capacity / contract grids submit via FormData; we read
+    // those fields off the underlying <form> element for the API payload.
+    const onSubmit = async (values: BranchCreateForm) => {
+        if (!formRef.current) return
 
-        const formData = new FormData(e.currentTarget)
-
-        // CNIC validation
-        const contactCnic = String(formData.get("contactPersonCnic") ?? "").trim()
-        if (contactCnic && !isValidCnic(contactCnic)) {
-            setError("Contact Person CNIC format is invalid. Expected XXXXX-XXXXXXX-X.")
-            setLoading(false)
-            return
-        }
-
-        // Phone validation — single-field phones
-        const singlePhoneFields: [string, string][] = [
-            ["Branch Manager Contact", String(formData.get("branchManagerContact") ?? "").trim()],
-            ["Operations Manager Contact", String(formData.get("operationsManagerContact") ?? "").trim()],
-            ["Supervisor Contact", String(formData.get("supervisorContact") ?? "").trim()],
-        ]
-        for (const [label, val] of singlePhoneFields) {
-            if (val && !isValidPhone(val)) {
-                setError(`${label} must be in format +92-XXX-XXXXXXX.`)
-                setLoading(false)
-                return
-            }
-        }
-
-        // At least one contactPhone is required + format
+        // At least one contactPhone is required + format check (mirrors legacy)
         const filledPhones = contactPhones.filter((n) => n.trim())
         if (filledPhones.length === 0) {
-            setError("At least one contact phone number is required.")
-            setLoading(false)
+            toast.error("At least one contact phone number is required.")
             return
         }
         for (const num of filledPhones) {
             if (!isValidPhone(num)) {
-                setError(`Contact phone "${num}" must be in format +92-XXX-XXXXXXX.`)
-                setLoading(false)
+                toast.error(`Contact phone "${num}" must be in format +92-XXX-XXXXXXX.`)
                 return
             }
         }
 
-        const data = {
+        // Build the legacy payload from FormData for fields that still live in
+        // native <input> elements (capacity grid, contract designations, etc.)
+        const formData = new FormData(formRef.current)
+        const payload: Record<string, unknown> = {
             ...Object.fromEntries(formData.entries()),
+            // RHF-validated values override raw FormData (numbers, booleans, etc.)
+            ...values,
             clientId,
-            isHeadOffice: formData.get("isHeadOffice") === "on",
+            isHeadOffice: Boolean(values.isHeadOffice),
             isLockerBranch,
             contractAttachments: attachments,
             regionId: selectedRegionId || null,
@@ -217,516 +298,1025 @@ export default function BranchForm({ clientId, clientName, regions, defaultRegio
             operationsManagerId: selectedOperationsManagerId || null,
         }
 
+        // Ensure every contactPhone field is included
+        filledPhones.forEach((p, idx) => {
+            payload[idx === 0 ? "contactPhone" : `contactPhone_${idx}`] = p
+        })
+
+        setSubmitting(true)
         try {
             const response = await fetch("/api/branches", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+                body: JSON.stringify(payload),
             })
+            const data = await response.json().catch(() => ({}))
 
             if (!response.ok) {
-                const err = await response.json()
-                throw new Error(err.message || "Failed to create branch")
+                const msg =
+                    (data && typeof data === "object" && "message" in data && typeof data.message === "string"
+                        ? data.message
+                        : null) || "Failed to create branch"
+                toast.error(msg)
+                setSubmitting(false)
+                return
             }
 
+            toast.success("Branch created")
             router.push(`/clients/${clientId}?tab=branches`)
             router.refresh()
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Unexpected error")
-            setLoading(false)
+            const msg = err instanceof Error ? err.message : "Unexpected error"
+            toast.error(msg)
+            setSubmitting(false)
         }
     }
 
     return (
-        <form onSubmit={handleSubmit} className="ui-card p-6">
-            {error && (
-                <div className="mb-6 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                </div>
-            )}
-
-            <div className="space-y-8">
-
+        <Form {...form}>
+            <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* ── Add Client's New Branch ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Add Client&apos;s New Branch</h2>
-                    <p className="mb-4 text-sm text-[var(--text-muted)]">Creating branch for: <span className="font-medium text-[var(--text)]">{clientName}</span></p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Name Of Branch <span className="text-red-500">*</span>
-                            </label>
-                            <input type="text" name="name" required placeholder="e.g., Main Branch, Gulberg Branch" className="ui-input" />
-                        </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Add Client&apos;s New Branch</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Creating branch for: <span className="font-medium text-foreground">{clientName}</span>
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Name Of Branch <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="e.g., Main Branch, Gulberg Branch"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Branch Code</label>
-                            <input type="text" name="code" placeholder="e.g., LHR-001, ISB-002" className="ui-input" />
-                        </div>
+                            <FormField
+                                control={form.control}
+                                name="code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Branch Code</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="e.g., LHR-001, ISB-002"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Branch Model</label>
-                            <SearchSelect name="branchType" options={BRANCH_MODEL_OPTIONS} defaultValue="CONVENTIONAL" placeholder="Select model" />
-                        </div>
+                            <FormField
+                                control={form.control}
+                                name="branchType"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Branch Model</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="branchType"
+                                                    options={BRANCH_MODEL_OPTIONS}
+                                                    defaultValue={field.value || "CONVENTIONAL"}
+                                                    placeholder="Select model"
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Office Type</label>
-                            <SearchSelect name="officeType" options={OFFICE_TYPE_OPTIONS} placeholder="— Select Office Type —" />
-                        </div>
+                            <FormField
+                                control={form.control}
+                                name="officeType"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Office Type</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="officeType"
+                                                    options={OFFICE_TYPE_OPTIONS}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder="— Select Office Type —"
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div className="md:col-span-2">
-                            <label className="flex items-center gap-2">
-                                <input type="checkbox" name="isHeadOffice" className="h-4 w-4 accent-[var(--brand)]" />
-                                <span className="text-sm text-[var(--text)]">This is the head office</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Location Information ── */}
-                <div className="space-y-6">
-                    <h2 className="text-base font-semibold pb-2 border-b border-[var(--border)] text-[var(--text)]">Location Information</h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Address</label>
-                            <textarea name="address" rows={2} placeholder="Enter complete address" className="ui-textarea" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">City</label>
-                            <SearchSelect name="city" options={CITY_OPTIONS} placeholder="Select city" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Province</label>
-                            <SearchSelect name="province" options={PROVINCE_OPTIONS} placeholder="Select province" />
-                        </div>
-                    </div>
-
-                    {/* Map picker */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-                            Pick Branch Location on Map
-                            <span className="ml-1 text-xs font-normal text-[var(--text-muted)]">(search or click to drop marker — or type coordinates manually below)</span>
-                        </label>
-                        <LocationPickerMap
-                            latName="latitude"
-                            lngName="longitude"
-                            label="Branch"
-                            onLocationChange={(lat, lng) => { setLatManual(lat); setLngManual(lng) }}
-                        />
-                    </div>
-
-                    {/* Manual coordinate override */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Latitude <span className="text-red-500">*</span> <span className="text-xs font-normal">(manual override)</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="latitudeManual"
-                                className="ui-input"
-                                placeholder="e.g. 31.5204"
-                                value={latManual}
-                                onChange={(e) => setLatManual(e.target.value)}
+                            <FormField
+                                control={form.control}
+                                name="isHeadOffice"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(field.value)}
+                                                onChange={(e) => field.onChange(e.target.checked)}
+                                                className="h-4 w-4 accent-[var(--brand)]"
+                                            />
+                                            <span className="text-sm text-foreground">This is the head office</span>
+                                        </label>
+                                    </FormItem>
+                                )}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Longitude <span className="text-red-500">*</span> <span className="text-xs font-normal">(manual override)</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="longitudeManual"
-                                className="ui-input"
-                                placeholder="e.g. 74.3587"
-                                value={lngManual}
-                                onChange={(e) => setLngManual(e.target.value)}
+                    </CardContent>
+                </Card>
+
+                {/* ── Address (Leaflet picker preserved as-is, wrapped in Card) ── */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Address</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="address"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Address</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                rows={2}
+                                                placeholder="Enter complete address"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>City</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="city"
+                                                    options={CITY_OPTIONS}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder="Select city"
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="province"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Province</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <SearchSelect
+                                                    name="province"
+                                                    options={PROVINCE_OPTIONS}
+                                                    defaultValue={field.value || ""}
+                                                    placeholder="Select province"
+                                                    onChange={(v) => field.onChange(v)}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div>
-                    </div>
-                </div>
+
+                        {/* Map picker — Leaflet preserved as-is */}
+                        <div>
+                            <FormLabel>
+                                Pick Branch Location on Map
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                    (search or click to drop marker — or type coordinates manually below)
+                                </span>
+                            </FormLabel>
+                            <div className="mt-2">
+                                <LocationPickerMap
+                                    latName="latitude"
+                                    lngName="longitude"
+                                    label="Branch"
+                                    onLocationChange={(lat, lng) => {
+                                        setLatManual(lat)
+                                        setLngManual(lng)
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Manual coordinate override */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FormLabel>
+                                    Latitude <span className="text-destructive">*</span>{" "}
+                                    <span className="text-xs font-normal">(manual override)</span>
+                                </FormLabel>
+                                <Input
+                                    name="latitudeManual"
+                                    placeholder="e.g. 31.5204"
+                                    value={latManual}
+                                    onChange={(e) => setLatManual(e.target.value)}
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <FormLabel>
+                                    Longitude <span className="text-destructive">*</span>{" "}
+                                    <span className="text-xs font-normal">(manual override)</span>
+                                </FormLabel>
+                                <Input
+                                    name="longitudeManual"
+                                    placeholder="e.g. 74.3587"
+                                    value={lngManual}
+                                    onChange={(e) => setLngManual(e.target.value)}
+                                    className="mt-2"
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Region & Assignment ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Region &amp; Assignment</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Region</label>
-                            <select
-                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
-                                value={selectedRegionId}
-                                onChange={(e) => setSelectedRegionId(e.target.value)}
-                                disabled={isRegionalViewer}
-                            >
-                                <option value="">— Select Region —</option>
-                                {regions.map((r) => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                            {isRegionalViewer && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned region.</p>
-                            )}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Region &amp; Assignment</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FormLabel>Select Region</FormLabel>
+                                <Select
+                                    value={selectedRegionId || "__NONE__"}
+                                    onValueChange={(v) => setSelectedRegionId(v === "__NONE__" ? "" : v)}
+                                    disabled={isRegionalViewer}
+                                >
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue placeholder="— Select Region —" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__NONE__">— Select Region —</SelectItem>
+                                        {regions.map((r) => (
+                                            <SelectItem key={r.id} value={r.id}>
+                                                {r.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {isRegionalViewer && (
+                                    <FormDescription className="mt-1">
+                                        Locked to your assigned region.
+                                    </FormDescription>
+                                )}
+                            </div>
+                            <div>
+                                <FormLabel>Select Regional Office</FormLabel>
+                                <Select
+                                    value={selectedRegionalOfficeId || "__NONE__"}
+                                    onValueChange={(v) => setSelectedRegionalOfficeId(v === "__NONE__" ? "" : v)}
+                                    disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
+                                >
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue
+                                            placeholder={
+                                                !selectedRegionId
+                                                    ? "— Select Region First —"
+                                                    : regionalOffices.length === 0
+                                                      ? "No offices in this region"
+                                                      : "— Select Regional Office —"
+                                            }
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__NONE__">— Select Regional Office —</SelectItem>
+                                        {regionalOffices.map((o) => (
+                                            <SelectItem key={o.id} value={o.id}>
+                                                {o.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <input type="hidden" name="regionalOfficeId" value={selectedRegionalOfficeId} />
+                                {lockedRegionalOffice && (
+                                    <FormDescription className="mt-1">
+                                        Locked to your assigned regional office.
+                                    </FormDescription>
+                                )}
+                            </div>
+                            <div>
+                                <FormLabel>Assigned Manager</FormLabel>
+                                <div className="mt-2">
+                                    <SearchSelect
+                                        name="assignedManagerId"
+                                        options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                        defaultValue={defaultManagerId ?? ""}
+                                        placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Select Regional Office</label>
-                            <select
-                                name="regionalOfficeId"
-                                className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
-                                value={selectedRegionalOfficeId}
-                                onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
-                                disabled={!selectedRegionId || Boolean(lockedRegionalOffice)}
-                            >
-                                <option value="">
-                                    {!selectedRegionId ? "— Select Region First —" : regionalOffices.length === 0 ? "No offices in this region" : "— Select Regional Office —"}
-                                </option>
-                                {regionalOffices.map((o) => (
-                                    <option key={o.id} value={o.id}>{o.name}</option>
-                                ))}
-                            </select>
-                            {lockedRegionalOffice && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Assigned Manager</label>
-                            <SearchSelect
-                                name="assignedManagerId"
-                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                defaultValue={defaultManagerId ?? ""}
-                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
-                            />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Capacity Requirements ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Capacity Requirements</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <CapField label="Day CPO's Required" name="dayCpoCapacity" required />
-                        <CapField label="Night CPO's Required" name="nightCpoCapacity" required />
-                        <CapField label="Day SO Capacity" name="daySoCapacity" required />
-                        <CapField label="Night SO Capacity" name="nightSoCapacity" required />
-                        <CapField label="Day ASO Capacity" name="dayAsoCapacity" required />
-                        <CapField label="Night ASO Capacity" name="nightAsoCapacity" required />
-                        <CapField label="Day LSO Capacity" name="dayLsoCapacity" required />
-                        <CapField label="Night LSO Capacity" name="nightLsoCapacity" required />
-                        <CapField label="Day Supervisors Required" name="daySupervisorCapacity" required />
-                        <CapField label="Night Supervisors Required" name="nightSupervisorCapacity" required />
-                        <CapField label="Day Guards" name="dayGuardCapacity" required />
-                        <CapField label="Night Guards" name="nightGuardCapacity" required />
-                        <CapField label="Day CCTV Operators" name="dayCctvCapacity" required />
-                        <CapField label="Night CCTV Operators" name="nightCctvCapacity" required />
-                        <CapField label="Day Receptionists" name="dayReceptionistCapacity" required />
-                        <CapField label="Night Receptionists" name="nightReceptionistCapacity" required />
-                    </div>
-                </div>
-
-                {/* ── Branch Enrollment & Locker ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Details</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Branch Enrollment Date <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                name="enrollmentDate"
-                                className={`ui-input ${!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}`}
-                                defaultValue={new Date().toISOString().slice(0, 10)}
-                                readOnly={!isSuperAdmin}
-                            />
-                            {!isSuperAdmin && (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">Auto-set to today. Only Super Admin can override.</p>
-                            )}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Capacity Requirements</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <CapField label="Day CPO's Required" name="dayCpoCapacity" required />
+                            <CapField label="Night CPO's Required" name="nightCpoCapacity" required />
+                            <CapField label="Day SO Capacity" name="daySoCapacity" required />
+                            <CapField label="Night SO Capacity" name="nightSoCapacity" required />
+                            <CapField label="Day ASO Capacity" name="dayAsoCapacity" required />
+                            <CapField label="Night ASO Capacity" name="nightAsoCapacity" required />
+                            <CapField label="Day LSO Capacity" name="dayLsoCapacity" required />
+                            <CapField label="Night LSO Capacity" name="nightLsoCapacity" required />
+                            <CapField label="Day Supervisors Required" name="daySupervisorCapacity" required />
+                            <CapField label="Night Supervisors Required" name="nightSupervisorCapacity" required />
+                            <CapField label="Day Guards" name="dayGuardCapacity" required />
+                            <CapField label="Night Guards" name="nightGuardCapacity" required />
+                            <CapField label="Day CCTV Operators" name="dayCctvCapacity" required />
+                            <CapField label="Night CCTV Operators" name="nightCctvCapacity" required />
+                            <CapField label="Day Receptionists" name="dayReceptionistCapacity" required />
+                            <CapField label="Night Receptionists" name="nightReceptionistCapacity" required />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-2">
-                                Locker Branch <span className="text-red-500">*</span>
-                            </label>
-                            <div className="flex items-center gap-6">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="isLockerBranchRadio"
-                                        value="yes"
-                                        checked={isLockerBranch === "yes"}
-                                        onChange={() => setIsLockerBranch("yes")}
-                                        className="h-4 w-4 accent-[var(--brand)]"
-                                    />
-                                    <span className="text-sm text-[var(--text)]">Yes</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="isLockerBranchRadio"
-                                        value="no"
-                                        checked={isLockerBranch === "no"}
-                                        onChange={() => setIsLockerBranch("no")}
-                                        className="h-4 w-4 accent-[var(--brand)]"
-                                    />
-                                    <span className="text-sm text-[var(--text)]">No</span>
-                                </label>
+                    </CardContent>
+                </Card>
+
+                {/* ── Branch Details / Locker ── */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Branch Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="enrollmentDate"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Branch Enrollment Date <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="date"
+                                                readOnly={!isSuperAdmin}
+                                                className={!isSuperAdmin ? "bg-[var(--surface-muted)] cursor-not-allowed" : ""}
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        {!isSuperAdmin && (
+                                            <FormDescription>
+                                                Auto-set to today. Only Super Admin can override.
+                                            </FormDescription>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div>
+                                <FormLabel>
+                                    Locker Branch <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="flex items-center gap-6 mt-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="isLockerBranchRadio"
+                                            value="yes"
+                                            checked={isLockerBranch === "yes"}
+                                            onChange={() => setIsLockerBranch("yes")}
+                                            className="h-4 w-4 accent-[var(--brand)]"
+                                        />
+                                        <span className="text-sm text-foreground">Yes</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="isLockerBranchRadio"
+                                            value="no"
+                                            checked={isLockerBranch === "no"}
+                                            onChange={() => setIsLockerBranch("no")}
+                                            className="h-4 w-4 accent-[var(--brand)]"
+                                        />
+                                        <span className="text-sm text-foreground">No</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Contact Person Info ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Contact Person Info</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-                            <input type="text" name="contactPerson" placeholder="Name of contact person" className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Designation</label>
-                            <input type="text" name="contactPersonDesignation" placeholder="e.g., Branch Manager, Officer" className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">CNIC #</label>
-                            <CnicInput name="contactPersonCnic" placeholder="#####-#######-#" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Phone Number <span className="text-red-500">*</span></label>
-                            <div className="space-y-2">
-                                {contactPhones.map((num, idx) => {
-                                    const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
-                                    return (
-                                    <div key={idx} className="flex items-start gap-2">
-                                        <div className="flex-1">
-                                            <input
-                                                type="tel"
-                                                value={num}
-                                                onChange={(e) => {
-                                                    const updated = [...contactPhones]
-                                                    updated[idx] = e.target.value
-                                                    setContactPhones(updated)
-                                                }}
-                                                className={`ui-input w-full ${invalid ? "border-red-400 focus:ring-red-300" : ""}`}
-                                                placeholder={idx === 0 ? "+92-300-1234567" : `Phone ${idx + 1}`}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Contact Person Info</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="contactPerson"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Name of contact person"
+                                                {...field}
+                                                value={field.value ?? ""}
                                             />
-                                            {invalid && (
-                                                <p className="mt-1 text-[11px] text-red-500">Format must be +92-300-1234567</p>
-                                            )}
-                                        </div>
-                                        {contactPhones.length > 1 && (
-                                            <button type="button" onClick={() => setContactPhones(contactPhones.filter((_, i) => i !== idx))} className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-red-500">
-                                                <X size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    )
-                                })}
-                                <button type="button" onClick={() => setContactPhones([...contactPhones, ""])} className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1">
-                                    <Plus size={13} /> Add another number
-                                </button>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contactPersonDesignation"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Designation</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="e.g., Branch Manager, Officer"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contactPersonCnic"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>CNIC #</FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "contactPersonCnic") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "contactPersonCnic") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <CnicInput
+                                                    name="contactPersonCnic"
+                                                    placeholder="#####-#######-#"
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div>
+                                <FormLabel>
+                                    Phone Number <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="space-y-2 mt-2">
+                                    {contactPhones.map((num, idx) => {
+                                        const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                        return (
+                                            <div key={idx} className="flex items-start gap-2">
+                                                <div className="flex-1">
+                                                    <Input
+                                                        type="tel"
+                                                        value={num}
+                                                        onChange={(e) => {
+                                                            const updated = [...contactPhones]
+                                                            updated[idx] = e.target.value
+                                                            setContactPhones(updated)
+                                                        }}
+                                                        className={invalid ? "border-destructive" : ""}
+                                                        placeholder={idx === 0 ? "+92-300-1234567" : `Phone ${idx + 1}`}
+                                                    />
+                                                    {invalid && (
+                                                        <p className="mt-1 text-[11px] text-destructive">
+                                                            Format must be +92-300-1234567
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                {contactPhones.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setContactPhones(contactPhones.filter((_, i) => i !== idx))
+                                                        }
+                                                        className="flex-shrink-0 mt-2 text-muted-foreground hover:text-destructive"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setContactPhones([...contactPhones, ""])}
+                                        className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1"
+                                    >
+                                        <Plus size={13} /> Add another number
+                                    </button>
+                                </div>
                             </div>
-                            {contactPhones.filter(p => p.trim()).map((p, idx) => (
-                                <input key={idx} type="hidden" name={idx === 0 ? "contactPhone" : `contactPhone_${idx}`} value={p} />
-                            ))}
+                            <FormField
+                                control={form.control}
+                                name="contactEmail"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="email"
+                                                placeholder="branch@example.com"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
-                            <input type="email" name="contactEmail" placeholder="branch@example.com" className="ui-input" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Branch Manager's Information ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Manager&apos;s Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-                            <input type="text" name="branchManagerName" placeholder="Manager's full name" className="ui-input" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Branch Manager&apos;s Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="branchManagerName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Manager's full name"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="branchManagerContact"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contact Number</FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "branchManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "branchManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <PhoneInput name="branchManagerContact" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="branchManagerEmail"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="email"
+                                                placeholder="manager@example.com"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contact Number</label>
-                            <PhoneInput name="branchManagerContact" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
-                            <input type="email" name="branchManagerEmail" placeholder="manager@example.com" className="ui-input" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Operations Manager's Information ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Operations Manager&apos;s Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Manager <span className="text-red-500">*</span>
-                            </label>
-                            <SearchSelect
-                                name="_operationsManagerId"
-                                options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
-                                onChange={(val) => setSelectedOperationsManagerId(val)}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Operations Manager&apos;s Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FormLabel>
+                                    Manager <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="mt-2">
+                                    <SearchSelect
+                                        name="_operationsManagerId"
+                                        options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                        placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                        onChange={(val) => setSelectedOperationsManagerId(val)}
+                                    />
+                                </div>
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="operationsManagerContact"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Manager Contact Number <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "operationsManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "operationsManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <PhoneInput name="operationsManagerContact" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Manager Contact Number <span className="text-red-500">*</span>
-                            </label>
-                            <PhoneInput name="operationsManagerContact" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Supervisor's Information ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Supervisor&apos;s Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Supervisor <span className="text-red-500">*</span>
-                            </label>
-                            <SearchSelect
-                                name="assignedSupervisorId"
-                                options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
-                                placeholder={selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Supervisor&apos;s Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <FormLabel>
+                                    Supervisor <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <div className="mt-2">
+                                    <SearchSelect
+                                        name="assignedSupervisorId"
+                                        options={supervisorUsers.map((u) => ({ value: u.id, label: u.name }))}
+                                        placeholder={
+                                            selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="supervisorContact"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Supervisor Contact Number <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "supervisorContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "supervisorContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <PhoneInput name="supervisorContact" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">
-                                Supervisor Contact Number <span className="text-red-500">*</span>
-                            </label>
-                            <PhoneInput name="supervisorContact" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Branch Contract ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Branch Contract</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Start</label>
-                            <input type="date" name="contractStart" className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract End</label>
-                            <input type="date" name="contractEnd" className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate Start</label>
-                            <input type="date" name="contractRateStart" className="ui-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Contract Rate End</label>
-                            <input type="date" name="contractRateEnd" className="ui-input" />
-                        </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Branch Contract</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="contractStart"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Start</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contractEnd"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract End</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contractRateStart"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Rate Start</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contractRateEnd"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contract Rate End</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        {/* Day Guards */}
-                        <div className="md:col-span-2">
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <MultiSearchSelect name="contractDayGuardDesignation" options={designationOptions} placeholder="Select designations" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <MultiSearchSelect name="contractDayGuardExService" options={exServiceOptions} placeholder="Select" />
+                            {/* Day Guards */}
+                            <div className="md:col-span-2">
+                                <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Day Guards</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <FormLabel>Guard Designation</FormLabel>
+                                        <div className="mt-2">
+                                            <MultiSearchSelect
+                                                name="contractDayGuardDesignation"
+                                                options={designationOptions}
+                                                placeholder="Select designations"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <FormLabel>Guard Ex Service</FormLabel>
+                                        <div className="mt-2">
+                                            <MultiSearchSelect
+                                                name="contractDayGuardExService"
+                                                options={exServiceOptions}
+                                                placeholder="Select"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Night Guards */}
-                        <div className="md:col-span-2">
-                            <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Designation</label>
-                                    <MultiSearchSelect name="contractNightGuardDesignation" options={designationOptions} placeholder="Select designations" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Guard Ex Service</label>
-                                    <MultiSearchSelect name="contractNightGuardExService" options={exServiceOptions} placeholder="Select" />
+                            {/* Night Guards */}
+                            <div className="md:col-span-2">
+                                <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Night Guards</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <FormLabel>Guard Designation</FormLabel>
+                                        <div className="mt-2">
+                                            <MultiSearchSelect
+                                                name="contractNightGuardDesignation"
+                                                options={designationOptions}
+                                                placeholder="Select designations"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <FormLabel>Guard Ex Service</FormLabel>
+                                        <div className="mt-2">
+                                            <MultiSearchSelect
+                                                name="contractNightGuardExService"
+                                                options={exServiceOptions}
+                                                placeholder="Select"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Day Guards</label>
-                            <input type="number" name="contractAdditionalDayGuards" className="ui-input" placeholder="0" min={0} />
+                            <FormField
+                                control={form.control}
+                                name="contractAdditionalDayGuards"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Additional Day Guards</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                placeholder="0"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contractAdditionalNightGuards"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Additional Night Guards</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                placeholder="0"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-1">Additional Night Guards</label>
-                            <input type="number" name="contractAdditionalNightGuards" className="ui-input" placeholder="0" min={0} />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Additional Attachments ── */}
-                <div>
-                    <h2 className="text-base font-semibold mb-4 pb-2 border-b border-[var(--border)] text-[var(--text)]">Additional Attachments</h2>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-sm text-[var(--text-muted)] mb-2">Upload Files (PDF, Word, Images)</label>
-                            <input
-                                ref={fileRef}
-                                type="file"
-                                multiple
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={handleFileAdd}
-                                className="block w-full text-sm text-[var(--text-muted)] file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[var(--brand)] file:text-white hover:file:opacity-90 cursor-pointer border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1.5"
-                            />
-                            <p className="mt-1 text-xs text-[var(--text-muted)]">You can select multiple files.</p>
-                        </div>
-                        {attachments.length > 0 ? (
-                            <div className="space-y-2">
-                                {attachments.map((att, idx) => (
-                                    <div key={idx} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="truncate text-[var(--text)]">{att.name}</span>
-                                            <a href={att.dataUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-xs text-[var(--brand)] hover:underline">Preview</a>
-                                        </div>
-                                        <button type="button" onClick={() => removeAttachment(idx)} className="flex-shrink-0 ml-3 text-[var(--text-muted)] hover:text-red-500">
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-                                ))}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Additional Attachments</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <div>
+                                <FormLabel>Upload Files (PDF, Word, Images)</FormLabel>
+                                <input
+                                    ref={fileRef}
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    onChange={handleFileAdd}
+                                    className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[var(--brand)] file:text-white hover:file:opacity-90 cursor-pointer border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1.5 mt-2"
+                                />
+                                <FormDescription className="mt-1">
+                                    You can select multiple files.
+                                </FormDescription>
                             </div>
-                        ) : (
-                            <p className="text-sm text-[var(--text-muted)] italic">No attachments added yet.</p>
-                        )}
-                    </div>
+                            {attachments.length > 0 ? (
+                                <div className="space-y-2">
+                                    {attachments.map((att, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="truncate text-foreground">{att.name}</span>
+                                                <a
+                                                    href={att.dataUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex-shrink-0 text-xs text-[var(--brand)] hover:underline"
+                                                >
+                                                    Preview
+                                                </a>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAttachment(idx)}
+                                                className="flex-shrink-0 ml-3 text-muted-foreground hover:text-destructive"
+                                            >
+                                                <X size={15} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">No attachments added yet.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Form Actions */}
+                <div className="flex items-center gap-3">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => router.push(`/clients/${clientId}?tab=branches`)}
+                        disabled={submitting}
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Cancel
+                    </Button>
+                    <PermissionGate module="CLIENTS" action="CREATE" mode="hide">
+                        <Button type="submit" disabled={submitting}>
+                            <Save className="mr-2 h-4 w-4" />
+                            {submitting ? "Creating…" : "Create Branch"}
+                        </Button>
+                    </PermissionGate>
                 </div>
-
-            </div>
-
-            {/* Form Actions */}
-            <div className="flex items-center gap-4 mt-8 pt-6 border-t border-[var(--border)]">
-                <Link href={`/clients/${clientId}?tab=branches`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Cancel
-                </Link>
-                <button type="submit" disabled={loading} className="ui-btn ui-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Save className="h-4 w-4" />
-                    {loading ? "Creating..." : "Create Branch"}
-                </button>
-            </div>
-        </form>
+            </form>
+        </Form>
     )
 }
 
-// Helper component for capacity number inputs
+// Helper component for capacity number inputs (uses shadcn Input).
 function CapField({ label, name, required }: { label: string; name: string; required?: boolean }) {
     return (
         <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">
-                {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+            <label className="block text-xs text-muted-foreground mb-1">
+                {label}
+                {required && <span className="text-destructive ml-0.5">*</span>}
             </label>
-            <input type="number" name={name} className="ui-input" placeholder="0" min={0} defaultValue={0} />
+            <Input type="number" name={name} placeholder="0" min={0} defaultValue={0} />
         </div>
     )
 }

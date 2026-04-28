@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, buildManagerScopeWhere, managerScopeDenied } from "@/lib/access/scope"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import DeploymentEditForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
 
@@ -76,6 +77,7 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
                 deployment={deployment}
                 clients={clients}
                 regionalOffices={regionalOffices}
+                blockInactiveUpdate={isWorkflowRuleEnabled("deployments.blockInactiveUpdate")}
             />
         </div>
     )

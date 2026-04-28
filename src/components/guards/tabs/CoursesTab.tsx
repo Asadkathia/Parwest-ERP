@@ -1,411 +1,647 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { Plus, X, Loader2, Trash2, Download, BookOpen } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+import { format } from "date-fns"
+import {
+    BookOpen,
+    CalendarIcon,
+    Download,
+    Plus,
+    Trash2,
+    Upload,
+    X,
+} from "lucide-react"
+
 import type { GuardLooseRow } from "@/components/guards/tabs/types"
+import { Button } from "@/components/shadcn/button"
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@/components/shadcn/card"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/shadcn/table"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/shadcn/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { Textarea } from "@/components/shadcn/textarea"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/shadcn/popover"
+import { Calendar } from "@/components/shadcn/calendar"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import { cn } from "@/lib/utils"
+import {
+    guardCourseCreateSchema,
+    type GuardCourseCreateInput,
+} from "@/lib/schemas/guard-course"
 
 type GuardCourse = {
-  id: string
-  courseName: string
-  courseLevel: string
-  instructor: string
-  location: string
-  issueDate: string | null
-  description: string | null
-  fileName: string | null
-  fileData: string | null
-  createdAt: string
-  createdBy: { id: string; name: string } | null
+    id: string
+    courseName: string
+    courseLevel: string
+    instructor: string
+    location: string
+    issueDate: string | null
+    description: string | null
+    fileName: string | null
+    fileData: string | null
+    createdAt: string
+    createdBy: { id: string; name: string } | null
 }
 
 interface CoursesTabProps {
-  courses: GuardLooseRow[]
-  guardId: string
-  canCreate?: boolean
-  canDelete?: boolean
+    /** Server-rendered initial rows; the tab refetches on mount via the API. */
+    courses?: GuardLooseRow[]
+    guardId: string
+    canCreate?: boolean
+    canDelete?: boolean
 }
 
 function formatDate(val: string | null | undefined) {
-  if (!val) return "—"
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
+    if (!val) return "—"
+    const d = new Date(val)
+    return Number.isNaN(d.getTime())
+        ? "—"
+        : d.toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
 }
 
-const EMPTY_FORM = {
-  courseName: "",
-  courseLevel: "",
-  instructor: "",
-  location: "",
-  issueDate: "",
-  description: "",
-  fileName: "",
-  fileData: "",
+/** Read a JSON error envelope and return its `message` field. */
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+    try {
+        const data = (await res.json()) as { message?: unknown }
+        if (data && typeof data.message === "string" && data.message.length > 0) {
+            return data.message
+        }
+    } catch {
+        /* ignore */
+    }
+    return fallback
 }
 
-export default function CoursesTab({ guardId, canCreate = false, canDelete = false }: CoursesTabProps) {
-  const [records, setRecords] = useState<GuardCourse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+const EMPTY_FORM: GuardCourseCreateInput = {
+    courseName: "",
+    courseLevel: "",
+    instructor: "",
+    location: "",
+    issueDate: "",
+    description: "",
+}
 
-  const fetchCourses = useCallback(() => {
-    if (!guardId) return
-    setLoading(true)
-    fetch(`/api/guards/${guardId}/courses`)
-      .then(r => r.json())
-      .then(data => { setRecords(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => { setRecords([]); setLoading(false) })
-  }, [guardId])
+export default function CoursesTab({
+    guardId,
+    canCreate = false,
+    canDelete = false,
+}: CoursesTabProps) {
+    const [records, setRecords] = useState<GuardCourse[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showDialog, setShowDialog] = useState(false)
+    const [saving, setSaving] = useState(false)
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by guardId via callback
-  useEffect(() => { fetchCourses() }, [fetchCourses])
+    // File upload (legacy widget — preserved during reskin)
+    const fileRef = useRef<HTMLInputElement>(null)
+    const [fileName, setFileName] = useState<string>("")
+    const [fileData, setFileData] = useState<string>("")
 
-  function openModal() {
-    setForm(EMPTY_FORM)
-    setError("")
-    setShowModal(true)
-    if (fileRef.current) fileRef.current.value = ""
-  }
+    // Delete confirmation
+    const [deleteTarget, setDeleteTarget] = useState<GuardCourse | null>(null)
+    const [deleting, setDeleting] = useState(false)
 
-  function setField(key: keyof typeof EMPTY_FORM, value: string) {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }
+    const form = useForm<GuardCourseCreateInput>({
+        resolver: zodResolver(guardCourseCreateSchema),
+        defaultValues: EMPTY_FORM,
+    })
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      setForm(prev => ({
-        ...prev,
-        fileName: file.name,
-        fileData: (ev.target?.result as string) || "",
-      }))
+    const fetchCourses = useCallback(async () => {
+        if (!guardId) return
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/guards/${guardId}/courses`)
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to load courses")
+                toast.error(msg)
+                setRecords([])
+                return
+            }
+            const data = await res.json()
+            setRecords(Array.isArray(data) ? (data as GuardCourse[]) : [])
+        } catch {
+            toast.error("Failed to load courses")
+            setRecords([])
+        } finally {
+            setLoading(false)
+        }
+    }, [guardId])
+
+    useEffect(() => {
+        void fetchCourses()
+    }, [fetchCourses])
+
+    const openDialog = () => {
+        form.reset(EMPTY_FORM)
+        setFileName("")
+        setFileData("")
+        if (fileRef.current) fileRef.current.value = ""
+        setShowDialog(true)
     }
-    reader.readAsDataURL(file)
-  }
 
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      setForm(prev => ({
-        ...prev,
-        fileName: file.name,
-        fileData: (ev.target?.result as string) || "",
-      }))
+    const closeDialog = () => {
+        setShowDialog(false)
+        form.reset(EMPTY_FORM)
+        setFileName("")
+        setFileData("")
+        if (fileRef.current) fileRef.current.value = ""
     }
-    reader.readAsDataURL(file)
-  }
 
-  function resetForm() {
-    setForm(EMPTY_FORM)
-    setError("")
-    if (fileRef.current) fileRef.current.value = ""
-  }
+    // ── Legacy file upload widget (preserved) ──────────────────────────────
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+            setFileName(file.name)
+            setFileData((ev.target?.result as string) || "")
+        }
+        reader.readAsDataURL(file)
+    }
 
-  async function handleSubmit() {
-    setError("")
-    if (!form.courseName.trim()) { setError("Course name is required."); return }
-    if (!form.courseLevel.trim()) { setError("Course level is required."); return }
-    if (!form.instructor.trim()) { setError("Course instructor is required."); return }
-    if (!form.location.trim()) { setError("Course location is required."); return }
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault()
+        const file = e.dataTransfer.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+            setFileName(file.name)
+            setFileData((ev.target?.result as string) || "")
+        }
+        reader.readAsDataURL(file)
+    }
 
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/guards/${guardId}/courses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          courseName: form.courseName.trim(),
-          courseLevel: form.courseLevel.trim(),
-          instructor: form.instructor.trim(),
-          location: form.location.trim(),
-          issueDate: form.issueDate || null,
-          description: form.description.trim() || null,
-          fileName: form.fileName || null,
-          fileData: form.fileData || null,
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        setError((d as { error?: string })?.error || "Failed to save course.")
-      } else {
-        setShowModal(false)
-        fetchCourses()
-      }
-    } catch { setError("Network error.") }
-    setSaving(false)
-  }
+    const clearFile = () => {
+        setFileName("")
+        setFileData("")
+        if (fileRef.current) fileRef.current.value = ""
+    }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this course record?")) return
-    setDeletingId(id)
-    try {
-      const res = await fetch(`/api/guards/${guardId}/courses/${id}`, { method: "DELETE" })
-      if (res.ok) fetchCourses()
-    } catch { /* ignore */ }
-    setDeletingId(null)
-  }
+    // ── Submit (POST) ─────────────────────────────────────────────────────
+    const handleSubmit = form.handleSubmit(async (values) => {
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/guards/${guardId}/courses`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    courseName: values.courseName.trim(),
+                    courseLevel: values.courseLevel.trim(),
+                    instructor: values.instructor.trim(),
+                    location: values.location.trim(),
+                    issueDate: values.issueDate || null,
+                    description: values.description?.trim() || null,
+                    fileName: fileName || null,
+                    fileData: fileData || null,
+                }),
+            })
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to save course")
+                toast.error(msg)
+                return
+            }
+            toast.success("Course added")
+            closeDialog()
+            await fetchCourses()
+        } catch {
+            toast.error("Failed to save course")
+        } finally {
+            setSaving(false)
+        }
+    })
 
-  function downloadFile(course: GuardCourse) {
-    if (!course.fileData || !course.fileName) return
-    const a = document.createElement("a")
-    a.href = course.fileData
-    a.download = course.fileName
-    a.click()
-  }
+    // ── Delete (DELETE) ───────────────────────────────────────────────────
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return
+        setDeleting(true)
+        try {
+            const res = await fetch(
+                `/api/guards/${guardId}/courses/${deleteTarget.id}`,
+                { method: "DELETE" }
+            )
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to delete course")
+                toast.error(msg)
+                return
+            }
+            toast.success("Course deleted")
+            setDeleteTarget(null)
+            await fetchCourses()
+        } catch {
+            toast.error("Failed to delete course")
+        } finally {
+            setDeleting(false)
+        }
+    }
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--text)] uppercase tracking-wide">Refresher Courses</h2>
-        {canCreate && (
-          <button
-            onClick={openModal}
-            className="ui-btn ui-btn-primary flex items-center justify-center w-9 h-9 p-0 rounded"
-            title="Add New Course"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+    const downloadFile = (course: GuardCourse) => {
+        if (!course.fileData || !course.fileName) return
+        const a = document.createElement("a")
+        a.href = course.fileData
+        a.download = course.fileName
+        a.click()
+    }
 
-      {/* Table */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--brand)]" />
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#1a2942] text-white text-xs uppercase">
-                <th className="px-4 py-3 text-left">Course Name</th>
-                <th className="px-4 py-3 text-left">Course Level</th>
-                <th className="px-4 py-3 text-left">Instructor</th>
-                <th className="px-4 py-3 text-left">Location</th>
-                <th className="px-4 py-3 text-left">Issue Date</th>
-                <th className="px-4 py-3 text-left">Description</th>
-                <th className="px-4 py-3 text-left">File</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-[var(--text-muted)]">
-                    <BookOpen className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                    NO RECORD FOUND
-                  </td>
-                </tr>
-              ) : records.map(course => (
-                <tr key={course.id} className="border-t border-[var(--border)] hover:bg-[var(--bg-muted)]/40 transition-colors">
-                  <td className="px-4 py-3 font-medium">{course.courseName}</td>
-                  <td className="px-4 py-3">{course.courseLevel}</td>
-                  <td className="px-4 py-3">{course.instructor}</td>
-                  <td className="px-4 py-3">{course.location}</td>
-                  <td className="px-4 py-3">{formatDate(course.issueDate)}</td>
-                  <td className="px-4 py-3 max-w-[180px] truncate text-[var(--text-muted)]">{course.description || "—"}</td>
-                  <td className="px-4 py-3">
-                    {course.fileData && course.fileName ? (
-                      <button
-                        onClick={() => downloadFile(course)}
-                        className="flex items-center gap-1 text-xs text-[var(--brand)] hover:underline"
-                        title={course.fileName}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span className="max-w-[80px] truncate">{course.fileName}</span>
-                      </button>
-                    ) : (
-                      <span className="text-[var(--text-muted)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {canDelete ? (
-                      <button
-                        onClick={() => handleDelete(course.id)}
-                        disabled={deletingId === course.id}
-                        className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
-                        title="Delete"
-                      >
-                        {deletingId === course.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Trash2 className="h-3.5 w-3.5" />}
-                      </button>
-                    ) : (
-                      <span className="text-[var(--text-muted)]">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    if (loading) {
+        return (
+            <Card>
+                <CardContent className="p-12 text-center text-sm text-muted-foreground">
+                    Loading courses…
+                </CardContent>
+            </Card>
+        )
+    }
 
-      {/* Add Course Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-              <h3 className="text-sm font-semibold text-[var(--text)] uppercase tracking-widest">
-                Add New Refresher Course
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-5 overflow-y-auto space-y-4 flex-1">
-              {/* Row 1: Course Name + Course Level */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Course Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="ui-input"
-                    placeholder="Course Name"
-                    value={form.courseName}
-                    onChange={e => setField("courseName", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Course Level <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="ui-input"
-                    placeholder="Course Name"
-                    value={form.courseLevel}
-                    onChange={e => setField("courseLevel", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Instructor + Location */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Course Instructor <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="ui-input"
-                    placeholder="Course Instructor"
-                    value={form.instructor}
-                    onChange={e => setField("instructor", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Course Location <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="ui-input"
-                    placeholder="Course Location"
-                    value={form.location}
-                    onChange={e => setField("location", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Issue Date + Description */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Issue Date
-                  </label>
-                  <input
-                    type="date"
-                    className="ui-input"
-                    placeholder="ISSUE DATE"
-                    value={form.issueDate}
-                    onChange={e => setField("issueDate", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                    Description
-                  </label>
-                  <input
-                    className="ui-input"
-                    placeholder="Description"
-                    value={form.description}
-                    onChange={e => setField("description", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* File Upload */}
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1 uppercase tracking-wide">
-                  Upload File
-                </label>
-                <div
-                  className="border-2 border-dashed border-[var(--border)] rounded-lg p-6 text-center cursor-pointer hover:border-[var(--brand)] hover:bg-[var(--bg-muted)]/30 transition-colors"
-                  onClick={() => fileRef.current?.click()}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={handleDrop}
-                >
-                  {form.fileName ? (
-                    <div className="flex items-center justify-center gap-2 text-sm text-[var(--brand)]">
-                      <Download className="h-4 w-4" />
-                      <span className="font-medium">{form.fileName}</span>
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); setForm(prev => ({ ...prev, fileName: "", fileData: "" })); if (fileRef.current) fileRef.current.value = "" }}
-                        className="ml-1 text-red-500 hover:text-red-700"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+    return (
+        <div className="space-y-4">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <div>
+                        <CardTitle>Refresher Courses</CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {records.length} {records.length === 1 ? "course" : "courses"} on file
+                        </p>
                     </div>
-                  ) : (
-                    <p className="text-sm text-[var(--text-muted)]">DROP FILES HERE TO UPLOAD</p>
-                  )}
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </div>
-              </div>
+                    {canCreate && (
+                        <PermissionGate module="GUARDS" action="CREATE" mode="hide">
+                            <Button type="button" size="sm" onClick={openDialog}>
+                                <Plus className="mr-1 h-4 w-4" />
+                                Add Course
+                            </Button>
+                        </PermissionGate>
+                    )}
+                </CardHeader>
+                <CardContent className="p-0">
+                    {records.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-sm text-muted-foreground">
+                            <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+                            <span>No refresher courses recorded yet.</span>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Course Name</TableHead>
+                                        <TableHead>Level</TableHead>
+                                        <TableHead>Instructor</TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Issue Date</TableHead>
+                                        <TableHead>Description</TableHead>
+                                        <TableHead>File</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {records.map((course) => (
+                                        <TableRow key={course.id}>
+                                            <TableCell className="font-medium">
+                                                {course.courseName}
+                                            </TableCell>
+                                            <TableCell>{course.courseLevel}</TableCell>
+                                            <TableCell>{course.instructor}</TableCell>
+                                            <TableCell>{course.location}</TableCell>
+                                            <TableCell className="tabular-nums">
+                                                {formatDate(course.issueDate)}
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                                                {course.description || "—"}
+                                            </TableCell>
+                                            <TableCell>
+                                                {course.fileData && course.fileName ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => downloadFile(course)}
+                                                        title={course.fileName}
+                                                        className="h-7 px-2"
+                                                    >
+                                                        <Download className="mr-1 h-3.5 w-3.5" />
+                                                        <span className="max-w-[100px] truncate text-xs">
+                                                            {course.fileName}
+                                                        </span>
+                                                    </Button>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {canDelete ? (
+                                                    <PermissionGate
+                                                        module="GUARDS"
+                                                        action="DELETE"
+                                                        mode="hide"
+                                                    >
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => setDeleteTarget(course)}
+                                                            className="h-7 w-7 p-0 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:hover:bg-rose-950/30"
+                                                            title="Delete course"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </PermissionGate>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-            </div>
+            {/* Add Course Dialog */}
+            <Dialog
+                open={showDialog}
+                onOpenChange={(open) => {
+                    if (!open) closeDialog()
+                }}
+            >
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Add Refresher Course</DialogTitle>
+                        <DialogDescription>
+                            Record a refresher course completed by this guard.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <FormField
+                                    control={form.control}
+                                    name="courseName"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>
+                                                Course Name <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Course name" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="courseLevel"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>
+                                                Course Level <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Level" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="instructor"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>
+                                                Instructor <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Course instructor" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="location"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>
+                                                Location <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Course location" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="issueDate"
+                                    render={({ field }) => {
+                                        const dateValue = field.value
+                                            ? new Date(field.value)
+                                            : undefined
+                                        const valid =
+                                            dateValue && !Number.isNaN(dateValue.getTime())
+                                        return (
+                                            <FormItem className="flex flex-col">
+                                                <FormLabel>Issue Date</FormLabel>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <FormControl>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                className={cn(
+                                                                    "w-full justify-start text-left font-normal",
+                                                                    !valid && "text-muted-foreground"
+                                                                )}
+                                                            >
+                                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                {valid
+                                                                    ? format(dateValue, "PPP")
+                                                                    : "Pick a date"}
+                                                            </Button>
+                                                        </FormControl>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent
+                                                        className="w-auto p-0"
+                                                        align="start"
+                                                    >
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={valid ? dateValue : undefined}
+                                                            onSelect={(d) =>
+                                                                field.onChange(
+                                                                    d ? format(d, "yyyy-MM-dd") : ""
+                                                                )
+                                                            }
+                                                            captionLayout="dropdown"
+                                                            fromYear={1990}
+                                                            toYear={new Date().getFullYear() + 1}
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )
+                                    }}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Description</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Description" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
 
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl shrink-0">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="ui-btn px-5 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded"
-              >
-                RESET
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={saving}
-                className="ui-btn ui-btn-primary px-5 py-2 text-sm flex items-center gap-2"
-              >
-                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                SUBMIT
-              </button>
-            </div>
-          </div>
+                            {/* Legacy file upload widget — preserved */}
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">Upload File</label>
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input p-6 text-center text-sm text-muted-foreground hover:border-primary hover:bg-muted/40"
+                                    onClick={() => fileRef.current?.click()}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault()
+                                            fileRef.current?.click()
+                                        }
+                                    }}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={handleDrop}
+                                >
+                                    {fileName ? (
+                                        <div className="flex items-center gap-2 text-primary">
+                                            <Download className="h-4 w-4" />
+                                            <span className="font-medium">{fileName}</span>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    clearFile()
+                                                }}
+                                                className="text-rose-500 hover:text-rose-700"
+                                                aria-label="Remove file"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Upload className="h-5 w-5 text-muted-foreground/60" />
+                                            <span>Drop a file here or click to upload</span>
+                                        </>
+                                    )}
+                                    <input
+                                        ref={fileRef}
+                                        type="file"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeDialog}
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={saving}>
+                                    {saving ? "Saving…" : "Save Course"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete confirmation */}
+            <AlertDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => {
+                    if (!open) setDeleteTarget(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this course record?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block">
+                                <span className="font-medium text-foreground">
+                                    {deleteTarget?.courseName ?? ""}
+                                </span>{" "}
+                                will be permanently removed from this guard&apos;s record. This
+                                action cannot be undone.
+                            </span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            disabled={deleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {deleting ? "Deleting…" : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
-      )}
-    </div>
-  )
+    )
 }

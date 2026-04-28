@@ -1,10 +1,25 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useState } from "react"
+import * as React from "react"
 import Link from "next/link"
-import { Plus, Search, RefreshCw, Tag, AlertCircle, CheckCircle2, Clock } from "lucide-react"
-import InlineAlert from "@/components/ui/inline-alert"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { type ColumnDef } from "@tanstack/react-table"
+import { AlertCircle, CheckCircle2, Clock, Loader2, Plus, Tag, Ticket } from "lucide-react"
+import { toast } from "sonner"
+
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { DataTable } from "@/components/shadcn/data-table"
+import { Input } from "@/components/shadcn/input"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
 
 type Lookup = { id: string; name: string; color?: string | null }
 type TicketRow = {
@@ -19,240 +34,384 @@ type TicketRow = {
   createdAt: string
 }
 
-const PAGE_SIZES = [10, 25, 50, 100]
+// Sentinel for the shadcn `Select` "all" option. Radix `Select` disallows
+// empty-string item values, so we map this back to "" before pushing to URL.
+const ALL_VALUE = "__ALL__"
 
-function ColorDot({ color }: { color?: string | null }) {
-  if (!color) return null
-  return <span className="inline-block h-2 w-2 rounded-full mr-1.5 shrink-0" style={{ backgroundColor: color }} />
+function statusVariant(name: string): "default" | "secondary" | "destructive" | "outline" {
+  const n = name.toLowerCase()
+  if (n.includes("close") || n.includes("resolv")) return "secondary"
+  if (n.includes("progress")) return "default"
+  if (n.includes("reject") || n.includes("cancel")) return "destructive"
+  return "outline"
 }
 
-function PriorityBadge({ priority }: { priority?: Lookup | null }) {
-  if (!priority) return <span className="text-[var(--text-muted)]">—</span>
-  const c = priority.color || "#94a3b8"
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border" style={{ color: c, borderColor: c, backgroundColor: `${c}20` }}>
-      {priority.name}
-    </span>
-  )
+function priorityVariant(name: string): "default" | "secondary" | "destructive" | "outline" {
+  const n = name.toLowerCase()
+  if (n.includes("critical") || n.includes("urgent") || n.includes("high")) return "destructive"
+  if (n.includes("medium") || n.includes("normal")) return "default"
+  if (n.includes("low")) return "secondary"
+  return "outline"
 }
 
-function StatusBadge({ status }: { status?: Lookup | null }) {
-  if (!status) return <span className="text-[var(--text-muted)]">—</span>
-  const n = status.name.toLowerCase()
-  const c = status.color || (n.includes("close") || n.includes("resolv") ? "#10b981" : n.includes("progress") ? "#f59e0b" : "#6366f1")
-  const Icon = n.includes("close") || n.includes("resolv") ? CheckCircle2 : n.includes("progress") ? Clock : AlertCircle
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border" style={{ color: c, borderColor: c, backgroundColor: `${c}20` }}>
-      <Icon className="h-3 w-3" />{status.name}
-    </span>
-  )
+function StatusIcon({ name }: { name: string }) {
+  const n = name.toLowerCase()
+  if (n.includes("close") || n.includes("resolv")) return <CheckCircle2 className="me-1 h-3 w-3" />
+  if (n.includes("progress")) return <Clock className="me-1 h-3 w-3" />
+  return <AlertCircle className="me-1 h-3 w-3" />
 }
-
-type RegionOption = { id: string; name: string }
 
 export default function TicketListManager({
   canCreate = true,
-  regions = [],
-  locked = false,
 }: {
   canCreate?: boolean
-  regions?: RegionOption[]
+  // Note: `regions` and `locked` are accepted to keep the server page contract
+  // stable but are no longer rendered — the global topbar region selector
+  // covers region scoping now.
+  regions?: { id: string; name: string }[]
   locked?: boolean
 }) {
-  const [tickets, setTickets] = useState<TicketRow[]>([])
-  const [categories, setCategories] = useState<Lookup[]>([])
-  const [priorities, setPriorities] = useState<Lookup[]>([])
-  const [statuses, setStatuses] = useState<Lookup[]>([])
-  const [search, setSearch] = useState("")
-  const [filterCat, setFilterCat] = useState("")
-  const [filterPrio, setFilterPrio] = useState("")
-  const [filterStatus, setFilterStatus] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-  const [sortKey, setSortKey] = useState("createdAt")
-  const [sortDir, setSortDir] = useState<"asc"|"desc">("desc")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [isPending, startTransition] = React.useTransition()
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("")
+  const filterStatus = searchParams.get("statusId") ?? ""
+  const filterPriority = searchParams.get("priorityId") ?? ""
+  const filterCategory = searchParams.get("categoryId") ?? ""
+  const initialSearch = searchParams.get("search") ?? ""
+  const [search, setSearch] = React.useState(initialSearch)
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [tickets, setTickets] = React.useState<TicketRow[]>([])
+  const [categories, setCategories] = React.useState<Lookup[]>([])
+  const [priorities, setPriorities] = React.useState<Lookup[]>([])
+  const [statuses, setStatuses] = React.useState<Lookup[]>([])
+  const [loading, setLoading] = React.useState(false)
+
+  const pushParam = React.useCallback(
+    (mutator: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString())
+      mutator(params)
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`)
+      })
+    },
+    [router, pathname, searchParams]
+  )
+
+  // Debounce search → URL
+  React.useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      pushParam((p) => {
+        if (search.trim()) p.set("search", search.trim())
+        else p.delete("search")
+      })
+    }, 350)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  const handleSelect = (key: string) => (val: string) => {
+    pushParam((p) => {
+      if (val && val !== ALL_VALUE) p.set(key, val)
+      else p.delete(key)
+    })
+  }
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
     try {
       const p = new URLSearchParams()
-      if (search.trim()) p.set("search", search.trim())
-      if (filterCat) p.set("categoryId", filterCat)
-      if (filterPrio) p.set("priorityId", filterPrio)
+      if (initialSearch) p.set("search", initialSearch)
+      if (filterCategory) p.set("categoryId", filterCategory)
+      if (filterPriority) p.set("priorityId", filterPriority)
       if (filterStatus) p.set("statusId", filterStatus)
       const res = await fetch(`/api/tickets?${p}`, { cache: "no-store" })
       const data = await res.json().catch(() => [])
-      if (!res.ok) throw new Error(data?.message || "Failed to load.")
+      if (!res.ok) {
+        const msg =
+          (data && typeof data.message === "string" && data.message) ||
+          "Failed to load tickets."
+        throw new Error(msg)
+      }
       setTickets(Array.isArray(data) ? data : [])
-      setPage(1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load tickets.")
-    } finally { setLoading(false) }
-  }, [search, filterCat, filterPrio, filterStatus])
+      toast.error(e instanceof Error ? e.message : "Failed to load tickets.")
+    } finally {
+      setLoading(false)
+    }
+  }, [initialSearch, filterCategory, filterPriority, filterStatus])
 
-  useEffect(() => {
+  React.useEffect(() => {
     Promise.all([
-      fetch("/api/tickets/categories").then(r=>r.json()).catch(()=>[]),
-      fetch("/api/tickets/priorities").then(r=>r.json()).catch(()=>[]),
-      fetch("/api/tickets/statuses").then(r=>r.json()).catch(()=>[]),
-    ]).then(([c,p,s])=>{ setCategories(Array.isArray(c)?c:[]); setPriorities(Array.isArray(p)?p:[]); setStatuses(Array.isArray(s)?s:[]) })
-    void load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      fetch("/api/tickets/categories").then((r) => r.json()).catch(() => []),
+      fetch("/api/tickets/priorities").then((r) => r.json()).catch(() => []),
+      fetch("/api/tickets/statuses").then((r) => r.json()).catch(() => []),
+    ]).then(([c, p, s]) => {
+      setCategories(Array.isArray(c) ? c : [])
+      setPriorities(Array.isArray(p) ? p : [])
+      setStatuses(Array.isArray(s) ? s : [])
+    })
   }, [])
 
-  const toggleSort = (k: string) => { if (sortKey===k) setSortDir(d=>d==="asc"?"desc":"asc"); else { setSortKey(k); setSortDir("asc") } }
+  React.useEffect(() => {
+    void load()
+  }, [load])
 
-  const sorted = [...tickets].sort((a,b) => {
-    if (sortKey==="ticketNumber") {
-      const diff = (a.ticketNumber??0) - (b.ticketNumber??0)
-      return sortDir==="asc" ? diff : -diff
-    }
-    const av = String((a as Record<string,unknown>)[sortKey]??"")
-    const bv = String((b as Record<string,unknown>)[sortKey]??"")
-    return sortDir==="asc" ? av.localeCompare(bv) : bv.localeCompare(av)
-  })
-  const totalPages = Math.max(1, Math.ceil(sorted.length/pageSize))
-  const paged = sorted.slice((page-1)*pageSize, page*pageSize)
-
-  const Th = ({ col, label }: { col: string; label: string }) => (
-    <th onClick={()=>toggleSort(col)} className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-white/10 whitespace-nowrap">
-      {label}
-      <span className="ml-1 text-[10px] opacity-50">{sortKey===col ? (sortDir==="asc"?"▲":"▼") : "⇅"}</span>
-    </th>
+  const columns = React.useMemo<ColumnDef<TicketRow>[]>(
+    () => [
+      {
+        accessorKey: "ticketNumber",
+        header: "ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {row.original.ticketNumber ?? "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "subject",
+        header: "Subject",
+        cell: ({ row }) => (
+          <Link
+            href={`/tickets/${row.original.id}`}
+            className="font-medium text-primary hover:underline line-clamp-2"
+          >
+            {row.original.subject}
+          </Link>
+        ),
+      },
+      {
+        id: "category",
+        header: "Category",
+        cell: ({ row }) =>
+          row.original.category ? (
+            <Badge variant="outline">{row.original.category.name}</Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: "priority",
+        header: "Priority",
+        cell: ({ row }) =>
+          row.original.priority ? (
+            <Badge variant={priorityVariant(row.original.priority.name)}>
+              {row.original.priority.name}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) =>
+          row.original.status ? (
+            <Badge variant={statusVariant(row.original.status.name)}>
+              <StatusIcon name={row.original.status.name} />
+              {row.original.status.name}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: "sender",
+        header: "Reporter",
+        cell: ({ row }) => row.original.sender?.name ?? "—",
+      },
+      {
+        id: "assignedTo",
+        header: "Assignee",
+        cell: ({ row }) =>
+          row.original.assignedTo ? (
+            <span className="font-medium">{row.original.assignedTo.name}</span>
+          ) : (
+            <Badge variant="destructive">Unassigned</Badge>
+          ),
+      },
+      {
+        accessorKey: "createdAt",
+        header: "Created",
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Link
+            href={`/tickets/${row.original.id}`}
+            className="font-medium text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            View
+          </Link>
+        ),
+      },
+    ],
+    []
   )
+
+  const isEmpty = !loading && tickets.length === 0
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Tickets</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">Track and resolve support tickets</p>
+          <h1 className="text-2xl font-bold">Tickets</h1>
+          <p className="text-sm text-muted-foreground">
+            Track and resolve support tickets
+          </p>
         </div>
         {canCreate ? (
-          <Link href="/tickets/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-            <Plus className="h-4 w-4" /> New Ticket
-          </Link>
+          <PermissionGate module="TICKETING" action="CREATE" mode="hide">
+            <Button asChild>
+              <Link href="/tickets/new">
+                <Plus className="me-2 h-4 w-4" />
+                New Ticket
+              </Link>
+            </Button>
+          </PermissionGate>
         ) : null}
       </div>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-
       {/* Filters */}
-      <div className="ui-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <Suspense>
-            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={!locked} />
-          </Suspense>
-          <div className="lg:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-            <input className="ui-input pl-9" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&void load()} placeholder="Search subject or description..." />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Search</label>
+          <div className="relative">
+            <Input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search subject or description…"
+              className="pr-8"
+            />
+            {(isPending || loading) && (
+              <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
-          <select className="ui-select" value={filterCat} onChange={e=>setFilterCat(e.target.value)}>
-            <option value="">All Categories</option>
-            {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select className="ui-select" value={filterPrio} onChange={e=>setFilterPrio(e.target.value)}>
-            <option value="">All Priorities</option>
-            {priorities.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <select className="ui-select" value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            {statuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={()=>void load()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading?"animate-spin":""}`} /> {loading?"Loading...":"Search"}
-          </button>
-          <button onClick={()=>{setSearch("");setFilterCat("");setFilterPrio("");setFilterStatus("");void load()}} className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-muted)] transition">
-            Clear
-          </button>
-          <span className="ml-auto text-xs text-[var(--text-muted)]">{tickets.length} total</span>
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Status</label>
+          <Select
+            value={filterStatus || ALL_VALUE}
+            onValueChange={handleSelect("statusId")}
+            disabled={isPending}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>All Statuses</SelectItem>
+              {statuses.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Priority</label>
+          <Select
+            value={filterPriority || ALL_VALUE}
+            onValueChange={handleSelect("priorityId")}
+            disabled={isPending}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Priorities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>All Priorities</SelectItem>
+              {priorities.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Category</label>
+          <Select
+            value={filterCategory || ALL_VALUE}
+            onValueChange={handleSelect("categoryId")}
+            disabled={isPending}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>All Categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="ui-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-muted)]">
-          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wide">
-            SHOW
-            <select className="ui-select w-16 py-1 text-xs" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1)}}>
-              {PAGE_SIZES.map(n=><option key={n} value={n}>{n}</option>)}
-            </select>
-            ENTRIES
-          </div>
-          <Link href="/tickets/prerequisites" className="flex items-center gap-1 text-xs text-[var(--brand)] hover:underline">
-            <Tag className="h-3 w-3" /> Configure Lookups
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px]">
-            <thead>
-              <tr style={{background:"#1e2a3a"}}>
-                <Th col="ticketNumber" label="ID" />
-                <Th col="subject" label="Subject" />
-                <Th col="sender" label="Sender" />
-                <th className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Category</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Priority</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Status</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Assigned To</th>
-                <Th col="createdAt" label="Created At" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {paged.length === 0 ? (
-                <tr><td colSpan={8} className="py-16 text-center text-sm text-[var(--text-muted)]">{loading?"Loading...":"No tickets found."}</td></tr>
-              ) : paged.map(t => {
-                const urgent = ["high","critical","urgent"].some(w=>t.priority?.name?.toLowerCase().includes(w))
-                return (
-                  <tr key={t.id} className="hover:bg-[var(--surface-muted)] transition-colors">
-                    <td className="px-3 py-3 text-sm font-mono text-[var(--text-muted)] whitespace-nowrap">{t.ticketNumber??"-"}</td>
-                    <td className="px-3 py-3 max-w-[280px]">
-                      <Link href={`/tickets/${t.id}`} className={`text-sm font-medium hover:underline line-clamp-2 ${urgent?"text-red-600":"text-[var(--brand)]"}`}>{t.subject}</Link>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-[var(--text-muted)] whitespace-nowrap">{t.sender?.name??"—"}</td>
-                    <td className="px-3 py-3 text-sm whitespace-nowrap">
-                      {t.category ? <span className="inline-flex items-center"><ColorDot color={t.category.color}/>{t.category.name}</span> : "—"}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap"><PriorityBadge priority={t.priority}/></td>
-                    <td className="px-3 py-3 whitespace-nowrap"><StatusBadge status={t.status}/></td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm">
-                      {t.assignedTo
-                        ? <span className="font-semibold text-emerald-600">{t.assignedTo.name}</span>
-                        : <span className="font-semibold text-red-500 text-xs">NOT ASSIGNED</span>}
-                    </td>
-                    <td className="px-3 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">
-                      {new Date(t.createdAt).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-muted)]">
-          <p className="text-xs text-[var(--text-muted)]">
-            Showing {tickets.length===0?0:(page-1)*pageSize+1}–{Math.min(page*pageSize,tickets.length)} of {tickets.length} entries
-          </p>
-          <div className="flex items-center gap-1">
-            {["Previous",...Array.from({length:Math.min(totalPages,7)},(_,i)=>String(i+1)),...(totalPages>7?[String(totalPages)]:[]),"Next"].map((lbl,i)=>{
-              const isNum = !isNaN(Number(lbl))
-              const pg = Number(lbl)
-              const disabled = lbl==="Previous"?page===1:lbl==="Next"?page>=totalPages:false
-              const active = isNum && pg===page
-              return <button key={i} onClick={()=>{
-                if(lbl==="Previous") setPage(p=>Math.max(1,p-1))
-                else if(lbl==="Next") setPage(p=>Math.min(totalPages,p+1))
-                else setPage(pg)
-              }} disabled={disabled} className={`min-w-[34px] h-8 px-2 rounded text-xs font-medium border transition ${active?"bg-[var(--brand)] text-white border-[var(--brand)]":disabled?"opacity-40 cursor-not-allowed border-[var(--border)] text-[var(--text-muted)]":"border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-muted)]"}`}>{lbl}</button>
-            })}
-          </div>
-        </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {tickets.length} ticket{tickets.length !== 1 ? "s" : ""} found
+        </span>
+        <Link
+          href="/tickets/prerequisites"
+          className="flex items-center gap-1 text-primary hover:underline"
+        >
+          <Tag className="h-3 w-3" /> Configure Lookups
+        </Link>
       </div>
+
+      {isEmpty ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <Ticket className="h-8 w-8 text-muted-foreground" aria-hidden />
+            <div className="text-base font-semibold">No tickets found</div>
+            <p className="max-w-md text-sm text-muted-foreground">
+              No tickets match the current filters. Try clearing filters or
+              create a new ticket.
+            </p>
+            {canCreate && (
+              <PermissionGate module="TICKETING" action="CREATE" mode="hide">
+                <Button asChild className="mt-2">
+                  <Link href="/tickets/new">
+                    <Plus className="me-2 h-4 w-4" />
+                    Create Ticket
+                  </Link>
+                </Button>
+              </PermissionGate>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={tickets}
+          searchKey="subject"
+          searchPlaceholder="Filter visible rows by subject…"
+          pageSize={25}
+          enableColumnVisibility
+          emptyMessage={loading ? "Loading…" : "No tickets match the on-page filter."}
+        />
+      )}
     </div>
   )
 }

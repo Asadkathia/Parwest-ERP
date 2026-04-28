@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import ActionButton from "@/components/ui/action-button"
-import { Input, Select } from "@/components/ui/form-controls"
 import { cn } from "@/lib/utils"
 import { BellOff, Bell, Save, RotateCcw } from "lucide-react"
 
@@ -194,7 +193,8 @@ function InsightConfigRow({ row, onSaved }: { row: InsightConfig; onSaved: () =>
                 {Object.entries(row.defaultThresholds).map(([k, defVal]) => (
                   <label key={k} className="text-sm">
                     <span className="mb-1 block font-medium">{k}</span>
-                    <Input
+                    <input
+                      className="ui-input"
                       value={thresholds[k] ?? ""}
                       onChange={(e) => setThresholds({ ...thresholds, [k]: e.target.value })}
                     />
@@ -212,20 +212,28 @@ function InsightConfigRow({ row, onSaved }: { row: InsightConfig; onSaved: () =>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-sm">
               <span className="mb-1 block font-medium">Severity override</span>
-              <Select value={severity} onChange={(e) => setSeverity(e.target.value as Severity | "")}>
+              <select
+                className="ui-select"
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value as Severity | "")}
+              >
                 <option value="">Default ({row.defaultSeverity})</option>
                 <option value="HIGH">HIGH</option>
                 <option value="MEDIUM">MEDIUM</option>
                 <option value="LOW">LOW</option>
-              </Select>
+              </select>
             </label>
 
             <label className="text-sm">
               <span className="mb-1 block font-medium">Mute</span>
-              <Select value={muted ? "1" : "0"} onChange={(e) => setMuted(e.target.value === "1")}>
+              <select
+                className="ui-select"
+                value={muted ? "1" : "0"}
+                onChange={(e) => setMuted(e.target.value === "1")}
+              >
                 <option value="0">Active</option>
                 <option value="1">Muted</option>
-              </Select>
+              </select>
             </label>
           </div>
 
@@ -233,7 +241,8 @@ function InsightConfigRow({ row, onSaved }: { row: InsightConfig; onSaved: () =>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm">
                 <span className="mb-1 block font-medium">Mute days (blank = forever)</span>
-                <Input
+                <input
+                  className="ui-input"
                   type="number"
                   min={1}
                   value={mutedDays}
@@ -242,7 +251,11 @@ function InsightConfigRow({ row, onSaved }: { row: InsightConfig; onSaved: () =>
               </label>
               <label className="text-sm">
                 <span className="mb-1 block font-medium">Mute reason</span>
-                <Input value={mutedReason} onChange={(e) => setMutedReason(e.target.value)} />
+                <input
+                  className="ui-input"
+                  value={mutedReason}
+                  onChange={(e) => setMutedReason(e.target.value)}
+                />
               </label>
             </div>
           ) : null}

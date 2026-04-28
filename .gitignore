@@ -72,3 +72,7 @@ playwright/.cache/
 # graphify
 graphify-out/
 src/lib/graphify-out/
+
+# Design-system v1.1 dump (folder name has trailing space)
+/Parwest\ /
+

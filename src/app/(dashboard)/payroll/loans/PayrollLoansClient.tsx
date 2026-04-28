@@ -1,7 +1,39 @@
+/**
+ * Parwest ERP — Payroll: Loans (canonical payroll-manager migration template)
+ * ─────────────────────────────────────────────────────────────────────────
+ * This file is the reference migration for all subsequent payroll managers
+ * (Salary V2, Holidays, Extra Hours, Allowances, Penalties, Advances, etc.).
+ *
+ * Canonical pieces:
+ *  - List/table → `<DataTable>` from `@/components/shadcn/data-table` with
+ *    column-defs in `useMemo`, `searchKey` for in-memory filtering, server-
+ *    side filters threaded via URL contract (region/month/etc.).
+ *  - Create/edit form → shadcn `<Form>` (RHF + zodResolver), with each field
+ *    wrapped FormField → FormItem → FormLabel → FormControl → FormMessage.
+ *    Schemas live under `src/lib/schemas/` and MUST mirror the existing API
+ *    validations exactly — no tightening or loosening on reskin.
+ *  - Destructive operations (finalize, revert, delete) → shadcn `AlertDialog`
+ *    instead of native `confirm()`, with destructive-variant action button.
+ *  - Toast feedback via sonner; reads `data.message` per the API envelope
+ *    contract (`{ success, message, code }`) — never `data.error`.
+ *  - Permission gating via `<PermissionGate module="PAYROLL" action="…">`
+ *    around create/update buttons (mode="hide" in toolbars).
+ *  - Currency rendered via `<ParwestCurrency>` for any displayed amounts.
+ *
+ * Reskin scope only — data flow, API endpoints, and URL contracts are
+ * preserved exactly. Sub-components (GuardAutocomplete, GuardContextFields,
+ * AttendanceDetailsTable, Base64FileUpload, RegionUrlPicker) are kept since
+ * they're shared across the payroll suite and out of scope for this pass.
+ */
+
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { type ColumnDef } from "@tanstack/react-table"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
@@ -9,8 +41,49 @@ import GuardInfoCard from "@/components/payroll/shared/GuardInfoCard"
 import AttendanceDetailsTable from "@/components/payroll/shared/AttendanceDetailsTable"
 import Base64FileUpload from "@/components/payroll/shared/Base64FileUpload"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
+import { Badge } from "@/components/shadcn/badge"
+import { Button, buttonVariants } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { DataTable } from "@/components/shadcn/data-table"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
 import { parseCsvToLoanRows, type BulkLoanDraftRow } from "@/lib/payroll/loans-bulk"
+import { cn } from "@/lib/utils"
+import {
+  PAYROLL_LOAN_PAYMENT_METHODS,
+  payrollLoanCreateSchema,
+  type PayrollLoanCreateInput,
+} from "@/lib/schemas/payroll-loan"
 
 type TabId = "add" | "finalize" | "history"
 
@@ -68,7 +141,7 @@ type HistoryRow = {
   totalAmount: number
 }
 
-const PAYMENT_METHODS = ["BANK", "CASH", "MOBILE"]
+const ALL_VALUE = "__ALL__"
 
 export default function PayrollLoansClient({
   canCreate = false,
@@ -122,9 +195,11 @@ export default function PayrollLoansClient({
         (canView ? (
           <HistoryTab />
         ) : (
-          <section className="ui-card p-4 text-sm text-[var(--text-muted)]">
-            No access — you don&apos;t have permission to view finalisation history.
-          </section>
+          <Card>
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              No access — you don&apos;t have permission to view finalisation history.
+            </CardContent>
+          </Card>
         ))}
     </PayrollPageShell>
   )
@@ -144,23 +219,39 @@ function AddLoansTab({
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
-  const [amount, setAmount] = useState("")
-  const [paymentDate, setPaymentDate] = useState("")
-  const [selectClientId, setSelectClientId] = useState("")
-  const [selectBranchId, setSelectBranchId] = useState("")
-  const [slipNumber, setSlipNumber] = useState("")
-  const [supervisorUserId, setSupervisorUserId] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("")
-  const [imageBase64, setImageBase64] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [supervisors, setSupervisors] = useState<Supervisor[]>([])
   const [saving, setSaving] = useState(false)
-  const [saveResult, setSaveResult] = useState<string | null>(null)
 
   const [bulkRows, setBulkRows] = useState<BulkLoanDraftRow[]>([])
   const [bulkCommitting, setBulkCommitting] = useState(false)
-  const [bulkResult, setBulkResult] = useState<string | null>(null)
+
+  // RHF + zod form. Mirrors legacy validation exactly — see schema for notes.
+  const form = useForm<PayrollLoanCreateInput>({
+    resolver: zodResolver(payrollLoanCreateSchema),
+    defaultValues: {
+      guardId: "",
+      month,
+      amount: undefined as unknown as number,
+      paymentDate: "",
+      slipNumber: "",
+      paymentMethod: undefined as unknown as PayrollLoanCreateInput["paymentMethod"],
+      selectClientId: "",
+      selectBranchId: "",
+      supervisorUserId: "",
+      imageBase64: null,
+    },
+    mode: "onChange",
+  })
+
+  // Keep the RHF `month` in sync with the local state (drives context fetch).
+  useEffect(() => {
+    form.setValue("month", month)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month])
+
+  const selectClientId = form.watch("selectClientId") ?? ""
 
   useEffect(() => {
     // Scope clients + supervisors to the gate-selected region. The server
@@ -222,11 +313,13 @@ function AddLoansTab({
       if (res.ok) {
         const ctx = (await res.json()) as GuardCurrentContext
         setContext(ctx)
+        form.setValue("guardId", ctx.guardId)
       } else {
         setContext(null)
+        form.setValue("guardId", "")
       }
     },
-    [month]
+    [month, form]
   )
 
   useEffect(() => {
@@ -241,49 +334,51 @@ function AddLoansTab({
 
   const payableAmount = useMemo(() => context?.currentUnpaidLoan ?? 0, [context])
 
-  const canSubmit = Boolean(
-    context && amount && Number(amount) > 0 && paymentDate && paymentMethod && slipNumber
-  )
-
-  const submit = async () => {
-    if (!context) return
+  const onSubmit = async (values: PayrollLoanCreateInput) => {
+    if (!context) {
+      toast.error("Select a guard first.")
+      return
+    }
     setSaving(true)
-    setSaveResult(null)
     try {
       const res = await fetch("/api/payroll/loans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           guardId: context.guardId,
-          month: `${month}-01`,
-          amount: Number(amount),
+          month: `${values.month}-01`,
+          amount: Number(values.amount),
           deploymentDays: context.deploymentDays,
           supervisor: context.currentSupervisor?.name ?? null,
           manager: context.currentManager?.name ?? null,
-          supervisorUserId: supervisorUserId || context.currentSupervisor?.id || null,
+          supervisorUserId:
+            values.supervisorUserId || context.currentSupervisor?.id || null,
           managerUserId: context.currentManager?.id ?? null,
-          clientId: selectClientId || null,
-          branchId: selectBranchId || null,
-          slipNumber,
-          paymentDate,
-          paymentMethod,
-          imageBase64,
+          clientId: values.selectClientId || null,
+          branchId: values.selectBranchId || null,
+          slipNumber: values.slipNumber,
+          paymentDate: values.paymentDate,
+          paymentMethod: values.paymentMethod,
+          imageBase64: values.imageBase64,
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setSaveResult(`Loan saved for ${context.name}.`)
-        setAmount("")
-        setSlipNumber("")
-        setPaymentDate("")
-        setPaymentMethod("")
-        setImageBase64(null)
+        toast.success(`Loan saved for ${context.name}.`)
+        form.reset({
+          ...form.getValues(),
+          amount: undefined as unknown as number,
+          slipNumber: "",
+          paymentDate: "",
+          paymentMethod: undefined as unknown as PayrollLoanCreateInput["paymentMethod"],
+          imageBase64: null,
+        })
         loadContext(context.guardId)
       } else {
-        setSaveResult(`Error: ${data.error ?? "Failed to save."}`)
+        toast.error(data?.message ?? "Failed to save loan.")
       }
     } catch {
-      setSaveResult("Network error. Please try again.")
+      toast.error("Network error. Please try again.")
     } finally {
       setSaving(false)
     }
@@ -296,7 +391,6 @@ function AddLoansTab({
       const text = e.target?.result
       if (typeof text !== "string") return
       setBulkRows(parseCsvToLoanRows(text))
-      setBulkResult(null)
     }
     reader.readAsText(file)
   }
@@ -318,17 +412,17 @@ function AddLoansTab({
           })),
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setBulkResult(`Committed ${data.committed}/${data.total} loans.`)
+        toast.success(`Committed ${data.committed}/${data.total} loans.`)
         setBulkRows((prev) =>
           prev.map((r) => (r.status === "READY" ? { ...r, status: "COMMITTED" } : r))
         )
       } else {
-        setBulkResult(`Error: ${data.error ?? "Bulk commit failed."}`)
+        toast.error(data?.message ?? "Bulk commit failed.")
       }
     } catch {
-      setBulkResult("Network error.")
+      toast.error("Network error.")
     } finally {
       setBulkCommitting(false)
     }
@@ -348,198 +442,292 @@ function AddLoansTab({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
       <div className="space-y-6">
-        <section className="ui-card p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <RegionUrlPicker
-                regions={regions}
-                locked={locked}
-                includeGlobalOption={!locked}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Month *
-              </label>
-              <input
-                type="month"
-                className="ui-input"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Parwest ID *
-              </label>
-              <GuardAutocomplete
-                value={parwestIdInput}
-                onChange={setParwestIdInput}
-                onSelect={handleGuardSelect}
-                regionId={effectiveRegionId}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Payable Amount
-              </label>
-              <input className="ui-input bg-cyan-50" value={payableAmount.toFixed(0)} readOnly />
-            </div>
-          </div>
-
-          <GuardContextFields
-            context={context}
-            showRows={[
-              "name",
-              "phone",
-              "client",
-              "branch",
-              "days",
-              "doubleDuty",
-              "supervisor",
-              "manager",
-            ]}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Amount Paid *
-              </label>
-              <input
-                type="number"
-                className="ui-input"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Date of Payment *
-              </label>
-              <input
-                type="date"
-                className="ui-input"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Slip Number *
-              </label>
-              <input
-                className="ui-input"
-                value={slipNumber}
-                onChange={(e) => setSlipNumber(e.target.value)}
-                placeholder="Loan slip number"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Select Client
-              </label>
-              <select
-                className="ui-select"
-                value={selectClientId}
-                onChange={(e) => {
-                  setSelectClientId(e.target.value)
-                  setSelectBranchId("")
-                }}
+        <Card>
+          <CardContent className="space-y-4 p-4">
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
               >
-                <option value="">--Select Client--</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Select Branch
-              </label>
-              <select
-                className="ui-select"
-                value={selectBranchId}
-                onChange={(e) => setSelectBranchId(e.target.value)}
-                disabled={!selectClientId}
-              >
-                <option value="">--Select Branch--</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Supervisor
-              </label>
-              <select
-                className="ui-select"
-                value={supervisorUserId}
-                onChange={(e) => setSupervisorUserId(e.target.value)}
-              >
-                <option value="">
-                  {context?.currentSupervisor
-                    ? `Default — ${context.currentSupervisor.name}`
-                    : "--Select supervisor--"}
-                </option>
-                {supervisors.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <RegionUrlPicker
+                      regions={regions}
+                      locked={locked}
+                      includeGlobalOption={!locked}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Month *
+                    </label>
+                    <Input
+                      type="month"
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Parwest ID *
+                    </label>
+                    <GuardAutocomplete
+                      value={parwestIdInput}
+                      onChange={setParwestIdInput}
+                      onSelect={handleGuardSelect}
+                      regionId={effectiveRegionId}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Payable Amount
+                    </label>
+                    <div className="flex h-9 items-center rounded-md border bg-muted px-3">
+                      <ParwestCurrency value={payableAmount} compact={false} />
+                    </div>
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Payment Method *
-              </label>
-              <select
-                className="ui-select"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="">Select Payment Method</option>
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Upload Image
-              </label>
-              <Base64FileUpload
-                value={imageBase64}
-                onChange={setImageBase64}
-                accept="image/*"
-                label="Choose File"
-              />
-            </div>
-          </div>
+                <GuardContextFields
+                  context={context}
+                  showRows={[
+                    "name",
+                    "phone",
+                    "client",
+                    "branch",
+                    "days",
+                    "doubleDuty",
+                    "supervisor",
+                    "manager",
+                  ]}
+                />
 
-          <div className="flex items-center justify-between pt-2">
-            {saveResult && <span className="text-sm">{saveResult}</span>}
-            <div className="ml-auto">
-              <ActionButton onClick={submit} disabled={!canSubmit || saving}>
-                {saving ? "Saving…" : "Save"}
-              </ActionButton>
-            </div>
-          </div>
-        </section>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount Paid *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={
+                              field.value === undefined || field.value === null
+                                ? ""
+                                : String(field.value)
+                            }
+                            onChange={(e) => {
+                              const v = e.target.value
+                              field.onChange(v === "" ? undefined : Number(v))
+                            }}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="paymentDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date of Payment *</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="slipNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slip Number *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Loan slip number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="selectClientId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select Client</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value || ALL_VALUE}
+                            onValueChange={(v) => {
+                              const next = v === ALL_VALUE ? "" : v
+                              field.onChange(next)
+                              form.setValue("selectBranchId", "")
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="--Select Client--" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ALL_VALUE}>--Select Client--</SelectItem>
+                              {clients.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="selectBranchId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select Branch</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value || ALL_VALUE}
+                            onValueChange={(v) =>
+                              field.onChange(v === ALL_VALUE ? "" : v)
+                            }
+                            disabled={!selectClientId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="--Select Branch--" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ALL_VALUE}>--Select Branch--</SelectItem>
+                              {branches.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="supervisorUserId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Supervisor</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value || ALL_VALUE}
+                            onValueChange={(v) =>
+                              field.onChange(v === ALL_VALUE ? "" : v)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  context?.currentSupervisor
+                                    ? `Default — ${context.currentSupervisor.name}`
+                                    : "--Select supervisor--"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ALL_VALUE}>
+                                {context?.currentSupervisor
+                                  ? `Default — ${context.currentSupervisor.name}`
+                                  : "--Select supervisor--"}
+                              </SelectItem>
+                              {supervisors.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Method *</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value ?? ""}
+                            onValueChange={(v) => field.onChange(v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Payment Method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PAYROLL_LOAN_PAYMENT_METHODS.map((m) => (
+                                <SelectItem key={m} value={m}>
+                                  {m}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="imageBase64"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Upload Image</FormLabel>
+                        <FormControl>
+                          <Base64FileUpload
+                            value={field.value ?? null}
+                            onChange={(v) => field.onChange(v)}
+                            accept="image/*"
+                            label="Choose File"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex items-center justify-end pt-2">
+                  <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                    <Button
+                      type="submit"
+                      variant="default"
+                      disabled={saving || !context}
+                    >
+                      {saving ? "Saving…" : "Save"}
+                    </Button>
+                  </PermissionGate>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
 
         <AttendanceDetailsTable
           guardId={context?.guardId ?? null}
@@ -548,76 +736,87 @@ function AddLoansTab({
           payableLoan={payableAmount}
         />
 
-        <section className="ui-card p-4 space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-base font-semibold">Bulk Upload</h3>
-            <div className="flex gap-2 flex-wrap">
-              <ActionButton variant="secondary" onClick={downloadTemplate}>
-                Download Template
-              </ActionButton>
-              <label className="ui-btn ui-btn-secondary px-3 py-2 text-sm cursor-pointer">
-                Upload CSV
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".csv"
-                  onChange={(e) => handleBulkUpload(e.target.files?.[0] || null)}
-                />
-              </label>
-              <ActionButton
-                onClick={commitBulk}
-                disabled={bulkCommitting || bulkRows.length === 0}
-              >
-                {bulkCommitting ? "Committing…" : "Commit Batch"}
-              </ActionButton>
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-base font-semibold">Bulk Upload</h3>
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" onClick={downloadTemplate}>
+                  Download Template
+                </Button>
+                <label
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "cursor-pointer"
+                  )}
+                >
+                  Upload CSV
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".csv"
+                    onChange={(e) => handleBulkUpload(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                  <Button
+                    onClick={commitBulk}
+                    disabled={bulkCommitting || bulkRows.length === 0}
+                  >
+                    {bulkCommitting ? "Committing…" : "Commit Batch"}
+                  </Button>
+                </PermissionGate>
+              </div>
             </div>
-          </div>
-          {bulkResult && <p className="text-sm">{bulkResult}</p>}
-          {bulkRows.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
-                <thead className="bg-[var(--surface-muted)]">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Guard ID</th>
-                    <th className="px-3 py-2 text-left">Amount</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-left">Notes</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bulkRows.map((r) => (
-                    <tr
-                      key={r.id}
-                      className={`border-t border-[var(--border)] ${r.status === "ERROR" ? "bg-red-50" : ""}`}
-                    >
-                      <td className="px-3 py-2 font-mono">
-                        {r.guardId || <span className="text-red-500">missing</span>}
-                      </td>
-                      <td className="px-3 py-2">{r.amount}</td>
-                      <td className="px-3 py-2">{r.loanDate}</td>
-                      <td className="px-3 py-2">{r.notes}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={
-                            r.status === "COMMITTED"
-                              ? "text-green-600 font-medium"
-                              : r.status === "ERROR"
-                                ? "text-red-500"
-                                : "text-[var(--text-muted)]"
-                          }
-                        >
-                          {r.status}
-                          {r.error ? ` — ${r.error}` : ""}
-                        </span>
-                      </td>
+            {bulkRows.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Guard ID</th>
+                      <th className="px-3 py-2 text-left">Amount</th>
+                      <th className="px-3 py-2 text-left">Date</th>
+                      <th className="px-3 py-2 text-left">Notes</th>
+                      <th className="px-3 py-2 text-left">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody>
+                    {bulkRows.map((r) => (
+                      <tr
+                        key={r.id}
+                        className={cn(
+                          "border-t",
+                          r.status === "ERROR" && "bg-destructive/10"
+                        )}
+                      >
+                        <td className="px-3 py-2 font-mono">
+                          {r.guardId || (
+                            <span className="text-destructive">missing</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{r.amount}</td>
+                        <td className="px-3 py-2">{r.loanDate}</td>
+                        <td className="px-3 py-2">{r.notes}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              r.status === "COMMITTED" && "text-green-600 font-medium",
+                              r.status === "ERROR" && "text-destructive",
+                              r.status === "READY" && "text-muted-foreground"
+                            )}
+                          >
+                            {r.status}
+                            {r.error ? ` — ${r.error}` : ""}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div>
@@ -646,8 +845,11 @@ function FinalizeLoansTab({
   const [rows, setRows] = useState<LoanRow[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+
+  // AlertDialog open state for the two destructive actions.
+  const [finalizeOpen, setFinalizeOpen] = useState(false)
+  const [revertOpen, setRevertOpen] = useState(false)
 
   const loadLoans = useCallback(async () => {
     setLoading(true)
@@ -665,43 +867,64 @@ function FinalizeLoansTab({
   }, [month, regionId, search])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps; sets loading/rows from server state
     loadLoans()
   }, [loadLoans])
 
+  const pendingCount = useMemo(
+    () => rows.filter((r) => r.status === "PENDING").length,
+    [rows]
+  )
+  const finalizedCount = useMemo(
+    () => rows.filter((r) => r.status === "FINALIZED").length,
+    [rows]
+  )
+
   const finalizeAll = async () => {
-    if (!confirm(`Finalize all PENDING loans for ${month}${regionId ? " in selected region" : ""}?`))
-      return
     setBusy(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/loans/finalize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month: `${month}-01`, regionId: regionId || null }),
-    })
-    const data = await res.json()
-    setResult(
-      res.ok
-        ? `Finalized ${data.finalized} loans. Total: ${data.totalAmount?.toFixed(0) ?? 0}`
-        : `Error: ${data.error ?? "Failed."}`
-    )
-    setBusy(false)
-    loadLoans()
+    try {
+      const res = await fetch("/api/payroll/loans/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: `${month}-01`, regionId: regionId || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success(
+          `Finalized ${data.finalized} loans. Total: ${data.totalAmount?.toFixed(0) ?? 0}`
+        )
+      } else {
+        toast.error(data?.message ?? "Failed to finalize loans.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setBusy(false)
+      setFinalizeOpen(false)
+      loadLoans()
+    }
   }
 
   const undoFinalize = async () => {
-    if (!confirm(`Revert all FINALIZED loans for ${month} back to PENDING?`)) return
     setBusy(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/loans/unfinalize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month: `${month}-01`, regionId: regionId || null }),
-    })
-    const data = await res.json()
-    setResult(res.ok ? `Reverted ${data.reverted} loans.` : `Error: ${data.error ?? "Failed."}`)
-    setBusy(false)
-    loadLoans()
+    try {
+      const res = await fetch("/api/payroll/loans/unfinalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: `${month}-01`, regionId: regionId || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success(`Reverted ${data.reverted} loans.`)
+      } else {
+        toast.error(data?.message ?? "Failed to revert loans.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setBusy(false)
+      setRevertOpen(false)
+      loadLoans()
+    }
   }
 
   const exportAll = () => {
@@ -758,119 +981,256 @@ function FinalizeLoansTab({
     URL.revokeObjectURL(url)
   }
 
-  return (
-    <section className="ui-card p-4 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr_auto_auto_auto] gap-3 items-end">
-        <div>
-          <RegionUrlPicker
-            regions={regions}
-            locked={locked}
-            includeGlobalOption={!locked}
-          />
-        </div>
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-            Month
-          </label>
-          <input
-            type="month"
-            className="ui-input"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-            Search
-          </label>
-          <input
-            className="ui-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name or Parwest ID"
-          />
-        </div>
-        {canCreate && (
-          <ActionButton onClick={finalizeAll} disabled={busy}>
-            Finalize All
-          </ActionButton>
-        )}
-        {canCreate && (
-          <ActionButton variant="secondary" onClick={undoFinalize} disabled={busy}>
-            Undo Finalize
-          </ActionButton>
-        )}
-        <ActionButton variant="secondary" onClick={exportAll}>
-          Export All
-        </ActionButton>
-      </div>
-      {result && <p className="text-sm">{result}</p>}
+  const columns = useMemo<ColumnDef<LoanRow>[]>(
+    () => [
+      {
+        id: "paymentMonth",
+        accessorFn: (r) => r.month.slice(0, 7),
+        header: "Payment Month",
+        cell: ({ row }) => row.original.month.slice(0, 7),
+      },
+      {
+        id: "parwestId",
+        accessorFn: (r) => r.guard.parwestId,
+        header: "Secure Ops ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.guard.parwestId}</span>
+        ),
+      },
+      {
+        id: "guardName",
+        accessorFn: (r) => r.guard.name,
+        header: "Name",
+        cell: ({ row }) => row.original.guard.name,
+      },
+      {
+        id: "phone",
+        accessorFn: (r) => r.guard.phone ?? "",
+        header: "Phone",
+        cell: ({ row }) => row.original.guard.phone ?? "—",
+      },
+      {
+        id: "supervisor",
+        accessorFn: (r) => r.supervisor ?? "",
+        header: "Current Supervisor",
+        cell: ({ row }) => row.original.supervisor ?? "—",
+      },
+      {
+        id: "amount",
+        accessorFn: (r) => r.amount,
+        header: () => <span className="block text-end">Amount</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency value={Number(row.original.amount)} />
+          </div>
+        ),
+      },
+      {
+        id: "paymentDate",
+        accessorFn: (r) => r.paymentDate ?? "",
+        header: "Date",
+        cell: ({ row }) => row.original.paymentDate?.slice(0, 10) ?? "—",
+      },
+      {
+        id: "paymentMethod",
+        accessorFn: (r) => r.paymentMethod ?? "",
+        header: "Method",
+        cell: ({ row }) => row.original.paymentMethod ?? "—",
+      },
+      {
+        id: "bank",
+        accessorFn: (r) => r.bankName ?? "",
+        header: "Bank",
+        cell: ({ row }) => row.original.bankName ?? "—",
+      },
+      {
+        id: "account",
+        accessorFn: (r) => r.accountNumber ?? "",
+        header: "Account",
+        cell: ({ row }) => row.original.accountNumber ?? "—",
+      },
+      {
+        id: "slip",
+        accessorFn: (r) => r.slipNumber ?? "",
+        header: "Slip",
+        cell: ({ row }) => row.original.slipNumber ?? "—",
+      },
+      {
+        id: "createdAt",
+        accessorFn: (r) => r.createdAt,
+        header: "Created At",
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.createdAt.slice(0, 10)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorFn: (r) => r.status,
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge
+            variant={row.original.status === "FINALIZED" ? "default" : "secondary"}
+          >
+            {row.original.status}
+          </Badge>
+        ),
+      },
+    ],
+    []
+  )
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] text-sm">
-          <thead className="bg-[var(--surface-muted)]">
-            <tr>
-              <th className="px-3 py-2 text-left">Payment Month</th>
-              <th className="px-3 py-2 text-left">Secure Ops ID</th>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-left">Phone</th>
-              <th className="px-3 py-2 text-left">Current Supervisor</th>
-              <th className="px-3 py-2 text-right">Amount</th>
-              <th className="px-3 py-2 text-left">Date</th>
-              <th className="px-3 py-2 text-left">Method</th>
-              <th className="px-3 py-2 text-left">Bank</th>
-              <th className="px-3 py-2 text-left">Account</th>
-              <th className="px-3 py-2 text-left">Slip</th>
-              <th className="px-3 py-2 text-left">Created At</th>
-              <th className="px-3 py-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={13} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={13} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  No loans for this month/region.
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-[var(--border)]">
-                <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
-                <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
-                <td className="px-3 py-2">{r.guard.name}</td>
-                <td className="px-3 py-2">{r.guard.phone ?? ""}</td>
-                <td className="px-3 py-2">{r.supervisor ?? ""}</td>
-                <td className="px-3 py-2 text-right">{r.amount}</td>
-                <td className="px-3 py-2">{r.paymentDate?.slice(0, 10) ?? ""}</td>
-                <td className="px-3 py-2">{r.paymentMethod ?? ""}</td>
-                <td className="px-3 py-2">{r.bankName ?? ""}</td>
-                <td className="px-3 py-2">{r.accountNumber ?? ""}</td>
-                <td className="px-3 py-2">{r.slipNumber ?? ""}</td>
-                <td className="px-3 py-2 text-xs">{r.createdAt.slice(0, 10)}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={
-                      r.status === "FINALIZED"
-                        ? "text-green-600 font-medium"
-                        : "text-[var(--text-muted)]"
-                    }
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr_auto_auto_auto] gap-3 items-end">
+          <div>
+            <RegionUrlPicker
+              regions={regions}
+              locked={locked}
+              includeGlobalOption={!locked}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Month
+            </label>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Search
+            </label>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name or Parwest ID"
+            />
+          </div>
+          {canCreate && (
+            <PermissionGate module="PAYROLL" action="UPDATE" mode="hide">
+              <AlertDialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button disabled={busy || pendingCount === 0}>
+                    Finalize All
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Finalize loans for {month}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {pendingCount} pending loan{pendingCount !== 1 ? "s" : ""}{" "}
+                      will be locked
+                      {regionId ? " in the selected region" : ""}. This action
+                      records a finalisation history entry.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={busy}>
+                      Keep open
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className={cn(
+                        buttonVariants({ variant: "destructive" })
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        void finalizeAll()
+                      }}
+                      disabled={busy}
+                    >
+                      {busy ? "Finalizing…" : "Finalize"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </PermissionGate>
+          )}
+          {canCreate && (
+            <PermissionGate module="PAYROLL" action="UPDATE" mode="hide">
+              <AlertDialog open={revertOpen} onOpenChange={setRevertOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={busy || finalizedCount === 0}
                   >
-                    {r.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+                    Undo Finalize
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Revert finalization?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {finalizedCount} finalized loan
+                      {finalizedCount !== 1 ? "s" : ""} for {month} will be
+                      unlocked back to PENDING
+                      {regionId ? " in the selected region" : ""}.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={busy}>
+                      Keep open
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className={cn(
+                        buttonVariants({ variant: "destructive" })
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        void undoFinalize()
+                      }}
+                      disabled={busy}
+                    >
+                      {busy ? "Reverting…" : "Revert"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </PermissionGate>
+          )}
+          <Button variant="outline" onClick={exportAll}>
+            Export All
+          </Button>
+        </div>
+
+        {loading ? (
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              Loading…
+            </CardContent>
+          </Card>
+        ) : rows.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+              <div className="text-base font-semibold">No loans found</div>
+              <p className="max-w-md text-sm text-muted-foreground">
+                No loans for this month/region. Switch to the Add Loans tab to
+                record one.
+              </p>
+              <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                <Button variant="outline" disabled>
+                  Add Loan (use the Add Loans tab)
+                </Button>
+              </PermissionGate>
+            </CardContent>
+          </Card>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={rows}
+            searchKey="guardName"
+            searchPlaceholder="Filter visible rows by name…"
+            pageSize={25}
+            emptyMessage="No loans match the on-page filter."
+          />
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -890,57 +1250,103 @@ function HistoryTab() {
       .finally(() => setLoading(false))
   }, [])
 
+  const columns = useMemo<ColumnDef<HistoryRow>[]>(
+    () => [
+      {
+        id: "finalizedAt",
+        accessorFn: (r) => r.finalizedAt,
+        header: "Dated",
+        cell: ({ row }) =>
+          new Date(row.original.finalizedAt).toLocaleString(),
+      },
+      {
+        id: "month",
+        accessorFn: (r) => r.month.slice(0, 7),
+        header: "Month",
+        cell: ({ row }) => row.original.month.slice(0, 7),
+      },
+      {
+        id: "region",
+        accessorFn: (r) => r.regionName ?? "All",
+        header: "Region",
+        cell: ({ row }) => row.original.regionName ?? "All",
+      },
+      {
+        id: "loanCount",
+        accessorFn: (r) => r.loanCount,
+        header: () => <span className="block text-end">Loans</span>,
+        cell: ({ row }) => (
+          <div className="text-end tabular-nums">{row.original.loanCount}</div>
+        ),
+      },
+      {
+        id: "totalAmount",
+        accessorFn: (r) => r.totalAmount,
+        header: () => <span className="block text-end">Total</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency value={Number(row.original.totalAmount)} />
+          </div>
+        ),
+      },
+      {
+        id: "finalizedBy",
+        accessorFn: (r) => r.finalizedByName,
+        header: "Finalised By",
+        cell: ({ row }) => row.original.finalizedByName,
+      },
+      {
+        id: "download",
+        header: "Download",
+        cell: ({ row }) => (
+          <a
+            href={`/api/payroll/loans/finalize-history/${row.original.id}/download`}
+            className="text-primary underline"
+          >
+            Download Report
+          </a>
+        ),
+      },
+    ],
+    []
+  )
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          Loading…
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <div className="text-base font-semibold">No history yet</div>
+          <p className="max-w-md text-sm text-muted-foreground">
+            No finalization history yet. Finalising a batch on the Finalize
+            Loans tab will record an entry here.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <section className="ui-card p-4">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px] text-sm">
-          <thead className="bg-[var(--surface-muted)]">
-            <tr>
-              <th className="px-3 py-2 text-left">Dated</th>
-              <th className="px-3 py-2 text-left">Month</th>
-              <th className="px-3 py-2 text-left">Region</th>
-              <th className="px-3 py-2 text-right">Loans</th>
-              <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-left">Finalised By</th>
-              <th className="px-3 py-2 text-left">Download</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  No finalization history yet.
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-[var(--border)]">
-                <td className="px-3 py-2">{new Date(r.finalizedAt).toLocaleString()}</td>
-                <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
-                <td className="px-3 py-2">{r.regionName ?? "All"}</td>
-                <td className="px-3 py-2 text-right">{r.loanCount}</td>
-                <td className="px-3 py-2 text-right">{r.totalAmount.toFixed(0)}</td>
-                <td className="px-3 py-2">{r.finalizedByName}</td>
-                <td className="px-3 py-2">
-                  <a
-                    href={`/api/payroll/loans/finalize-history/${r.id}/download`}
-                    className="text-[var(--brand)] underline"
-                  >
-                    Download Report
-                  </a>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <Card>
+      <CardContent className="p-4">
+        <DataTable
+          columns={columns}
+          data={rows}
+          searchKey="finalizedBy"
+          searchPlaceholder="Filter by finaliser…"
+          pageSize={25}
+          emptyMessage="No history matches the on-page filter."
+        />
+      </CardContent>
+    </Card>
   )
 }

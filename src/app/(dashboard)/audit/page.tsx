@@ -5,6 +5,7 @@ import { FileText } from "lucide-react"
 import { isSuperAdmin } from "@/lib/api/permissions"
 import { deriveRegionalScope } from "@/lib/access/scope"
 import AuditLogManager from "@/components/audit/AuditLogManager"
+import { Card, CardContent } from "@/components/shadcn/card"
 
 export default async function AuditPage({
   searchParams,
@@ -38,13 +39,15 @@ export default async function AuditPage({
       {needsRegionGate ? (
         <>
           <AuditLogManager regionId={effectiveRegionId} regions={pickerRegions} locked={locked} />
-          <div className="ui-card p-10 text-center">
-            <FileText className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-            <p className="text-base font-medium text-[var(--text)]">Select a region to view audit logs.</p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Audit log entries carry a target region. Choose a region above to load its activity.
-            </p>
-          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground" aria-hidden />
+              <p className="text-base font-medium">Select a region to view audit logs.</p>
+              <p className="text-sm text-muted-foreground">
+                Audit log entries carry a target region. Choose a region from the topbar to load its activity.
+              </p>
+            </CardContent>
+          </Card>
         </>
       ) : (
         <AuditLogManager regionId={effectiveRegionId} regions={pickerRegions} locked={locked} />

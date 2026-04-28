@@ -1,5 +1,4 @@
 import Link from "next/link"
-import Panel from "@/components/ui/panel"
 import SectionTitle from "@/components/ui/section-title"
 import { Inbox, ShieldCheck, Ticket } from "lucide-react"
 import type { MyQueueCounts } from "@/lib/dashboard/queries"
@@ -22,7 +21,7 @@ export default function MyQueue({ counts, userName }: { counts: MyQueueCounts; u
     },
   ]
   return (
-    <Panel>
+    <aside className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-xs)]">
       <SectionTitle title="My Queue" subtitle={userName} />
       <ul className="mt-3 space-y-2">
         {rows.map((r) => {
@@ -60,6 +59,6 @@ export default function MyQueue({ counts, userName }: { counts: MyQueueCounts; u
           </Link>
         </li>
       </ul>
-    </Panel>
+    </aside>
   )
 }

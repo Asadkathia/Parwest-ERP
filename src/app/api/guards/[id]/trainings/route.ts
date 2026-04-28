@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(
   _request: NextRequest,
@@ -12,8 +13,18 @@ export async function GET(
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
+    const managerScope = deriveManagerScope(session)
 
     const { id: guardId } = await context.params
+
+    const guardScope = await prisma.guard.findUnique({
+      where: { id: guardId },
+      select: { regionId: true, regionalOfficeId: true },
+    })
+    if (!guardScope) return notFound("Guard not found")
+    if (managerScopeDenied(managerScope, { regionId: guardScope.regionId, regionalOfficeId: guardScope.regionalOfficeId })) {
+      return forbidden("Forbidden: guard is outside your scope.")
+    }
 
     const trainings = await prisma.training.findMany({
       where: { guardId },
@@ -34,6 +45,7 @@ export async function POST(
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
+    const managerScope = deriveManagerScope(session)
 
     const { id: guardId } = await context.params
     const body = await request.json()
@@ -48,9 +60,12 @@ export async function POST(
 
     const guard = await prisma.guard.findUnique({
       where: { id: guardId },
-      select: { id: true, parwestId: true, name: true },
+      select: { id: true, parwestId: true, name: true, regionId: true, regionalOfficeId: true },
     })
     if (!guard) return badRequest("Guard not found.")
+    if (managerScopeDenied(managerScope, { regionId: guard.regionId, regionalOfficeId: guard.regionalOfficeId })) {
+      return forbidden("Forbidden: guard is outside your scope.")
+    }
 
     const training = await prisma.training.create({
       data: { guardId, trainingType, completedAt, instructor, notes },

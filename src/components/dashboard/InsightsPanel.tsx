@@ -39,15 +39,15 @@ type InsightResult = {
 type Tab = "EFFICIENCY" | "ANOMALY"
 
 function sevClasses(sev: Severity) {
-  if (sev === "HIGH") return "border-l-red-500 bg-red-50"
-  if (sev === "MEDIUM") return "border-l-amber-500 bg-amber-50/60"
-  return "border-l-slate-300 bg-slate-50"
+  if (sev === "HIGH") return "border-l-red-500 bg-red-50 dark:bg-red-950/30"
+  if (sev === "MEDIUM") return "border-l-amber-500 bg-amber-50/60 dark:bg-amber-950/20"
+  return "border-l-slate-300 bg-slate-50 dark:bg-slate-900/30"
 }
 
 function sevPill(sev: Severity) {
-  if (sev === "HIGH") return "bg-red-100 text-red-700"
-  if (sev === "MEDIUM") return "bg-amber-100 text-amber-700"
-  return "bg-slate-100 text-slate-600"
+  if (sev === "HIGH") return "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+  if (sev === "MEDIUM") return "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+  return "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
 }
 
 export default function InsightsPanel({ canManage }: { canManage: boolean }) {
@@ -117,7 +117,7 @@ export default function InsightsPanel({ canManage }: { canManage: boolean }) {
       </CardHeader>
       <CardBody className="space-y-2">
         {error ? (
-          <p className="rounded-[var(--radius-md)] bg-red-50 p-3 text-sm text-red-700">{error}</p>
+          <p className="rounded-[var(--radius-md)] bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>
         ) : results.length === 0 && !loading ? (
           <p className="py-6 text-center text-sm text-[var(--text-muted)]">No insights in this category.</p>
         ) : (
@@ -143,7 +143,7 @@ function TabButton({
       onClick={onClick}
       className={cn(
         "flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-semibold transition",
-        active ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+        active ? "bg-card text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
       )}
     >
       {children}
@@ -160,7 +160,7 @@ function InsightRow({ r }: { r: InsightResult }) {
     <div
       className={cn(
         "overflow-hidden rounded-[var(--radius-md)] border-l-4 border border-[var(--border)]",
-        hasIssue ? sevClasses(r.severity) : "bg-white"
+        hasIssue ? sevClasses(r.severity) : "bg-card"
       )}
     >
       <button
@@ -187,7 +187,7 @@ function InsightRow({ r }: { r: InsightResult }) {
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-xs font-bold",
-              hasIssue ? "bg-white text-[var(--text)] shadow-sm" : "bg-emerald-100 text-emerald-700"
+              hasIssue ? "bg-card text-[var(--text)] shadow-sm" : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
             )}
           >
             {hasIssue ? r.count : "✓"}
@@ -202,7 +202,7 @@ function InsightRow({ r }: { r: InsightResult }) {
         </div>
       </button>
       {open && hasDrill ? (
-        <div className="border-t border-[var(--border)] bg-white px-3 py-2">
+        <div className="border-t border-[var(--border)] bg-card px-3 py-2">
           {r.items && r.items.length > 0 ? (
             <ul className="divide-y divide-[var(--border)]">
               {r.items.map((it) => (

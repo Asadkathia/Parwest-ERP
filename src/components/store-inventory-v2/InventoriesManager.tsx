@@ -1,12 +1,22 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
+import { useCallback, useEffect, useState } from "react"
+import type { ColumnDef } from "@tanstack/react-table"
+import { AlertCircle } from "lucide-react"
+
+import { DataTable } from "@/components/shadcn/data-table"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn/alert"
+import { Button } from "@/components/shadcn/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
 import { apiGet } from "@/components/store-inventory-v2/api"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
 
 type Option = { id: string; name: string }
@@ -30,15 +40,20 @@ type Row = {
   }
 }
 
+const ALL_VALUE = "__all__"
+
 export default function InventoriesManager({
   categoryScope = "NON_WEAPON",
-  regions = [],
-  locked = false,
+  regions: _regions = [],
+  locked: _locked = false,
 }: {
   categoryScope?: InventoryCategoryScope
   regions?: RegionOption[]
   locked?: boolean
 }) {
+  void _regions
+  void _locked
+  // Server-side scoping preserved verbatim — DO NOT touch.
   const scopeQuery = useScopeQuery()
   const [rows, setRows] = useState<Row[]>([])
   const [stores, setStores] = useState<Option[]>([])
@@ -47,24 +62,22 @@ export default function InventoriesManager({
   const [storeId, setStoreId] = useState("")
   const [productId, setProductId] = useState("")
   const [variantId, setVariantId] = useState("")
-  const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setNotice(null)
+    setErrorMessage(null)
     try {
       const params = new URLSearchParams()
       if (storeId) params.set("storeId", storeId)
       if (productId) params.set("productId", productId)
       if (variantId) params.set("variationId", variantId)
-      if (query.trim()) params.set("search", query.trim())
       params.set("categoryScope", categoryScope)
-
       params.set("includeZero", "true")
       if (scopeQuery.regionId) params.set("regionId", scopeQuery.regionId)
-      if (scopeQuery.regionalOfficeId) params.set("regionalOfficeId", scopeQuery.regionalOfficeId)
+      if (scopeQuery.regionalOfficeId)
+        params.set("regionalOfficeId", scopeQuery.regionalOfficeId)
 
       const [data, storeRows, productRows] = await Promise.all([
         apiGet<Row[]>(`/api/store-inventory/v2/inventories?${params.toString()}`),
@@ -87,115 +100,233 @@ export default function InventoriesManager({
         if (categoryScope === "AMMO") return category.includes("ammo")
         return !category.includes("weapon") && !category.includes("ammo")
       })
-      setProducts(filteredProducts.map((row) => ({ id: row.id, name: `${row.sku} - ${row.name}` })))
+      setProducts(
+        filteredProducts.map((row) => ({ id: row.id, name: `${row.sku} - ${row.name}` })),
+      )
 
       const uniqueVariants = new Map<string, string>()
       for (const row of filteredProducts) {
-        if (row.variation?.id && row.variation?.name) uniqueVariants.set(row.variation.id, row.variation.name)
+        if (row.variation?.id && row.variation?.name)
+          uniqueVariants.set(row.variation.id, row.variation.name)
       }
-      setVariants(Array.from(uniqueVariants.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)))
+      setVariants(
+        Array.from(uniqueVariants.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load balances."
-      setNotice({ type: "error", message })
+      setErrorMessage(message)
       setRows([])
     } finally {
       setLoading(false)
     }
-  }, [categoryScope, productId, query, storeId, variantId, scopeQuery.query, scopeQuery.regionId, scopeQuery.regionalOfficeId])
+  }, [
+    categoryScope,
+    productId,
+    storeId,
+    variantId,
+    scopeQuery.query,
+    scopeQuery.regionId,
+    scopeQuery.regionalOfficeId,
+  ])
 
   useEffect(() => {
     void load()
   }, [load])
-  
-  const visible = useMemo(() => rows, [rows])
 
   const clearFilters = () => {
     setStoreId("")
     setProductId("")
     setVariantId("")
-    setQuery("")
   }
+
+  const title =
+    categoryScope === "WEAPON"
+      ? "Weapon Inventories"
+      : categoryScope === "AMMO"
+        ? "Ammo Inventories"
+        : "Inventories"
+
+  const columns: ColumnDef<Row>[] = [
+    {
+      id: "store",
+      header: "Store",
+      accessorFn: (row) => row.store.name,
+      cell: ({ row }) => row.original.store.name,
+    },
+    {
+      id: "product",
+      header: "Product",
+      accessorFn: (row) => `${row.product.sku} ${row.product.name}`,
+      cell: ({ row }) => (
+        <span>
+          <span className="font-mono text-xs text-muted-foreground">{row.original.product.sku}</span>{" "}
+          <span className="font-medium">{row.original.product.name}</span>
+        </span>
+      ),
+    },
+    {
+      id: "variant",
+      header: "Variant",
+      accessorFn: (row) => row.product.variation?.name || "—",
+    },
+    {
+      id: "category",
+      header: "Category",
+      accessorFn: (row) => row.product.category?.name || "—",
+    },
+    {
+      id: "quantityOnHand",
+      accessorKey: "quantityOnHand",
+      header: () => <span className="block text-end">Available</span>,
+      cell: ({ row }) => (
+        <span className="block text-end tabular-nums">{row.original.quantityOnHand}</span>
+      ),
+    },
+    {
+      id: "quantityHeld",
+      accessorKey: "quantityHeld",
+      header: () => <span className="block text-end">Reusable</span>,
+      cell: ({ row }) => (
+        <span className="block text-end tabular-nums">{row.original.quantityHeld}</span>
+      ),
+    },
+    {
+      id: "quantityIssued",
+      accessorKey: "quantityIssued",
+      header: () => <span className="block text-end">Assigned</span>,
+      cell: ({ row }) => (
+        <span className="block text-end tabular-nums">{row.original.quantityIssued}</span>
+      ),
+    },
+    {
+      id: "totalQty",
+      header: () => <span className="block text-end">Total</span>,
+      accessorFn: (row) => row.quantityOnHand + row.quantityHeld + row.quantityIssued,
+      cell: ({ row }) => (
+        <span className="block text-end font-semibold tabular-nums">
+          {row.original.quantityOnHand + row.original.quantityHeld + row.original.quantityIssued}
+        </span>
+      ),
+    },
+    {
+      id: "avgUnitCost",
+      header: () => <span className="block text-end">Avg Cost</span>,
+      cell: ({ row }) =>
+        row.original.avgUnitCost == null ? (
+          <span className="block text-end text-muted-foreground">—</span>
+        ) : (
+          <span className="block text-end">
+            <ParwestCurrency value={row.original.avgUnitCost} />
+          </span>
+        ),
+    },
+    {
+      id: "updatedAt",
+      accessorKey: "updatedAt",
+      header: "Updated",
+      cell: ({ row }) => new Date(row.original.updatedAt).toLocaleDateString("en-US"),
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title={categoryScope === "WEAPON" ? "Weapon Inventories" : categoryScope === "AMMO" ? "Ammo Inventories" : "Inventories"}
-        subtitle="Store-wise quantity view for available/reusable/issued stock."
-      />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      <p className="text-sm text-muted-foreground -mt-4">
+        Store-wise quantity view for available/reusable/issued stock.
+      </p>
 
-      <FilterBar>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-          <Suspense>
-            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
-          </Suspense>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Store</label>
-            <select className="ui-select" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-              <option value="">Select Store</option>
-              {stores.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Product</label>
-            <select className="ui-select" value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">Select Product</option>
-              {products.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Product Variant</label>
-            <select className="ui-select" value={variantId} onChange={(e) => setVariantId(e.target.value)}>
-              <option value="">Select Variant</option>
-              {variants.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-            <input className="ui-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search product/store" />
-          </div>
-        </div>
-        <div className="mt-4">
-          <button className="ui-btn ui-btn-secondary" onClick={clearFilters}>
-            Clear Filters
-          </button>
-        </div>
-      </FilterBar>
+      {errorMessage ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <DataTable
-        rows={visible}
-        rowKey="id"
-        searchable={false}
-        emptyText={loading ? "Loading inventory balances..." : "No inventory balances found."}
-        columns={[
-          { key: "store", header: "Store", render: (row) => row.store.name, sortable: true },
-          { key: "product", header: "Product", render: (row) => `${row.product.name}`, sortable: true },
-          { key: "variant", header: "Product Variant", render: (row) => row.product.variation?.name || "—" },
-          { key: "category", header: "Category", render: (row) => row.product.category?.name || "—" },
-          { key: "quantityOnHand", header: "Available Qty", sortable: true },
-          { key: "quantityHeld", header: "Reusable Qty", sortable: true },
-          { key: "quantityIssued", header: "Assigned Qty", sortable: true },
-          {
-            key: "totalQty",
-            header: "Total Qty",
-            render: (row) => row.quantityOnHand + row.quantityHeld + row.quantityIssued,
-          },
-          { key: "avgUnitCost", header: "Avg Cost", render: (row) => (row.avgUnitCost == null ? "—" : row.avgUnitCost.toFixed(2)) },
-          { key: "updatedAt", header: "Updated", render: (row) => new Date(row.updatedAt).toLocaleDateString("en-US") },
-        ]}
-      />
+      <Card>
+        <CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Store</label>
+            <Select
+              value={storeId || ALL_VALUE}
+              onValueChange={(value) => setStoreId(value === ALL_VALUE ? "" : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All stores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>All stores</SelectItem>
+                {stores.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {row.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Product</label>
+            <Select
+              value={productId || ALL_VALUE}
+              onValueChange={(value) => setProductId(value === ALL_VALUE ? "" : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All products" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>All products</SelectItem>
+                {products.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {row.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Variant</label>
+            <Select
+              value={variantId || ALL_VALUE}
+              onValueChange={(value) => setVariantId(value === ALL_VALUE ? "" : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All variants" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>All variants</SelectItem>
+                {variants.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {row.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!loading && rows.length === 0 && !errorMessage ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No inventory balances found.
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          searchKey="product"
+          searchPlaceholder="Search by product…"
+          emptyMessage={loading ? "Loading inventory balances…" : "No inventory balances found."}
+        />
+      )}
     </div>
   )
 }

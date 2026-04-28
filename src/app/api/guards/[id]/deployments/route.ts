@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { forbidden, unauthorized } from "@/lib/api/response"
+import { forbidden, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -10,10 +11,20 @@ export async function GET(_req: Request, { params }: Params) {
   const session = await auth()
   if (!session) return unauthorized()
   if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
+  const managerScope = deriveManagerScope(session)
 
   const { id } = await params
 
   try {
+    const guardScope = await prisma.guard.findUnique({
+      where: { id },
+      select: { regionId: true, regionalOfficeId: true },
+    })
+    if (!guardScope) return notFound("Guard not found")
+    if (managerScopeDenied(managerScope, { regionId: guardScope.regionId, regionalOfficeId: guardScope.regionalOfficeId })) {
+      return forbidden("Forbidden: guard is outside your scope.")
+    }
+
     const deployments = await prisma.deployment.findMany({
       where: { guardId: id },
       orderBy: { deploymentDate: "desc" },

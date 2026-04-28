@@ -1,6 +1,22 @@
 "use client"
 
 import { DollarSign, Download } from "lucide-react"
+
+import {
+    Card,
+    CardContent,
+} from "@/components/shadcn/card"
+import { Button } from "@/components/shadcn/button"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/shadcn/table"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { TabStatusBadge } from "@/components/guards/tabs/status-badge"
 import type { PaidSalaryRecord } from "@/components/guards/tabs/types"
 
 interface PaidSalariesTabProps {
@@ -8,14 +24,6 @@ interface PaidSalariesTabProps {
 }
 
 export default function PaidSalariesTab({ salaries }: PaidSalariesTabProps) {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-PK", {
-            style: "currency",
-            currency: "PKR",
-            minimumFractionDigits: 0,
-        }).format(amount)
-    }
-
     const formatDate = (date: string) => {
         return new Date(date).toLocaleDateString("en-US", {
             year: "numeric",
@@ -24,103 +32,75 @@ export default function PaidSalariesTab({ salaries }: PaidSalariesTabProps) {
         })
     }
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "PAID":
-                return "bg-green-100 text-green-800"
-            case "PENDING":
-                return "bg-yellow-100 text-yellow-800"
-            case "FAILED":
-                return "bg-red-100 text-red-800"
-            default:
-                return "bg-gray-100 text-gray-800"
-        }
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Paid Salaries</h2>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                    Export Salary History
-                </button>
+                <div>
+                    <h2 className="text-20 font-bold">Paid Salaries</h2>
+                    <p className="text-sm text-muted-foreground">Historical salary disbursements.</p>
+                </div>
+                <Button>Export Salary History</Button>
             </div>
 
             {salaries.length === 0 ? (
-                <div className="bg-white rounded-lg border p-12 text-center">
-                    <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No salary records found</p>
-                </div>
+                <Card>
+                    <CardContent className="p-12 text-center">
+                        <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No salary records found</p>
+                    </CardContent>
+                </Card>
             ) : (
-                <div className="bg-white rounded-lg border">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Month
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Gross Amount
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Deductions
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Net Amount
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Payment Method
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Paid On
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                <Card>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Month</TableHead>
+                                    <TableHead>Gross Amount</TableHead>
+                                    <TableHead>Deductions</TableHead>
+                                    <TableHead>Net Amount</TableHead>
+                                    <TableHead>Payment Method</TableHead>
+                                    <TableHead>Paid On</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                 {salaries.map((salary, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium whitespace-nowrap">
                                             {salary.month}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            {formatCurrency(salary.amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                                            {formatCurrency(salary.deductions)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                                            {formatCurrency(salary.netAmount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            <ParwestCurrency value={salary.amount} compact={false} />
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            <ParwestCurrency value={-Math.abs(salary.deductions)} compact={false} />
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap font-semibold text-emerald-600 dark:text-emerald-400">
+                                            <ParwestCurrency value={salary.netAmount} compact={false} />
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
                                             {salary.method}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap tabular-nums">
                                             {formatDate(salary.paidOn)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(salary.status)}`}>
-                                                {salary.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <button className="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            <TabStatusBadge label={salary.status} status={salary.status} />
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            <Button variant="link" size="sm" className="px-0 h-auto">
                                                 <Download className="h-4 w-4" />
                                                 Slip
-                                            </button>
-                                        </td>
-                                    </tr>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             )}
         </div>
     )

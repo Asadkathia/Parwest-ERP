@@ -1,9 +1,34 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { AlertTriangle, ExternalLink, Loader2, RefreshCw, RotateCcw } from "lucide-react"
+
 import SectionTitle from "@/components/ui/section-title"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/shadcn/card"
+import { Switch } from "@/components/shadcn/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
 type WorkflowRule = {
   key: string
@@ -25,6 +50,69 @@ type ApiPayload = {
   message?: string
 }
 
+// Humanized descriptions per v1.1 design reference (Parwest /workflow-rules.html).
+const RULE_DESCRIPTIONS: Record<string, string> = {
+  "deployments.singleActivePerGuard":
+    "One active deployment per guard at a time. Prevents overlapping assignments.",
+  "deployments.blockInactiveUpdate":
+    "Prevent editing ended deployments. Protects audit integrity.",
+  "deployments.lockAfterEnd":
+    "Lock deployment records once the end date has passed. Disabling allows back-editing of historical deployments.",
+  "deployments.requireActiveGuardStatus":
+    "Guard lifecycle must be ACTIVE before deployment is allowed.",
+  "deployments.requireGuardOfficeConsistency":
+    "Guard's assigned regional office must match the branch's region.",
+  "deployments.requireEndDate":
+    "An end date must be provided when ending a deployment.",
+  "deployments.disallowEndDateBeforeDeploymentDate":
+    "End date cannot precede the deployment start date.",
+  "deployments.disallowFutureEndDate":
+    "End date cannot be set in the future.",
+  "deployments.requireBranchContract":
+    "Branch must have an active contract before guards can be assigned.",
+  "deployments.requireClientHasBranches":
+    "Client must have at least one branch before deployment is allowed.",
+  "deployments.requireVerifiedPrerequisites":
+    "Guard must have all required prerequisites verified before deployment.",
+  "inventoryDemand.requirePendingInitialStatus":
+    "New inventory demands always start in PENDING status.",
+  "inventoryDemand.enforceTransitionMap":
+    "Only valid demand status transitions are permitted (e.g. PENDING→APPROVED).",
+  "inventoryDemand.blockCoreEditsAfterTerminal":
+    "Core demand fields cannot be edited after a terminal status. Disabling allows data tampering on closed records.",
+  "inventoryDemand.requireSufficientStockForFulfillment":
+    "Store must have sufficient stock before a demand can be fulfilled.",
+}
+
+// Rules whose disable transition is destructive / non-reversible in effect.
+const DESTRUCTIVE_RULES = new Set<string>([
+  "deployments.lockAfterEnd",
+  "deployments.blockInactiveUpdate",
+  "inventoryDemand.blockCoreEditsAfterTerminal",
+])
+
+const DESTRUCTIVE_CONSEQUENCES: Record<string, string> = {
+  "deployments.lockAfterEnd":
+    "Disabling lockAfterEnd will allow editing of ended deployments. This may break audit trails on historical records.",
+  "deployments.blockInactiveUpdate":
+    "Disabling blockInactiveUpdate will allow modifications to ended/inactive deployments. This may compromise audit integrity.",
+  "inventoryDemand.blockCoreEditsAfterTerminal":
+    "Disabling blockCoreEditsAfterTerminal will allow tampering with core demand fields on closed records.",
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  deployments: "Deployments",
+  inventoryDemand: "Inventory Demand",
+}
+
+function moduleOf(ruleKey: string): string {
+  return ruleKey.split(".")[0] || "other"
+}
+
+function humanizeDescription(ruleKey: string): string {
+  return RULE_DESCRIPTIONS[ruleKey] || "Workflow validation rule."
+}
+
 export default function WorkflowRulesManager() {
   const [rules, setRules] = useState<WorkflowRule[]>([])
   const [presets, setPresets] = useState<WorkflowPreset[]>([])
@@ -33,12 +121,12 @@ export default function WorkflowRulesManager() {
   const [loading, setLoading] = useState(false)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [applyingPreset, setApplyingPreset] = useState(false)
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [pendingDisable, setPendingDisable] = useState<WorkflowRule | null>(null)
+
   const selectedPreset = presets.find((preset) => preset.id === selectedPresetId) || null
 
   const loadRules = useCallback(async () => {
     setLoading(true)
-    setNotice(null)
     try {
       const response = await fetch("/api/workflow-rules", { cache: "no-store" })
       const payload = (await response.json().catch(() => ({}))) as ApiPayload
@@ -53,7 +141,7 @@ export default function WorkflowRulesManager() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load workflow rules."
       setRules([])
-      setNotice({ type: "error", message })
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -63,18 +151,13 @@ export default function WorkflowRulesManager() {
     void loadRules()
   }, [loadRules])
 
-  const toggleRule = async (rule: WorkflowRule) => {
+  const persistToggle = useCallback(async (rule: WorkflowRule, nextValue: boolean) => {
     setSavingKey(rule.key)
-    setNotice(null)
     try {
       const response = await fetch("/api/workflow-rules", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          updates: {
-            [rule.key]: !rule.value,
-          },
-        }),
+        body: JSON.stringify({ updates: { [rule.key]: nextValue } }),
       })
       const payload = (await response.json().catch(() => ({}))) as ApiPayload
       if (!response.ok) {
@@ -82,17 +165,35 @@ export default function WorkflowRulesManager() {
       }
       setRules(Array.isArray(payload.rules) ? payload.rules : [])
       setActivePresetId(typeof payload.activePresetId === "string" ? payload.activePresetId : null)
-      setNotice({ type: "success", message: `${rule.key} updated.` })
+      toast.success(`${rule.key} updated`)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update workflow rule."
-      setNotice({ type: "error", message })
+      toast.error(message)
     } finally {
       setSavingKey(null)
     }
-  }
+  }, [])
+
+  const handleToggle = useCallback(
+    (rule: WorkflowRule, nextChecked: boolean) => {
+      // Confirm only on the disable transition for destructive rules.
+      if (!nextChecked && rule.value && DESTRUCTIVE_RULES.has(rule.key)) {
+        setPendingDisable(rule)
+        return
+      }
+      void persistToggle(rule, nextChecked)
+    },
+    [persistToggle]
+  )
+
+  const confirmDisable = useCallback(() => {
+    if (!pendingDisable) return
+    const rule = pendingDisable
+    setPendingDisable(null)
+    void persistToggle(rule, false)
+  }, [pendingDisable, persistToggle])
 
   const resetToDefaults = async () => {
-    setNotice(null)
     const updates: Record<string, boolean> = {}
     rules.forEach((rule) => {
       updates[rule.key] = rule.defaultValue
@@ -109,17 +210,16 @@ export default function WorkflowRulesManager() {
       }
       setRules(Array.isArray(payload.rules) ? payload.rules : [])
       setActivePresetId(typeof payload.activePresetId === "string" ? payload.activePresetId : null)
-      setNotice({ type: "success", message: "Workflow rules reset to defaults." })
+      toast.success("Workflow rules reset to defaults")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to reset workflow rules."
-      setNotice({ type: "error", message })
+      toast.error(message)
     }
   }
 
   const applyPreset = async () => {
     if (!selectedPresetId) return
     setApplyingPreset(true)
-    setNotice(null)
     try {
       const response = await fetch("/api/workflow-rules", {
         method: "PATCH",
@@ -132,14 +232,36 @@ export default function WorkflowRulesManager() {
       }
       setRules(Array.isArray(payload.rules) ? payload.rules : [])
       setActivePresetId(typeof payload.activePresetId === "string" ? payload.activePresetId : null)
-      setNotice({ type: "success", message: `Preset ${selectedPresetId} applied.` })
+      toast.success(`Preset ${selectedPresetId} applied`)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to apply workflow preset."
-      setNotice({ type: "error", message })
+      toast.error(message)
     } finally {
       setApplyingPreset(false)
     }
   }
+
+  const groupedRules = useMemo(() => {
+    const groups = new Map<string, WorkflowRule[]>()
+    rules.forEach((rule) => {
+      const mod = moduleOf(rule.key)
+      const arr = groups.get(mod) || []
+      arr.push(rule)
+      groups.set(mod, arr)
+    })
+    return Array.from(groups.entries()).map(([key, items]) => ({
+      key,
+      label: MODULE_LABELS[key] || key,
+      items,
+    }))
+  }, [rules])
+
+  const [activeTab, setActiveTab] = useState<string>("")
+  useEffect(() => {
+    if (!activeTab && groupedRules.length) {
+      setActiveTab(groupedRules[0].key)
+    }
+  }, [groupedRules, activeTab])
 
   return (
     <div className="space-y-6">
@@ -147,87 +269,175 @@ export default function WorkflowRulesManager() {
         title="Workflow Rules"
         subtitle="Toggle workflow strictness without changing route code. Changes are persisted and applied immediately."
       />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
-      <section className="ui-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm text-[var(--text-muted)]">
-            <p>Rules here control deployment and inventory workflow behavior.</p>
-            <p>Active preset: <span className="font-mono">{activePresetId || "custom"}</span></p>
-          </div>
-          <div className="flex gap-2">
-            <ActionButton variant="secondary" onClick={() => void loadRules()} disabled={loading}>
-              Refresh
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={() => void resetToDefaults()} disabled={loading || !rules.length}>
-              Reset Defaults
-            </ActionButton>
-          </div>
-        </div>
-        <div className="mb-4 grid gap-2 md:grid-cols-[1fr_auto]">
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <label className="block text-xs uppercase text-[var(--text-muted)] mb-1">Preset</label>
-            <select
-              className="ui-select"
-              value={selectedPresetId}
-              onChange={(event) => setSelectedPresetId(event.target.value)}
-            >
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-            {selectedPreset?.description ? (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {selectedPreset.description}
-              </p>
-            ) : null}
+            <CardTitle>Active configuration</CardTitle>
+            <CardDescription>
+              Active preset: <span className="font-mono">{activePresetId || "custom"}</span>
+            </CardDescription>
           </div>
-          <div className="flex items-end">
-            <ActionButton variant="secondary" onClick={() => void applyPreset()} disabled={!selectedPresetId || applyingPreset}>
-              {applyingPreset ? "Applying..." : "Apply Preset"}
-            </ActionButton>
-          </div>
-        </div>
+          <PermissionGate module="SETTINGS" action="UPDATE" mode="hide">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => void loadRules()} disabled={loading}>
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void resetToDefaults()}
+                disabled={loading || !rules.length}
+              >
+                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                Reset Defaults
+              </Button>
+            </div>
+          </PermissionGate>
+        </CardHeader>
+        <CardContent>
+          <PermissionGate module="SETTINGS" action="UPDATE" mode="hide">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+              <div>
+                <label className="mb-1 block text-xs uppercase text-muted-foreground">Preset</label>
+                <select
+                  className="ui-select"
+                  value={selectedPresetId}
+                  onChange={(event) => setSelectedPresetId(event.target.value)}
+                >
+                  {presets.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedPreset?.description ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{selectedPreset.description}</p>
+                ) : null}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => void applyPreset()}
+                disabled={!selectedPresetId || applyingPreset}
+              >
+                {applyingPreset ? (
+                  <>
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  "Apply Preset"
+                )}
+              </Button>
+            </div>
+          </PermissionGate>
+        </CardContent>
+      </Card>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Rule Key</th>
-                <th className="px-3 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Current</th>
-                <th className="px-3 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Default</th>
-                <th className="px-3 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Env Override Key</th>
-                <th className="px-3 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.key} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 text-sm font-mono">{rule.key}</td>
-                  <td className="px-3 py-2 text-sm">{rule.value ? "enabled" : "disabled"}</td>
-                  <td className="px-3 py-2 text-sm">{rule.defaultValue ? "enabled" : "disabled"}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-[var(--text-muted)]">{rule.envOverrideKey}</td>
-                  <td className="px-3 py-2 text-sm">
-                    <ActionButton
-                      className="px-2 py-1 text-xs"
-                      variant="secondary"
-                      onClick={() => void toggleRule(rule)}
-                      disabled={savingKey === rule.key}
-                    >
-                      {savingKey === rule.key ? "Saving..." : rule.value ? "Disable" : "Enable"}
-                    </ActionButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!rules.length ? (
-            <p className="p-3 text-sm text-[var(--text-muted)]">{loading ? "Loading workflow rules..." : "No workflow rules found."}</p>
-          ) : null}
-        </div>
-      </section>
+      {!rules.length ? (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            {loading ? "Loading workflow rules..." : "No workflow rules found."}
+          </CardContent>
+        </Card>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {groupedRules.map((group) => (
+              <TabsTrigger key={group.key} value={group.key}>
+                {group.label}
+                <span className="ml-2 text-xs text-muted-foreground">{group.items.length}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {groupedRules.map((group) => (
+            <TabsContent key={group.key} value={group.key} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                {group.items.map((rule) => {
+                  const isDestructive = DESTRUCTIVE_RULES.has(rule.key)
+                  const isSaving = savingKey === rule.key
+                  return (
+                    <Card key={rule.key} className={isDestructive ? "border-destructive/40" : ""}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <CardTitle className="font-mono text-sm">{rule.key}</CardTitle>
+                            <CardDescription>{humanizeDescription(rule.key)}</CardDescription>
+                          </div>
+                          {isDestructive ? (
+                            <Badge variant="destructive" className="shrink-0 gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Danger zone
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <PermissionGate module="SETTINGS" action="UPDATE" mode="disable">
+                              <Switch
+                                checked={rule.value}
+                                disabled={isSaving}
+                                onCheckedChange={(checked) => handleToggle(rule, checked)}
+                                aria-label={`Toggle ${rule.key}`}
+                              />
+                            </PermissionGate>
+                            <span className="text-sm text-muted-foreground">
+                              {rule.value ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            Default: {rule.defaultValue ? "on" : "off"}
+                          </span>
+                        </div>
+                        <p className="mt-3 truncate font-mono text-[11px] text-muted-foreground">
+                          ENV: {rule.envOverrideKey}
+                        </p>
+                      </CardContent>
+                      <CardFooter className="justify-between text-xs text-muted-foreground">
+                        {/* TODO: surface last-changed audit metadata once the workflow store records it */}
+                        <span>Audit history available</span>
+                        <Link
+                          href={`/audit?module=SETTINGS&search=${encodeURIComponent(rule.key)}`}
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          Audit trail
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
+
+      <AlertDialog open={!!pendingDisable} onOpenChange={(open) => !open && setPendingDisable(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable danger-zone rule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDisable
+                ? DESTRUCTIVE_CONSEQUENCES[pendingDisable.key] ||
+                  `Disabling ${pendingDisable.key} may have non-reversible effects.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep enabled</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDisable}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disable Rule
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

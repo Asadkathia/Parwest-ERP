@@ -166,6 +166,29 @@ export async function PUT(
                 profileIntroducer: body.profileIntroducer || null,
                 additionalContactNumbers: body.additionalContactNumbers || null,
                 nearestRelativesJson: body.nearestRelativesJson || null,
+                familyMembersJson: (() => {
+                    if (body.familyMembersJson === undefined || body.familyMembersJson === null) return undefined
+                    const raw = String(body.familyMembersJson || "").trim()
+                    if (!raw) return null
+                    try {
+                        const parsed = JSON.parse(raw)
+                        if (!Array.isArray(parsed)) return null
+                        const cleaned = parsed
+                            .filter((m) => m && typeof m === "object")
+                            .map((m: Record<string, unknown>) => {
+                                const out: Record<string, string> = {}
+                                for (const f of ["name", "relation", "age", "profession", "address", "childCnic", "childAge", "childDob"]) {
+                                    const v = String(m[f] ?? "").trim()
+                                    if (v) out[f] = v
+                                }
+                                return out
+                            })
+                            .filter((m) => Object.keys(m).length > 0)
+                        return cleaned.length > 0 ? JSON.stringify(cleaned) : null
+                    } catch {
+                        return null
+                    }
+                })(),
             },
         })
 

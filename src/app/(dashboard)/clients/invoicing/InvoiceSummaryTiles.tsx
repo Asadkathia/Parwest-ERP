@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import StatCard from "@/components/ui/stat-card"
+import StatCard from "@/components/shadcn/parwest-stat-card"
 import type { InvoiceRow } from "./types"
 
 export default function InvoiceSummaryTiles({ rows }: { rows: InvoiceRow[] }) {

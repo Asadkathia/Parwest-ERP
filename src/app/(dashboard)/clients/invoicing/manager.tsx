@@ -1,12 +1,26 @@
 "use client"
 
+/**
+ * Parwest ERP — Client Invoicing manager (Phase 5B reskin)
+ * ─────────────────────────────────────────────────────────────────────────
+ * The legacy in-page `RegionUrlPicker` is removed: the global topbar region
+ * filter (post-Phase 4) drives `?regionId=` for all dashboard pages, so the
+ * inline picker is redundant. Server-side scoping in the API route is
+ * untouched — `deriveManagerScope` + `buildManagerScopeWhere` continue to
+ * filter by region.
+ *
+ * Inline `InlineAlert` + `setError`/`setNotice` are replaced by sonner
+ * toasts. The only remaining local error surface is the bulk-generate
+ * confirm flow.
+ */
+
 import { useCallback, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
+
 import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-import FilterBar from "@/components/ui/filter-bar"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { Button } from "@/components/shadcn/button"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 import InvoiceComposer from "./InvoiceComposer"
 import InvoiceList from "./InvoiceList"
 import InvoiceDetailModal from "./InvoiceDetailModal"
@@ -14,16 +28,14 @@ import InvoiceSummaryTiles from "./InvoiceSummaryTiles"
 import AdvancesPanel from "./AdvancesPanel"
 import { currentMonth, type InvoiceRow } from "./types"
 
-type RegionOption = { id: string; name: string }
-
 type ApiClientRow = { id: string; name?: string | null }
 type BranchRow = { id: string; name: string }
 
-export default function ClientInvoicingManager({
-  regions = [],
-  locked = false,
-}: {
-  regions?: RegionOption[]
+// `regions` and `locked` are retained in the prop signature so that the
+// server `page.tsx` does not need to change in this PR. Both are unused in
+// the body — the global topbar picker drives `?regionId=` instead.
+export default function ClientInvoicingManager(_props: {
+  regions?: { id: string; name: string }[]
   locked?: boolean
 } = {}) {
   const searchParams = useSearchParams()
@@ -37,8 +49,6 @@ export default function ClientInvoicingManager({
   const [branches, setBranches] = useState<BranchRow[]>([])
   const [invoices, setInvoices] = useState<InvoiceRow[]>([])
 
-  const [error, setError] = useState("")
-  const [notice, setNotice] = useState("")
   const [detail, setDetail] = useState<InvoiceRow | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
 
@@ -53,9 +63,15 @@ export default function ClientInvoicingManager({
           : "/api/clients"
         const res = await fetch(url, { cache: "no-store" })
         const data = await res.json()
-        if (!res.ok) { if (alive) setError(data?.message || "Failed to load clients."); return }
+        if (!res.ok) {
+          if (alive) toast.error(data?.message || "Failed to load clients.")
+          return
+        }
         const rows = Array.isArray(data)
-          ? (data as ApiClientRow[]).map((r) => ({ id: String(r.id), name: String(r.name || r.id) }))
+          ? (data as ApiClientRow[]).map((r) => ({
+              id: String(r.id),
+              name: String(r.name || r.id),
+            }))
           : []
         if (alive) {
           setClients(rows)
@@ -64,10 +80,12 @@ export default function ClientInvoicingManager({
           else if (!rows.some((r) => r.id === clientId)) setClientId(rows[0].id)
         }
       } catch {
-        if (alive) setError("Failed to load clients.")
+        if (alive) toast.error("Failed to load clients.")
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlRegionId])
 
@@ -75,49 +93,86 @@ export default function ClientInvoicingManager({
   useEffect(() => {
     let alive = true
     setBranchId("")
-    if (!clientId) { setBranches([]); return }
+    if (!clientId) {
+      setBranches([])
+      return
+    }
     ;(async () => {
       try {
-        const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/branches`, { cache: "no-store" })
+        const res = await fetch(
+          `/api/clients/${encodeURIComponent(clientId)}/branches`,
+          { cache: "no-store" }
+        )
         const data = await res.json()
         if (!res.ok) return
-        if (alive) setBranches(Array.isArray(data) ? data.map((b) => ({ id: String(b.id), name: String(b.name) })) : [])
-      } catch { /* ignore */ }
+        if (alive)
+          setBranches(
+            Array.isArray(data)
+              ? data.map((b) => ({ id: String(b.id), name: String(b.name) }))
+              : []
+          )
+      } catch {
+        /* ignore */
+      }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [clientId])
 
   const loadInvoices = useCallback(async () => {
-    if (!clientId) { setInvoices([]); return }
+    if (!clientId) {
+      setInvoices([])
+      return
+    }
     try {
       const params = new URLSearchParams({ clientId, month: period })
       if (statusFilter) params.set("status", statusFilter)
-      const res = await fetch(`/api/invoices?${params.toString()}`, { cache: "no-store" })
+      const res = await fetch(`/api/invoices?${params.toString()}`, {
+        cache: "no-store",
+      })
       const data = await res.json()
-      if (!res.ok) { setError(data?.message || "Failed to load invoices."); return }
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to load invoices.")
+        return
+      }
       setInvoices(Array.isArray(data) ? data : [])
     } catch {
-      setError("Failed to load invoices.")
+      toast.error("Failed to load invoices.")
     }
   }, [clientId, period, statusFilter])
 
-  useEffect(() => { loadInvoices() }, [loadInvoices])
+  useEffect(() => {
+    loadInvoices()
+  }, [loadInvoices])
 
   const openDetail = async (invoiceId: string) => {
     try {
-      const res = await fetch(`/api/invoices/${invoiceId}`, { cache: "no-store" })
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        cache: "no-store",
+      })
       const data = await res.json()
-      if (!res.ok) { setError(data?.message || "Failed to load invoice."); return }
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to load invoice.")
+        return
+      }
       setDetail(data)
     } catch {
-      setError("Failed to load invoice.")
+      toast.error("Failed to load invoice.")
     }
   }
 
   const runBulkGenerate = async () => {
-    if (!period) { setError("Select a period."); return }
-    if (!confirm(`Generate draft invoices for all clients in your scope for ${period}?`)) return
-    setError(""); setNotice("")
+    if (!period) {
+      toast.error("Select a period.")
+      return
+    }
+    if (
+      !confirm(
+        `Generate draft invoices for all clients in your scope for ${period}?`
+      )
+    )
+      return
     setBulkBusy(true)
     try {
       const res = await fetch("/api/invoices/generate-monthly", {
@@ -126,8 +181,13 @@ export default function ClientInvoicingManager({
         body: JSON.stringify({ month: period }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data?.message || "Bulk generation failed."); return }
-      setNotice(`Bulk generate: created ${data.summary.created}, skipped ${data.summary.skipped}, errors ${data.summary.errors}.`)
+      if (!res.ok) {
+        toast.error(data?.message || "Bulk generation failed.")
+        return
+      }
+      toast.success(
+        `Bulk generate: created ${data.summary.created}, skipped ${data.summary.skipped}, errors ${data.summary.errors}.`
+      )
       loadInvoices()
     } finally {
       setBulkBusy(false)
@@ -140,24 +200,13 @@ export default function ClientInvoicingManager({
         title="Client Invoicing"
         subtitle="Compose, auto-fill and track invoices. Advances are auto-applied on creation."
         action={
-          <ActionButton onClick={runBulkGenerate} disabled={bulkBusy || !period}>
-            {bulkBusy ? "Generating…" : "Bulk generate (period)"}
-          </ActionButton>
+          <PermissionGate module="CLIENTS" action="CREATE" mode="hide">
+            <Button onClick={runBulkGenerate} disabled={bulkBusy || !period}>
+              {bulkBusy ? "Generating…" : "Bulk generate (period)"}
+            </Button>
+          </PermissionGate>
         }
       />
-
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-
-      <FilterBar>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <RegionUrlPicker
-            regions={regions}
-            locked={locked}
-            includeGlobalOption={!locked}
-          />
-        </div>
-      </FilterBar>
 
       <InvoiceSummaryTiles rows={invoices} />
 
@@ -170,8 +219,13 @@ export default function ClientInvoicingManager({
         onChangeClient={setClientId}
         onChangeBranch={setBranchId}
         onChangePeriod={setPeriod}
-        onCreated={(msg) => { setNotice(msg); loadInvoices() }}
-        setError={setError}
+        onCreated={(msg) => {
+          toast.success(msg)
+          loadInvoices()
+        }}
+        setError={(msg) => {
+          if (msg) toast.error(msg)
+        }}
       />
 
       <InvoiceList
@@ -184,17 +238,22 @@ export default function ClientInvoicingManager({
       <AdvancesPanel
         clientId={clientId}
         branches={branches}
-        setError={setError}
-        setNotice={setNotice}
+        setError={(msg) => {
+          if (msg) toast.error(msg)
+        }}
+        setNotice={(msg) => {
+          if (msg) toast.success(msg)
+        }}
       />
 
       {detail ? (
         <InvoiceDetailModal
           invoice={detail}
           onClose={() => setDetail(null)}
-          onUpdated={(next) => { setDetail(next); loadInvoices() }}
-          setError={setError}
-          setNotice={setNotice}
+          onUpdated={(next) => {
+            setDetail(next)
+            loadInvoices()
+          }}
         />
       ) : null}
     </div>

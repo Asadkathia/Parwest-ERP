@@ -3,8 +3,9 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 function sanitizeCnic(value: string) {
     return value.trim()
@@ -18,11 +19,35 @@ export async function GET(request: NextRequest) {
         }
         if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
+        const managerScope = deriveManagerScope(session)
+
         const { searchParams } = new URL(request.url)
         const cnicQuery = sanitizeCnic(searchParams.get("cnic") || "")
 
+        const where: Record<string, unknown> = {}
+        if (cnicQuery) where.cnic = { contains: cnicQuery, mode: "insensitive" }
+        if (managerScope) {
+            const scopedGuards = await prisma.guard.findMany({
+                where: buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
+                select: { cnic: true },
+            })
+            const allowedCnics = Array.from(new Set(scopedGuards.map((g) => g.cnic).filter(Boolean)))
+            if (allowedCnics.length === 0) {
+                return NextResponse.json([])
+            }
+            if (cnicQuery) {
+                delete where.cnic
+                where.AND = [
+                    { cnic: { in: allowedCnics } },
+                    { cnic: { contains: cnicQuery, mode: "insensitive" } },
+                ]
+            } else {
+                where.cnic = { in: allowedCnics }
+            }
+        }
+
         const blacklistRows = await prisma.blacklistedCnic.findMany({
-            where: cnicQuery ? { cnic: { contains: cnicQuery, mode: "insensitive" } } : undefined,
+            where,
             orderBy: { updatedAt: "desc" },
             take: 200,
         })
@@ -72,6 +97,8 @@ export async function POST(request: NextRequest) {
         }
         if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
+        const managerScope = deriveManagerScope(session)
+
         const body = await request.json()
         const cnic = sanitizeCnic(typeof body.cnic === "string" ? body.cnic : "")
         const reason = typeof body.reason === "string" ? body.reason.trim() : null
@@ -88,8 +115,23 @@ export async function POST(request: NextRequest) {
         // unless the caller explicitly flags the guard as absconded.
         const guardsForCnic = await prisma.guard.findMany({
             where: { cnic },
-            select: { id: true, name: true },
+            select: { id: true, name: true, regionId: true, regionalOfficeId: true },
         })
+
+        if (managerScope) {
+            if (guardsForCnic.length === 0) {
+                if (!isSuperAdmin(session)) {
+                    return forbidden("Forbidden: only Super Admins can blacklist a CNIC not tied to any guard.")
+                }
+            } else {
+                const outOfScope = guardsForCnic.some((g) =>
+                    managerScopeDenied(managerScope, { regionId: g.regionId, regionalOfficeId: g.regionalOfficeId })
+                )
+                if (outOfScope) {
+                    return forbidden("Forbidden: this CNIC belongs to a guard outside your assigned region.")
+                }
+            }
+        }
         if (guardsForCnic.length > 0) {
             if (absconded && !reason) {
                 return badRequest("Reason is required when blacklisting an absconded guard.")

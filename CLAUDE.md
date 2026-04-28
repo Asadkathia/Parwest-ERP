@@ -93,3 +93,21 @@ Prisma with `@prisma/adapter-pg` (uses `pg` Pool for connection pooling — not 
 - **Guard list select**: `api/guards` GET uses explicit `select` that excludes `photoUrl` (base64 blob). Don't add `photoUrl` to list queries — fetch on detail endpoint only.
 - **Parwest ID generation**: uses `findFirst({ orderBy: { parwestId: "desc" } })` — do not revert to a findMany scan.
 - **Pending DB indexes** (need `prisma migrate dev`): `Attendance(guardId,date)`, `Deployment(status,clientId)`, `Payroll(paymentStatus,month)`.
+
+## Design System v1.1
+
+The codebase migrated to shadcn/ui + Parwest token theme in 2026-04. Core conventions:
+
+- **shadcn primitives** live at `@/components/shadcn/*`. Always prefer these over rolling custom UI.
+- **Tokens** in `src/styles/tokens.css` (v1.0) + `src/styles/tokens-v1.1.css` (v1.1 contract + RTL + dark + reduced-motion). Tailwind v4 `@theme` keys in `src/styles/parwest-theme.css`.
+- **No hex literals outside `src/styles/`** — use Tailwind utilities (`bg-primary`, `text-muted-foreground`) or v1.0 tokens (`var(--brand-600)`).
+- **Forms**: react-hook-form + zod, schemas in `src/lib/schemas/*`. Wrap with shadcn `Form`. Field shape: `FormField → FormItem → FormLabel → FormControl → FormMessage`.
+- **Currency**: use `<ParwestCurrency value={n}>` from `@/components/shadcn/parwest-currency`. Helpers `formatPKRShort`/`formatPKRFull` in `@/lib/format/currency`.
+- **Toasts**: `import { toast } from 'sonner'`. Always read `data.message` from the API envelope, not `data.error`.
+- **Region picker**: global in topbar (`AppTopbar` reads `useRegions()`, drives `?regionId=`). Don't add inline pickers per page.
+- **Permission gates**: `<PermissionGate module="GUARDS" action="UPDATE" mode="disable">` from `@/components/shadcn/permission-gate`. Use `useCanAccess()` for imperative checks.
+- **Sidebar always dark** — never inherits content theme. Token block in `tokens-v1.1.css`.
+- **Destructive confirms** use shadcn `AlertDialog` with destructive Button variant. Browser `confirm()` is banned.
+- **Status badges always include label text** — color is never the sole signal (a11y rule).
+- **Add new components to `@/components/shadcn/`**, not `@/components/ui/`. The `ui/` folder contains legacy components retained for callers; do not extend.
+- **Install shadcn primitives** via `npx shadcn@latest add <component> --legacy-peer-deps`.

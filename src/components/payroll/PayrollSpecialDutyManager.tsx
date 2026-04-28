@@ -1,13 +1,80 @@
+/**
+ * Parwest ERP — Payroll: Special Duty (canonical reskin)
+ * ──────────────────────────────────────────────────────
+ * Reskinned to match the canonical payroll-loans template:
+ *  - List → `<DataTable>` with `<ParwestCurrency>` for amounts
+ *  - Form → shadcn `<Form>` (RHF + zodResolver) inside a `<Dialog>`
+ *  - Cancel (delete) → `<AlertDialog>` with destructive variant
+ *  - Permission gates around Add / Cancel buttons
+ *  - Toasts via sonner reading `data.message`
+ *
+ * Behaviour, API endpoints, and URL contract are preserved exactly.
+ * Shared widgets (GuardAutocomplete, GuardContextFields, Base64FileUpload,
+ * RegionUrlPicker) are kept as-is per migration policy.
+ */
+
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { type ColumnDef } from "@tanstack/react-table"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
 import Base64FileUpload from "@/components/payroll/shared/Base64FileUpload"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
+import { Badge } from "@/components/shadcn/badge"
+import { Button, buttonVariants } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { DataTable } from "@/components/shadcn/data-table"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+import { Textarea } from "@/components/shadcn/textarea"
+
+import { cn } from "@/lib/utils"
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
+import {
+  payrollSpecialDutyCreateSchema,
+  type PayrollSpecialDutyCreateInput,
+} from "@/lib/schemas/payroll-special-duty"
 
 type Row = {
   id: string
@@ -36,6 +103,8 @@ type PayrollSpecialDutyManagerProps = {
   locked?: boolean
 }
 
+const ALL_VALUE = "__ALL__"
+
 export default function PayrollSpecialDutyManager({
   canCreate = false,
   canDelete = false,
@@ -45,24 +114,41 @@ export default function PayrollSpecialDutyManager({
 }: PayrollSpecialDutyManagerProps = {}) {
   const [rows, setRows] = useState<Row[]>([])
   const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>(ALL_VALUE)
   const [loading, setLoading] = useState(false)
 
   const [formOpen, setFormOpen] = useState(false)
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
-  const [hours, setHours] = useState("")
-  const [hourRate, setHourRate] = useState("")
-  const [comments, setComments] = useState("")
-  const [attachment, setAttachment] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
   const [clients, setClients] = useState<ClientOption[]>([])
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [branchesLoading, setBranchesLoading] = useState(false)
-  const [clientId, setClientId] = useState("")
-  const [branchId, setBranchId] = useState("")
+
+  // Cancel (destructive) dialog state.
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<Row | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
+
+  const form = useForm<PayrollSpecialDutyCreateInput>({
+    resolver: zodResolver(payrollSpecialDutyCreateSchema),
+    defaultValues: {
+      guardId: "",
+      dateFrom: "",
+      dateTo: "",
+      hours: undefined as unknown as number,
+      hourRate: undefined as unknown as number,
+      comments: "",
+      attachmentBase64: null,
+      clientId: "",
+      branchId: "",
+    },
+    mode: "onChange",
+  })
+
+  const clientId = form.watch("clientId") ?? ""
+  const watchedHours = form.watch("hours")
+  const watchedRate = form.watch("hourRate")
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -75,7 +161,6 @@ export default function PayrollSpecialDutyManager({
   }, [search, effectiveRegionId])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by filter deps via callback
     loadRows()
   }, [loadRows])
 
@@ -90,24 +175,26 @@ export default function PayrollSpecialDutyManager({
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
         setClients(
-          list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+          list.map((c: { id: string; name: string }) => ({
+            id: c.id,
+            name: c.name,
+          }))
         )
       })
       .catch(() => setClients([]))
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing dependent dropdowns when region changes
-    setClientId("")
-    setBranchId("")
+    form.setValue("clientId", "")
+    form.setValue("branchId", "")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveRegionId])
 
   useEffect(() => {
     if (!clientId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing dependent dropdown when parent cleared
       setBranches([])
-      setBranchId("")
+      form.setValue("branchId", "")
       return
     }
     setBranchesLoading(true)
-    setBranchId("")
+    form.setValue("branchId", "")
     fetch(`/api/clients/${clientId}/branches`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
@@ -122,65 +209,227 @@ export default function PayrollSpecialDutyManager({
       })
       .catch(() => setBranches([]))
       .finally(() => setBranchesLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
     setParwestIdInput(opt.parwestId)
     const res = await fetch(`/api/guards/${opt.id}/current-context`)
-    if (res.ok) setContext(await res.json())
+    if (res.ok) {
+      const ctx = (await res.json()) as GuardCurrentContext
+      setContext(ctx)
+      form.setValue("guardId", ctx.guardId)
+    } else {
+      setContext(null)
+      form.setValue("guardId", "")
+    }
   }
 
   const resetForm = () => {
     setParwestIdInput("")
     setContext(null)
-    setDateFrom("")
-    setDateTo("")
-    setHours("")
-    setHourRate("")
-    setComments("")
-    setAttachment(null)
-    setClientId("")
-    setBranchId("")
     setBranches([])
-    setResult(null)
+    form.reset({
+      guardId: "",
+      dateFrom: "",
+      dateTo: "",
+      hours: undefined as unknown as number,
+      hourRate: undefined as unknown as number,
+      comments: "",
+      attachmentBase64: null,
+      clientId: "",
+      branchId: "",
+    })
   }
 
-  const submit = async () => {
-    if (!context || !dateFrom || !dateTo || !hours || !hourRate) return
+  const onSubmit = async (values: PayrollSpecialDutyCreateInput) => {
+    if (!context) {
+      toast.error("Select a guard first.")
+      return
+    }
     setSaving(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/special-duty-records", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        guardId: context.guardId,
-        dateFrom,
-        dateTo,
-        hours: Number(hours),
-        hourRate: Number(hourRate),
-        comments: comments || null,
-        attachmentBase64: attachment,
-        clientId: clientId || null,
-        branchId: branchId || null,
-      }),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (res.ok) {
-      setResult("Saved.")
-      resetForm()
-      setFormOpen(false)
-      loadRows()
-    } else {
-      setResult(`Error: ${data.error ?? "Failed."}`)
+    try {
+      const res = await fetch("/api/payroll/special-duty-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guardId: context.guardId,
+          dateFrom: values.dateFrom,
+          dateTo: values.dateTo,
+          hours: Number(values.hours),
+          hourRate: Number(values.hourRate),
+          comments: values.comments || null,
+          attachmentBase64: values.attachmentBase64,
+          clientId: values.clientId || null,
+          branchId: values.branchId || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success("Special duty record saved.")
+        resetForm()
+        setFormOpen(false)
+        loadRows()
+      } else {
+        toast.error(data?.message ?? "Failed to save special duty record.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setSaving(false)
     }
   }
 
-  const cancel = async (id: string) => {
-    if (!confirm("Cancel this special duty record?")) return
-    const res = await fetch(`/api/payroll/special-duty-records/${id}`, { method: "DELETE" })
-    if (res.ok) loadRows()
+  const performCancel = async () => {
+    if (!cancelTarget) return
+    setCancelBusy(true)
+    try {
+      const res = await fetch(
+        `/api/payroll/special-duty-records/${cancelTarget.id}`,
+        { method: "DELETE" }
+      )
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success("Special duty record cancelled.")
+        loadRows()
+      } else {
+        toast.error(data?.message ?? "Failed to cancel record.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setCancelBusy(false)
+      setCancelOpen(false)
+      setCancelTarget(null)
+    }
   }
+
+  const filteredRows = useMemo(() => {
+    if (statusFilter === ALL_VALUE) return rows
+    return rows.filter((r) => r.status === statusFilter)
+  }, [rows, statusFilter])
+
+  const columns = useMemo<ColumnDef<Row>[]>(
+    () => [
+      {
+        id: "parwestId",
+        accessorFn: (r) => r.guard.parwestId,
+        header: "Secure Ops ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.guard.parwestId}
+          </span>
+        ),
+      },
+      {
+        id: "guardName",
+        accessorFn: (r) => r.guard.name,
+        header: "Name",
+        cell: ({ row }) => row.original.guard.name,
+      },
+      {
+        id: "dateFrom",
+        accessorFn: (r) => r.dateFrom,
+        header: "Date From",
+        cell: ({ row }) => row.original.dateFrom.slice(0, 10),
+      },
+      {
+        id: "dateTo",
+        accessorFn: (r) => r.dateTo,
+        header: "Date To",
+        cell: ({ row }) => row.original.dateTo.slice(0, 10),
+      },
+      {
+        id: "hours",
+        accessorFn: (r) => r.hours,
+        header: () => <span className="block text-end">Hours</span>,
+        cell: ({ row }) => (
+          <div className="text-end tabular-nums">{row.original.hours}</div>
+        ),
+      },
+      {
+        id: "rate",
+        accessorFn: (r) => r.hourRate,
+        header: () => <span className="block text-end">Rate</span>,
+        cell: ({ row }) => (
+          <div className="text-end tabular-nums">{row.original.hourRate}</div>
+        ),
+      },
+      {
+        id: "amount",
+        accessorFn: (r) => r.amount,
+        header: () => <span className="block text-end">Amount</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency value={Number(row.original.amount)} />
+          </div>
+        ),
+      },
+      {
+        id: "comments",
+        accessorFn: (r) => r.comments ?? "",
+        header: "Comments",
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.comments ?? ""}</span>
+        ),
+      },
+      {
+        id: "file",
+        accessorFn: (r) => r.attachmentBase64 ?? "",
+        header: "File",
+        cell: ({ row }) =>
+          row.original.attachmentBase64 ? (
+            <a
+              href={row.original.attachmentBase64}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline text-xs"
+            >
+              View
+            </a>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          ),
+      },
+      {
+        id: "status",
+        accessorFn: (r) => r.status,
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge
+            variant={
+              row.original.status === "CANCELLED" ? "destructive" : "secondary"
+            }
+          >
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      {
+        id: "action",
+        header: "Action",
+        cell: ({ row }) =>
+          canDelete && row.original.status !== "CANCELLED" ? (
+            <PermissionGate module="PAYROLL" action="DELETE" mode="hide">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                onClick={() => {
+                  setCancelTarget(row.original)
+                  setCancelOpen(true)
+                }}
+              >
+                Cancel
+              </Button>
+            </PermissionGate>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          ),
+      },
+    ],
+    [canDelete]
+  )
 
   return (
     <PayrollPageShell
@@ -188,295 +437,410 @@ export default function PayrollSpecialDutyManager({
       subtitle="Record date-range special duty with attachment."
       actions={
         canCreate ? (
-          <ActionButton onClick={() => setFormOpen(true)}>+ Add Special Duty</ActionButton>
+          <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+            <Button onClick={() => setFormOpen(true)}>+ Add Special Duty</Button>
+          </PermissionGate>
         ) : undefined
       }
     >
-      <section className="ui-card p-4 space-y-4">
-        <div className="flex gap-3 flex-wrap items-end">
-          <div className="min-w-[180px]">
-            <RegionUrlPicker
-              regions={regions}
-              locked={locked}
-              includeGlobalOption={!locked}
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Search
-            </label>
-            <input
-              className="ui-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Parwest ID or name"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left">Secure Ops ID</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Date From</th>
-                <th className="px-3 py-2 text-left">Date To</th>
-                <th className="px-3 py-2 text-right">Hours</th>
-                <th className="px-3 py-2 text-right">Rate</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-                <th className="px-3 py-2 text-left">Comments</th>
-                <th className="px-3 py-2 text-left">File</th>
-                <th className="px-3 py-2 text-left">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={10} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!loading && rows.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    No records.
-                  </td>
-                </tr>
-              )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
-                  <td className="px-3 py-2">{r.guard.name}</td>
-                  <td className="px-3 py-2">{r.dateFrom.slice(0, 10)}</td>
-                  <td className="px-3 py-2">{r.dateTo.slice(0, 10)}</td>
-                  <td className="px-3 py-2 text-right">{r.hours}</td>
-                  <td className="px-3 py-2 text-right">{r.hourRate}</td>
-                  <td className="px-3 py-2 text-right">{r.amount.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-xs">{r.comments ?? ""}</td>
-                  <td className="px-3 py-2">
-                    {r.attachmentBase64 ? (
-                      <a
-                        href={r.attachmentBase64}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[var(--brand)] underline text-xs"
-                      >
-                        View
-                      </a>
-                    ) : (
-                      <span className="text-[var(--text-muted)] text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {canDelete ? (
-                      <button
-                        type="button"
-                        onClick={() => cancel(r.id)}
-                        className="text-red-500 hover:underline text-xs"
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <span className="text-xs text-[var(--text-muted)]">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="ui-card w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Add Special Duty</h2>
-              <button
-                type="button"
-                className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]"
-                onClick={() => {
-                  setFormOpen(false)
-                  resetForm()
-                }}
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr] gap-3 items-end">
+            <div>
+              <RegionUrlPicker
+                regions={regions}
+                locked={locked}
+                includeGlobalOption={!locked}
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Status
+              </label>
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => setStatusFilter(v)}
               >
-                ×
-              </button>
+                <SelectTrigger>
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_VALUE}>All statuses</SelectItem>
+                  <SelectItem value="PENDING">PENDING</SelectItem>
+                  <SelectItem value="APPROVED">APPROVED</SelectItem>
+                  <SelectItem value="CANCELLED">CANCELLED</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
             <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Secure Ops ID *
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Search
               </label>
-              <GuardAutocomplete
-                value={parwestIdInput}
-                onChange={setParwestIdInput}
-                onSelect={handleGuardSelect}
-                regionId={effectiveRegionId}
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by Parwest ID or name"
               />
             </div>
+          </div>
 
-            <GuardContextFields context={context} showRows={["name", "type", "status"]} />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Date From *
-                </label>
-                <input
-                  type="date"
-                  className="ui-input"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Date To *
-                </label>
-                <input
-                  type="date"
-                  className="ui-input"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Hour *
-                </label>
-                <input
-                  type="number"
-                  className="ui-input"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Hour Rate *
-                </label>
-                <input
-                  type="number"
-                  className="ui-input"
-                  value={hourRate}
-                  onChange={(e) => setHourRate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Amount
-                </label>
-                <input
-                  className="ui-input bg-[var(--surface-muted)]"
-                  value={hours && hourRate ? (Number(hours) * Number(hourRate)).toFixed(0) : "0"}
-                  readOnly
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Comments *
-              </label>
-              <textarea
-                className="ui-textarea"
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                Attachment *
-              </label>
-              <Base64FileUpload
-                value={attachment}
-                onChange={setAttachment}
-                accept="image/*,.pdf"
-                label="Choose File"
-                previewMode="link"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Client
-                </label>
-                <select
-                  className="ui-select"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Optional. Link this special duty to a client (and branch) so it can be added to that client&apos;s invoice.
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Loading…
+              </CardContent>
+            </Card>
+          ) : filteredRows.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="text-base font-semibold">No records</div>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  No special-duty records match the current filters.
                 </p>
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Branch
-                </label>
-                <select
-                  className="ui-select"
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  disabled={!clientId || branchesLoading}
-                >
-                  <option value="">
-                    {!clientId
-                      ? "Select client first"
-                      : branchesLoading
-                        ? "Loading branches…"
-                        : branches.length === 0
-                          ? "No branches for this client"
-                          : "— None —"}
-                  </option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.city ? `${b.name} - ${b.city}` : b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                {canCreate && (
+                  <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                    <Button variant="outline" onClick={() => setFormOpen(true)}>
+                      + Add Special Duty
+                    </Button>
+                  </PermissionGate>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filteredRows}
+              searchKey="guardName"
+              searchPlaceholder="Filter visible rows by name…"
+              pageSize={25}
+              emptyMessage="No special-duty records match the on-page filter."
+            />
+          )}
+        </CardContent>
+      </Card>
 
-            <div className="flex justify-between items-center pt-2">
-              {result && <span className="text-sm">{result}</span>}
-              <div className="ml-auto flex gap-2">
-                <ActionButton
-                  variant="secondary"
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) resetForm()
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Special Duty</DialogTitle>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  Secure Ops ID *
+                </label>
+                <GuardAutocomplete
+                  value={parwestIdInput}
+                  onChange={setParwestIdInput}
+                  onSelect={handleGuardSelect}
+                  regionId={effectiveRegionId}
+                />
+              </div>
+
+              <GuardContextFields
+                context={context}
+                showRows={["name", "type", "status"]}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dateFrom"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date From *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dateTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date To *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hour *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            field.value === undefined || field.value === null
+                              ? ""
+                              : String(field.value)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === "" ? undefined : Number(v))
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="hourRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hour Rate *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            field.value === undefined || field.value === null
+                              ? ""
+                              : String(field.value)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === "" ? undefined : Number(v))
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    Amount
+                  </label>
+                  <Input
+                    className="bg-muted"
+                    value={
+                      watchedHours && watchedRate
+                        ? (Number(watchedHours) * Number(watchedRate)).toFixed(0)
+                        : "0"
+                    }
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="comments"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comments</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={3}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="attachmentBase64"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Attachment</FormLabel>
+                    <FormControl>
+                      <Base64FileUpload
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v)}
+                        accept="image/*,.pdf"
+                        label="Choose File"
+                        previewMode="link"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value || ALL_VALUE}
+                          onValueChange={(v) => {
+                            const next = v === ALL_VALUE ? "" : v
+                            field.onChange(next)
+                            form.setValue("branchId", "")
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="— None —" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ALL_VALUE}>— None —</SelectItem>
+                            {clients.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Optional. Link this special duty to a client (and branch)
+                        so it can be added to that client&apos;s invoice.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="branchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Branch</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value || ALL_VALUE}
+                          onValueChange={(v) =>
+                            field.onChange(v === ALL_VALUE ? "" : v)
+                          }
+                          disabled={!clientId || branchesLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                !clientId
+                                  ? "Select client first"
+                                  : branchesLoading
+                                    ? "Loading branches…"
+                                    : branches.length === 0
+                                      ? "No branches for this client"
+                                      : "— None —"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ALL_VALUE}>— None —</SelectItem>
+                            {branches.map((b) => (
+                              <SelectItem key={b.id} value={b.id}>
+                                {b.city ? `${b.name} - ${b.city}` : b.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
                     setFormOpen(false)
                     resetForm()
                   }}
                 >
                   Cancel
-                </ActionButton>
-                <ActionButton
-                  onClick={submit}
-                  disabled={!context || !dateFrom || !dateTo || !hours || !hourRate || saving}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </ActionButton>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                </Button>
+                <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                  <Button type="submit" disabled={saving || !context}>
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </PermissionGate>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={cancelOpen}
+        onOpenChange={(open) => {
+          setCancelOpen(open)
+          if (!open) setCancelTarget(null)
+        }}
+      >
+        <AlertDialogTrigger asChild>
+          <span className="hidden" />
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel special duty record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget ? (
+                <>
+                  This will cancel the special duty for{" "}
+                  <strong>{cancelTarget.guard.name}</strong> from{" "}
+                  {cancelTarget.dateFrom.slice(0, 10)} to{" "}
+                  {cancelTarget.dateTo.slice(0, 10)}.
+                </>
+              ) : (
+                "This will cancel the special duty record."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelBusy}>
+              Keep open
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: "destructive" }))}
+              onClick={(e) => {
+                e.preventDefault()
+                void performCancel()
+              }}
+              disabled={cancelBusy}
+            >
+              {cancelBusy ? "Cancelling…" : "Cancel record"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PayrollPageShell>
   )
 }

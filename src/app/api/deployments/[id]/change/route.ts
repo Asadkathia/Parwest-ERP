@@ -49,7 +49,7 @@ export async function POST(
     const current = await prisma.deployment.findUnique({
       where: { id },
       include: {
-        guard: { select: { id: true, name: true, parwestId: true, regionalOfficeId: true } },
+        guard: { select: { id: true, name: true, parwestId: true, regionalOfficeId: true, regionId: true } },
         client: { select: { id: true, name: true } },
         branch: { select: { id: true, name: true } },
       },
@@ -91,10 +91,20 @@ export async function POST(
     // Validate new client/branch/office exist
     const [newClient, newOffice] = await Promise.all([
       prisma.client.findUnique({ where: { id: newClientId }, select: { id: true, name: true, isBranchless: true, _count: { select: { branches: true } } } }),
-      prisma.regionalOffice.findUnique({ where: { id: newRegionalOfficeId }, select: { id: true } }),
+      prisma.regionalOffice.findUnique({ where: { id: newRegionalOfficeId }, select: { id: true, regionId: true } }),
     ])
     if (!newClient) return notFound("New client not found.")
     if (!newOffice) return notFound("Regional office not found.")
+
+    if (managerScope && managerScopeDenied(managerScope, { regionId: current.guard.regionId, regionalOfficeId: current.guard.regionalOfficeId })) {
+      return forbidden("Forbidden: guard is outside your scope.")
+    }
+    if (current.guard.regionalOfficeId && current.guard.regionalOfficeId !== newRegionalOfficeId) {
+      return badRequest("Guard regional office does not match deployment regional office.")
+    }
+    if (current.guard.regionId && newOffice.regionId && current.guard.regionId !== newOffice.regionId) {
+      return badRequest("Guard region does not match deployment regional office's region.")
+    }
     if (
       isWorkflowRuleEnabled("deployments.requireClientHasBranches") &&
       !newClient.isBranchless &&

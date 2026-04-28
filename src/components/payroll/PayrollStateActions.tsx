@@ -10,8 +10,22 @@
  */
 
 import { useState } from "react"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
 type Scope = {
   month: string // YYYY-MM
@@ -103,20 +117,54 @@ export default function PayrollStateActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {canLockRegion && (
-        <ActionButton onClick={() => setOpen("lock-region")}>
-          Lock Region
-        </ActionButton>
+      {canLockRegion && scope && (
+        <AlertDialog
+          open={open === "lock-region"}
+          onOpenChange={(o) => setOpen(o ? "lock-region" : null)}
+        >
+          <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
+            <AlertDialogTrigger asChild>
+              <ActionButton>Lock Region</ActionButton>
+            </AlertDialogTrigger>
+          </PermissionGate>
+          {open === "lock-region" && (
+            <LockRegionModal
+              scope={scope}
+              onClose={() => setOpen(null)}
+              onDone={() => {
+                setOpen(null)
+                onActionComplete()
+              }}
+            />
+          )}
+        </AlertDialog>
       )}
       {canUnlockRegion && (
         <ActionButton variant="secondary" onClick={() => setOpen("unlock-region")}>
           Unlock Region
         </ActionButton>
       )}
-      {canGlobalFinalize && (
-        <ActionButton onClick={() => setOpen("global-finalize")}>
-          Globally Finalize
-        </ActionButton>
+      {canGlobalFinalize && scope && (
+        <AlertDialog
+          open={open === "global-finalize"}
+          onOpenChange={(o) => setOpen(o ? "global-finalize" : null)}
+        >
+          <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
+            <AlertDialogTrigger asChild>
+              <ActionButton>Globally Finalize</ActionButton>
+            </AlertDialogTrigger>
+          </PermissionGate>
+          {open === "global-finalize" && (
+            <GlobalFinalizeModal
+              scope={scope}
+              onClose={() => setOpen(null)}
+              onDone={() => {
+                setOpen(null)
+                onActionComplete()
+              }}
+            />
+          )}
+        </AlertDialog>
       )}
       {canGlobalUnfinalize && (
         <ActionButton variant="secondary" onClick={() => setOpen("global-unfinalize")}>
@@ -136,10 +184,27 @@ export default function PayrollStateActions({
           Release Hold
         </ActionButton>
       )}
-      {canEmergencyRelease && (
-        <ActionButton variant="danger" onClick={() => setOpen("emergency")}>
-          Emergency Release
-        </ActionButton>
+      {canEmergencyRelease && payrollId && (
+        <AlertDialog
+          open={open === "emergency"}
+          onOpenChange={(o) => setOpen(o ? "emergency" : null)}
+        >
+          <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
+            <AlertDialogTrigger asChild>
+              <ActionButton variant="danger">Emergency Release</ActionButton>
+            </AlertDialogTrigger>
+          </PermissionGate>
+          {open === "emergency" && (
+            <EmergencyReleaseModal
+              payrollId={payrollId}
+              onClose={() => setOpen(null)}
+              onDone={() => {
+                setOpen(null)
+                onActionComplete()
+              }}
+            />
+          )}
+        </AlertDialog>
       )}
 
       {open === "hold" && payrollId && (
@@ -162,16 +227,6 @@ export default function PayrollStateActions({
           }}
         />
       )}
-      {open === "emergency" && payrollId && (
-        <EmergencyReleaseModal
-          payrollId={payrollId}
-          onClose={() => setOpen(null)}
-          onDone={() => {
-            setOpen(null)
-            onActionComplete()
-          }}
-        />
-      )}
       {open === "mark-paid" && payrollId && (
         <MarkPaidModal
           payrollId={payrollId}
@@ -182,28 +237,8 @@ export default function PayrollStateActions({
           }}
         />
       )}
-      {open === "lock-region" && scope && (
-        <LockRegionModal
-          scope={scope}
-          onClose={() => setOpen(null)}
-          onDone={() => {
-            setOpen(null)
-            onActionComplete()
-          }}
-        />
-      )}
       {open === "unlock-region" && scope && (
         <UnlockRegionModal
-          scope={scope}
-          onClose={() => setOpen(null)}
-          onDone={() => {
-            setOpen(null)
-            onActionComplete()
-          }}
-        />
-      )}
-      {open === "global-finalize" && scope && (
-        <GlobalFinalizeModal
           scope={scope}
           onClose={() => setOpen(null)}
           onDone={() => {
@@ -378,51 +413,59 @@ function EmergencyReleaseModal({
 }) {
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const submit = async () => {
     if (!reason.trim()) {
-      setError("A reason is required.")
+      toast.error("A reason is required.")
       return
     }
     setBusy(true)
-    setError(null)
     const res = await postJson("/api/payroll/state/emergency-release", {
       payrollId,
       reason: reason.trim(),
     })
     setBusy(false)
     if (!res.ok) {
-      setError(res.message ?? "Failed.")
+      toast.error(res.message ?? "Failed.")
       return
     }
+    toast.success("Emergency release applied.")
     onDone()
   }
 
   return (
-    <ModalShell title="Emergency Release" onClose={onClose}>
-      <InlineAlert
-        type="error"
-        message="This will bypass any locks. Audited."
-      />
-      {error && <InlineAlert type="error" message={error} />}
-      <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-        Reason (required)
-      </label>
-      <textarea
-        className="ui-input min-h-[100px] w-full"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-      />
-      <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
-          Cancel
-        </ActionButton>
-        <ActionButton variant="danger" onClick={submit} disabled={busy}>
-          {busy ? "Releasing…" : "Confirm Emergency Release"}
-        </ActionButton>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Emergency Release</AlertDialogTitle>
+        <AlertDialogDescription>
+          This will bypass any locks. Audited.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <div className="space-y-2">
+        <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
+          Reason (required)
+        </label>
+        <textarea
+          className="ui-input min-h-[100px] w-full"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          disabled={busy}
+        />
       </div>
-    </ModalShell>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={busy} onClick={onClose}>
+          Keep open
+        </AlertDialogCancel>
+        <Button
+          variant="destructive"
+          onClick={submit}
+          disabled={busy}
+        >
+          {busy && <Loader2 className="animate-spin" />}
+          Release Emergency
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   )
 }
 
@@ -510,14 +553,12 @@ function LockRegionModal({
   onDone: () => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   // Confirm modal — we don't pre-fetch a count to avoid an extra endpoint;
   // the backend short-circuits when nothing matches and returns a friendly
   // message. The success result populates a toast in the parent via onDone.
 
   const submit = async () => {
     setBusy(true)
-    setError(null)
     const res = await postJson<{ locked: number; totalNet: number; totalReserve: number; historyId?: string | null }>(
       "/api/payroll/state/lock-region",
       {
@@ -528,35 +569,50 @@ function LockRegionModal({
     )
     setBusy(false)
     if (!res.ok) {
-      setError(res.message ?? "Failed to lock.")
+      toast.error(res.message ?? "Failed to lock.")
       return
     }
+    const locked = res.data?.locked ?? 0
+    toast.success(`Locked ${locked} payroll record${locked === 1 ? "" : "s"}.`)
     onDone()
   }
 
   return (
-    <ModalShell title="Lock Region" onClose={onClose}>
-      {error && <InlineAlert type="error" message={error} />}
-      <p className="text-sm text-[var(--text)]">
-        This will lock all <span className="font-semibold">CALCULATED</span> payrolls
-        for{" "}
-        <span className="font-mono">{scope.month}</span>
-        {scope.regionId ? ` in the selected region` : ` across your scope`} and
-        accrue their reserve amounts to the ledger.
-      </p>
-      <p className="text-xs text-[var(--text-muted)]">
-        After this, payrolls can be marked Paid or held; only a SuperAdmin can
-        unlock the region.
-      </p>
-      <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
-          Cancel
-        </ActionButton>
-        <ActionButton onClick={submit} disabled={busy}>
-          {busy ? "Locking…" : "Confirm Lock"}
-        </ActionButton>
-      </div>
-    </ModalShell>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Lock Region</AlertDialogTitle>
+        <AlertDialogDescription asChild>
+          <div className="space-y-2">
+            <p className="text-sm text-[var(--text)]">
+              This will lock all{" "}
+              <span className="font-semibold">CALCULATED</span> payrolls for{" "}
+              <span className="font-mono">{scope.month}</span>
+              {scope.regionId
+                ? ` in the selected region`
+                : ` across your scope`}{" "}
+              and accrue their reserve amounts to the ledger.
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              After this, payrolls can be marked Paid or held; only a
+              SuperAdmin can unlock the region.
+            </p>
+          </div>
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={busy} onClick={onClose}>
+          Keep open
+        </AlertDialogCancel>
+        <Button
+          variant="destructive"
+          onClick={submit}
+          disabled={busy}
+        >
+          {busy && <Loader2 className="animate-spin" />}
+          Lock Region
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   )
 }
 
@@ -631,41 +687,51 @@ function GlobalFinalizeModal({
   onDone: () => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const submit = async () => {
     setBusy(true)
-    setError(null)
     const res = await postJson("/api/payroll/state/global-finalize", {
       month: scope.month,
     })
     setBusy(false)
     if (!res.ok) {
-      setError(res.message ?? "Failed to finalize.")
+      toast.error(res.message ?? "Failed to finalize.")
       return
     }
+    toast.success(`Globally finalized payrolls for ${scope.month}.`)
     onDone()
   }
 
   return (
-    <ModalShell title="Globally Finalize" onClose={onClose}>
-      <InlineAlert
-        type="error"
-        message="All REGIONAL_LOCKED payrolls for the month will be frozen as GLOBAL_FINALIZED."
-      />
-      {error && <InlineAlert type="error" message={error} />}
-      <p className="text-sm text-[var(--text-muted)]">
-        Month: <span className="font-mono">{scope.month}</span>
-      </p>
-      <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
-          Cancel
-        </ActionButton>
-        <ActionButton onClick={submit} disabled={busy}>
-          {busy ? "Finalizing…" : "Confirm Global Finalize"}
-        </ActionButton>
-      </div>
-    </ModalShell>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Globally Finalize</AlertDialogTitle>
+        <AlertDialogDescription asChild>
+          <div className="space-y-2">
+            <p>
+              All REGIONAL_LOCKED payrolls for the month will be frozen as
+              GLOBAL_FINALIZED.
+            </p>
+            <p className="text-sm text-[var(--text-muted)]">
+              Month: <span className="font-mono">{scope.month}</span>
+            </p>
+          </div>
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={busy} onClick={onClose}>
+          Keep open
+        </AlertDialogCancel>
+        <Button
+          variant="destructive"
+          onClick={submit}
+          disabled={busy}
+        >
+          {busy && <Loader2 className="animate-spin" />}
+          Finalize Globally
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   )
 }
 

@@ -1,28 +1,53 @@
+/**
+ * Parwest ERP — Payroll: Bulk Salary Slips (canonical reskin)
+ * ───────────────────────────────────────────────────────────
+ * Reskinned to match the canonical payroll-loans template:
+ *  - Generated slips list → `<DataTable>` with `<ParwestCurrency>`
+ *  - Settings + earnings/deductions toggles in shadcn `<Card>` panels
+ *  - Permission gates around Generate button
+ *  - AlertDialog confirm before generating (destructive against existing
+ *    slips for the same month → mirrors legacy server-side overwrite)
+ *  - Toasts via sonner reading `data.message`
+ *
+ * Behaviour, API endpoints, and URL contract are preserved exactly. The
+ * upload + generate flow is a single-step batch (not a wizard), so we
+ * keep that shape and only reskin the surrounding shell.
+ */
+
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { type ColumnDef } from "@tanstack/react-table"
+import { toast } from "sonner"
+
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
-const EARNINGS = [
-  { key: "basicSalary", label: "Basic Salary" },
-  { key: "workingDays", label: "Working Days" },
-  { key: "paidWorkingDays", label: "Paid Working Days" },
-  { key: "overtime", label: "Overtime / Hours" },
-  { key: "gazettedHolidays", label: "Gazetted Holidays" },
-  { key: "gazettedHolidaysOvertimeAmount", label: "Gazetted Holidays / Overtime Amount" },
-  { key: "arrears", label: "Arrears" },
-] as const
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
+import { Button, buttonVariants } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Checkbox } from "@/components/shadcn/checkbox"
+import { DataTable } from "@/components/shadcn/data-table"
+import { Input } from "@/components/shadcn/input"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
-const DEDUCTIONS = [
-  { key: "advanceSalary", label: "Advance Salary" },
-  { key: "eobi", label: "EOBI" },
-  { key: "mess", label: "Mess Deduction" },
-  { key: "specialBranch", label: "Special Branch" },
-  { key: "apsaaTraining", label: "APSAA Training" },
-  { key: "absencePenalty", label: "Absence Penalty" },
-] as const
+import { cn } from "@/lib/utils"
+import {
+  PAYROLL_SALARY_SLIP_DEDUCTIONS,
+  PAYROLL_SALARY_SLIP_EARNINGS,
+  payrollBulkSalarySlipGenerateSchema,
+} from "@/lib/schemas/payroll-bulk-salary-slip"
 
 type SlipRow = {
   id: string
@@ -89,12 +114,16 @@ export default function PayrollBulkSalarySlipsManager({
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
-  const [earnings, setEarnings] = useState<Set<string>>(new Set(EARNINGS.map((e) => e.key)))
-  const [deductions, setDeductions] = useState<Set<string>>(new Set(DEDUCTIONS.map((d) => d.key)))
+  const [earnings, setEarnings] = useState<Set<string>>(
+    new Set(PAYROLL_SALARY_SLIP_EARNINGS.map((e) => e.key))
+  )
+  const [deductions, setDeductions] = useState<Set<string>>(
+    new Set(PAYROLL_SALARY_SLIP_DEDUCTIONS.map((d) => d.key))
+  )
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
   const [slips, setSlips] = useState<SlipRow[]>([])
   const [loadingSlips, setLoadingSlips] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
 
   const loadSlips = useCallback(async () => {
     setLoadingSlips(true)
@@ -107,17 +136,24 @@ export default function PayrollBulkSalarySlipsManager({
   }, [month, effectiveRegionId])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch driven by month filter via callback
     loadSlips()
   }, [loadSlips])
 
-  const toggleSet = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
+  const toggleSet = (
+    set: Set<string>,
+    key: string,
+    setter: (s: Set<string>) => void
+  ) => {
     const next = new Set(set)
     if (next.has(key)) next.delete(key)
     else next.add(key)
     setter(next)
   }
-  const toggleAll = (allKeys: string[], set: Set<string>, setter: (s: Set<string>) => void) => {
+  const toggleAll = (
+    allKeys: string[],
+    set: Set<string>,
+    setter: (s: Set<string>) => void
+  ) => {
     const allOn = allKeys.every((k) => set.has(k))
     setter(allOn ? new Set() : new Set(allKeys))
   }
@@ -125,7 +161,6 @@ export default function PayrollBulkSalarySlipsManager({
   const handleFile = (file: File | null) => {
     if (!file) return
     setFileError(null)
-    setResult(null)
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result
@@ -144,7 +179,11 @@ export default function PayrollBulkSalarySlipsManager({
   }
 
   const downloadTemplate = () => {
-    const cols = ["parwestId", ...EARNINGS.map((e) => e.key), ...DEDUCTIONS.map((d) => d.key)]
+    const cols = [
+      "parwestId",
+      ...PAYROLL_SALARY_SLIP_EARNINGS.map((e) => e.key),
+      ...PAYROLL_SALARY_SLIP_DEDUCTIONS.map((d) => d.key),
+    ]
     const csv = cols.join(",") + "\n,0,0,0,0,0,0,0,0,0,0,0,0,0\n"
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
@@ -156,94 +195,171 @@ export default function PayrollBulkSalarySlipsManager({
   }
 
   const generate = async () => {
-    if (parsedRows.length === 0) {
-      setFileError("Upload a file first.")
+    const parsed = payrollBulkSalarySlipGenerateSchema.safeParse({
+      month,
+      earnings: Array.from(earnings),
+      deductions: Array.from(deductions),
+      rows: parsedRows,
+    })
+    if (!parsed.success) {
+      const first = parsed.error.issues[0]?.message ?? "Invalid input."
+      toast.error(first)
+      setFileError(first)
       return
     }
     setBusy(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/salary-slips/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        month: `${month}-01`,
-        earnings: Array.from(earnings),
-        deductions: Array.from(deductions),
-        rows: parsedRows,
-      }),
-    })
-    const data = await res.json()
-    setBusy(false)
-    if (res.ok) {
-      const failed = data.results.filter((r: { success: boolean }) => !r.success)
-      setResult(
-        `Generated ${data.generated}/${data.total} payslips.${failed.length > 0 ? ` ${failed.length} failed.` : ""}`
-      )
-      loadSlips()
-    } else {
-      setResult(`Error: ${data.error ?? "Failed."}`)
+    try {
+      const res = await fetch("/api/payroll/salary-slips/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          month: `${parsed.data.month}-01`,
+          earnings: parsed.data.earnings,
+          deductions: parsed.data.deductions,
+          rows: parsed.data.rows,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        const failed = (data.results ?? []).filter(
+          (r: { success: boolean }) => !r.success
+        )
+        toast.success(
+          `Generated ${data.generated}/${data.total} payslips.${
+            failed.length > 0 ? ` ${failed.length} failed.` : ""
+          }`
+        )
+        loadSlips()
+      } else {
+        toast.error(data?.message ?? "Failed to generate payslips.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setBusy(false)
+      setGenerateOpen(false)
     }
   }
+
+  const columns = useMemo<ColumnDef<SlipRow>[]>(
+    () => [
+      {
+        id: "parwestId",
+        accessorFn: (r) => r.guard.parwestId,
+        header: "Parwest ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.guard.parwestId}
+          </span>
+        ),
+      },
+      {
+        id: "guardName",
+        accessorFn: (r) => r.guard.name,
+        header: "Name",
+        cell: ({ row }) => row.original.guard.name,
+      },
+      {
+        id: "grossPay",
+        accessorFn: (r) => r.grossPay,
+        header: () => <span className="block text-end">Gross Pay</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency value={Number(row.original.grossPay)} />
+          </div>
+        ),
+      },
+      {
+        id: "netPayable",
+        accessorFn: (r) => r.netPayable,
+        header: () => <span className="block text-end">Net Payable</span>,
+        cell: ({ row }) => (
+          <div className="text-end font-semibold">
+            <ParwestCurrency value={Number(row.original.netPayable)} />
+          </div>
+        ),
+      },
+      {
+        id: "createdAt",
+        accessorFn: (r) => r.createdAt,
+        header: "Generated",
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleString()}
+          </span>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <PayrollPageShell
       title="Payroll — Bulk Salary Slips"
       subtitle="Upload a CSV of per-guard earnings/deductions and generate payslips for the month."
     >
-      <section className="ui-card p-4 space-y-4">
-        <h3 className="text-base font-semibold">Upload Settings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr] gap-4 items-end">
-          <div>
-            <RegionUrlPicker
-              regions={regions}
-              locked={locked}
-              includeGlobalOption={!locked}
-            />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Salary Month *
-            </label>
-            <input
-              type="month"
-              className="ui-input"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 items-end">
-            <ActionButton variant="secondary" onClick={downloadTemplate}>
-              Download Sample Template
-            </ActionButton>
-            <label className="ui-btn ui-btn-secondary px-3 py-2 text-sm cursor-pointer">
-              Upload CSV
-              <input
-                type="file"
-                className="hidden"
-                accept=".csv"
-                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <h3 className="text-base font-semibold">Upload Settings</h3>
+          <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr] gap-4 items-end">
+            <div>
+              <RegionUrlPicker
+                regions={regions}
+                locked={locked}
+                includeGlobalOption={!locked}
               />
-            </label>
-            {parsedRows.length > 0 && (
-              <span className="text-sm text-[var(--text-muted)]">
-                {parsedRows.length} rows parsed
-              </span>
-            )}
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Salary Month *
+              </label>
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 items-end">
+              <Button variant="outline" onClick={downloadTemplate}>
+                Download Sample Template
+              </Button>
+              <label
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "cursor-pointer"
+                )}
+              >
+                Upload CSV
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".csv"
+                  onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {parsedRows.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  {parsedRows.length} rows parsed
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        {fileError && <p className="text-sm text-red-500">{fileError}</p>}
-      </section>
+          {fileError && (
+            <p className="text-sm text-destructive">{fileError}</p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <CheckboxPanel
           title="Earnings"
           accent="green"
-          options={EARNINGS}
+          options={PAYROLL_SALARY_SLIP_EARNINGS}
           selected={earnings}
           onToggle={(k) => toggleSet(earnings, k, setEarnings)}
           onToggleAll={() =>
             toggleAll(
-              EARNINGS.map((e) => e.key),
+              PAYROLL_SALARY_SLIP_EARNINGS.map((e) => e.key),
               earnings,
               setEarnings
             )
@@ -252,12 +368,12 @@ export default function PayrollBulkSalarySlipsManager({
         <CheckboxPanel
           title="Deductions"
           accent="red"
-          options={DEDUCTIONS}
+          options={PAYROLL_SALARY_SLIP_DEDUCTIONS}
           selected={deductions}
           onToggle={(k) => toggleSet(deductions, k, setDeductions)}
           onToggleAll={() =>
             toggleAll(
-              DEDUCTIONS.map((d) => d.key),
+              PAYROLL_SALARY_SLIP_DEDUCTIONS.map((d) => d.key),
               deductions,
               setDeductions
             )
@@ -266,59 +382,75 @@ export default function PayrollBulkSalarySlipsManager({
       </div>
 
       <div className="flex justify-end mt-6">
-        {result && <span className="self-center text-sm mr-4">{result}</span>}
         {canCreate && (
-          <ActionButton onClick={generate} disabled={busy || parsedRows.length === 0}>
-            {busy ? "Generating…" : "Upload & Generate Payslips"}
-          </ActionButton>
+          <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+            <AlertDialog open={generateOpen} onOpenChange={setGenerateOpen}>
+              <AlertDialogTrigger asChild>
+                <Button disabled={busy || parsedRows.length === 0}>
+                  {busy ? "Generating…" : "Upload & Generate Payslips"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Generate payslips for {month}?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {parsedRows.length} guard row
+                    {parsedRows.length !== 1 ? "s" : ""} will be processed. This
+                    will overwrite any existing slips for matching guards in
+                    this month.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={busy}>
+                    Keep open
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className={cn(buttonVariants({ variant: "destructive" }))}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      void generate()
+                    }}
+                    disabled={busy}
+                  >
+                    {busy ? "Generating…" : "Generate"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </PermissionGate>
         )}
       </div>
 
-      <section className="ui-card p-4 mt-8 space-y-3">
-        <h3 className="text-base font-semibold">Generated Slips — {month}</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left">Parwest ID</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-right">Gross Pay</th>
-                <th className="px-3 py-2 text-right">Net Payable</th>
-                <th className="px-3 py-2 text-left">Generated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingSlips && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!loadingSlips && slips.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    No slips generated for this month.
-                  </td>
-                </tr>
-              )}
-              {slips.map((s) => (
-                <tr key={s.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 font-mono">{s.guard.parwestId}</td>
-                  <td className="px-3 py-2">{s.guard.name}</td>
-                  <td className="px-3 py-2 text-right">PKR {s.grossPay.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right font-semibold">
-                    PKR {s.netPayable.toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-[var(--text-muted)]">
-                    {new Date(s.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <Card className="mt-8">
+        <CardContent className="space-y-3 p-4">
+          <h3 className="text-base font-semibold">Generated Slips — {month}</h3>
+
+          {loadingSlips ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          ) : slips.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <div className="text-base font-semibold">No slips yet</div>
+              <p className="max-w-md text-sm text-muted-foreground">
+                No slips generated for this month. Upload a CSV and click
+                Generate to create payslips.
+              </p>
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={slips}
+              searchKey="guardName"
+              searchPlaceholder="Filter visible rows by name…"
+              pageSize={25}
+              emptyMessage="No payslips match the on-page filter."
+            />
+          )}
+        </CardContent>
+      </Card>
     </PayrollPageShell>
   )
 }
@@ -341,32 +473,37 @@ function CheckboxPanel({
   const allOn = options.every((o) => selected.has(o.key))
   const headerClass = accent === "green" ? "bg-green-600" : "bg-red-600"
   return (
-    <div className="ui-card p-0 overflow-hidden">
-      <div className={`${headerClass} text-white px-4 py-2 flex items-center justify-between`}>
+    <Card className="overflow-hidden p-0">
+      <div
+        className={cn(
+          headerClass,
+          "text-white px-4 py-2 flex items-center justify-between"
+        )}
+      >
         <span className="font-semibold">{title}</span>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={allOn}
-            onChange={onToggleAll}
-            className="accent-white"
+            onCheckedChange={() => onToggleAll()}
+            className="border-white data-[state=checked]:bg-white data-[state=checked]:text-foreground"
           />
           Select All
         </label>
       </div>
-      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-2">
         {options.map((o) => (
-          <label key={o.key} className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
+          <label
+            key={o.key}
+            className="flex items-center gap-2 text-sm cursor-pointer"
+          >
+            <Checkbox
               checked={selected.has(o.key)}
-              onChange={() => onToggle(o.key)}
-              className="accent-[var(--brand)]"
+              onCheckedChange={() => onToggle(o.key)}
             />
             {o.label}
           </label>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

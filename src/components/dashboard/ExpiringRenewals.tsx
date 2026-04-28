@@ -51,7 +51,9 @@ export default function ExpiringRenewals({ docs, contracts }: { docs: ExpiringIt
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                        urgent ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                        urgent
+                          ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                          : "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
                       )}
                     >
                       {days <= 0 ? "today" : `${days}d`}
@@ -74,7 +76,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       onClick={onClick}
       className={cn(
         "flex-1 rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition",
-        active ? "bg-white text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+        active ? "bg-card text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
       )}
     >
       {children}

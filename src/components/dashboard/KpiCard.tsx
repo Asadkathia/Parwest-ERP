@@ -53,9 +53,9 @@ function DeltaChip({ value }: { value: number }) {
     <span
       className={cn(
         "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-        flat && "bg-gray-100 text-gray-600",
-        up && !flat && "bg-emerald-100 text-emerald-700",
-        !up && !flat && "bg-red-100 text-red-700"
+        flat && "bg-muted text-muted-foreground",
+        up && !flat && "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+        !up && !flat && "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
       )}
     >
       {flat ? <Minus className="h-3 w-3" /> : up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}

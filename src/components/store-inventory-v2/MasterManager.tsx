@@ -1,15 +1,79 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+/**
+ * Parwest ERP — MasterManager (Phase 6B reskin)
+ * ─────────────────────────────────────────────────────────────────────────
+ * Single-file reskin of the catch-all master taxonomy editor (stores,
+ * vendors, categories, brands, units, statuses, conditions, weapon-types,
+ * calibres, license-types, variations, repairings).
+ *
+ * Reskin only — same payload, same `useScopeQuery()` server-side scoping,
+ * same legacy validations (mirrored in `@/lib/schemas/inventory-master`).
+ *
+ * Notable parity decisions:
+ *   - The inline `RegionUrlPicker` is REMOVED. URL params (`?regionId=…`)
+ *     are still honored via `useScopeQuery()` and the global topbar feeds
+ *     them in. Mirrors AdjustmentsManager / AuditManager (Phase 6A/6B).
+ *   - Delete is wired through a shadcn `AlertDialog` destructive variant.
+ *   - Permission gates: CREATE/UPDATE wrap the form; DELETE wraps the row
+ *     action.
+ *   - All data.error reads in legacy upstream shape remain handled by the
+ *     shared `apiSend`/`apiGet` envelope helpers — no `data.error` paths
+ *     in this file.
+ */
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import type { ColumnDef } from "@tanstack/react-table"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { AlertCircle, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+
+import { DataTable } from "@/components/shadcn/data-table"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn/alert"
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { Input } from "@/components/shadcn/input"
+import { Checkbox } from "@/components/shadcn/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
+import {
+  inventoryMasterFormSchema,
+  validateInventoryMasterVariant,
+  type InventoryMasterCategoryAssignee,
+  type InventoryMasterFormInput,
+  type InventoryMasterStoreType,
+  type InventoryMasterVariant,
+} from "@/lib/schemas/inventory-master"
 
 type RegionOption = { id: string; name: string }
 
@@ -29,7 +93,6 @@ type MasterResource =
 
 type RegionalOffice = { id: string; name: string }
 type Option = { id: string; name: string }
-type CategoryAssignee = "GUARD" | "EMPLOYEE" | "CLIENT"
 
 type Row = {
   id: string
@@ -71,72 +134,64 @@ type Props = {
   supportsCategoryFields?: boolean
   supportsVendorFields?: boolean
   supportsStatusCategory?: boolean
+  /** Legacy region picker props — kept for prop-shape compat only. */
   regions?: RegionOption[]
   locked?: boolean
 }
 
-type FormState = {
-  name: string
-  code: string
-  shortCode: string
-  description: string
-  contact: string
-  companyPhone: string
-  contactPerson: string
-  contactPersonPhone: string
-  type: "STORE" | "WAREHOUSE"
-  contactNumber: string
-  address: string
-  regionalOfficeId: string
-  prefix: string
-  isHeadOffice: boolean
-  latitude: string
-  longitude: string
-  parentId: string
-  canAssignGuard: boolean
-  canAssignEmployee: boolean
-  canAssignClient: boolean
-  categoryId: string
-  assignee: CategoryAssignee[]
+const ASSIGNEE_OPTIONS: Array<{
+  value: InventoryMasterCategoryAssignee
+  label: string
+}> = [
+  { value: "GUARD", label: "Guard" },
+  { value: "EMPLOYEE", label: "Employee" },
+  { value: "CLIENT", label: "Client" },
+]
+
+const ASSIGNEE_LABELS: Record<InventoryMasterCategoryAssignee, string> = {
+  GUARD: "Guard",
+  EMPLOYEE: "Employee",
+  CLIENT: "Client",
 }
 
-const EMPTY_FORM: FormState = {
-  name: "",
-  code: "",
-  shortCode: "",
-  description: "",
-  contact: "",
-  companyPhone: "",
-  contactPerson: "",
-  contactPersonPhone: "",
-  type: "STORE",
-  contactNumber: "",
-  address: "",
-  regionalOfficeId: "",
-  prefix: "",
-  isHeadOffice: false,
-  latitude: "",
-  longitude: "",
-  parentId: "",
-  canAssignGuard: false,
-  canAssignEmployee: false,
-  canAssignClient: false,
-  categoryId: "",
-  assignee: [],
+const NONE_VALUE = "__none__"
+
+function buildEmptyForm(
+  lockedOfficeId: string | null,
+): InventoryMasterFormInput {
+  return {
+    name: "",
+    code: "",
+    shortCode: "",
+    description: "",
+    contact: "",
+    companyPhone: "",
+    contactPerson: "",
+    contactPersonPhone: "",
+    type: "STORE",
+    contactNumber: "",
+    address: "",
+    regionalOfficeId: lockedOfficeId ?? "",
+    prefix: "",
+    isHeadOffice: false,
+    latitude: "",
+    longitude: "",
+    parentId: "",
+    assignee: [],
+    categoryId: "",
+  }
 }
 
 function resolveCategoryAssignees(row: {
   canAssignGuard?: boolean
   canAssignEmployee?: boolean
   canAssignClient?: boolean
-}): CategoryAssignee[] {
-  const active = [
+}): InventoryMasterCategoryAssignee[] {
+  return [
     row.canAssignGuard ? "GUARD" : null,
     row.canAssignEmployee ? "EMPLOYEE" : null,
     row.canAssignClient ? "CLIENT" : null,
-  ].filter(Boolean) as CategoryAssignee[]
-
-  return active
+  ].filter(Boolean) as InventoryMasterCategoryAssignee[]
 }
 
 function formatCategoryAssignees(row: {
@@ -144,15 +199,9 @@ function formatCategoryAssignees(row: {
   canAssignEmployee?: boolean
   canAssignClient?: boolean
 }): string {
-  const labels: Record<CategoryAssignee, string> = {
-    GUARD: "Guard",
-    EMPLOYEE: "Employee",
-    CLIENT: "Client",
-  }
-
   const active = resolveCategoryAssignees(row)
   if (active.length === 0) return "—"
-  return active.map((value) => labels[value]).join(", ")
+  return active.map((value) => ASSIGNEE_LABELS[value]).join(", ")
 }
 
 export default function MasterManager({
@@ -166,9 +215,13 @@ export default function MasterManager({
   supportsCategoryFields = false,
   supportsVendorFields = false,
   supportsStatusCategory = false,
-  regions = [],
-  locked = false,
+  regions: _regions = [],
+  locked: _locked = false,
 }: Props) {
+  // Phase 6B: region picker handled by global topbar; props kept for compat.
+  void _regions
+  void _locked
+
   const isVendorResource = resource === "vendors"
   const scopeQuery = useScopeQuery()
   const { data: session } = useSession()
@@ -181,86 +234,111 @@ export default function MasterManager({
     | undefined
   const isRegional = sessionUser?.roleScopeType === "REGIONAL"
   const callerRegionId = isRegional ? sessionUser?.regionId ?? null : null
-  const callerRegionalOfficeId = isRegional ? sessionUser?.regionalOfficeId ?? null : null
+  const callerRegionalOfficeId = isRegional
+    ? sessionUser?.regionalOfficeId ?? null
+    : null
+
+  // Stores belong to a regional office. When a REGIONAL user with a single
+  // assigned office creates a store, hardcode that office instead of letting
+  // them pick an arbitrary one (which would also be rejected by the server).
+  const lockedOfficeId = supportsStoreFields ? callerRegionalOfficeId : null
+
+  const variant: InventoryMasterVariant = useMemo(
+    () => ({
+      supportsDescription,
+      supportsStoreFields,
+      supportsUnitShortCode,
+      supportsContact,
+      supportsCategoryFields,
+      supportsVendorFields,
+      supportsStatusCategory,
+    }),
+    [
+      supportsDescription,
+      supportsStoreFields,
+      supportsUnitShortCode,
+      supportsContact,
+      supportsCategoryFields,
+      supportsVendorFields,
+      supportsStatusCategory,
+    ],
+  )
 
   const [rows, setRows] = useState<Row[]>([])
   const [regionalOffices, setRegionalOffices] = useState<RegionalOffice[]>([])
   const [categories, setCategories] = useState<Option[]>([])
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [query, setQuery] = useState("")
-  // Stores belong to a regional office. When a REGIONAL user with a single
-  // assigned office creates a store, hardcode that office instead of letting
-  // them pick an arbitrary one (which would also be rejected by the server).
-  const lockedOfficeId = supportsStoreFields ? callerRegionalOfficeId : null
-  const [form, setForm] = useState<FormState>({
-    ...EMPTY_FORM,
-    regionalOfficeId: lockedOfficeId ?? "",
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  const form = useForm<InventoryMasterFormInput>({
+    resolver: zodResolver(inventoryMasterFormSchema),
+    defaultValues: buildEmptyForm(lockedOfficeId),
+    mode: "onSubmit",
   })
 
-  const resetForm = () => {
-    setForm({ ...EMPTY_FORM, regionalOfficeId: lockedOfficeId ?? "" })
+  const resetForm = useCallback(() => {
+    form.reset(buildEmptyForm(lockedOfficeId))
     setEditingId(null)
-  }
+  }, [form, lockedOfficeId])
 
   const loadRows = useCallback(async () => {
     setLoading(true)
-    setNotice(null)
+    setErrorMessage(null)
 
     try {
       const effectiveRegionId = scopeQuery.regionId || callerRegionId
       const officesUrl = effectiveRegionId
         ? `/api/regional-offices?regionId=${encodeURIComponent(effectiveRegionId)}`
         : "/api/regional-offices"
-      // Region/office filter only applies to scoped resources (currently 'stores').
-      // Other masters (brands, units, categories, …) are global taxonomies.
-      const masterUrl = resource === "stores"
-        ? `/api/store-inventory/v2/masters/${resource}${scopeQuery.query}`
-        : `/api/store-inventory/v2/masters/${resource}`
+      // Region/office filter only applies to scoped resources (currently
+      // 'stores'). Other masters (brands, units, categories, …) are global
+      // taxonomies.
+      const masterUrl =
+        resource === "stores"
+          ? `/api/store-inventory/v2/masters/${resource}${scopeQuery.query}`
+          : `/api/store-inventory/v2/masters/${resource}`
       const [masterRows, officeRows, categoryRows] = await Promise.all([
         apiGet<Row[]>(masterUrl),
-        supportsStoreFields ? apiGet<RegionalOffice[]>(officesUrl) : Promise.resolve([]),
-        supportsStatusCategory ? apiGet<Option[]>("/api/store-inventory/v2/masters/categories") : Promise.resolve([]),
+        supportsStoreFields
+          ? apiGet<RegionalOffice[]>(officesUrl)
+          : Promise.resolve([] as RegionalOffice[]),
+        supportsStatusCategory
+          ? apiGet<Option[]>("/api/store-inventory/v2/masters/categories")
+          : Promise.resolve([] as Option[]),
       ])
 
       setRows(masterRows)
       setRegionalOffices(officeRows)
       setCategories(categoryRows)
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to load ${title}.`
-      setNotice({ type: "error", message })
+      const message =
+        error instanceof Error ? error.message : `Failed to load ${title}.`
+      setErrorMessage(message)
       setRows([])
       setRegionalOffices([])
       setCategories([])
     } finally {
       setLoading(false)
     }
-  }, [resource, supportsStatusCategory, supportsStoreFields, title, callerRegionId, scopeQuery.query, scopeQuery.regionId])
+  }, [
+    resource,
+    supportsStatusCategory,
+    supportsStoreFields,
+    title,
+    callerRegionId,
+    scopeQuery.query,
+    scopeQuery.regionId,
+  ])
 
   useEffect(() => {
     void loadRows()
   }, [loadRows])
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return rows
-    const q = query.trim().toLowerCase()
-    return rows.filter((row) => {
-      return (
-        row.name.toLowerCase().includes(q) ||
-        (row.code || "").toLowerCase().includes(q) ||
-        (row.shortCode || "").toLowerCase().includes(q) ||
-        (row.contact || "").toLowerCase().includes(q) ||
-        (row.description || "").toLowerCase().includes(q) ||
-        (row.regionalOffice?.name || "").toLowerCase().includes(q)
-      )
-    })
-  }, [rows, query])
-
   const startEdit = (row: Row) => {
     setEditingId(row.id)
-    setForm({
+    form.reset({
       name: row.name || "",
       code: row.code || "",
       shortCode: row.shortCode || "",
@@ -278,359 +356,947 @@ export default function MasterManager({
       latitude: row.latitude != null ? String(row.latitude) : "",
       longitude: row.longitude != null ? String(row.longitude) : "",
       parentId: row.parentId || "",
-      canAssignGuard: row.canAssignGuard || false,
-      canAssignEmployee: row.canAssignEmployee || false,
-      canAssignClient: row.canAssignClient || false,
-      categoryId: row.categoryId || "",
       assignee: resolveCategoryAssignees(row),
+      categoryId: row.categoryId || "",
     })
   }
 
-  const submit = async () => {
-    if (!form.name.trim()) {
-      setNotice({ type: "error", message: "Name is required." })
-      return
-    }
-
-    if (supportsVendorFields) {
-      if (!form.companyPhone.trim() || !form.contactPerson.trim() || !form.contactPersonPhone.trim() || !form.address.trim()) {
-        setNotice({
-          type: "error",
-          message: "Company phone, contact person name/phone, and address are required for vendors.",
-        })
-        return
+  const onSubmit = async (values: InventoryMasterFormInput) => {
+    // Variant-specific required-field gates (mirrors legacy validations).
+    const variantErrors = validateInventoryMasterVariant(values, variant)
+    if (variantErrors.length > 0) {
+      for (const err of variantErrors) {
+        form.setError(err.field, { message: err.message })
       }
-    }
-
-    if (supportsUnitShortCode && !form.shortCode.trim()) {
-      setNotice({ type: "error", message: "Short code is required for units." })
       return
     }
 
     const payload: Record<string, unknown> = {
-      name: form.name.trim(),
+      name: values.name.trim(),
     }
 
-    if (supportsDescription) payload.description = form.description.trim() || null
-    if (supportsContact) payload.contact = form.contact.trim() || null
-    if (supportsVendorFields) {
-      payload.companyPhone = form.companyPhone.trim() || null
-      payload.contactPerson = form.contactPerson.trim() || null
-      payload.contactPersonPhone = form.contactPersonPhone.trim() || null
-      payload.address = form.address.trim() || null
+    if (supportsDescription) {
+      payload.description = values.description?.trim() || null
     }
-    if (supportsUnitShortCode) payload.shortCode = form.shortCode.trim()
+    if (supportsContact) {
+      payload.contact = values.contact?.trim() || null
+    }
+    if (supportsVendorFields) {
+      payload.companyPhone = values.companyPhone?.trim() || null
+      payload.contactPerson = values.contactPerson?.trim() || null
+      payload.contactPersonPhone = values.contactPersonPhone?.trim() || null
+      payload.address = values.address?.trim() || null
+    }
+    if (supportsUnitShortCode) {
+      payload.shortCode = values.shortCode?.trim() || ""
+    }
 
     if (supportsStoreFields) {
-      const normalizedType = form.type === "WAREHOUSE" ? "WAREHOUSE" : "STORE"
+      const normalizedType: InventoryMasterStoreType =
+        values.type === "WAREHOUSE" ? "WAREHOUSE" : "STORE"
       payload.type = normalizedType
-      payload.prefix = form.prefix.trim() || null
-      payload.isHeadOffice = form.isHeadOffice
-      payload.latitude = form.latitude.trim() ? Number(form.latitude) : null
-      payload.longitude = form.longitude.trim() ? Number(form.longitude) : null
-      payload.contactNumber = form.contactNumber.trim() || null
-      payload.address = form.address.trim() || null
-      payload.regionalOfficeId = form.regionalOfficeId || null
+      payload.prefix = values.prefix?.trim() || null
+      payload.isHeadOffice = values.isHeadOffice
+      payload.latitude = values.latitude?.trim()
+        ? Number(values.latitude)
+        : null
+      payload.longitude = values.longitude?.trim()
+        ? Number(values.longitude)
+        : null
+      payload.contactNumber = values.contactNumber?.trim() || null
+      payload.address = values.address?.trim() || null
+      payload.regionalOfficeId = values.regionalOfficeId || null
       payload.isActive = true
     }
-    
+
     if (supportsCategoryFields) {
-      payload.parentId = form.parentId || null
-      payload.canAssignGuard = form.assignee.includes("GUARD")
-      payload.canAssignEmployee = form.assignee.includes("EMPLOYEE")
-      payload.canAssignClient = form.assignee.includes("CLIENT")
+      payload.parentId = values.parentId || null
+      payload.canAssignGuard = values.assignee.includes("GUARD")
+      payload.canAssignEmployee = values.assignee.includes("EMPLOYEE")
+      payload.canAssignClient = values.assignee.includes("CLIENT")
     }
 
     if (supportsStatusCategory) {
-      payload.categoryId = form.categoryId || null
+      payload.categoryId = values.categoryId || null
     }
-
-    setSaving(true)
-    setNotice(null)
 
     try {
       if (editingId) {
-        await apiSend(`/api/store-inventory/v2/masters/${resource}/${editingId}`, "PATCH", payload)
-        setNotice({ type: "success", message: `${title} updated successfully.` })
+        await apiSend(
+          `/api/store-inventory/v2/masters/${resource}/${editingId}`,
+          "PATCH",
+          payload,
+        )
+        toast.success(`${title} updated successfully.`)
       } else {
-        await apiSend(`/api/store-inventory/v2/masters/${resource}`, "POST", payload)
-        setNotice({ type: "success", message: `${title} created successfully.` })
+        await apiSend(
+          `/api/store-inventory/v2/masters/${resource}`,
+          "POST",
+          payload,
+        )
+        toast.success(`${title} created successfully.`)
       }
-
       resetForm()
       await loadRows()
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to save ${title}.`
-      setNotice({ type: "error", message })
-    } finally {
-      setSaving(false)
+      const message =
+        error instanceof Error ? error.message : `Failed to save ${title}.`
+      toast.error(message)
     }
   }
 
-  const remove = async (id: string) => {
+  const confirmRemove = async () => {
+    if (!pendingDeleteId) return
+    const id = pendingDeleteId
+    setPendingDeleteId(null)
     try {
-      await apiSend(`/api/store-inventory/v2/masters/${resource}/${id}`, "DELETE")
-      setNotice({ type: "success", message: `${title} deleted successfully.` })
+      await apiSend(
+        `/api/store-inventory/v2/masters/${resource}/${id}`,
+        "DELETE",
+      )
+      toast.success(`${title} deleted successfully.`)
       if (editingId === id) resetForm()
       await loadRows()
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to delete ${title}.`
-      setNotice({ type: "error", message })
+      const message =
+        error instanceof Error ? error.message : `Failed to delete ${title}.`
+      toast.error(message)
     }
   }
 
+  // ─── List columns ────────────────────────────────────────────────────────
+  const columns: ColumnDef<Row>[] = useMemo(() => {
+    const cols: ColumnDef<Row>[] = [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        ),
+      },
+    ]
+
+    if (supportsStoreFields) {
+      cols.push(
+        {
+          id: "code",
+          header: "Code",
+          accessorFn: (row) => row.code || "—",
+          cell: ({ row }) => (
+            <span className="tabular-nums">{row.original.code || "—"}</span>
+          ),
+        },
+        {
+          id: "type",
+          header: "Type",
+          accessorFn: (row) => row.type || "—",
+          cell: ({ row }) => {
+            const type = row.original.type
+            if (!type) return <span>—</span>
+            const variantLabel: "default" | "secondary" =
+              type === "WAREHOUSE" ? "secondary" : "default"
+            return <Badge variant={variantLabel}>{type}</Badge>
+          },
+        },
+        {
+          id: "regionalOffice",
+          header: "Regional Office",
+          accessorFn: (row) => row.regionalOffice?.name || "—",
+        },
+        {
+          id: "prefix",
+          header: "Prefix",
+          accessorFn: (row) => row.prefix || "—",
+        },
+        {
+          id: "isHeadOffice",
+          header: "H.O",
+          accessorFn: (row) => (row.isHeadOffice ? "Yes" : "No"),
+          cell: ({ row }) => (
+            <Badge
+              variant={row.original.isHeadOffice ? "default" : "secondary"}
+            >
+              {row.original.isHeadOffice ? "Yes" : "No"}
+            </Badge>
+          ),
+        },
+      )
+    }
+
+    if (supportsCategoryFields) {
+      cols.push(
+        {
+          id: "parent",
+          header: "Parent",
+          accessorFn: (row) => row.parent?.name || "—",
+        },
+        {
+          id: "assignees",
+          header: "Assignees",
+          accessorFn: (row) => formatCategoryAssignees(row),
+          cell: ({ row }) => formatCategoryAssignees(row.original),
+        },
+      )
+    }
+
+    if (supportsUnitShortCode) {
+      cols.push({
+        id: "shortCode",
+        header: "Short Code",
+        accessorFn: (row) => row.shortCode || "—",
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {row.original.shortCode || "—"}
+          </span>
+        ),
+      })
+    }
+
+    if (supportsContact) {
+      cols.push({
+        id: "contact",
+        header: "Contact",
+        accessorFn: (row) => row.contact || "—",
+      })
+    }
+
+    if (supportsVendorFields) {
+      cols.push(
+        {
+          id: "companyPhone",
+          header: "Company Phone",
+          accessorFn: (row) => row.companyPhone || "—",
+          cell: ({ row }) => (
+            <span className="tabular-nums">
+              {row.original.companyPhone || "—"}
+            </span>
+          ),
+        },
+        {
+          id: "contactPerson",
+          header: "Contact Person Name",
+          accessorFn: (row) => row.contactPerson || "—",
+        },
+        {
+          id: "contactPersonPhone",
+          header: "Contact Person Phone",
+          accessorFn: (row) => row.contactPersonPhone || "—",
+          cell: ({ row }) => (
+            <span className="tabular-nums">
+              {row.original.contactPersonPhone || "—"}
+            </span>
+          ),
+        },
+        {
+          id: "address",
+          header: "Address",
+          accessorFn: (row) => row.address || "—",
+        },
+      )
+    }
+
+    if (supportsStatusCategory) {
+      cols.push({
+        id: "category",
+        header: "Category",
+        accessorFn: (row) => row.category?.name || "—",
+      })
+    }
+
+    if (supportsDescription) {
+      cols.push({
+        id: "description",
+        header: "Description",
+        accessorFn: (row) => row.description || "—",
+      })
+    }
+
+    cols.push({
+      id: "actions",
+      header: () => <span className="block text-end">Actions</span>,
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <PermissionGate module="INVENTORY" action="UPDATE" mode="hide">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => startEdit(row.original)}
+            >
+              <Pencil className="me-1 h-3.5 w-3.5" />
+              Edit
+            </Button>
+          </PermissionGate>
+          <PermissionGate module="INVENTORY" action="DELETE" mode="hide">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setPendingDeleteId(row.original.id)}
+            >
+              <Trash2 className="me-1 h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </PermissionGate>
+        </div>
+      ),
+    })
+
+    return cols
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    supportsStoreFields,
+    supportsCategoryFields,
+    supportsUnitShortCode,
+    supportsContact,
+    supportsVendorFields,
+    supportsStatusCategory,
+    supportsDescription,
+  ])
+
+  const watchedType = form.watch("type")
+  const watchedAssignees = form.watch("assignee")
+  const watchedIsHeadOffice = form.watch("isHeadOffice")
+  const editingCode = form.watch("code")
+
   return (
     <div className="space-y-6">
-      <SectionTitle title={title} subtitle={subtitle} />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      </div>
 
-      <FilterBar className="space-y-4">
-        <div className={`grid grid-cols-1 gap-4 ${supportsStoreFields ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">{isVendorResource ? "Company Name *" : "Name *"}</label>
-            <input className="ui-input" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
-          </div>
+      {errorMessage ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
 
-          {supportsUnitShortCode ? (
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Short Code *</label>
-              <input className="ui-input" value={form.shortCode} onChange={(e) => setForm((prev) => ({ ...prev, shortCode: e.target.value }))} />
-            </div>
-          ) : null}
+      {/* ── Create / edit form ──────────────────────────────────────────── */}
+      <PermissionGate
+        module="INVENTORY"
+        action={editingId ? "UPDATE" : "CREATE"}
+        mode="hide"
+      >
+        <Card>
+          <CardContent className="pt-6">
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+              >
+                <div
+                  className={`grid grid-cols-1 gap-4 ${
+                    supportsStoreFields ? "md:grid-cols-3" : "md:grid-cols-2"
+                  }`}
+                >
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {isVendorResource ? "Company Name *" : "Name *"}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          {supportsDescription ? (
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Description</label>
-              <input className="ui-input" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
-            </div>
-          ) : null}
-
-          {supportsContact ? (
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact</label>
-              <input className="ui-input" value={form.contact} onChange={(e) => setForm((prev) => ({ ...prev, contact: e.target.value }))} />
-            </div>
-          ) : null}
-          {supportsVendorFields ? (
-            <>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Company Phone</label>
-                <input className="ui-input" value={form.companyPhone} onChange={(e) => setForm((prev) => ({ ...prev, companyPhone: e.target.value }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person Name</label>
-                <input className="ui-input" value={form.contactPerson} onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Person Phone</label>
-                <input className="ui-input" value={form.contactPersonPhone} onChange={(e) => setForm((prev) => ({ ...prev, contactPersonPhone: e.target.value }))} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Address</label>
-                <input className="ui-input" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} />
-              </div>
-            </>
-          ) : null}
-
-          {supportsStoreFields ? (
-            <>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Code (Auto-generated)</label>
-                <input
-                  className="ui-input"
-                  value={editingId ? form.code : ""}
-                  readOnly
-                  placeholder={editingId ? "" : "Generated on create from region + type"}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Type *</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={`ui-btn ${form.type === "STORE" ? "ui-btn-primary" : "ui-btn-secondary"}`}
-                    onClick={() => setForm((prev) => ({ ...prev, type: "STORE" }))}
-                  >
-                    Store
-                  </button>
-                  <button
-                    type="button"
-                    className={`ui-btn ${form.type === "WAREHOUSE" ? "ui-btn-primary" : "ui-btn-secondary"}`}
-                    onClick={() => setForm((prev) => ({ ...prev, type: "WAREHOUSE" }))}
-                  >
-                    Warehouse
-                  </button>
-                </div>
-              </div>
-              {lockedOfficeId ? null : (
-                <div>
-                  <label className="mb-1 block text-sm text-[var(--text-muted)]">Regional Office</label>
-                  <select className="ui-select" value={form.regionalOfficeId} onChange={(e) => setForm((prev) => ({ ...prev, regionalOfficeId: e.target.value }))}>
-                    <option value="">Select office</option>
-                    {regionalOffices.map((office) => (
-                      <option key={office.id} value={office.id}>
-                        {office.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Contact Number</label>
-                <input className="ui-input" value={form.contactNumber} onChange={(e) => setForm((prev) => ({ ...prev, contactNumber: e.target.value }))} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Address</label>
-                <input className="ui-input" value={form.address} onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Prefix</label>
-                <input className="ui-input" value={form.prefix} onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))} placeholder="e.g. WH-KHI" />
-              </div>
-              <div className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="isHeadOffice"
-                  checked={form.isHeadOffice}
-                  onChange={(e) => setForm((prev) => ({ ...prev, isHeadOffice: e.target.checked }))}
-                />
-                <label htmlFor="isHeadOffice" className="text-sm text-[var(--text-muted)]">Is Head Office</label>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Latitude</label>
-                <input className="ui-input" type="number" step="any" value={form.latitude} onChange={(e) => setForm((prev) => ({ ...prev, latitude: e.target.value }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Longitude</label>
-                <input className="ui-input" type="number" step="any" value={form.longitude} onChange={(e) => setForm((prev) => ({ ...prev, longitude: e.target.value }))} />
-              </div>
-            </>
-          ) : null}
-
-          {supportsCategoryFields ? (
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Parent Category</label>
-              <select className="ui-select" value={form.parentId} onChange={(e) => setForm((prev) => ({ ...prev, parentId: e.target.value }))}>
-                <option value="">None (Top Level)</option>
-                {rows
-                  .filter((r) => r.id !== editingId)
-                  .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          ) : null}
-          {supportsCategoryFields ? (
-            <div>
-              <label className="mb-2 block text-sm text-[var(--text-muted)]">Assignees</label>
-              <div className="flex flex-wrap gap-4 rounded-md border border-[var(--border)] p-3">
-                {([
-                  { value: "GUARD", label: "Guard" },
-                  { value: "EMPLOYEE", label: "Employee" },
-                  { value: "CLIENT", label: "Client" },
-                ] as Array<{ value: CategoryAssignee; label: string }>).map((option) => (
-                  <label key={option.value} className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-                    <input
-                      type="checkbox"
-                      checked={form.assignee.includes(option.value)}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          assignee: e.target.checked
-                            ? [...prev.assignee, option.value]
-                            : prev.assignee.filter((value) => value !== option.value),
-                        }))
-                      }
+                  {supportsUnitShortCode ? (
+                    <FormField
+                      control={form.control}
+                      name="shortCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Short Code *</FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {supportsStatusCategory ? (
-            <div>
-              <label className="mb-1 block text-sm text-[var(--text-muted)]">Category</label>
-              <select className="ui-select" value={form.categoryId} onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value }))}>
-                <option value="">None</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-        </div>
+                  ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={() => void submit()} disabled={saving}>
-            {saving ? "Saving..." : editingId ? "Update" : "Create"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={resetForm}>Reset</ActionButton>
-        </div>
-      </FilterBar>
+                  {supportsDescription ? (
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
 
-      <FilterBar>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Suspense>
-            <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
-          </Suspense>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-            <input className="ui-input" placeholder="Search by name/code/office" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </div>
-        </div>
-      </FilterBar>
+                  {supportsContact ? (
+                    <FormField
+                      control={form.control}
+                      name="contact"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact</FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
 
-      <DataTable
-        rows={filtered}
-        rowKey="id"
-        searchable={false}
-        emptyText={loading ? `Loading ${title.toLowerCase()}...` : `No ${title.toLowerCase()} found.`}
-        columns={[
-          { key: "name", header: "Name", sortable: true },
-          ...(supportsStoreFields
-            ? [
-                { key: "code", header: "Code" },
-                { key: "type", header: "Type" },
-                { key: "regionalOffice", header: "Regional Office", render: (row: Row) => row.regionalOffice?.name || "—" },
-                { key: "prefix", header: "Prefix" },
-                { key: "isHeadOffice", header: "H.O", render: (row: Row) => (row.isHeadOffice ? "Yes" : "No") },
-              ]
-            : []),
-          ...(supportsCategoryFields ? [{ key: "parent", header: "Parent", render: (row: Row) => row.parent?.name || "—" }] : []),
-          ...(supportsCategoryFields
-            ? [
-                { key: "assignee", header: "Assignees", render: (row: Row) => formatCategoryAssignees(row) },
-              ]
-            : []),
-          ...(supportsUnitShortCode ? [{ key: "shortCode", header: "Short Code" }] : []),
-          ...(supportsContact ? [{ key: "contact", header: "Contact", render: (row: Row) => row.contact || "—" }] : []),
-          ...(supportsVendorFields
-            ? [
-                { key: "companyPhone", header: "Company Phone", render: (row: Row) => row.companyPhone || "—" },
-                { key: "contactPerson", header: "Contact Person Name", render: (row: Row) => row.contactPerson || "—" },
-                { key: "contactPersonPhone", header: "Contact Person Phone", render: (row: Row) => row.contactPersonPhone || "—" },
-                { key: "address", header: "Address", render: (row: Row) => row.address || "—" },
-              ]
-            : []),
-          ...(supportsStatusCategory ? [{ key: "category", header: "Category", render: (row: Row) => row.category?.name || "—" }] : []),
-          ...(supportsDescription ? [{ key: "description", header: "Description", render: (row: Row) => row.description || "—" }] : []),
-          {
-            key: "actions",
-            header: "Actions",
-            render: (row: Row) => (
-              <div className="flex flex-wrap gap-2">
-                <button className="text-[var(--brand)] hover:underline" onClick={() => startEdit(row)}>Edit</button>
-                <button className="text-red-600 hover:underline" onClick={() => void remove(row.id)}>Delete</button>
-              </div>
-            ),
-          },
-        ]}
-      />
+                  {supportsVendorFields ? (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="companyPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company Phone *</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="tabular-nums"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="contactPerson"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Person Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="contactPersonPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Person Phone *</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="tabular-nums"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Address *</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  ) : null}
+
+                  {supportsStoreFields ? (
+                    <>
+                      <FormItem>
+                        <FormLabel>Code (Auto-generated)</FormLabel>
+                        <FormControl>
+                          <Input
+                            readOnly
+                            value={editingId ? editingCode || "" : ""}
+                            placeholder={
+                              editingId
+                                ? ""
+                                : "Generated on create from region + type"
+                            }
+                            className="tabular-nums"
+                          />
+                        </FormControl>
+                      </FormItem>
+
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={() => (
+                          <FormItem>
+                            <FormLabel>Type *</FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant={
+                                    watchedType === "STORE"
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() =>
+                                    form.setValue("type", "STORE", {
+                                      shouldDirty: true,
+                                    })
+                                  }
+                                >
+                                  Store
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant={
+                                    watchedType === "WAREHOUSE"
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() =>
+                                    form.setValue("type", "WAREHOUSE", {
+                                      shouldDirty: true,
+                                    })
+                                  }
+                                >
+                                  Warehouse
+                                </Button>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {lockedOfficeId ? null : (
+                        <FormField
+                          control={form.control}
+                          name="regionalOfficeId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Regional Office</FormLabel>
+                              <Select
+                                value={field.value || NONE_VALUE}
+                                onValueChange={(value) =>
+                                  field.onChange(
+                                    value === NONE_VALUE ? "" : value,
+                                  )
+                                }
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select office" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value={NONE_VALUE}>
+                                    Select office
+                                  </SelectItem>
+                                  {regionalOffices.map((office) => (
+                                    <SelectItem
+                                      key={office.id}
+                                      value={office.id}
+                                    >
+                                      {office.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      <FormField
+                        control={form.control}
+                        name="contactNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Number</FormLabel>
+                            <FormControl>
+                              <Input
+                                className="tabular-nums"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Address</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="prefix"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Prefix</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g. WH-KHI"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormItem className="flex flex-row items-center gap-2 pt-6">
+                        <FormControl>
+                          <Checkbox
+                            id="isHeadOffice"
+                            checked={watchedIsHeadOffice}
+                            onCheckedChange={(value) =>
+                              form.setValue("isHeadOffice", value === true, {
+                                shouldDirty: true,
+                              })
+                            }
+                          />
+                        </FormControl>
+                        <FormLabel
+                          htmlFor="isHeadOffice"
+                          className="text-sm font-normal text-muted-foreground"
+                        >
+                          Is Head Office
+                        </FormLabel>
+                      </FormItem>
+
+                      <FormField
+                        control={form.control}
+                        name="latitude"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Latitude</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="tabular-nums"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="longitude"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Longitude</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="tabular-nums"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  ) : null}
+
+                  {supportsCategoryFields ? (
+                    <FormField
+                      control={form.control}
+                      name="parentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Parent Category</FormLabel>
+                          <Select
+                            value={field.value || NONE_VALUE}
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value === NONE_VALUE ? "" : value,
+                              )
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="None (Top Level)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value={NONE_VALUE}>
+                                None (Top Level)
+                              </SelectItem>
+                              {rows
+                                .filter((r) => r.id !== editingId)
+                                .map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
+
+                  {supportsCategoryFields ? (
+                    <FormItem>
+                      <FormLabel>Assignees</FormLabel>
+                      <div className="flex flex-wrap gap-4 rounded-md border p-3">
+                        {ASSIGNEE_OPTIONS.map((option) => {
+                          const checked = watchedAssignees.includes(
+                            option.value,
+                          )
+                          return (
+                            <label
+                              key={option.value}
+                              className="inline-flex items-center gap-2 text-sm"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => {
+                                  const isOn = value === true
+                                  const next = isOn
+                                    ? [
+                                        ...watchedAssignees.filter(
+                                          (entry) => entry !== option.value,
+                                        ),
+                                        option.value,
+                                      ]
+                                    : watchedAssignees.filter(
+                                        (entry) => entry !== option.value,
+                                      )
+                                  form.setValue("assignee", next, {
+                                    shouldDirty: true,
+                                  })
+                                }}
+                              />
+                              {option.label}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </FormItem>
+                  ) : null}
+
+                  {supportsStatusCategory ? (
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select
+                            value={field.value || NONE_VALUE}
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value === NONE_VALUE ? "" : value,
+                              )
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="None" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value={NONE_VALUE}>None</SelectItem>
+                              {categories.map((category) => (
+                                <SelectItem
+                                  key={category.id}
+                                  value={category.id}
+                                >
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting
+                      ? "Saving..."
+                      : editingId
+                        ? "Update"
+                        : "Create"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={resetForm}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </PermissionGate>
+
+      {/* ── List ────────────────────────────────────────────────────────── */}
+      {!loading && rows.length === 0 && !errorMessage ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No {title.toLowerCase()} found.
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          searchKey="name"
+          searchPlaceholder={`Search ${title.toLowerCase()} by name…`}
+          emptyMessage={
+            loading
+              ? `Loading ${title.toLowerCase()}…`
+              : `No ${title.toLowerCase()} found.`
+          }
+        />
+      )}
+
+      {/* ── Delete confirm dialog ───────────────────────────────────────── */}
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null)
+        }}
+      >
+        <AlertDialogTrigger asChild>
+          <span className="hidden" />
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {title.toLowerCase()}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The record will be permanently
+              removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                void confirmRemove()
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

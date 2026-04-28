@@ -1,12 +1,65 @@
+/**
+ * Parwest ERP — Payroll: Extra Hours (canonical reskin)
+ * ─────────────────────────────────────────────────────
+ * Reskinned to match the canonical payroll-loans template:
+ *  - List → `<DataTable>` with `<ParwestCurrency>` for amounts
+ *  - Form → shadcn `<Form>` (RHF + zodResolver) inside a `<Dialog>`
+ *  - Permission gates around Add buttons
+ *  - Toasts via sonner reading `data.message`
+ *
+ * Behaviour, API endpoints, and URL contract are preserved exactly.
+ * Shared widgets (GuardAutocomplete, GuardContextFields, RegionUrlPicker)
+ * are kept as-is per migration policy.
+ */
+
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { type ColumnDef } from "@tanstack/react-table"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { DataTable } from "@/components/shadcn/data-table"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+
 import type { GuardCurrentContext } from "@/lib/guards/currentContext"
+import {
+  payrollExtraHoursCreateSchema,
+  type PayrollExtraHoursCreateInput,
+} from "@/lib/schemas/payroll-extra-hours"
 
 type Row = {
   id: string
@@ -27,6 +80,8 @@ type PayrollExtraHoursManagerProps = {
   locked?: boolean
 }
 
+const ALL_VALUE = "__ALL__"
+
 export default function PayrollExtraHoursManager({
   canCreate = false,
   effectiveRegionId = null,
@@ -37,20 +92,35 @@ export default function PayrollExtraHoursManager({
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
-  // Form state
   const [formOpen, setFormOpen] = useState(false)
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [context, setContext] = useState<GuardCurrentContext | null>(null)
-  const [hours, setHours] = useState("")
-  const [rate, setRate] = useState("")
-  const [selectClientId, setSelectClientId] = useState("")
-  const [selectBranchId, setSelectBranchId] = useState("")
   const [clients, setClients] = useState<Client[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [saving, setSaving] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  const form = useForm<PayrollExtraHoursCreateInput>({
+    resolver: zodResolver(payrollExtraHoursCreateSchema),
+    defaultValues: {
+      guardId: "",
+      month,
+      hours: undefined as unknown as number,
+      rate: undefined as unknown as number,
+      selectClientId: "",
+      selectBranchId: "",
+    },
+    mode: "onChange",
+  })
+
+  // Keep RHF month synced with local state (drives context/list fetches).
+  useEffect(() => {
+    form.setValue("month", month)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month])
+
+  const selectClientId = form.watch("selectClientId") ?? ""
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -77,8 +147,8 @@ export default function PayrollExtraHoursManager({
 
   useEffect(() => {
     if (!formOpen) return
-    // Scope clients to the gate-selected region for SuperAdmin; REGIONAL users
-    // are scoped server-side already.
+    // Scope clients to the gate-selected region for SuperAdmin; REGIONAL
+    // users are scoped server-side already.
     const url = effectiveRegionId
       ? `/api/clients?regionId=${encodeURIComponent(effectiveRegionId)}`
       : "/api/clients"
@@ -86,7 +156,12 @@ export default function PayrollExtraHoursManager({
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : data.clients ?? data.rows ?? []
-        setClients(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
+        setClients(
+          list.map((c: { id: string; name: string }) => ({
+            id: c.id,
+            name: c.name,
+          }))
+        )
       })
       .catch(() => {})
   }, [formOpen, effectiveRegionId])
@@ -107,45 +182,112 @@ export default function PayrollExtraHoursManager({
 
   const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
     setParwestIdInput(opt.parwestId)
-    const res = await fetch(`/api/guards/${opt.id}/current-context?month=${month}`)
-    if (res.ok) setContext(await res.json())
+    const res = await fetch(
+      `/api/guards/${opt.id}/current-context?month=${month}`
+    )
+    if (res.ok) {
+      const ctx = (await res.json()) as GuardCurrentContext
+      setContext(ctx)
+      form.setValue("guardId", ctx.guardId)
+    } else {
+      setContext(null)
+      form.setValue("guardId", "")
+    }
   }
 
   const resetForm = () => {
     setParwestIdInput("")
     setContext(null)
-    setHours("")
-    setRate("")
-    setSelectClientId("")
-    setSelectBranchId("")
-    setResult(null)
+    form.reset({
+      guardId: "",
+      month,
+      hours: undefined as unknown as number,
+      rate: undefined as unknown as number,
+      selectClientId: "",
+      selectBranchId: "",
+    })
   }
 
-  const submit = async () => {
-    if (!context || !hours || !rate) return
+  const onSubmit = async (values: PayrollExtraHoursCreateInput) => {
+    if (!context) {
+      toast.error("Select a guard first.")
+      return
+    }
     setSaving(true)
-    setResult(null)
-    const res = await fetch("/api/payroll/extra-hours", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        guardId: context.guardId,
-        month: `${month}-01`,
-        hours: Number(hours),
-        rate: Number(rate),
-      }),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (res.ok) {
-      setResult(`Saved for ${context.name}.`)
-      resetForm()
-      setFormOpen(false)
-      loadRows()
-    } else {
-      setResult(`Error: ${data.error ?? "Failed."}`)
+    try {
+      const res = await fetch("/api/payroll/extra-hours", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guardId: context.guardId,
+          month: `${values.month}-01`,
+          hours: Number(values.hours),
+          rate: Number(values.rate),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success(`Saved for ${context.name}.`)
+        resetForm()
+        setFormOpen(false)
+        loadRows()
+      } else {
+        toast.error(data?.message ?? "Failed to save extra hours.")
+      }
+    } catch {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setSaving(false)
     }
   }
+
+  const columns = useMemo<ColumnDef<Row>[]>(
+    () => [
+      {
+        id: "parwestId",
+        accessorFn: (r) => r.guard.parwestId,
+        header: "Parwest ID",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.guard.parwestId}
+          </span>
+        ),
+      },
+      {
+        id: "guardName",
+        accessorFn: (r) => r.guard.name,
+        header: "Name",
+        cell: ({ row }) => row.original.guard.name,
+      },
+      {
+        id: "month",
+        accessorFn: (r) => r.month.slice(0, 7),
+        header: "Month",
+        cell: ({ row }) => row.original.month.slice(0, 7),
+      },
+      {
+        id: "hours",
+        accessorFn: (r) => r.extraHours,
+        header: () => <span className="block text-end">Hours</span>,
+        cell: ({ row }) => (
+          <div className="text-end tabular-nums">
+            {row.original.extraHours}
+          </div>
+        ),
+      },
+      {
+        id: "amount",
+        accessorFn: (r) => r.extraHoursAmount,
+        header: () => <span className="block text-end">Amount</span>,
+        cell: ({ row }) => (
+          <div className="text-end">
+            <ParwestCurrency value={Number(row.original.extraHoursAmount ?? 0)} />
+          </div>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <PayrollPageShell
@@ -153,214 +295,279 @@ export default function PayrollExtraHoursManager({
       subtitle="Record monthly extra-hour adjustments per guard."
       actions={
         canCreate ? (
-          <ActionButton onClick={() => setFormOpen(true)}>+ Add Extra Hours</ActionButton>
+          <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+            <Button onClick={() => setFormOpen(true)}>+ Add Extra Hours</Button>
+          </PermissionGate>
         ) : undefined
       }
     >
-      <section className="ui-card p-4 space-y-4">
-        <div className="flex gap-3 flex-wrap items-end">
-          <div className="min-w-[180px]">
-            <RegionUrlPicker
-              regions={regions}
-              locked={locked}
-              includeGlobalOption={!locked}
-            />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Month
-            </label>
-            <input
-              type="month"
-              className="ui-input"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-              Search
-            </label>
-            <input
-              className="ui-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Parwest ID or name"
-            />
-          </div>
-        </div>
-
-        {fetchError && (
-          <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded px-3 py-2">
-            Failed to load extra-hours records: {fetchError}
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-sm">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <th className="px-3 py-2 text-left">Parwest ID</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Month</th>
-                <th className="px-3 py-2 text-right">Hours</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!loading && rows.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                    No records.
-                  </td>
-                </tr>
-              )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2 font-mono">{r.guard.parwestId}</td>
-                  <td className="px-3 py-2">{r.guard.name}</td>
-                  <td className="px-3 py-2">{r.month.slice(0, 7)}</td>
-                  <td className="px-3 py-2 text-right">{r.extraHours}</td>
-                  <td className="px-3 py-2 text-right">{r.extraHoursAmount?.toFixed(0) ?? 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="ui-card w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Add Extra Hours</h2>
-              <button
-                type="button"
-                className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]"
-                onClick={() => {
-                  setFormOpen(false)
-                  resetForm()
-                }}
-              >
-                ×
-              </button>
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-[200px_200px_1fr] gap-3 items-end">
+            <div>
+              <RegionUrlPicker
+                regions={regions}
+                locked={locked}
+                includeGlobalOption={!locked}
+              />
             </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Month
+              </label>
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                Search
+              </label>
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Parwest ID or name"
+              />
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Secure Ops ID *
-                </label>
-                <GuardAutocomplete
-                  value={parwestIdInput}
-                  onChange={setParwestIdInput}
-                  onSelect={handleGuardSelect}
-                  regionId={effectiveRegionId}
+          {fetchError && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded px-3 py-2">
+              Failed to load extra-hours records: {fetchError}
+            </div>
+          )}
+
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Loading…
+              </CardContent>
+            </Card>
+          ) : rows.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="text-base font-semibold">No records</div>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  No extra-hour entries for this month/region.
+                </p>
+                {canCreate && (
+                  <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                    <Button variant="outline" onClick={() => setFormOpen(true)}>
+                      + Add Extra Hours
+                    </Button>
+                  </PermissionGate>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={rows}
+              searchKey="guardName"
+              searchPlaceholder="Filter visible rows by name…"
+              pageSize={25}
+              emptyMessage="No extra-hour records match the on-page filter."
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) resetForm()
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Extra Hours</DialogTitle>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    Secure Ops ID *
+                  </label>
+                  <GuardAutocomplete
+                    value={parwestIdInput}
+                    onChange={setParwestIdInput}
+                    onSelect={handleGuardSelect}
+                    regionId={effectiveRegionId}
+                  />
+                  {context ? (
+                    <Badge variant="secondary" className="mt-2">
+                      {context.name}
+                    </Badge>
+                  ) : null}
+                </div>
+                <FormField
+                  control={form.control}
+                  name="hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hours *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            field.value === undefined || field.value === null
+                              ? ""
+                              : String(field.value)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === "" ? undefined : Number(v))
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rate *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={
+                            field.value === undefined || field.value === null
+                              ? ""
+                              : String(field.value)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === "" ? undefined : Number(v))
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Hours *
-                </label>
-                <input
-                  type="number"
-                  className="ui-input"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
+
+              <GuardContextFields
+                context={context}
+                showRows={["name", "status", "type", "location"]}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="selectClientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Client</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value || ALL_VALUE}
+                          onValueChange={(v) => {
+                            const next = v === ALL_VALUE ? "" : v
+                            field.onChange(next)
+                            form.setValue("selectBranchId", "")
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="--Select Client--" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ALL_VALUE}>
+                              --Select Client--
+                            </SelectItem>
+                            {clients.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Rate *
-                </label>
-                <input
-                  type="number"
-                  className="ui-input"
-                  value={rate}
-                  onChange={(e) => setRate(e.target.value)}
+                <FormField
+                  control={form.control}
+                  name="selectBranchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Branch</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value || ALL_VALUE}
+                          onValueChange={(v) =>
+                            field.onChange(v === ALL_VALUE ? "" : v)
+                          }
+                          disabled={!selectClientId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="--Select Branch--" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ALL_VALUE}>
+                              --Select Branch--
+                            </SelectItem>
+                            {branches.map((b) => (
+                              <SelectItem key={b.id} value={b.id}>
+                                {b.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    Month
+                  </label>
+                  <Input type="month" value={month} readOnly />
+                </div>
               </div>
-            </div>
 
-            <GuardContextFields
-              context={context}
-              showRows={["name", "status", "type", "location"]}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Select Client
-                </label>
-                <select
-                  className="ui-select"
-                  value={selectClientId}
-                  onChange={(e) => {
-                    setSelectClientId(e.target.value)
-                    setSelectBranchId("")
-                  }}
-                >
-                  <option value="">--Select Client--</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Select Branch
-                </label>
-                <select
-                  className="ui-select"
-                  value={selectBranchId}
-                  onChange={(e) => setSelectBranchId(e.target.value)}
-                  disabled={!selectClientId}
-                >
-                  <option value="">--Select Branch--</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
-                  Month
-                </label>
-                <input type="month" className="ui-input" value={month} readOnly />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-2">
-              {result && <span className="text-sm">{result}</span>}
-              <div className="ml-auto flex gap-2">
-                <ActionButton
-                  variant="secondary"
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
                     setFormOpen(false)
                     resetForm()
                   }}
                 >
                   Cancel
-                </ActionButton>
-                <ActionButton onClick={submit} disabled={!context || !hours || !rate || saving}>
-                  {saving ? "Saving…" : "Save"}
-                </ActionButton>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                </Button>
+                <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+                  <Button type="submit" disabled={saving || !context}>
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </PermissionGate>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </PayrollPageShell>
   )
 }

@@ -1,8 +1,24 @@
 "use client"
 
 import { Package } from "lucide-react"
-import type { GuardLooseRow } from "@/components/guards/tabs/types"
 import Link from "next/link"
+
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@/components/shadcn/card"
+import { Button } from "@/components/shadcn/button"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/shadcn/table"
+import type { GuardLooseRow } from "@/components/guards/tabs/types"
 
 type InventoryItem = {
     id: string
@@ -24,62 +40,78 @@ export default function InventoryTab({ inventory }: InventoryTabProps) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Inventory</h2>
-                <div className="flex items-center gap-2">
-                    <div className="text-sm text-gray-600">
-                        Items: <span className="font-semibold">{items.length}</span>
-                    </div>
-                    <Link href="/store-inventory/employee-assignments" className="ui-btn ui-btn-secondary">
-                        Inventory V2
-                    </Link>
+                <div>
+                    <h2 className="text-20 font-bold">Inventory</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Items: <span className="font-semibold tabular-nums">{items.length}</span>
+                    </p>
                 </div>
+                <Button asChild variant="secondary">
+                    <Link href="/store-inventory/employee-assignments">Inventory V2</Link>
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-lg border p-4">
-                    <p className="text-sm text-gray-600">Assigned Items</p>
-                    <p className="text-2xl font-bold mt-1">{items.length}</p>
-                </div>
-                <div className="bg-white rounded-lg border p-4">
-                    <p className="text-sm text-gray-600">Item Categories</p>
-                    <p className="text-2xl font-bold mt-1">{uniqueCategories}</p>
-                </div>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-normal text-muted-foreground">
+                            Assigned Items
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-2xl font-bold tabular-nums">{items.length}</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-normal text-muted-foreground">
+                            Item Categories
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-2xl font-bold tabular-nums">{uniqueCategories}</p>
+                    </CardContent>
+                </Card>
             </div>
 
             {items.length === 0 ? (
-                <div className="bg-white rounded-lg border p-12 text-center">
-                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No inventory assigned</p>
-                </div>
+                <Card>
+                    <CardContent className="p-12 text-center">
+                        <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No inventory assigned</p>
+                    </CardContent>
+                </Card>
             ) : (
-                <div className="bg-white rounded-lg border overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issued Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {items.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-sm font-medium">{item.item}</td>
-                                    <td className="px-6 py-4 text-sm">{item.category}</td>
-                                    <td className="px-6 py-4 text-sm font-mono">{item.serialNumber || "—"}</td>
-                                    <td className="px-6 py-4 text-sm">
-                                        {item.issuedDate
-                                            ? new Date(item.issuedDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-                                            : "—"}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm">{item.condition || "—"}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <Card>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead>Serial</TableHead>
+                                    <TableHead>Issued Date</TableHead>
+                                    <TableHead>Condition</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {items.map((item) => (
+                                    <TableRow key={item.id}>
+                                        <TableCell className="font-medium">{item.item}</TableCell>
+                                        <TableCell>{item.category}</TableCell>
+                                        <TableCell className="font-mono tabular-nums">{item.serialNumber || "—"}</TableCell>
+                                        <TableCell className="tabular-nums">
+                                            {item.issuedDate
+                                                ? new Date(item.issuedDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                                                : "—"}
+                                        </TableCell>
+                                        <TableCell>{item.condition || "—"}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             )}
         </div>
     )

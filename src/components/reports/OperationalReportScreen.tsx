@@ -9,6 +9,12 @@ import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
 import { REPORT_BINDINGS } from "@/lib/reports/bindings"
+import ClientSummaryChart from "@/components/reports/ClientSummaryChart"
+import GuardDeploymentChart from "@/components/reports/GuardDeploymentChart"
+import DayNightDutyChart from "@/components/reports/DayNightDutyChart"
+import ClientEnrolledChart from "@/components/reports/ClientEnrolledChart"
+import InventoryStoreSummaryChart from "@/components/reports/InventoryStoreSummaryChart"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
 type Props = {
   screen: string
@@ -164,9 +170,11 @@ export default function OperationalReportScreen({ screen, config, links }: Props
           <ActionButton type="button" variant="secondary" onClick={resetFilters} disabled={loading}>
             Reset
           </ActionButton>
-          <ActionButton type="button" variant="secondary" onClick={exportCsv} disabled={loading}>
-            Export CSV
-          </ActionButton>
+          <PermissionGate module="REPORTS" action="VIEW" mode="disable">
+            <ActionButton type="button" variant="secondary" onClick={exportCsv} disabled={loading}>
+              Export CSV
+            </ActionButton>
+          </PermissionGate>
           <ActionButton type="button" onClick={loadReport} disabled={loading}>
             {loading ? "Loading..." : "Generate Report"}
           </ActionButton>
@@ -185,6 +193,26 @@ export default function OperationalReportScreen({ screen, config, links }: Props
             ))}
           </div>
         </section>
+      ) : null}
+
+      {screen === "client-summary" && rows.length > 0 ? (
+        <ClientSummaryChart rows={rows} />
+      ) : null}
+
+      {(screen === "guard-deployment" || screen === "guardDeploymentreports") && rows.length > 0 ? (
+        <GuardDeploymentChart rows={rows} />
+      ) : null}
+
+      {(screen === "day-night-duty" || screen === "dayNightDutyGuards") && rows.length > 0 ? (
+        <DayNightDutyChart rows={rows} />
+      ) : null}
+
+      {(screen === "client-enrolled" || screen === "clientEnrolledreports") && rows.length > 0 ? (
+        <ClientEnrolledChart rows={rows} />
+      ) : null}
+
+      {screen === "inventory-store-summary" && rows.length > 0 ? (
+        <InventoryStoreSummaryChart rows={rows} />
       ) : null}
 
       <section className="ui-card overflow-x-auto">

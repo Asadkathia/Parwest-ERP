@@ -8,6 +8,7 @@ import SectionTitle from "@/components/ui/section-title"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
 import StatusChip from "@/components/ui/status-chip"
 import { deriveBranchModel } from "@/lib/branches/model"
+import BranchDeleteButton from "@/components/clients/BranchDeleteButton"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -63,6 +64,12 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               <Edit className="h-4 w-4" />
               Edit Branch
             </Link>
+            <BranchDeleteButton
+              branchId={branch.id}
+              clientId={branch.clientId}
+              branchName={branch.name}
+              activeDeploymentCount={activeDeployments.length}
+            />
           </div>
         }
       />

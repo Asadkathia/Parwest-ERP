@@ -1,14 +1,19 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import type { ColumnDef } from "@tanstack/react-table"
+
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
-import DataTable from "@/components/shared/DataTable"
-import { Alert, AlertDescription } from "@/components/shadcn/alert"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { DataTable as ShadcnDataTable } from "@/components/shadcn/data-table"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
 type Option = { id: string; name: string }
 type RegionOption = { id: string; name: string }
@@ -48,15 +53,19 @@ const EMPTY_FORM = {
   serialRequired: false,
 }
 
+// Phase 6A: list-only migration. Region picker handled by the global topbar.
+// `regions` / `locked` props remain for compat with the screen route signature.
 export default function ProductsManager({
   createMode = false,
-  regions = [],
-  locked = false,
+  regions: _regions = [],
+  locked: _locked = false,
 }: {
   createMode?: boolean
   regions?: RegionOption[]
   locked?: boolean
 }) {
+  void _regions
+  void _locked
   const [products, setProducts] = useState<Product[]>([])
   const [brands, setBrands] = useState<Option[]>([])
   const [units, setUnits] = useState<Option[]>([])
@@ -67,7 +76,6 @@ export default function ProductsManager({
   const [calibres, setCalibres] = useState<Option[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
@@ -108,11 +116,8 @@ export default function ProductsManager({
     void load()
   }, [load])
 
-  const visibleRows = useMemo(() => {
-    if (!search.trim()) return products
-    const q = search.trim().toLowerCase()
-    return products.filter((row) => `${row.sku} ${row.name} ${row.brand?.name || ""} ${row.status?.name || ""}`.toLowerCase().includes(q))
-  }, [products, search])
+  // Phase 6A: search is now handled by ShadcnDataTable's built-in `searchKey`.
+  const visibleRows = useMemo(() => products, [products])
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === form.categoryId),
@@ -230,19 +235,7 @@ export default function ProductsManager({
   return (
     <div className="space-y-6">
       <SectionTitle title={createMode ? "Create Product" : "Products"} subtitle={createMode ? "Create store-inventory v2 products backed by Prisma models." : "Manage and search v2 products."} />
-      {notice ? (
-        notice.type === "success" ? (
-          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertDescription>{notice.message}</AlertDescription>
-          </Alert>
-        ) : (
-          <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{notice.message}</AlertDescription>
-          </Alert>
-        )
-      ) : null}
+      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -340,51 +333,79 @@ export default function ProductsManager({
 
       {!createMode ? (
         <>
-          <FilterBar>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Suspense>
-                <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
-              </Suspense>
-              <div>
-                <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-                <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by sku/name/brand" />
-              </div>
-            </div>
-          </FilterBar>
-
-          <DataTable
-            rows={visibleRows}
-            rowKey="id"
-            searchable={false}
-            emptyText={loading ? "Loading products..." : "No products found."}
-            columns={[
-              { key: "sku", header: "SKU", sortable: true },
-              { key: "name", header: "Name", sortable: true },
-              { key: "brand", header: "Brand", render: (row) => row.brand?.name || "—" },
-              { key: "unit", header: "Unit", render: (row) => row.unit?.name || "—" },
-              { key: "category", header: "Category", render: (row) => row.category?.name || "—" },
-              { key: "variation", header: "Variant", render: (row) => row.variation?.name || "—" },
-              { key: "weaponType", header: "Weapon Type", render: (row) => row.weaponType?.name || "—" },
-              { key: "calibre", header: "Calibre", render: (row) => row.calibre?.name || "—" },
-              { key: "status", header: "Status", render: (row) => row.status?.name || "—" },
-              { key: "condition", header: "Condition", render: (row) => row.condition?.name || "—" },
-              { key: "serialRequired", header: "Serial", render: (row) => (row.serialRequired ? "Yes" : "No") },
-              {
-                key: "actions",
-                header: "Actions",
-                render: (row) => (
-                  <div className="flex items-center gap-3">
-                    <button className="text-[var(--brand)] hover:underline" onClick={() => startEdit(row)}>
-                      Edit
-                    </button>
-                    <button className="text-red-600 hover:underline" onClick={() => void removeProduct(row.id)}>
-                      Delete
-                    </button>
-                  </div>
-                ),
-              },
-            ]}
-          />
+          {visibleRows.length === 0 && !loading ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-sm text-muted-foreground">No products yet.</p>
+                <PermissionGate module="INVENTORY" action="CREATE" mode="hide">
+                  <Button asChild size="sm">
+                    <Link href="/store-inventory/product-create">Create your first product</Link>
+                  </Button>
+                </PermissionGate>
+              </CardContent>
+            </Card>
+          ) : (
+            <ShadcnDataTable
+              data={visibleRows}
+              searchKey="name"
+              searchPlaceholder="Search by name…"
+              emptyMessage={loading ? "Loading products…" : "No products found."}
+              columns={[
+                { id: "sku", accessorKey: "sku", header: "SKU", cell: ({ row }) => <span className="font-mono text-xs">{row.original.sku}</span> },
+                { id: "name", accessorKey: "name", header: "Name", cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
+                { id: "brand", header: "Brand", accessorFn: (row) => row.brand?.name || "—" },
+                { id: "unit", header: "Unit", accessorFn: (row) => row.unit?.name || "—" },
+                { id: "category", header: "Category", accessorFn: (row) => row.category?.name || "—" },
+                { id: "variation", header: "Variant", accessorFn: (row) => row.variation?.name || "—" },
+                { id: "weaponType", header: "Weapon Type", accessorFn: (row) => row.weaponType?.name || "—" },
+                { id: "calibre", header: "Calibre", accessorFn: (row) => row.calibre?.name || "—" },
+                {
+                  id: "status",
+                  header: "Status",
+                  cell: ({ row }) =>
+                    row.original.status?.name ? (
+                      <Badge variant="secondary">{row.original.status.name}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    ),
+                },
+                { id: "condition", header: "Condition", accessorFn: (row) => row.condition?.name || "—" },
+                {
+                  id: "serialRequired",
+                  header: "Serial",
+                  cell: ({ row }) =>
+                    row.original.serialRequired ? (
+                      <Badge>Required</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    ),
+                },
+                {
+                  id: "actions",
+                  header: "Actions",
+                  enableHiding: false,
+                  cell: ({ row }) => (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => startEdit(row.original)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="text-destructive hover:underline"
+                        onClick={() => void removeProduct(row.original.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ),
+                },
+              ] as ColumnDef<Product>[]}
+            />
+          )}
         </>
       ) : null}
     </div>

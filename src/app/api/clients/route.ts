@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         if (regionId) where.regionId = regionId
         if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
         if (status) where.status = status
-        Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId" }))
+        Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
 
         if (isRuntimeMockEnabled()) {
             const clients = mockClientsList
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
                 name: String(body.name || "Mock Client"),
                 email: body.email || null,
                 type: body.type || "OTHER",
-                isBranchless: body.isBranchless === "true",
+                isBranchless: body.isBranchless === true || body.isBranchless === "true",
                 headOfficeAddress: body.headOfficeAddress || null,
                 city: body.city || null,
                 status: body.status || "ACTIVE",

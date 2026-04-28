@@ -4,12 +4,12 @@
 @import "../styles/tokens.css";
 @import "../styles/tokens-v1.1.css";
 @import "../styles/parwest-theme.css";
-@import "../styles/print.css";
 
 /* Legacy aliases — kept so existing components that read these
    custom-property names (--surface, --text, --brand, --border, --danger)
    continue to render identically while we migrate to v1.0/v1.1 tokens.
-   No new code should reference these. */
+   No new code should reference these. (--bg, --success, --warning had
+   zero remaining references and were removed in the design-system pass.) */
 :root {
   --surface: var(--bg-card);
   --surface-muted: var(--bg-card-hover);
@@ -177,15 +177,16 @@ body {
   height: 4px;
   width: 4px;
 }
-
 /* ── Parwest reduced-motion overrides ──────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  /* 1. Zero all v1.0 duration tokens */
   :root {
     --duration-fast:   0ms;
     --duration-normal: 0ms;
     --duration-slow:   0ms;
   }
 
+  /* 2. Kill all CSS transitions and animations universally */
   *, *::before, *::after {
     animation-duration:        0.01ms !important;
     animation-iteration-count: 1      !important;
@@ -193,6 +194,7 @@ body {
     scroll-behavior:           auto   !important;
   }
 
+  /* 3. Radix data-state animation tokens */
   [data-state],
   [data-side] {
     --tw-enter-opacity:     1   !important;
@@ -206,6 +208,7 @@ body {
     animation-duration:     0ms !important;
   }
 
+  /* 4. Radix Dialog / Sheet / DropdownMenu */
   [data-radix-popper-content-wrapper],
   [role="dialog"],
   [role="alertdialog"],
@@ -214,28 +217,33 @@ body {
     transition: none !important;
   }
 
+  /* 5. Sonner toasts */
   [data-sonner-toast],
   [data-sonner-toaster] {
     animation: none !important;
     transition: opacity 0ms !important;
   }
 
+  /* 6. Skeleton shimmer → static */
   .skeleton,
   [data-skeleton] {
     animation: none !important;
     background: hsl(var(--muted)) !important;
   }
 
+  /* 7. Accordion / Collapsible (Radix) */
   [data-radix-collapsible-content] {
     animation: none !important;
     transition: none !important;
   }
 
+  /* 8. Progress bar fill (no sliding) */
   .progress-fill,
   [role="progressbar"] > * {
     transition: none !important;
   }
 
+  /* 9. Sidebar collapse */
   .sidebar,
   [data-sidebar] {
     transition: none !important;

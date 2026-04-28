@@ -1,10 +1,84 @@
 "use client"
 
-import { User, Phone, MapPin, Building, Briefcase, BookOpen, UserCheck, Activity } from "lucide-react"
-import type { GuardTabModel, NearestRelative, FamilyMember } from "@/components/guards/tabs/types"
+/**
+ * GuardProfileTab — Canonical pattern (Phase 3b template)
+ * ------------------------------------------------------------
+ * This tab is the reference implementation that the remaining 17 guard-profile
+ * tabs follow. The pattern:
+ *   1. Define a zod schema in src/lib/schemas/<feature>.ts mirroring the
+ *      legacy field-level validations (no rule changes).
+ *   2. Use react-hook-form via shadcn <Form> + <FormField>/<FormItem>/
+ *      <FormLabel>/<FormControl>/<FormMessage>.
+ *   3. Wrap legacy specialty inputs (e.g. CnicInput, PhoneInput) inside
+ *      <FormControl> with field.value/onChange wiring — DO NOT rewrite their
+ *      async/format logic.
+ *   4. Two-column grid layout (grid grid-cols-2 gap-6) for the form body.
+ *   5. Required fields use <FormLabel> with a red asterisk.
+ *   6. On submit, hit the existing API endpoint and surface envelope errors via
+ *      toast.error(data.message). Use toast.success on 2xx.
+ *   7. Read-only sections (display) live below the editable form card.
+ */
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useRouter } from "next/navigation"
+import { format } from "date-fns"
+import { toast } from "sonner"
+import {
+    User,
+    Phone,
+    MapPin,
+    Building,
+    Briefcase,
+    BookOpen,
+    UserCheck,
+    Activity,
+    CalendarIcon,
+    Loader2,
+} from "lucide-react"
+
+import {
+    Form,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormControl,
+    FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/shadcn/select"
+import { Button } from "@/components/shadcn/button"
+import { Calendar } from "@/components/shadcn/calendar"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/shadcn/popover"
+import { cn } from "@/lib/utils"
+
+import CnicInput from "@/components/ui/CnicInput"
+import PhoneInput from "@/components/ui/PhoneInput"
+
+import {
+    guardPersonalSchema,
+    type GuardPersonalInput,
+} from "@/lib/schemas/guard-personal"
+import type {
+    GuardTabModel,
+    NearestRelative,
+    FamilyMember,
+} from "@/components/guards/tabs/types"
 
 interface GeneralInformationProps {
     guard: GuardTabModel
+    canUpdate?: boolean
 }
 
 function InfoField({ label, value }: { label: string; value?: string | number | null }) {
@@ -16,7 +90,68 @@ function InfoField({ label, value }: { label: string; value?: string | number | 
     )
 }
 
-export default function GeneralInformationTab({ guard }: GeneralInformationProps) {
+function RequiredMark() {
+    return <span className="text-red-500 ml-0.5">*</span>
+}
+
+function toIsoDate(value?: string | Date | null): string {
+    if (!value) return ""
+    const d = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(d.getTime())) return ""
+    return d.toISOString().slice(0, 10)
+}
+
+export default function GeneralInformationTab({ guard, canUpdate = false }: GeneralInformationProps) {
+    const router = useRouter()
+    const [submitting, setSubmitting] = useState(false)
+
+    const form = useForm<GuardPersonalInput>({
+        resolver: zodResolver(guardPersonalSchema),
+        defaultValues: {
+            name: guard.name || "",
+            cnic: guard.cnic || "",
+            phone: guard.phone || "",
+            email: guard.email || "",
+            dateOfBirth: toIsoDate(guard.dateOfBirth),
+            fatherName: guard.fatherName || "",
+            motherName: guard.motherName || "",
+            religion: guard.religion || "",
+            maritalStatus:
+                (guard.maritalStatus as GuardPersonalInput["maritalStatus"]) || "",
+            nationality: guard.nationality || "",
+            addressCurrent: guard.addressCurrent || "",
+            addressPermanent: guard.addressPermanent || "",
+            emergencyContact: guard.emergencyContact || "",
+        },
+    })
+
+    const onSubmit = async (values: GuardPersonalInput) => {
+        if (!guard.id) return
+        setSubmitting(true)
+        try {
+            const res = await fetch(`/api/guards/${guard.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(values),
+            })
+            const data = (await res.json().catch(() => ({}))) as {
+                message?: string
+                success?: boolean
+            }
+            if (!res.ok) {
+                // Error envelope is { success: false, message, code } — read .message
+                toast.error(data.message || "Failed to update personal details")
+                return
+            }
+            toast.success("Personal details updated")
+            router.refresh()
+        } catch {
+            toast.error("Network error — please try again")
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     const formatDate = (date?: Date | string | null) => {
         if (!date) return "—"
         return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -38,15 +173,6 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
         return `${years} years`
     }
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "ACTIVE": return "bg-green-100 text-green-800"
-            case "INACTIVE": return "bg-gray-100 text-gray-800"
-            case "PENDING": return "bg-yellow-100 text-yellow-800"
-            default: return "bg-gray-100 text-gray-800"
-        }
-    }
-
     const nearestRelativeList = Array.isArray(guard.nearestRelatives) ? guard.nearestRelatives : []
     const familyMemberList = Array.isArray(guard.familyMembers) ? guard.familyMembers : []
 
@@ -57,36 +183,340 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
 
     return (
         <div className="space-y-6">
-            {/* Status Badge */}
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">General Information</h2>
-                <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(guard.status || "PENDING")}`}>
-                    {guard.status || "PENDING"}
-                </span>
             </div>
 
-            {/* Personal Information */}
+            {/* Editable Personal Information — canonical Form pattern */}
+            <Form {...form}>
+                <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="bg-white rounded-lg border p-6 space-y-6"
+                >
+                    <div className="flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        <h3 className="text-lg font-semibold">Personal Information</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {/* Parwest ID — read-only */}
+                        <div className="space-y-2">
+                            <FormLabel>Parwest ID</FormLabel>
+                            <Input value={guard.parwestId || ""} disabled />
+                        </div>
+
+                        {/* Full Name */}
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        Full Name<RequiredMark />
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter full name" {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* CNIC — wraps legacy CnicInput so async uniqueness/format checks are preserved */}
+                        <FormField
+                            control={form.control}
+                            name="cnic"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        CNIC<RequiredMark />
+                                    </FormLabel>
+                                    <FormControl>
+                                        <div
+                                            onChange={(e: React.ChangeEvent<HTMLDivElement>) => {
+                                                const target = e.target as HTMLInputElement
+                                                if (target?.name === "cnic") field.onChange(target.value)
+                                            }}
+                                            onBlur={field.onBlur}
+                                        >
+                                            <CnicInput
+                                                name="cnic"
+                                                required
+                                                defaultValue={field.value}
+                                                uniqueCheckUrl="/api/guards/check-cnic"
+                                                excludeGuardId={guard.id}
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                            />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Phone — wraps legacy PhoneInput */}
+                        <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Phone</FormLabel>
+                                    <FormControl>
+                                        <div
+                                            onChange={(e: React.ChangeEvent<HTMLDivElement>) => {
+                                                const target = e.target as HTMLInputElement
+                                                if (target?.name === "phone") field.onChange(target.value)
+                                            }}
+                                            onBlur={field.onBlur}
+                                        >
+                                            <PhoneInput
+                                                name="phone"
+                                                defaultValue={field.value || ""}
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                            />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Email */}
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                        <Input type="email" placeholder="name@example.com" {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Date of Birth — shadcn Calendar inside Popover */}
+                        <FormField
+                            control={form.control}
+                            name="dateOfBirth"
+                            render={({ field }) => {
+                                const dateValue = field.value ? new Date(field.value) : undefined
+                                const valid = dateValue && !Number.isNaN(dateValue.getTime())
+                                return (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>
+                                            Date of Birth<RequiredMark />
+                                        </FormLabel>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <FormControl>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        disabled={!canUpdate}
+                                                        className={cn(
+                                                            "w-full justify-start text-left font-normal",
+                                                            !valid && "text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                                        {valid ? format(dateValue, "PPP") : "Pick a date"}
+                                                    </Button>
+                                                </FormControl>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={valid ? dateValue : undefined}
+                                                    onSelect={(d) =>
+                                                        field.onChange(d ? format(d, "yyyy-MM-dd") : "")
+                                                    }
+                                                    captionLayout="dropdown"
+                                                    fromYear={1940}
+                                                    toYear={new Date().getFullYear()}
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem>
+                                )
+                            }}
+                        />
+
+                        {/* Father's Name */}
+                        <FormField
+                            control={form.control}
+                            name="fatherName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Father&apos;s Name</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Mother's Name */}
+                        <FormField
+                            control={form.control}
+                            name="motherName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Mother&apos;s Name</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Religion */}
+                        <FormField
+                            control={form.control}
+                            name="religion"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Religion</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Marital Status — shadcn Select */}
+                        <FormField
+                            control={form.control}
+                            name="maritalStatus"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Marital Status</FormLabel>
+                                    <Select
+                                        value={field.value || ""}
+                                        onValueChange={field.onChange}
+                                        disabled={!canUpdate}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="SINGLE">Single</SelectItem>
+                                            <SelectItem value="MARRIED">Married</SelectItem>
+                                            <SelectItem value="DIVORCED">Divorced</SelectItem>
+                                            <SelectItem value="WIDOWED">Widowed</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Nationality */}
+                        <FormField
+                            control={form.control}
+                            name="nationality"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nationality</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Emergency Contact */}
+                        <FormField
+                            control={form.control}
+                            name="emergencyContact"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Emergency Contact</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Current Address */}
+                        <FormField
+                            control={form.control}
+                            name="addressCurrent"
+                            render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Current Address</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Permanent Address */}
+                        <FormField
+                            control={form.control}
+                            name="addressPermanent"
+                            render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Permanent Address</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} disabled={!canUpdate} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    {canUpdate ? (
+                        <div className="flex justify-end gap-3">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => form.reset()}
+                                disabled={submitting}
+                            >
+                                Reset
+                            </Button>
+                            <Button type="submit" disabled={submitting}>
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving…
+                                    </>
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </Button>
+                        </div>
+                    ) : null}
+                </form>
+            </Form>
+
+            {/* Read-only display sections (preserved from legacy view) */}
             <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <User className="h-5 w-5" />
-                    Personal Information
+                    Additional Personal Details
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoField label="Parwest ID" value={guard.parwestId} />
-                    <InfoField label="Full Name" value={guard.name} />
-                    <InfoField label="CNIC" value={guard.cnic} />
                     <InfoField label="CNIC Issue Date" value={formatDate(guard.cnicIssueDate)} />
                     <InfoField label="CNIC Expiry Date" value={formatDate(guard.cnicExpiryDate)} />
-                    <InfoField label="Father's Name" value={guard.fatherName} />
-                    <InfoField label="Mother's Name" value={guard.motherName} />
-                    <InfoField label="Date of Birth" value={formatDate(guard.dateOfBirth)} />
                     <InfoField label="Current Age" value={calculateCurrentAge(guard.dateOfBirth)} />
-                    <InfoField label="Religion" value={guard.religion} />
                     <InfoField label="Sect" value={guard.sect} />
                     <InfoField label="Cast" value={guard.cast} />
-                    <InfoField label="Marital Status" value={guard.maritalStatus} />
                     <InfoField label="Blood Group" value={guard.bloodGroup} />
-                    <InfoField label="Nationality" value={guard.nationality} />
                     <InfoField label="Next of Kin" value={guard.nextOfKin} />
                     <InfoField label="Police Station" value={guard.policeStation} />
                     <InfoField label="Profile Introducer" value={guard.profileIntroducer} />
@@ -96,32 +526,27 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                 </div>
             </div>
 
-            {/* Contact Information */}
+            {/* Contact Information (additional) */}
             <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Phone className="h-5 w-5" />
-                    Contact Information
+                    Additional Contact Numbers
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoField label="Phone" value={guard.phone} />
-                    <InfoField label="Email" value={guard.email} />
-                    <InfoField label="Emergency Contact" value={guard.emergencyContact} />
                     <div className="md:col-span-2 lg:col-span-3">
                         <InfoField label="Additional Contact Numbers" value={guard.additionalContactNumbers || guard.phoneSecondary} />
                     </div>
                 </div>
             </div>
 
-            {/* Address Information */}
+            {/* Address Information additional contacts */}
             <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <MapPin className="h-5 w-5" />
-                    Address Information
+                    Address Contacts
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <InfoField label="Current Address" value={guard.addressCurrent} />
                     <InfoField label="Current Address Contact" value={guard.currentAddressContact} />
-                    <InfoField label="Permanent Address" value={guard.addressPermanent} />
                     <InfoField label="Permanent Address Contact" value={guard.permanentAddressContact} />
                 </div>
             </div>
@@ -154,7 +579,6 @@ export default function GeneralInformationTab({ guard }: GeneralInformationProps
                         ? guard.previousEmployments
                         : null
 
-                    // Build display entries — prefer multi-entry JSON, fall back to flat fields
                     const entries = multiEntries ?? (isPreviouslyServed ? [{
                         type: exLabel,
                         isExService: true,

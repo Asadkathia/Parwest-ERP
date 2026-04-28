@@ -1,391 +1,852 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { CheckCircle, XCircle, Clock, Eye, ShieldCheck, X, Upload, FileText } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+import {
+    CheckCircle2,
+    Clock,
+    Eye,
+    FileText,
+    RotateCcw,
+    ShieldCheck,
+    Upload,
+    XCircle,
+} from "lucide-react"
+
+import { Button } from "@/components/shadcn/button"
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@/components/shadcn/card"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/shadcn/table"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/shadcn/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/shadcn/form"
+import { Input } from "@/components/shadcn/input"
+import { Textarea } from "@/components/shadcn/textarea"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/shadcn/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn/alert"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+    TabStatusBadge,
+    type TabStatusVariant,
+} from "@/components/guards/tabs/status-badge"
+import {
+    VERIFICATION_STATUS_LABELS,
+    VERIFICATION_STATUS_VALUES,
+    deriveSimpleStatus,
+    guardPrerequisiteVerifySchema,
+    type GuardPrerequisiteVerifyInput,
+    type VerificationStatusValue,
+} from "@/lib/schemas/guard-prerequisite"
 
 type PrereqRow = {
-  docTypeId: string
-  docTypeName: string
-  isActive: boolean
-  docCategory: string
-  isSystemGenerated: boolean
-  prereqId: string | null
-  status: string
-  verificationStatus: string | null
-  hasAttachment: boolean
-  attachmentName: string | null
-  documentUrl: string | null
-  uploadedBy: string | null
-  uploadedAt: string | null
-  verifiedAt: string | null
-  verifiedBy: string | null
-  editedBy: string | null
-  editedAt: string | null
-  expiryDate: string | null
-  comments: string | null
-  updatedAt: string | null
-}
-
-const VERIFICATION_STATUSES = [
-  { value: "REQUEST_SUBMITTED", label: "Request Submitted" },
-  { value: "REQUEST_NOT_SUBMITTED", label: "Request Not Submitted" },
-  { value: "VERIFIED", label: "Verified" },
-  { value: "NON_VERIFIED", label: "Non Verified" },
-  { value: "LETTER_ISSUED", label: "Letter Issued" },
-  { value: "LETTER_NOT_ISSUED", label: "Letter Not Issued" },
-  { value: "FEEDBACK_RECEIVED", label: "Feedback Received" },
-  { value: "FEEDBACK_PENDING", label: "Feedback Pending" },
-]
-
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error("Failed to read file"))
-    reader.readAsDataURL(file)
-  })
-}
-
-async function viewDocument(guardId: string, row: PrereqRow) {
-  let data: string | null = row.documentUrl
-  if (!data && row.hasAttachment && row.prereqId) {
-    try {
-      const res = await fetch(`/api/guards/${guardId}/prerequisites/${row.prereqId}`)
-      if (!res.ok) return
-      const payload = await res.json()
-      data = payload.attachmentData || payload.documentUrl
-    } catch {
-      return
-    }
-  }
-  if (!data) return
-  const win = window.open()
-  if (!win) return
-  if (data.startsWith("data:")) {
-    win.document.write(`<html><body style="margin:0"><iframe src="${data}" width="100%" height="100%" style="border:none"></iframe></body></html>`)
-  } else {
-    win.location.href = data
-  }
+    docTypeId: string
+    docTypeName: string
+    isActive: boolean
+    docCategory: string
+    isSystemGenerated: boolean
+    prereqId: string | null
+    status: string
+    verificationStatus: string | null
+    hasAttachment: boolean
+    attachmentName: string | null
+    documentUrl: string | null
+    uploadedBy: string | null
+    uploadedAt: string | null
+    verifiedAt: string | null
+    verifiedBy: string | null
+    editedBy: string | null
+    editedAt: string | null
+    expiryDate: string | null
+    comments: string | null
+    updatedAt: string | null
 }
 
 interface VerificationTabProps {
-  guardId: string
-  canCreate?: boolean
-  canUpdate?: boolean
+    guardId: string
+    canCreate?: boolean
+    canUpdate?: boolean
 }
 
-export default function VerificationTab({ guardId, canCreate = false, canUpdate = false }: VerificationTabProps) {
-  const [rows, setRows] = useState<PrereqRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [verifyModal, setVerifyModal] = useState<PrereqRow | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [pendingUploadDocType, setPendingUploadDocType] = useState<string | null>(null)
+function readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error("Failed to read file"))
+        reader.readAsDataURL(file)
+    })
+}
 
-  // Modal form state
-  const [modalVerifStatus, setModalVerifStatus] = useState("")
-  const [modalComments, setModalComments] = useState("")
-  const [modalExpiry, setModalExpiry] = useState("")
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const res = await fetch(`/api/guards/${guardId}/prerequisites`)
-      if (!res.ok) throw new Error("Failed to load")
-      const data: PrereqRow[] = await res.json()
-      // Only show VERIFICATION category docs
-      setRows(data.filter((r) => r.docCategory === "VERIFICATION" && r.isActive))
-    } catch {
-      setError("Failed to load verification data")
-    } finally {
-      setLoading(false)
+async function viewDocument(guardId: string, row: PrereqRow) {
+    let data: string | null = row.documentUrl
+    if (!data && row.hasAttachment && row.prereqId) {
+        try {
+            const res = await fetch(`/api/guards/${guardId}/prerequisites/${row.prereqId}`)
+            if (!res.ok) return
+            const payload = await res.json()
+            data = payload.attachmentData || payload.documentUrl
+        } catch {
+            return
+        }
     }
-  }, [guardId])
-
-  useEffect(() => { load() }, [load])
-
-  // Upload document directly from verification tab
-  const handleUploadClick = (docTypeName: string) => {
-    setPendingUploadDocType(docTypeName)
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !pendingUploadDocType) return
-    e.target.value = ""
-    setUploading(pendingUploadDocType)
-    try {
-      const base64 = await readFileAsBase64(file)
-      const res = await fetch(`/api/guards/${guardId}/prerequisites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ docTypeName: pendingUploadDocType, attachmentData: base64, attachmentName: file.name }),
-      })
-      if (!res.ok) throw new Error("Upload failed")
-      await load()
-    } catch {
-      setError("Failed to upload document")
-    } finally {
-      setUploading(null)
-      setPendingUploadDocType(null)
+    if (!data) return
+    const win = window.open()
+    if (!win) return
+    if (data.startsWith("data:")) {
+        win.document.write(
+            `<html><body style="margin:0"><iframe src="${data}" width="100%" height="100%" style="border:none"></iframe></body></html>`
+        )
+    } else {
+        win.location.href = data
     }
-  }
+}
 
-  const openVerifyModal = (row: PrereqRow) => {
-    setVerifyModal(row)
-    setModalVerifStatus(row.verificationStatus || "")
-    setModalComments(row.comments || "")
-    setModalExpiry(row.expiryDate ? row.expiryDate.split("T")[0] : "")
-  }
+function formatDate(d: string | null) {
+    return d
+        ? new Date(d).toLocaleDateString("en-PK", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+          })
+        : "—"
+}
 
-  const handleSaveVerification = async () => {
-    if (!verifyModal?.prereqId) return
-    setSaving(true)
-    try {
-      // Derive simplified status from verification status
-      let status = "PENDING"
-      if (modalVerifStatus === "VERIFIED") status = "VERIFIED"
-      else if (modalVerifStatus === "NON_VERIFIED") status = "REJECTED"
-
-      const res = await fetch(`/api/guards/${guardId}/prerequisites/${verifyModal.prereqId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status,
-          verificationStatus: modalVerifStatus || null,
-          comments: modalComments || null,
-          expiryDate: modalExpiry || null,
-        }),
-      })
-      if (!res.ok) throw new Error("Save failed")
-      setVerifyModal(null)
-      await load()
-    } catch {
-      setError("Failed to save verification")
-    } finally {
-      setSaving(false)
+/** Map row status/verificationStatus + file presence to a TabStatusBadge label+variant. */
+function badgeForRow(row: PrereqRow): { label: string; variant: TabStatusVariant } {
+    const hasFile = row.hasAttachment || !!row.documentUrl
+    if (!hasFile) return { label: "Not Uploaded", variant: "warning" }
+    if (row.status === "VERIFIED" || row.verificationStatus === "VERIFIED") {
+        return { label: "Verified", variant: "success" }
     }
-  }
+    if (row.status === "REJECTED" || row.verificationStatus === "NON_VERIFIED") {
+        return { label: "Rejected", variant: "destructive" }
+    }
+    if (row.verificationStatus) {
+        const label =
+            VERIFICATION_STATUS_LABELS[row.verificationStatus as VerificationStatusValue] ??
+            row.verificationStatus
+        return { label, variant: "info" }
+    }
+    return { label: "Uploaded — Pending", variant: "warning" }
+}
 
-  const formatDate = (d: string | null) =>
-    d ? new Date(d).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" }) : "—"
+/** Read a JSON error envelope and return its message field. */
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+    try {
+        const data = (await res.json()) as { message?: unknown }
+        if (data && typeof data.message === "string" && data.message.length > 0) {
+            return data.message
+        }
+    } catch {
+        /* ignore */
+    }
+    return fallback
+}
 
-  const verifiedCount = rows.filter((r) => r.status === "VERIFIED").length
-  const uploadedCount = rows.filter((r) => r.hasAttachment || r.documentUrl).length
-  const pendingCount = rows.filter((r) => r.isActive && !(r.hasAttachment || r.documentUrl)).length
+export default function VerificationTab({
+    guardId,
+    canCreate = false,
+    canUpdate = false,
+}: VerificationTabProps) {
+    const [rows, setRows] = useState<PrereqRow[]>([])
+    const [loading, setLoading] = useState(true)
+    const [uploading, setUploading] = useState<string | null>(null)
+    const [pendingUploadDocType, setPendingUploadDocType] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
-  if (loading) return <div className="py-12 text-center text-sm text-gray-500">Loading verifications...</div>
+    // Verification dialog state
+    const [verifyTarget, setVerifyTarget] = useState<PrereqRow | null>(null)
+    const [saving, setSaving] = useState(false)
 
-  return (
-    <div className="space-y-6">
-      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+    // Reject confirmation state
+    const [rejectTarget, setRejectTarget] = useState<PrereqRow | null>(null)
+    const [rejecting, setRejecting] = useState(false)
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Verification Status</h2>
-        <div className="flex items-center gap-4 text-sm">
-          <span><span className="text-gray-500">Verified: </span><span className="font-semibold text-green-600">{verifiedCount}/{rows.length}</span></span>
-          <span><span className="text-gray-500">Docs Uploaded: </span><span className="font-semibold text-blue-600">{uploadedCount}</span></span>
-          {pendingCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
-              <Clock className="h-3 w-3" /> {pendingCount} doc{pendingCount > 1 ? "s" : ""} missing
-            </span>
-          )}
-        </div>
-      </div>
+    // Reset confirmation state
+    const [resetTarget, setResetTarget] = useState<PrereqRow | null>(null)
+    const [resetting, setResetting] = useState(false)
 
-      {error && <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">{error}</div>}
+    const verifyForm = useForm<GuardPrerequisiteVerifyInput>({
+        resolver: zodResolver(guardPrerequisiteVerifySchema),
+        defaultValues: { verificationStatus: "VERIFIED", expiryDate: "", comments: "" },
+    })
 
-      {/* Guard status warning */}
-      {verifiedCount < rows.length && (
-        <div className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            Guard status is <strong>PENDING</strong> — {rows.length - verifiedCount} verification{rows.length - verifiedCount > 1 ? "s" : ""} not yet complete.
-            Guard cannot be deployed until all verifications are done.
-          </span>
-        </div>
-      )}
-      {verifiedCount === rows.length && rows.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          <CheckCircle className="h-4 w-4 shrink-0" />
-          <span>All verifications complete. Guard is eligible for deployment.</span>
-        </div>
-      )}
+    const load = useCallback(async () => {
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/guards/${guardId}/prerequisites`)
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to load verification data")
+                toast.error(msg)
+                setRows([])
+                return
+            }
+            const data: PrereqRow[] = await res.json()
+            setRows(
+                Array.isArray(data)
+                    ? data.filter((r) => r.docCategory === "VERIFICATION" && r.isActive)
+                    : []
+            )
+        } catch {
+            toast.error("Failed to load verification data")
+            setRows([])
+        } finally {
+            setLoading(false)
+        }
+    }, [guardId])
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
-              <th className="px-4 py-3 text-left">#</th>
-              <th className="px-4 py-3 text-left">Document</th>
-              <th className="px-4 py-3 text-left">Uploaded File</th>
-              <th className="px-4 py-3 text-left">Verification Status</th>
-              <th className="px-4 py-3 text-left">Uploaded By</th>
-              <th className="px-4 py-3 text-left">Uploaded Date</th>
-              <th className="px-4 py-3 text-left">Verified By</th>
-              <th className="px-4 py-3 text-left">Verified Date</th>
-              <th className="px-4 py-3 text-left">Edited By</th>
-              <th className="px-4 py-3 text-left">Expiry</th>
-              <th className="px-4 py-3 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-gray-400">
-                  No verification document types configured. Go to <strong>Guards → Prerequisites</strong> and add document types with category <em>Verification Document</em>.
-                </td>
-              </tr>
-            ) : rows.map((row, idx) => {
-              const hasFile = row.hasAttachment || !!row.documentUrl
-              const isUploadingThis = uploading === row.docTypeName
-              return (
-                <tr key={row.docTypeId} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
-                  <td className="px-4 py-3 font-medium">{row.docTypeName}</td>
-                  <td className="px-4 py-3">
-                    {hasFile ? (
-                      <button onClick={() => viewDocument(guardId, row)} className="flex items-center gap-1 text-blue-600 hover:underline text-xs">
-                        <FileText className="h-3 w-3" />
-                        {row.attachmentName || "View"}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-orange-500 font-medium">Not Uploaded</span>
+    useEffect(() => {
+        void load()
+    }, [load])
+
+    // ── Upload (POST) ──────────────────────────────────────────────────────
+    const handleUploadClick = (docTypeName: string) => {
+        setPendingUploadDocType(docTypeName)
+        fileInputRef.current?.click()
+    }
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !pendingUploadDocType) return
+        e.target.value = ""
+        setUploading(pendingUploadDocType)
+        try {
+            const base64 = await readFileAsBase64(file)
+            const res = await fetch(`/api/guards/${guardId}/prerequisites`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    docTypeName: pendingUploadDocType,
+                    attachmentData: base64,
+                    attachmentName: file.name,
+                }),
+            })
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to upload document")
+                toast.error(msg)
+                return
+            }
+            toast.success("Document uploaded")
+            await load()
+        } catch {
+            toast.error("Failed to upload document")
+        } finally {
+            setUploading(null)
+            setPendingUploadDocType(null)
+        }
+    }
+
+    // ── Open verify dialog ─────────────────────────────────────────────────
+    const openVerifyDialog = (row: PrereqRow) => {
+        const initialStatus =
+            (row.verificationStatus as VerificationStatusValue | null) ?? "VERIFIED"
+        verifyForm.reset({
+            verificationStatus: VERIFICATION_STATUS_VALUES.includes(initialStatus)
+                ? initialStatus
+                : "VERIFIED",
+            expiryDate: row.expiryDate ? row.expiryDate.split("T")[0] : "",
+            comments: row.comments || "",
+        })
+        setVerifyTarget(row)
+    }
+
+    // ── Submit verify dialog (PATCH) ───────────────────────────────────────
+    const handleVerifySubmit = verifyForm.handleSubmit(async (values) => {
+        if (!verifyTarget?.prereqId) return
+        setSaving(true)
+        try {
+            const res = await fetch(
+                `/api/guards/${guardId}/prerequisites/${verifyTarget.prereqId}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        status: deriveSimpleStatus(values.verificationStatus),
+                        verificationStatus: values.verificationStatus,
+                        comments: values.comments || null,
+                        expiryDate: values.expiryDate || null,
+                    }),
+                }
+            )
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to save verification")
+                toast.error(msg)
+                return
+            }
+            toast.success("Verification updated")
+            setVerifyTarget(null)
+            await load()
+        } catch {
+            toast.error("Failed to save verification")
+        } finally {
+            setSaving(false)
+        }
+    })
+
+    // ── Quick Reject (PATCH) ───────────────────────────────────────────────
+    const handleConfirmReject = async () => {
+        if (!rejectTarget?.prereqId) return
+        setRejecting(true)
+        try {
+            const res = await fetch(
+                `/api/guards/${guardId}/prerequisites/${rejectTarget.prereqId}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        status: "REJECTED",
+                        verificationStatus: "NON_VERIFIED",
+                    }),
+                }
+            )
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to reject document")
+                toast.error(msg)
+                return
+            }
+            toast.success("Document marked as rejected")
+            setRejectTarget(null)
+            await load()
+        } catch {
+            toast.error("Failed to reject document")
+        } finally {
+            setRejecting(false)
+        }
+    }
+
+    // ── Reset to PENDING (PATCH) ───────────────────────────────────────────
+    const handleConfirmReset = async () => {
+        if (!resetTarget?.prereqId) return
+        setResetting(true)
+        try {
+            const res = await fetch(
+                `/api/guards/${guardId}/prerequisites/${resetTarget.prereqId}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        status: "PENDING",
+                        verificationStatus: null,
+                    }),
+                }
+            )
+            if (!res.ok) {
+                const msg = await readErrorMessage(res, "Failed to reset verification")
+                toast.error(msg)
+                return
+            }
+            toast.success("Verification reset to pending")
+            setResetTarget(null)
+            await load()
+        } catch {
+            toast.error("Failed to reset verification")
+        } finally {
+            setResetting(false)
+        }
+    }
+
+    // ── Derived counts ─────────────────────────────────────────────────────
+    const verifiedCount = rows.filter((r) => r.status === "VERIFIED").length
+    const uploadedCount = rows.filter((r) => r.hasAttachment || r.documentUrl).length
+    const pendingCount = rows.filter(
+        (r) => r.isActive && !(r.hasAttachment || r.documentUrl)
+    ).length
+
+    if (loading) {
+        return (
+            <Card>
+                <CardContent className="p-12 text-center text-sm text-muted-foreground">
+                    Loading verifications...
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileChange}
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            />
+
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-20 font-bold">Verification Status</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Verification documents and their workflow status.
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <TabStatusBadge
+                        label={`Verified ${verifiedCount}/${rows.length}`}
+                        variant="success"
+                    />
+                    <TabStatusBadge label={`Uploaded ${uploadedCount}`} variant="info" />
+                    {pendingCount > 0 && (
+                        <TabStatusBadge
+                            label={`${pendingCount} missing`}
+                            variant="warning"
+                        />
                     )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <VerifBadge status={row.status} verificationStatus={row.verificationStatus} hasFile={hasFile} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{row.uploadedBy || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.uploadedAt)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{row.verifiedBy || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.verifiedAt)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
-                    {row.editedBy ? (
-                      <span title={row.editedAt ? `Edited: ${formatDate(row.editedAt)}` : undefined}>
-                        {row.editedBy}
-                        {row.editedAt && <span className="block text-gray-400">{formatDate(row.editedAt)}</span>}
-                      </span>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.expiryDate)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {/* Upload button — always shown in verification tab */}
-                      {canCreate && (
-                        <button
-                          onClick={() => handleUploadClick(row.docTypeName)}
-                          disabled={isUploadingThis}
-                          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                          title={hasFile ? "Replace document" : "Upload document"}
-                        >
-                          <Upload className="h-3 w-3" />
-                          {isUploadingThis ? "..." : hasFile ? "Replace" : "Upload"}
-                        </button>
-                      )}
-                      {/* Verify button — requires file */}
-                      {canUpdate && (
-                        <button
-                          onClick={() => openVerifyModal(row)}
-                          disabled={!hasFile}
-                          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                          title={!hasFile ? "Upload document first" : "Set verification status"}
-                        >
-                          <ShieldCheck className="h-3 w-3" />
-                          {row.prereqId && hasFile ? "Update" : "Verify"}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                </div>
+            </div>
 
-      {/* Verification Modal */}
-      {verifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h3 className="text-base font-semibold">Set Verification Status</h3>
-              <button onClick={() => setVerifyModal(null)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="space-y-4 px-6 py-5">
-              <div className="rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
-                {verifyModal.docTypeName}
-              </div>
-              {(verifyModal.hasAttachment || verifyModal.documentUrl) && (
-                <button onClick={() => viewDocument(guardId, verifyModal)} className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                  <Eye className="h-4 w-4" /> View Uploaded Document
-                </button>
-              )}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Verification Status <span className="text-red-500">*</span></label>
-                <select
-                  value={modalVerifStatus}
-                  onChange={(e) => setModalVerifStatus(e.target.value)}
-                  className="ui-select"
-                >
-                  <option value="">-- Select Status --</option>
-                  {VERIFICATION_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Expiry Date (optional)</label>
-                <input type="date" value={modalExpiry} onChange={(e) => setModalExpiry(e.target.value)} className="ui-input" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Comments</label>
-                <textarea value={modalComments} onChange={(e) => setModalComments(e.target.value)} rows={3} className="ui-input resize-none" placeholder="Optional notes..." />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <button onClick={() => setVerifyModal(null)} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveVerification}
-                disabled={saving || !modalVerifStatus}
-                className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : <><CheckCircle className="h-4 w-4" /> Submit</>}
-              </button>
-            </div>
-          </div>
+            {/* Workflow alert */}
+            {rows.length > 0 && verifiedCount < rows.length && (
+                <Alert>
+                    <Clock className="h-4 w-4" />
+                    <AlertTitle>Guard status is PENDING</AlertTitle>
+                    <AlertDescription>
+                        {rows.length - verifiedCount} verification
+                        {rows.length - verifiedCount === 1 ? "" : "s"} not yet complete.
+                        Guard cannot be deployed until all verifications are done.
+                    </AlertDescription>
+                </Alert>
+            )}
+            {rows.length > 0 && verifiedCount === rows.length && (
+                <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <AlertTitle>All verifications complete</AlertTitle>
+                    <AlertDescription>
+                        Guard is eligible for deployment.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* Table */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Verification Documents</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12">#</TableHead>
+                                <TableHead>Document</TableHead>
+                                <TableHead>File</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Uploaded</TableHead>
+                                <TableHead>Verified</TableHead>
+                                <TableHead>Edited</TableHead>
+                                <TableHead>Expiry</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {rows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={9}
+                                        className="py-10 text-center text-sm text-muted-foreground"
+                                    >
+                                        No verification document types configured. Go to{" "}
+                                        <strong>Guards → Prerequisites</strong> and add
+                                        document types with category{" "}
+                                        <em>Verification Document</em>.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                rows.map((row, idx) => {
+                                    const hasFile = row.hasAttachment || !!row.documentUrl
+                                    const isUploadingThis = uploading === row.docTypeName
+                                    const badge = badgeForRow(row)
+                                    const isFinalised =
+                                        row.status === "VERIFIED" ||
+                                        row.status === "REJECTED"
+                                    return (
+                                        <TableRow key={row.docTypeId}>
+                                            <TableCell className="text-muted-foreground tabular-nums">
+                                                {idx + 1}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {row.docTypeName}
+                                            </TableCell>
+                                            <TableCell>
+                                                {hasFile ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            void viewDocument(guardId, row)
+                                                        }
+                                                        className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline"
+                                                    >
+                                                        <FileText className="h-3 w-3" />
+                                                        {row.attachmentName || "View"}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">
+                                                        Not uploaded
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <TabStatusBadge
+                                                    label={badge.label}
+                                                    variant={badge.variant}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {row.uploadedBy || "—"}
+                                                {row.uploadedAt && (
+                                                    <div className="text-[11px] text-muted-foreground/80">
+                                                        {formatDate(row.uploadedAt)}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {row.verifiedBy || "—"}
+                                                {row.verifiedAt && (
+                                                    <div className="text-[11px] text-muted-foreground/80">
+                                                        {formatDate(row.verifiedAt)}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {row.editedBy || "—"}
+                                                {row.editedAt && (
+                                                    <div className="text-[11px] text-muted-foreground/80">
+                                                        {formatDate(row.editedAt)}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground tabular-nums">
+                                                {formatDate(row.expiryDate)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {canCreate && (
+                                                        <PermissionGate
+                                                            module="GUARDS"
+                                                            action="CREATE"
+                                                            mode="disable"
+                                                        >
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    handleUploadClick(
+                                                                        row.docTypeName
+                                                                    )
+                                                                }
+                                                                disabled={isUploadingThis}
+                                                                title={
+                                                                    hasFile
+                                                                        ? "Replace document"
+                                                                        : "Upload document"
+                                                                }
+                                                            >
+                                                                <Upload className="mr-1 h-3.5 w-3.5" />
+                                                                {isUploadingThis
+                                                                    ? "..."
+                                                                    : hasFile
+                                                                      ? "Replace"
+                                                                      : "Upload"}
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    )}
+                                                    {canUpdate && (
+                                                        <PermissionGate
+                                                            module="GUARDS"
+                                                            action="UPDATE"
+                                                            mode="disable"
+                                                        >
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() =>
+                                                                    openVerifyDialog(row)
+                                                                }
+                                                                disabled={!hasFile}
+                                                                title={
+                                                                    !hasFile
+                                                                        ? "Upload document first"
+                                                                        : "Set verification status"
+                                                                }
+                                                            >
+                                                                <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                                                                {row.prereqId && hasFile
+                                                                    ? "Update"
+                                                                    : "Verify"}
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    )}
+                                                    {canUpdate && hasFile && row.prereqId && row.status !== "REJECTED" && (
+                                                        <PermissionGate
+                                                            module="GUARDS"
+                                                            action="UPDATE"
+                                                            mode="disable"
+                                                        >
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    setRejectTarget(row)
+                                                                }
+                                                                title="Mark as rejected"
+                                                                className="text-rose-700 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                            >
+                                                                <XCircle className="mr-1 h-3.5 w-3.5" />
+                                                                Reject
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    )}
+                                                    {canUpdate && hasFile && row.prereqId && isFinalised && (
+                                                        <PermissionGate
+                                                            module="GUARDS"
+                                                            action="UPDATE"
+                                                            mode="disable"
+                                                        >
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    setResetTarget(row)
+                                                                }
+                                                                title="Reset to pending"
+                                                            >
+                                                                <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                                                                Reset
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                })
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            {/* Verify dialog */}
+            <Dialog
+                open={!!verifyTarget}
+                onOpenChange={(open) => {
+                    if (!open) setVerifyTarget(null)
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Set verification status</DialogTitle>
+                        <DialogDescription>
+                            {verifyTarget?.docTypeName ?? ""}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {verifyTarget && (verifyTarget.hasAttachment || verifyTarget.documentUrl) && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="self-start"
+                            onClick={() => void viewDocument(guardId, verifyTarget)}
+                        >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View uploaded document
+                        </Button>
+                    )}
+
+                    <Form {...verifyForm}>
+                        <form onSubmit={handleVerifySubmit} className="space-y-4">
+                            <FormField
+                                control={verifyForm.control}
+                                name="verificationStatus"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Verification status{" "}
+                                            <span className="text-rose-500">*</span>
+                                        </FormLabel>
+                                        <Select
+                                            value={field.value}
+                                            onValueChange={(v) =>
+                                                field.onChange(v as VerificationStatusValue)
+                                            }
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select status" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {VERIFICATION_STATUS_VALUES.map((value) => (
+                                                    <SelectItem key={value} value={value}>
+                                                        {VERIFICATION_STATUS_LABELS[value]}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={verifyForm.control}
+                                name="expiryDate"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Expiry date (optional)</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={verifyForm.control}
+                                name="comments"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Comments</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                rows={3}
+                                                placeholder="Optional notes..."
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setVerifyTarget(null)}
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={saving}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    {saving ? "Saving..." : "Submit"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reject confirmation */}
+            <AlertDialog
+                open={!!rejectTarget}
+                onOpenChange={(open) => {
+                    if (!open) setRejectTarget(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Mark verification as rejected?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block">
+                                <span className="font-medium text-foreground">
+                                    {rejectTarget?.docTypeName ?? ""}
+                                </span>{" "}
+                                will be marked <strong>Non-verified</strong>. The guard&apos;s
+                                lifecycle status may flip back to PENDING and they cannot be
+                                deployed until all verifications are complete.
+                            </span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={rejecting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmReject}
+                            disabled={rejecting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {rejecting ? "Rejecting..." : "Mark Rejected"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Reset confirmation */}
+            <AlertDialog
+                open={!!resetTarget}
+                onOpenChange={(open) => {
+                    if (!open) setResetTarget(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reset verification to pending?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block">
+                                The current verification decision for{" "}
+                                <span className="font-medium text-foreground">
+                                    {resetTarget?.docTypeName ?? ""}
+                                </span>{" "}
+                                will be cleared. The document remains uploaded.
+                            </span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmReset}
+                            disabled={resetting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {resetting ? "Resetting..." : "Reset"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
-      )}
-    </div>
-  )
-}
-
-function VerifBadge({ status, verificationStatus, hasFile }: { status: string; verificationStatus: string | null; hasFile: boolean }) {
-  if (!hasFile) {
-    return <div className="flex items-center gap-1 text-orange-500"><Clock className="h-4 w-4" /><span className="text-xs font-medium">Not Uploaded</span></div>
-  }
-  if (status === "VERIFIED" || verificationStatus === "VERIFIED") {
-    return <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /><span className="text-xs font-medium">Verified</span></div>
-  }
-  if (status === "REJECTED" || verificationStatus === "NON_VERIFIED") {
-    return <div className="flex items-center gap-1 text-red-600"><XCircle className="h-4 w-4" /><span className="text-xs font-medium">Rejected</span></div>
-  }
-  if (verificationStatus) {
-    const label: Record<string, string> = {
-      REQUEST_SUBMITTED: "Request Submitted",
-      REQUEST_NOT_SUBMITTED: "Not Submitted",
-      LETTER_ISSUED: "Letter Issued",
-      LETTER_NOT_ISSUED: "Letter Not Issued",
-      FEEDBACK_RECEIVED: "Feedback Received",
-      FEEDBACK_PENDING: "Feedback Pending",
-    }
-    return <div className="flex items-center gap-1 text-blue-600"><Clock className="h-4 w-4" /><span className="text-xs font-medium">{label[verificationStatus] || verificationStatus}</span></div>
-  }
-  return <div className="flex items-center gap-1 text-blue-500"><Clock className="h-4 w-4" /><span className="text-xs font-medium">Uploaded — Pending</span></div>
+    )
 }

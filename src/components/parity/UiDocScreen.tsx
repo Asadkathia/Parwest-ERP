@@ -2,7 +2,6 @@ import Link from "next/link"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
 import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import { Checkbox, Input, Select, Textarea } from "@/components/ui/form-controls"
 
 export type UiField = {
   label: string
@@ -95,7 +94,7 @@ export default function UiDocScreen({
                   return (
                     <div key={field.label} className="md:col-span-2 lg:col-span-3">
                       {label}
-                      <Textarea placeholder={field.placeholder || field.label} rows={3} />
+                      <textarea className="ui-textarea" placeholder={field.placeholder || field.label} rows={3} />
                     </div>
                   )
                 }
@@ -104,14 +103,14 @@ export default function UiDocScreen({
                   return (
                     <div key={field.label}>
                       {label}
-                      <Select defaultValue="">
+                      <select className="ui-select" defaultValue="">
                         <option value="">-- Select --</option>
                         {(field.options || [field.label]).map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
                         ))}
-                      </Select>
+                      </select>
                     </div>
                   )
                 }
@@ -119,7 +118,7 @@ export default function UiDocScreen({
                 if (type === "checkbox") {
                   return (
                     <div key={field.label} className="flex items-center mt-7 gap-2">
-                      <Checkbox />
+                      <input type="checkbox" className="h-4 w-4 accent-[var(--brand)]" />
                       <label className="text-sm text-[var(--text)]">{field.label}</label>
                     </div>
                   )
@@ -128,7 +127,7 @@ export default function UiDocScreen({
                 return (
                   <div key={field.label}>
                     {label}
-                    <Input type={type} placeholder={field.placeholder || field.label} />
+                    <input className="ui-input" type={type} placeholder={field.placeholder || field.label} />
                   </div>
                 )
               })}

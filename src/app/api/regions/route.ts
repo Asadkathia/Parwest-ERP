@@ -6,6 +6,10 @@ import { badRequest, conflict, internalServerError, unauthorized, forbidden } fr
 import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope } from "@/lib/access/scope"
 
+// GET is intentionally open to any authenticated user — regions drive the
+// global topbar picker and are not sensitive. Regional users still only see
+// their assigned region thanks to `deriveManagerScope` filtering below.
+
 const MOCK_REGIONS = [
     { id: "mock-region-punjab", name: "Punjab", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
     { id: "mock-region-sindh", name: "Sindh", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
@@ -15,7 +19,6 @@ export async function GET() {
     try {
         const session = await auth()
         if (!session) return unauthorized()
-        if (!hasAction(session, "SETTINGS", "VIEW")) return forbidden()
 
         const scope = deriveManagerScope(session)
 

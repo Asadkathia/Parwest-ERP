@@ -2,8 +2,44 @@
 
 import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Ticket, Send, Lock, User, Clock, Tag, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react"
-import InlineAlert from "@/components/ui/inline-alert"
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Lock,
+  RefreshCw,
+  Send,
+  Tag,
+  Ticket as TicketIcon,
+  User,
+} from "lucide-react"
+import { toast } from "sonner"
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
+import { Checkbox } from "@/components/shadcn/checkbox"
+import { Label } from "@/components/shadcn/label"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+import { Textarea } from "@/components/shadcn/textarea"
 
 type Lookup = { id: string; name: string; color?: string | null }
 type UserRef = { id: string; name: string }
@@ -28,38 +64,53 @@ type Comment = {
   user: UserRef
 }
 
-function StatusBadge({ status }: { status?: Lookup | null }) {
-  if (!status) return null
-  const n = status.name.toLowerCase()
-  const c = status.color || (n.includes("close") || n.includes("resolv") ? "#10b981" : n.includes("progress") ? "#f59e0b" : "#6366f1")
-  const Icon = n.includes("close") || n.includes("resolv") ? CheckCircle2 : n.includes("progress") ? Clock : AlertCircle
-  return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border" style={{ color: c, borderColor: c, backgroundColor: `${c}20` }}>
-      <Icon className="h-3 w-3" />{status.name}
-    </span>
-  )
+const UNASSIGNED = "__UNASSIGNED__"
+const NONE = "__NONE__"
+
+function statusVariant(name: string): "default" | "secondary" | "destructive" | "outline" {
+  const n = name.toLowerCase()
+  if (n.includes("close") || n.includes("resolv")) return "secondary"
+  if (n.includes("progress")) return "default"
+  if (n.includes("reject") || n.includes("cancel")) return "destructive"
+  return "outline"
 }
 
-function PriorityBadge({ priority }: { priority?: Lookup | null }) {
-  if (!priority) return null
-  const c = priority.color || "#94a3b8"
-  return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold border" style={{ color: c, borderColor: c, backgroundColor: `${c}20` }}>
-      {priority.name}
-    </span>
-  )
+function priorityVariant(name: string): "default" | "secondary" | "destructive" | "outline" {
+  const n = name.toLowerCase()
+  if (n.includes("critical") || n.includes("urgent") || n.includes("high")) return "destructive"
+  if (n.includes("medium") || n.includes("normal")) return "default"
+  if (n.includes("low")) return "secondary"
+  return "outline"
+}
+
+function isTerminalStatus(name: string): boolean {
+  const n = name.toLowerCase()
+  return n.includes("close") || n.includes("resolv")
+}
+
+function StatusIcon({ name }: { name: string }) {
+  const n = name.toLowerCase()
+  if (n.includes("close") || n.includes("resolv")) return <CheckCircle2 className="me-1 h-3 w-3" />
+  if (n.includes("progress")) return <Clock className="me-1 h-3 w-3" />
+  return <AlertCircle className="me-1 h-3 w-3" />
 }
 
 function Avatar({ name }: { name: string }) {
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
   return (
-    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand)] text-white text-xs font-bold shrink-0">
+    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
       {initials}
     </span>
   )
 }
 
-export default function TicketDetail({ paramsPromise, canUpdate = true }: { paramsPromise: Promise<{ id: string }>; canUpdate?: boolean }) {
+export default function TicketDetail({
+  paramsPromise,
+  canUpdate = true,
+}: {
+  paramsPromise: Promise<{ id: string }>
+  canUpdate?: boolean
+}) {
   const { id } = use(paramsPromise)
   const router = useRouter()
 
@@ -71,8 +122,6 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
   const [users, setUsers] = useState<UserRef[]>([])
 
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [notice, setNotice] = useState("")
 
   // Reply form
   const [message, setMessage] = useState("")
@@ -82,16 +131,19 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
   // Field updating
   const [updating, setUpdating] = useState(false)
 
+  // Destructive status-change confirm
+  const [pendingStatus, setPendingStatus] = useState<Lookup | null>(null)
+
   const loadTicket = async () => {
     try {
       const [t, c] = await Promise.all([
-        fetch(`/api/tickets/${id}`).then(r => r.json()),
-        fetch(`/api/tickets/${id}/comments`).then(r => r.json()).catch(() => []),
+        fetch(`/api/tickets/${id}`).then((r) => r.json()),
+        fetch(`/api/tickets/${id}/comments`).then((r) => r.json()).catch(() => []),
       ])
       setTicket(t)
       setComments(Array.isArray(c) ? c : [])
     } catch {
-      setError("Failed to load ticket.")
+      toast.error("Failed to load ticket.")
     } finally {
       setLoading(false)
     }
@@ -100,21 +152,21 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
   useEffect(() => {
     void loadTicket()
     Promise.all([
-      fetch("/api/tickets/categories").then(r => r.json()).catch(() => []),
-      fetch("/api/tickets/priorities").then(r => r.json()).catch(() => []),
-      fetch("/api/tickets/statuses").then(r => r.json()).catch(() => []),
-      fetch("/api/users").then(r => r.json()).catch(() => []),
+      fetch("/api/tickets/categories").then((r) => r.json()).catch(() => []),
+      fetch("/api/tickets/priorities").then((r) => r.json()).catch(() => []),
+      fetch("/api/tickets/statuses").then((r) => r.json()).catch(() => []),
+      fetch("/api/users").then((r) => r.json()).catch(() => []),
     ]).then(([c, p, s, u]) => {
       setCategories(Array.isArray(c) ? c : [])
       setPriorities(Array.isArray(p) ? p : [])
       setStatuses(Array.isArray(s) ? s : [])
       setUsers(Array.isArray(u) ? u : [])
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const patch = async (field: Record<string, string | null>) => {
-    setUpdating(true); setError(""); setNotice("")
+    setUpdating(true)
     try {
       const res = await fetch(`/api/tickets/${id}`, {
         method: "PATCH",
@@ -122,19 +174,40 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
         body: JSON.stringify(field),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.message || "Failed to update.")
+      if (!res.ok) {
+        const msg =
+          (data && typeof data.message === "string" && data.message) ||
+          "Failed to update."
+        throw new Error(msg)
+      }
       setTicket(data)
-      setNotice("Ticket updated.")
+      toast.success("Ticket updated.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update.")
+      toast.error(e instanceof Error ? e.message : "Failed to update.")
     } finally {
       setUpdating(false)
     }
   }
 
+  const handleStatusChange = (statusId: string) => {
+    const next = statuses.find((s) => s.id === statusId)
+    if (!next) return
+    if (isTerminalStatus(next.name) && next.id !== ticket?.status?.id) {
+      setPendingStatus(next)
+      return
+    }
+    void patch({ statusId })
+  }
+
+  const confirmTerminalStatus = async () => {
+    if (!pendingStatus) return
+    await patch({ statusId: pendingStatus.id })
+    setPendingStatus(null)
+  }
+
   const handleReply = async () => {
     if (!message.trim()) return
-    setPosting(true); setError(""); setNotice("")
+    setPosting(true)
     try {
       const res = await fetch(`/api/tickets/${id}/comments`, {
         method: "POST",
@@ -142,12 +215,18 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
         body: JSON.stringify({ message: message.trim(), isInternal }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.message || "Failed to post comment.")
-      setComments(prev => [...prev, data])
+      if (!res.ok) {
+        const msg =
+          (data && typeof data.message === "string" && data.message) ||
+          "Failed to post comment."
+        throw new Error(msg)
+      }
+      setComments((prev) => [...prev, data])
       setMessage("")
       setIsInternal(false)
+      toast.success("Comment posted.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to post comment.")
+      toast.error(e instanceof Error ? e.message : "Failed to post comment.")
     } finally {
       setPosting(false)
     }
@@ -156,7 +235,7 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <RefreshCw className="h-6 w-6 animate-spin text-[var(--brand)]" />
+        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
   }
@@ -164,8 +243,10 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
   if (!ticket) {
     return (
       <div className="py-24 text-center">
-        <p className="text-[var(--text-muted)]">Ticket not found.</p>
-        <button onClick={() => router.back()} className="mt-4 text-sm text-[var(--brand)] hover:underline">Go back</button>
+        <p className="text-muted-foreground">Ticket not found.</p>
+        <Button variant="link" onClick={() => router.back()} className="mt-4">
+          Go back
+        </Button>
       </div>
     )
   }
@@ -174,216 +255,360 @@ export default function TicketDetail({ paramsPromise, canUpdate = true }: { para
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition mt-1 shrink-0">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="mt-1 shrink-0"
+        >
+          <ArrowLeft className="me-1.5 h-4 w-4" /> Back
+        </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Ticket className="h-5 w-5 text-[var(--brand)] shrink-0" />
+            <TicketIcon className="h-5 w-5 text-primary shrink-0" />
             {ticket.ticketNumber && (
-              <span className="text-xs font-mono font-semibold text-[var(--text-muted)] bg-[var(--surface-muted)] px-2 py-0.5 rounded">
+              <Badge variant="outline" className="font-mono">
                 #{ticket.ticketNumber}
-              </span>
+              </Badge>
             )}
-            <StatusBadge status={ticket.status} />
-            <PriorityBadge priority={ticket.priority} />
+            {ticket.status && (
+              <Badge variant={statusVariant(ticket.status.name)}>
+                <StatusIcon name={ticket.status.name} />
+                {ticket.status.name}
+              </Badge>
+            )}
+            {ticket.priority && (
+              <Badge variant={priorityVariant(ticket.priority.name)}>
+                {ticket.priority.name}
+              </Badge>
+            )}
           </div>
-          <h1 className="text-xl font-bold text-[var(--text)] mt-2 leading-snug">{ticket.subject}</h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            Submitted by <span className="font-medium text-[var(--text)]">{ticket.sender?.name ?? "Unknown"}</span>
+          <h1 className="text-xl font-bold mt-2 leading-snug">{ticket.subject}</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Submitted by{" "}
+            <span className="font-medium text-foreground">
+              {ticket.sender?.name ?? "Unknown"}
+            </span>
             {" · "}
-            {new Date(ticket.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-            {" "}
-            {new Date(ticket.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+            {new Date(ticket.createdAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}{" "}
+            {new Date(ticket.createdAt).toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </p>
         </div>
       </div>
-
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
         {/* Main — description + comments */}
         <div className="space-y-4">
           {/* Description */}
           {ticket.description && (
-            <div className="ui-card p-5">
-              <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Description</h2>
-              <p className="text-sm text-[var(--text)] whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
-            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Description
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {ticket.description}
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           {/* Comment thread */}
-          <div className="ui-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-muted)]">
-              <p className="text-sm font-semibold text-[var(--text)]">
-                Comments <span className="text-[var(--text-muted)] font-normal ml-1">({comments.length})</span>
-              </p>
-            </div>
-            {comments.length === 0 ? (
-              <div className="py-10 text-center text-sm text-[var(--text-muted)]">No comments yet. Be the first to reply.</div>
-            ) : (
-              <div className="divide-y divide-[var(--border)]">
-                {comments.map(c => (
-                  <div key={c.id} className={`px-5 py-4 ${c.isInternal ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
-                    <div className="flex items-start gap-3">
-                      <Avatar name={c.user.name} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-semibold text-[var(--text)]">{c.user.name}</span>
-                          {c.isInternal && (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded">
-                              <Lock className="h-2.5 w-2.5" /> Internal Note
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-muted/50 py-3">
+              <CardTitle className="text-sm font-semibold">
+                Comments{" "}
+                <span className="text-muted-foreground font-normal ml-1">
+                  ({comments.length})
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {comments.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  No comments yet. Be the first to reply.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {comments.map((c) => (
+                    <div
+                      key={c.id}
+                      className={`px-5 py-4 ${
+                        c.isInternal ? "bg-amber-50 dark:bg-amber-950/20" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar name={c.user.name} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-semibold">
+                              {c.user.name}
                             </span>
-                          )}
-                          <span className="text-xs text-[var(--text-muted)] ml-auto">
-                            {new Date(c.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                            {" "}
-                            {new Date(c.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
+                            {c.isInternal && (
+                              <Badge
+                                variant="outline"
+                                className="text-amber-700 border-amber-300 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                              >
+                                <Lock className="me-1 h-2.5 w-2.5" />
+                                Internal Note
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {new Date(c.createdAt).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}{" "}
+                              {new Date(c.createdAt).toLocaleTimeString("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {c.message}
+                          </p>
                         </div>
-                        <p className="text-sm text-[var(--text)] whitespace-pre-wrap leading-relaxed">{c.message}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Reply form */}
-            {canUpdate ? (
-              <div className="px-5 py-4 border-t border-[var(--border)] bg-[var(--surface-muted)] space-y-3">
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  className="ui-textarea min-h-[100px]"
-                  placeholder="Write a reply..."
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={isInternal}
-                      onChange={e => setIsInternal(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--border)] accent-amber-500"
-                    />
-                    <span className="text-sm text-[var(--text-muted)] flex items-center gap-1">
-                      <Lock className="h-3.5 w-3.5" /> Internal note (admin only)
-                    </span>
-                  </label>
-                  <button
-                    onClick={handleReply}
-                    disabled={posting || !message.trim()}
-                    className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--brand)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-                  >
-                    <Send className="h-4 w-4" />
-                    {posting ? "Sending..." : "Send Reply"}
-                  </button>
+                  ))}
                 </div>
-              </div>
-            ) : null}
-          </div>
+              )}
+
+              {/* Reply form */}
+              {canUpdate ? (
+                <div className="px-5 py-4 border-t bg-muted/30 space-y-3">
+                  <Textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className="min-h-[100px]"
+                    placeholder="Write a reply..."
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="flex items-center gap-2 cursor-pointer select-none">
+                      <Checkbox
+                        checked={isInternal}
+                        onCheckedChange={(v) => setIsInternal(Boolean(v))}
+                      />
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Lock className="h-3.5 w-3.5" /> Internal note (admin only)
+                      </span>
+                    </Label>
+                    <Button
+                      onClick={handleReply}
+                      disabled={posting || !message.trim()}
+                    >
+                      <Send className="me-2 h-4 w-4" />
+                      {posting ? "Sending..." : "Send Reply"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar — ticket controls */}
         <div className="space-y-4">
-          <div className="ui-card p-5 space-y-4">
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-2">Ticket Details</h2>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Ticket Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Status */}
+              <div>
+                <Label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <AlertCircle className="h-3 w-3" /> Status
+                </Label>
+                <PermissionGate module="TICKETING" action="UPDATE" mode="disable">
+                  <Select
+                    value={ticket.status?.id ?? ""}
+                    onValueChange={handleStatusChange}
+                    disabled={updating || !canUpdate}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </PermissionGate>
+              </div>
 
-            {/* Status */}
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" /> Status
-              </label>
-              <select
-                className="ui-select text-sm"
-                value={ticket.status?.id ?? ""}
-                onChange={e => void patch({ statusId: e.target.value })}
-                disabled={updating || !canUpdate}
-              >
-                {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
+              {/* Priority */}
+              <div>
+                <Label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <Tag className="h-3 w-3" /> Priority
+                </Label>
+                <Select
+                  value={ticket.priority?.id ?? ""}
+                  onValueChange={(v) => void patch({ priorityId: v })}
+                  disabled={updating || !canUpdate}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priorities.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Priority */}
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
-                <Tag className="h-3 w-3" /> Priority
-              </label>
-              <select
-                className="ui-select text-sm"
-                value={ticket.priority?.id ?? ""}
-                onChange={e => void patch({ priorityId: e.target.value })}
-                disabled={updating || !canUpdate}
-              >
-                {priorities.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+              {/* Category */}
+              <div>
+                <Label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <Tag className="h-3 w-3" /> Category
+                </Label>
+                <Select
+                  value={ticket.category?.id ?? NONE}
+                  onValueChange={(v) =>
+                    void patch({ categoryId: v === NONE ? null : v })
+                  }
+                  disabled={updating || !canUpdate}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>— None —</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Category */}
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
-                <Tag className="h-3 w-3" /> Category
-              </label>
-              <select
-                className="ui-select text-sm"
-                value={ticket.category?.id ?? ""}
-                onChange={e => void patch({ categoryId: e.target.value })}
-                disabled={updating || !canUpdate}
-              >
-                <option value="">— None —</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-
-            {/* Assigned To */}
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
-                <User className="h-3 w-3" /> Assigned To
-              </label>
-              <select
-                className="ui-select text-sm"
-                value={ticket.assignedTo?.id ?? ""}
-                onChange={e => void patch({ assignedToId: e.target.value || null })}
-                disabled={updating || !canUpdate}
-              >
-                <option value="">— Unassigned —</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              {!ticket.assignedTo && (
-                <p className="text-xs text-red-500 mt-1 font-medium">Not assigned</p>
-              )}
-            </div>
-          </div>
+              {/* Assigned To */}
+              <div>
+                <Label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <User className="h-3 w-3" /> Assigned To
+                </Label>
+                <Select
+                  value={ticket.assignedTo?.id ?? UNASSIGNED}
+                  onValueChange={(v) =>
+                    void patch({ assignedToId: v === UNASSIGNED ? null : v })
+                  }
+                  disabled={updating || !canUpdate}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!ticket.assignedTo && (
+                  <p className="text-xs text-destructive mt-1 font-medium">
+                    Not assigned
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Meta info */}
-          <div className="ui-card p-5 space-y-3">
-            <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-2">Info</h2>
-            <div className="space-y-2 text-xs">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Info
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs">
               <div className="flex justify-between gap-2">
-                <span className="text-[var(--text-muted)]">Ticket #</span>
-                <span className="font-mono font-semibold text-[var(--text)]">{ticket.ticketNumber ?? "—"}</span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="text-[var(--text-muted)]">Sender</span>
-                <span className="font-medium text-[var(--text)] text-right">{ticket.sender?.name ?? "—"}</span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="text-[var(--text-muted)]">Created</span>
-                <span className="text-[var(--text)] text-right">
-                  {new Date(ticket.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                <span className="text-muted-foreground">Ticket #</span>
+                <span className="font-mono font-semibold">
+                  {ticket.ticketNumber ?? "—"}
                 </span>
               </div>
               <div className="flex justify-between gap-2">
-                <span className="text-[var(--text-muted)]">Updated</span>
-                <span className="text-[var(--text)] text-right">
-                  {new Date(ticket.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                <span className="text-muted-foreground">Sender</span>
+                <span className="font-medium text-right">
+                  {ticket.sender?.name ?? "—"}
                 </span>
               </div>
-            </div>
-          </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Created</span>
+                <span className="text-right">
+                  {new Date(ticket.createdAt).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Updated</span>
+                <span className="text-right">
+                  {new Date(ticket.updatedAt).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Destructive status-change confirm */}
+      <AlertDialog
+        open={pendingStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatus(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Set status to {pendingStatus?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This is a terminal status. The ticket may not be reopened from the
+              UI once {pendingStatus?.name.toLowerCase()}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmTerminalStatus()
+              }}
+              disabled={updating}
+            >
+              {updating ? "Updating..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

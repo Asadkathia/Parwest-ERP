@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button } from "@/components/shadcn/button"
-import EmptyState from "@/components/ui/empty-state"
+import ActionButton from "@/components/ui/action-button"
+import { Card, CardContent } from "@/components/shadcn/card"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
@@ -308,8 +308,8 @@ export default function InvoicePrerequisitesManager({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={onSave}>Submit</Button>
-              <Button variant="secondary" onClick={resetDefaults}>Reset</Button>
+              <ActionButton onClick={onSave}>Submit</ActionButton>
+              <ActionButton variant="secondary" onClick={resetDefaults}>Reset</ActionButton>
             </div>
           </FilterBar>
 
@@ -379,10 +379,15 @@ export default function InvoicePrerequisitesManager({
               <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div className="flex items-end">
-              <Button onClick={() => setNotice("Invoice header saved.")}>Submit</Button>
+              <ActionButton onClick={() => setNotice("Invoice header saved.")}>Submit</ActionButton>
             </div>
           </div>
-          <EmptyState title="Invoice Header" description="Header presets can be managed here in frontend mode." />
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+              <p className="text-base font-semibold">Invoice Header</p>
+              <p className="text-sm text-muted-foreground">Header presets can be managed here in frontend mode.</p>
+            </CardContent>
+          </Card>
         </FilterBar>
       )}
 
@@ -395,8 +400,8 @@ export default function InvoicePrerequisitesManager({
             <label className="block text-sm text-[var(--text-muted)]">Effective Rate</label>
             <input type="number" className="ui-input" value={editRateValue} onChange={(e) => setEditRateValue(e.target.value)} placeholder="Effective Rate" />
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setEditingRate(null)}>Cancel</Button>
-              <Button onClick={onApplyEditRate}>Save</Button>
+              <ActionButton variant="secondary" onClick={() => setEditingRate(null)}>Cancel</ActionButton>
+              <ActionButton onClick={onApplyEditRate}>Save</ActionButton>
             </div>
           </div>
         </FormDialog>

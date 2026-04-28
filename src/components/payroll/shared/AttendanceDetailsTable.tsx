@@ -70,7 +70,7 @@ export default function AttendanceDetailsTable({
         Attendance Details month of {monthLabel(month) || "—"}
       </div>
       <table className="w-full min-w-[800px] text-sm">
-        <thead className="bg-green-100 text-green-900">
+        <thead className="bg-green-100 dark:bg-green-950/40 text-green-900 dark:text-green-200">
           <tr>
             <th className="px-3 py-2 text-left">Branch Name</th>
             <th className="px-3 py-2 text-right">Salary Rate</th>
@@ -130,7 +130,7 @@ export default function AttendanceDetailsTable({
             <span className="text-[var(--text-muted)]">Total Loan Paid: </span>
             <span className="font-semibold">{totalLoanPaid.toFixed(0)}</span>
           </div>
-          <div className="px-4 py-2 text-sm bg-cyan-50 text-cyan-900">
+          <div className="px-4 py-2 text-sm bg-cyan-50 dark:bg-cyan-950/40 text-cyan-900 dark:text-cyan-200">
             <span>Payable Loan: </span>
             <span className="font-semibold">{payableLoan.toFixed(0)}</span>
           </div>

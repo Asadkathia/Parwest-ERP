@@ -8,7 +8,6 @@ import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import { Card, CardBody } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/form-controls"
 
 type Props = {
   config: ScreenConfig
@@ -148,7 +147,9 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
               if (type === "checkbox") {
                 return (
                   <div key={field.label} className="flex items-center gap-2 mt-7">
-                    <Checkbox
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--brand)]"
                       checked={valueOf(field.label) === "true"}
                       onChange={(e) => setField(field.label, e.target.checked ? "true" : "false")}
                     />

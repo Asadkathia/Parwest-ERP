@@ -1,228 +1,570 @@
 "use client"
 
-import { useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import StatusChip from "@/components/ui/status-chip"
-import { round2, statusVariant, type InvoiceRow } from "./types"
+/**
+ * Parwest ERP — Invoice Detail dialog (Phase 5B reskin)
+ * ─────────────────────────────────────────────────────────────────────────
+ * Replaces the legacy fixed-overlay modal with a shadcn `Dialog`. The local
+ * `setSaveResult`-style notice state is gone — success and error feedback
+ * is now delivered through sonner toasts (`@/components/shadcn/sonner` is
+ * already mounted by the dashboard shell).
+ *
+ * Behaviour parity:
+ *   - Same endpoints + payload contracts.
+ *   - Same actions: Record Payment, Mark as PAID, Void.
+ *   - Same client/server validation. Server caps amount, rejects voids
+ *     when payments exist, etc. — we do not duplicate those server-side
+ *     rules in the zod schema (only the input-level checks).
+ *   - Errors read `data.message` from the API envelope (the legacy already
+ *     did so; nothing to fix on that front).
+ */
+
+import * as React from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+
+import { Badge } from "@/components/shadcn/badge"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog"
+import { Input } from "@/components/shadcn/input"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/shadcn/form"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/shadcn/table"
+import { formatPKRFull } from "@/lib/format/currency"
+import {
+  PAYMENT_METHODS,
+  invoicePaymentSchema,
+  type InvoicePaymentForm,
+} from "@/lib/schemas/invoice-payment"
+import { round2, type InvoiceRow } from "./types"
 
 type Props = {
   invoice: InvoiceRow
   onClose: () => void
   onUpdated: (next: InvoiceRow) => void
-  setError: (msg: string) => void
-  setNotice: (msg: string) => void
 }
 
-export default function InvoiceDetailModal({ invoice, onClose, onUpdated, setError, setNotice }: Props) {
-  const [paymentOpen, setPaymentOpen] = useState(false)
-  const [paymentAmount, setPaymentAmount] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("CASH")
-  const [paymentNotes, setPaymentNotes] = useState("")
-  const [voidOpen, setVoidOpen] = useState(false)
-  const [voidReason, setVoidReason] = useState("")
+function statusBadgeVariant(
+  status: string
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "PAID":
+    case "ADVANCE_PAID":
+      return "default"
+    case "OVERDUE":
+    case "UNPAID":
+    case "VOID":
+      return "destructive"
+    case "PARTIAL_PAID":
+    case "PENDING":
+      return "secondary"
+    default:
+      return "outline"
+  }
+}
+
+export default function InvoiceDetailModal({
+  invoice,
+  onClose,
+  onUpdated,
+}: Props) {
+  const [paymentOpen, setPaymentOpen] = React.useState(false)
+  const [voidOpen, setVoidOpen] = React.useState(false)
+  const [voidReason, setVoidReason] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
 
   const outstanding = round2(invoice.amount - invoice.paidAmount)
   const isVoid = invoice.status === "VOID"
 
-  const submitPayment = async () => {
-    const amt = Number(paymentAmount)
-    if (!Number.isFinite(amt) || amt <= 0) { setError("Enter a positive amount."); return }
-    setError("")
-    const res = await fetch(`/api/invoices/${invoice.id}/payments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: amt, method: paymentMethod, notes: paymentNotes || undefined }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data?.message || "Payment failed."); return }
-    onUpdated(data)
-    setPaymentOpen(false); setPaymentAmount(""); setPaymentNotes("")
-    setNotice(`Recorded payment of ${amt.toLocaleString()} on ${data.invoiceNumber}.`)
+  const form = useForm<InvoicePaymentForm>({
+    resolver: zodResolver(invoicePaymentSchema),
+    defaultValues: {
+      amount: undefined,
+      method: "CASH",
+      notes: "",
+    },
+  })
+
+  const submitPayment = async (values: {
+    amount: number
+    method: (typeof PAYMENT_METHODS)[number]
+    notes?: string
+  }) => {
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: values.amount,
+          method: values.method,
+          notes: values.notes || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(
+          (data as { message?: string })?.message || "Payment failed."
+        )
+        return
+      }
+      onUpdated(data as InvoiceRow)
+      setPaymentOpen(false)
+      form.reset({ amount: undefined, method: "CASH", notes: "" })
+      toast.success(
+        `Recorded payment of ${formatPKRFull(values.amount)} on ${(data as InvoiceRow).invoiceNumber}.`
+      )
+    } catch {
+      toast.error("Payment failed.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const markPaid = async () => {
-    if (outstanding <= 0) {
-      const res = await fetch(`/api/invoices/${invoice.id}`, {
-        method: "PATCH",
+    setSubmitting(true)
+    try {
+      if (outstanding <= 0) {
+        const res = await fetch(`/api/invoices/${invoice.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "PAID" }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          toast.error(
+            (data as { message?: string })?.message || "Update failed."
+          )
+          return
+        }
+        onUpdated(data as InvoiceRow)
+        toast.success(`Invoice ${(data as InvoiceRow).invoiceNumber} marked PAID.`)
+        return
+      }
+      const res = await fetch(`/api/invoices/${invoice.id}/payments`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "PAID" }),
+        body: JSON.stringify({
+          amount: outstanding,
+          method: "CASH",
+          notes: "Mark as PAID quick action",
+        }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data?.message || "Update failed."); return }
-      onUpdated(data); return
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(
+          (data as { message?: string })?.message || "Failed to mark paid."
+        )
+        return
+      }
+      onUpdated(data as InvoiceRow)
+      toast.success(
+        `Recorded payment of ${formatPKRFull(outstanding)} on ${(data as InvoiceRow).invoiceNumber}.`
+      )
+    } catch {
+      toast.error("Failed to mark paid.")
+    } finally {
+      setSubmitting(false)
     }
-    const res = await fetch(`/api/invoices/${invoice.id}/payments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: outstanding, method: "CASH", notes: "Mark as PAID quick action" }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data?.message || "Failed to mark paid."); return }
-    onUpdated(data)
   }
 
   const submitVoid = async () => {
-    if (!voidReason.trim()) { setError("Void reason required."); return }
-    setError("")
-    const res = await fetch(`/api/invoices/${invoice.id}/void`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: voidReason.trim() }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data?.message || "Void failed."); return }
-    onUpdated(data); setVoidOpen(false); setVoidReason("")
-    setNotice(`Invoice ${data.invoiceNumber} voided.`)
+    if (!voidReason.trim()) {
+      toast.error("Void reason required.")
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/void`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: voidReason.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(
+          (data as { message?: string })?.message || "Void failed."
+        )
+        return
+      }
+      onUpdated(data as InvoiceRow)
+      setVoidOpen(false)
+      setVoidReason("")
+      toast.success(`Invoice ${(data as InvoiceRow).invoiceNumber} voided.`)
+    } catch {
+      toast.error("Void failed.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="ui-card w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">{invoice.invoiceNumber}</h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              {invoice.client?.name}{invoice.branch ? ` • ${invoice.branch.name}` : ""} • {new Date(invoice.month).toISOString().slice(0, 7)}
-            </p>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-start justify-between gap-3 pr-6">
+            <div>
+              <DialogTitle className="font-mono text-base">
+                {invoice.invoiceNumber}
+              </DialogTitle>
+              <DialogDescription>
+                {invoice.client?.name}
+                {invoice.branch ? ` • ${invoice.branch.name}` : ""} •{" "}
+                {new Date(invoice.month).toISOString().slice(0, 7)}
+              </DialogDescription>
+            </div>
+            <Badge variant={statusBadgeVariant(invoice.status)}>
+              {invoice.status}
+            </Badge>
           </div>
-          <button type="button" className="text-2xl text-[var(--text-muted)] hover:text-[var(--text)]" onClick={onClose}>×</button>
-        </div>
+        </DialogHeader>
 
         {isVoid ? (
-          <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             <div className="font-semibold">Voided</div>
             {invoice.voidReason ? <div>Reason: {invoice.voidReason}</div> : null}
-            {invoice.voidedAt ? <div className="text-xs opacity-80">at {new Date(invoice.voidedAt).toLocaleString()}</div> : null}
+            {invoice.voidedAt ? (
+              <div className="text-xs opacity-80">
+                at {new Date(invoice.voidedAt).toLocaleString()}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <Stat label="Subtotal" value={Number(invoice.subtotal || 0).toLocaleString()} />
-          <Stat label="Tax" value={Number(invoice.taxAmount || 0).toLocaleString()} />
-          <Stat label="Total" value={Number(invoice.amount || 0).toLocaleString()} bold />
-          <Stat label="Paid / Outstanding" value={`${Number(invoice.paidAmount || 0).toLocaleString()} / ${outstanding.toLocaleString()}`} />
+        {/* Totals */}
+        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <Stat
+            label="Subtotal"
+            value={<ParwestCurrency value={Number(invoice.subtotal || 0)} />}
+          />
+          <Stat
+            label="Tax"
+            value={<ParwestCurrency value={Number(invoice.taxAmount || 0)} />}
+          />
+          <Stat
+            label="Total"
+            value={<ParwestCurrency value={Number(invoice.amount || 0)} />}
+            bold
+          />
+          <Stat
+            label="Paid / Outstanding"
+            value={
+              <span className="inline-flex items-center gap-1">
+                <ParwestCurrency value={Number(invoice.paidAmount || 0)} />
+                <span className="text-muted-foreground">/</span>
+                <ParwestCurrency value={outstanding} />
+              </span>
+            }
+          />
         </div>
 
+        {/* Line items */}
         <div>
-          <h3 className="text-sm font-semibold mb-2">Line items</h3>
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-muted)]">
-              <tr>
-                <Th>Kind</Th><Th>Description</Th>
-                <Th className="text-right">Qty</Th><Th className="text-right">Unit</Th><Th className="text-right">Total</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {(invoice.lineItems || []).length === 0 ? (
-                <tr><td colSpan={5} className="px-2 py-3 text-[var(--text-muted)]">No line items.</td></tr>
-              ) : (invoice.lineItems || []).map((li) => (
-                <tr key={li.id} className="border-t border-[var(--border)]">
-                  <td className="px-2 py-1">{li.kind}</td>
-                  <td className="px-2 py-1">{li.description}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{li.quantity}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{Number(li.unitPrice).toLocaleString()}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{Number(li.lineTotal).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h3 className="mb-2 text-sm font-semibold">Line items</h3>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Kind</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-end">Qty</TableHead>
+                  <TableHead className="text-end">Unit</TableHead>
+                  <TableHead className="text-end">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(invoice.lineItems || []).length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-sm text-muted-foreground"
+                    >
+                      No line items.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (invoice.lineItems || []).map((li) => (
+                    <TableRow key={li.id}>
+                      <TableCell className="text-xs">{li.kind}</TableCell>
+                      <TableCell>{li.description}</TableCell>
+                      <TableCell className="text-end tabular-nums">
+                        {li.quantity}
+                      </TableCell>
+                      <TableCell className="text-end">
+                        <ParwestCurrency value={Number(li.unitPrice)} />
+                      </TableCell>
+                      <TableCell className="text-end">
+                        <ParwestCurrency value={Number(li.lineTotal)} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
+        {/* Advances applied */}
         {invoice.advanceApplications && invoice.advanceApplications.length > 0 ? (
           <div>
-            <h3 className="text-sm font-semibold mb-2">Advances applied</h3>
-            <ul className="text-sm space-y-1">
+            <h3 className="mb-2 text-sm font-semibold">Advances applied</h3>
+            <ul className="space-y-1 text-sm">
               {invoice.advanceApplications.map((a) => (
-                <li key={a.id} className="flex justify-between border-b border-[var(--border)] py-1">
-                  <span className="text-[var(--text-muted)]">advance {a.advance.id.slice(-6)} ({new Date(a.advance.paymentDate).toISOString().slice(0, 10)})</span>
-                  <span className="tabular-nums">{Number(a.amount).toLocaleString()}</span>
+                <li
+                  key={a.id}
+                  className="flex justify-between border-b py-1"
+                >
+                  <span className="text-muted-foreground">
+                    advance {a.advance.id.slice(-6)} (
+                    {new Date(a.advance.paymentDate)
+                      .toISOString()
+                      .slice(0, 10)}
+                    )
+                  </span>
+                  <ParwestCurrency value={Number(a.amount)} />
                 </li>
               ))}
             </ul>
           </div>
         ) : null}
 
+        {/* Action row */}
         <div className="flex flex-wrap items-center gap-2">
-          <StatusChip label={invoice.status} variant={statusVariant(invoice.status)} />
           <div className="flex-1" />
           {!isVoid ? (
             <>
-              <ActionButton variant="secondary" onClick={() => setPaymentOpen(true)} disabled={outstanding <= 0}>Record Payment</ActionButton>
-              <ActionButton onClick={markPaid} disabled={invoice.status === "PAID"}>Mark as PAID</ActionButton>
-              <button
-                type="button"
-                className="text-sm text-red-600 hover:text-red-800 underline"
-                onClick={() => setVoidOpen(true)}
-                disabled={invoice.paidAmount > 0}
-                title={invoice.paidAmount > 0 ? "Cannot void an invoice with payments" : "Void invoice"}
-              >
-                Void
-              </button>
+              <PermissionGate module="CLIENTS" action="UPDATE" mode="hide">
+                <Button
+                  variant="secondary"
+                  onClick={() => setPaymentOpen((s) => !s)}
+                  disabled={outstanding <= 0 || submitting}
+                >
+                  Record Payment
+                </Button>
+              </PermissionGate>
+              <PermissionGate module="CLIENTS" action="UPDATE" mode="hide">
+                <Button
+                  onClick={markPaid}
+                  disabled={invoice.status === "PAID" || submitting}
+                >
+                  Mark as PAID
+                </Button>
+              </PermissionGate>
+              <PermissionGate module="CLIENTS" action="DELETE" mode="hide">
+                <Button
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setVoidOpen((s) => !s)}
+                  disabled={invoice.paidAmount > 0 || submitting}
+                  title={
+                    invoice.paidAmount > 0
+                      ? "Cannot void an invoice with payments"
+                      : "Void invoice"
+                  }
+                >
+                  Void
+                </Button>
+              </PermissionGate>
             </>
           ) : null}
         </div>
 
-        {paymentOpen ? (
-          <div className="ui-card p-3 mt-2 space-y-2">
-            <h4 className="text-sm font-semibold">Record Payment</h4>
-            <div className="grid gap-2 md:grid-cols-3">
-              <Field label="Amount">
-                <input className="ui-input" type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
-              </Field>
-              <Field label="Method">
-                <select className="ui-select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                  <option value="CASH">CASH</option>
-                  <option value="BANK">BANK</option>
-                  <option value="MOBILE">MOBILE</option>
-                  <option value="OTHER">OTHER</option>
-                </select>
-              </Field>
-              <Field label="Notes">
-                <input className="ui-input" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} />
-              </Field>
-            </div>
-            <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setPaymentOpen(false)}>Cancel</ActionButton>
-              <ActionButton onClick={submitPayment}>Save payment</ActionButton>
-            </div>
-          </div>
+        {/* Inline payment form */}
+        {paymentOpen && !isVoid ? (
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              <h4 className="text-sm font-semibold">Record Payment</h4>
+              <Form {...form}>
+                <form
+                  className="space-y-3"
+                  onSubmit={form.handleSubmit(submitPayment)}
+                  noValidate
+                >
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <FormField
+                      control={form.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Amount</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={
+                                field.value === undefined ||
+                                Number.isNaN(field.value)
+                                  ? ""
+                                  : field.value
+                              }
+                              onChange={(e) => {
+                                const v = e.target.value
+                                field.onChange(v === "" ? undefined : Number(v))
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="method"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Method</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Method" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {PAYMENT_METHODS.map((m) => (
+                                <SelectItem key={m} value={m}>
+                                  {m}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setPaymentOpen(false)}
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? "Saving…" : "Save payment"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
         ) : null}
 
-        {voidOpen ? (
-          <div className="ui-card p-3 mt-2 space-y-2 border border-red-200">
-            <h4 className="text-sm font-semibold text-red-700">Void invoice</h4>
-            <Field label="Reason (required)">
-              <input className="ui-input" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="e.g. issued in error" />
-            </Field>
-            <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setVoidOpen(false)}>Cancel</ActionButton>
-              <ActionButton onClick={submitVoid}>Confirm void</ActionButton>
-            </div>
-          </div>
+        {/* Inline void form */}
+        {voidOpen && !isVoid ? (
+          <Card className="border-destructive/40">
+            <CardContent className="space-y-3 p-4">
+              <h4 className="text-sm font-semibold text-destructive">
+                Void invoice
+              </h4>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Reason (required)
+                </label>
+                <Input
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="e.g. issued in error"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setVoidOpen(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={submitVoid}
+                  disabled={submitting}
+                >
+                  {submitting ? "Voiding…" : "Confirm void"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : null}
-      </div>
-    </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-function Stat({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) {
+function Stat({
+  label,
+  value,
+  bold = false,
+}: {
+  label: string
+  value: React.ReactNode
+  bold?: boolean
+}) {
   return (
     <div>
-      <div className="text-xs text-[var(--text-muted)]">{label}</div>
-      <div className={`tabular-nums ${bold ? "font-semibold" : ""}`}>{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={bold ? "font-semibold" : undefined}>{value}</div>
     </div>
   )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs text-[var(--text-muted)] mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-2 py-1 text-left text-xs uppercase text-[var(--text-muted)] ${className}`}>{children}</th>
 }

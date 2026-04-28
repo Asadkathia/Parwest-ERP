@@ -9,9 +9,20 @@ import PricingManager from "@/components/clients/PricingManager"
 import ClientStatusToggle from "@/components/clients/ClientStatusToggle"
 import Link from "next/link"
 import { ArrowLeft, Edit, FileText, Plus, Paperclip, Building2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/shadcn/table"
+import { TabStatusBadge } from "@/components/guards/tabs/status-badge"
+import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
 import SectionTitle from "@/components/ui/section-title"
-import StatusChip from "@/components/ui/status-chip"
 
 type TabKey =
   | "general-information"
@@ -270,38 +281,47 @@ export default async function ClientDetailPage({
         subtitle="Legacy-aligned client profile view"
         action={
           <div className="flex items-center gap-2">
-            <Link href="/clients" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-            {!client.isBranchless && canCreateClient && (
-              <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Branch
+            <Button asChild variant="outline">
+              <Link href="/clients">
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Link>
+            </Button>
+            {!client.isBranchless && canCreateClient && (
+              <Button asChild variant="outline">
+                <Link href={`/clients/${client.id}/branches/new`}>
+                  <Plus className="h-4 w-4" />
+                  Add Branch
+                </Link>
+              </Button>
             )}
             {canUpdateClient ? <ClientStatusToggle clientId={client.id} currentStatus={client.status} /> : null}
             {canUpdateClient ? (
-              <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
-              </Link>
+              <Button asChild>
+                <Link href={`/clients/${client.id}/edit`}>
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </Link>
+              </Button>
             ) : null}
           </div>
         }
       />
 
-      <div className="flex flex-wrap gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-2">
+      <div className="flex flex-wrap gap-2 rounded-md border bg-card p-2">
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab
           return (
-            <Link
+            <Button
               key={tab.key}
-              href={`/clients/${client.id}?tab=${tab.key}`}
-              className={isActive ? "ui-btn ui-btn-primary" : "ui-btn ui-btn-secondary"}
+              asChild
+              variant={isActive ? "default" : "outline"}
+              size="sm"
             >
-              {tab.label}
-            </Link>
+              <Link href={`/clients/${client.id}?tab=${tab.key}`}>
+                {tab.label}
+              </Link>
+            </Button>
           )
         })}
       </div>
@@ -310,16 +330,18 @@ export default async function ClientDetailPage({
         <div className="space-y-4">
           {/* ── Profile header card ── */}
           <Card>
-            <CardHeader className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[var(--text)]">GENERAL INFORMATION</h2>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">General Information</CardTitle>
               {canUpdateClient ? (
-                <Link href={`/clients/${client.id}/edit`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/clients/${client.id}/edit`}>
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </Link>
+                </Button>
               ) : null}
             </CardHeader>
-            <CardBody className="space-y-4">
+            <CardContent className="space-y-4">
               {/* Logo + quick metrics */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[200px_1fr]">
                 <div className="space-y-3">
@@ -330,14 +352,14 @@ export default async function ClientDetailPage({
                       width={200}
                       height={176}
                       unoptimized
-                      className="h-44 w-full rounded-[var(--radius-md)] border border-[var(--border)] object-cover"
+                      className="h-44 w-full rounded-md border object-cover"
                     />
                   ) : (
-                    <div className="flex h-44 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] text-xs text-[var(--text-muted)]">
+                    <div className="flex h-44 w-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground">
                       PHOTO NOT AVAILABLE
                     </div>
                   )}
-                  <button type="button" className="ui-btn ui-btn-primary w-full text-xs">UPLOAD PICTURE</button>
+                  <Button type="button" size="sm" className="w-full">Upload Picture</Button>
                 </div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                   <InfoCell label="BRANCHES" value={String(client.branches.length)} />
@@ -350,15 +372,15 @@ export default async function ClientDetailPage({
                   <InfoCell label="TOTAL DEPLOYMENTS" value={String(client.deployments?.length ?? 0)} />
                 </div>
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           {/* ── Basic Details ── */}
           <Card>
             <CardHeader>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CLIENT DETAILS</h3>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Client Details</CardTitle>
             </CardHeader>
-            <CardBody>
+            <CardContent>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <InfoCell label="NAME" value={client.name} />
                 <InfoCell label="CLIENT TYPE" value={client.type} />
@@ -376,15 +398,15 @@ export default async function ClientDetailPage({
                 <InfoCell label="NTN" value={client.ntn || "—"} />
                 <InfoCell label="STRN" value={client.strn || "—"} />
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           {/* ── Contact Information ── */}
           <Card>
             <CardHeader>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTACT INFORMATION</h3>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Contact Information</CardTitle>
             </CardHeader>
-            <CardBody>
+            <CardContent>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <InfoCell label="CONTACT PERSON" value={client.contactPerson || "—"} />
                 <InfoCell label="CONTACT DESIGNATION" value={(client as unknown as { contactPersonDesignation?: string | null }).contactPersonDesignation || "—"} />
@@ -399,23 +421,23 @@ export default async function ClientDetailPage({
                 />
                 <InfoCell label="ASSIGNED SUPERVISOR" value={client.supervisorAssignments?.[0]?.supervisor?.name || client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           {/* ── Introducer Information (conditional) ── */}
           {(client.introducerName || client.introducerContactNumber || client.introducerCnic) ? (
             <Card>
               <CardHeader>
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">INTRODUCER INFORMATION</h3>
+                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Introducer Information</CardTitle>
               </CardHeader>
-              <CardBody>
+              <CardContent>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <InfoCell label="INTRODUCER NAME" value={client.introducerName || "—"} />
                   <InfoCell label="CONTACT NUMBER" value={client.introducerContactNumber || "—"} />
                   <InfoCell label="CNIC" value={client.introducerCnic || "—"} />
                   <InfoCell label="ADDRESS" value={client.introducerAddress || "—"} />
                 </div>
-              </CardBody>
+              </CardContent>
             </Card>
           ) : null}
 
@@ -423,9 +445,9 @@ export default async function ClientDetailPage({
           {(client.dayGuardCapacity != null || client.nightGuardCapacity != null || client.daySupervisorCapacity != null || client.nightSupervisorCapacity != null || client.cpoCapacity != null) ? (
             <Card>
               <CardHeader>
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">GUARD CAPACITY (CONFIGURED)</h3>
+                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Guard Capacity (Configured)</CardTitle>
               </CardHeader>
-              <CardBody>
+              <CardContent>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
                   <InfoCell label="DAY GUARDS" value={client.dayGuardCapacity != null ? String(client.dayGuardCapacity) : "—"} />
                   <InfoCell label="NIGHT GUARDS" value={client.nightGuardCapacity != null ? String(client.nightGuardCapacity) : "—"} />
@@ -433,7 +455,7 @@ export default async function ClientDetailPage({
                   <InfoCell label="NIGHT SUPERVISORS" value={client.nightSupervisorCapacity != null ? String(client.nightSupervisorCapacity) : "—"} />
                   <InfoCell label="CPO CAPACITY" value={client.cpoCapacity != null ? String(client.cpoCapacity) : "—"} />
                 </div>
-              </CardBody>
+              </CardContent>
             </Card>
           ) : null}
 
@@ -453,15 +475,18 @@ export default async function ClientDetailPage({
             return (
               <Card>
                 <CardHeader>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">CONTRACT DETAILS</h3>
+                  <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Contract Details</CardTitle>
                 </CardHeader>
-                <CardBody>
+                <CardContent>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <InfoCell label="CONTRACT START" value={formatDate(client.contractStart)} />
                     <InfoCell label="CONTRACT END" value={formatDate(client.contractEnd)} />
                     <InfoCell label="RATE PERIOD START" value={formatDate(client.contractRateStart)} />
                     <InfoCell label="RATE PERIOD END" value={formatDate(client.contractRateEnd)} />
-                    <InfoCell label="CONTRACT PRICE" value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"} />
+                    <InfoCell
+                      label="CONTRACT PRICE"
+                      value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"}
+                    />
                     <InfoCell label="DAY GUARD DESIGNATION" value={c.contractDayGuardDesignation || client.contractGuardDesignation || "—"} />
                     <InfoCell label="DAY GUARD EX-SERVICE" value={c.contractDayGuardExService || client.contractGuardExService || "—"} />
                     <InfoCell label="ADDITIONAL DAY GUARDS" value={c.contractAdditionalDayGuards != null ? String(c.contractAdditionalDayGuards) : (client.contractAdditionalGuards != null ? String(client.contractAdditionalGuards) : "—")} />
@@ -469,7 +494,7 @@ export default async function ClientDetailPage({
                     <InfoCell label="NIGHT GUARD EX-SERVICE" value={c.contractNightGuardExService || "—"} />
                     <InfoCell label="ADDITIONAL NIGHT GUARDS" value={c.contractAdditionalNightGuards != null ? String(c.contractAdditionalNightGuards) : "—"} />
                   </div>
-                </CardBody>
+                </CardContent>
               </Card>
             )
           })()}
@@ -478,23 +503,23 @@ export default async function ClientDetailPage({
 
       {activeTab === "assigned-guards" ? (
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[var(--text)]">ASSIGNED GUARDS</h2>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">Full deployment history — current &amp; previous</p>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Assigned Guards</CardTitle>
+              <p className="text-xs text-muted-foreground">Full deployment history — current &amp; previous</p>
             </div>
-            <div className="flex gap-2 text-xs">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Active: {(client.deployments || []).filter(d => d.status === "ACTIVE").length}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                Previous: {(client.deployments || []).filter(d => d.status !== "ACTIVE").length}
-              </span>
+            <div className="flex flex-wrap gap-2">
+              <TabStatusBadge
+                label={`Active: ${(client.deployments || []).filter((d) => d.status === "ACTIVE").length}`}
+                variant="success"
+              />
+              <TabStatusBadge
+                label={`Previous: ${(client.deployments || []).filter((d) => d.status !== "ACTIVE").length}`}
+                variant="muted"
+              />
             </div>
           </CardHeader>
-          <CardBody className="space-y-4">
+          <CardContent className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="assigned-guards">
               <FilterField label="Status" name="guardStatus" as="select" defaultValue={guardStatus} options={["All", "Active", "Previous"]} />
               <FilterField label="Select Date" name="selectDate" type="date" defaultValue={selectDate} />
@@ -503,60 +528,53 @@ export default async function ClientDetailPage({
             </LegacyFilterForm>
 
             {deploymentHistory.length === 0 ? (
-              <EmptyTableMessage message="No guard deployment records found." />
+              <EmptyTableMessage message="No records found." />
             ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>PARWEST ID</Th>
-                    <Th>GUARD NAME</Th>
-                    <Th>BRANCH</Th>
-                    <Th>DESIGNATION</Th>
-                    <Th>SHIFT</Th>
-                    <Th>DEPLOYED ON</Th>
-                    <Th>END DATE</Th>
-                    <Th>TYPE</Th>
-                    <Th>STATUS</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deploymentHistory.map((d) => (
-                    <tr key={d.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{d.guard?.parwestId || "—"}</Td>
-                      <Td>{d.guard?.name || "—"}</Td>
-                      <Td>{d.branch?.name || "—"}</Td>
-                      <Td>{normalizeDesignation(d.designation)}</Td>
-                      <Td>{normalizeShift(d.shiftType)}</Td>
-                      <Td>{formatDate(d.deploymentDate)}</Td>
-                      <Td>{d.endDate ? formatDate(d.endDate) : "—"}</Td>
-                      <Td>{d.deploymentType || "REGULAR"}</Td>
-                      <Td>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          d.status === "ACTIVE"
-                            ? "bg-green-100 text-green-800"
-                            : d.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-gray-100 text-gray-600"
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${d.status === "ACTIVE" ? "bg-green-500" : d.status === "PENDING" ? "bg-yellow-500" : "bg-gray-400"}`} />
-                          {d.status}
-                        </span>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parwest ID</TableHead>
+                      <TableHead>Guard Name</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Designation</TableHead>
+                      <TableHead>Shift</TableHead>
+                      <TableHead>Deployed On</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deploymentHistory.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-mono tabular-nums">{d.guard?.parwestId || "—"}</TableCell>
+                        <TableCell className="font-medium">{d.guard?.name || "—"}</TableCell>
+                        <TableCell>{d.branch?.name || "—"}</TableCell>
+                        <TableCell>{normalizeDesignation(d.designation)}</TableCell>
+                        <TableCell>{normalizeShift(d.shiftType)}</TableCell>
+                        <TableCell className="tabular-nums">{formatDate(d.deploymentDate)}</TableCell>
+                        <TableCell className="tabular-nums">{d.endDate ? formatDate(d.endDate) : "—"}</TableCell>
+                        <TableCell>{d.deploymentType || "REGULAR"}</TableCell>
+                        <TableCell>
+                          <TabStatusBadge label={d.status} status={d.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {activeTab === "extra-guards" ? (
         <Card>
           <CardHeader>
-            <h2 className="text-base font-semibold text-[var(--text)]">EXTRA GUARDS</h2>
+            <CardTitle className="text-base">Extra Guards</CardTitle>
           </CardHeader>
-          <CardBody className="space-y-4">
+          <CardContent className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="extra-guards">
               <FilterField label="Branch*" name="branch" defaultValue={branch} />
               <FilterField label="Start Date" name="startDate" type="date" defaultValue={startDate} />
@@ -566,47 +584,51 @@ export default async function ClientDetailPage({
             </LegacyFilterForm>
 
             {filteredExtraRows.length === 0 ? (
-              <EmptyTableMessage message="No extra guard deployment records found." />
+              <EmptyTableMessage message="No records found." />
             ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>PARWEST ID</Th>
-                    <Th>GUARD NAME</Th>
-                    <Th>BRANCH</Th>
-                    <Th>SHIFT</Th>
-                    <Th>DEPLOYMENT DATE</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredExtraRows.map(({ deployment, branch }) => (
-                    <tr key={deployment.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{deployment.guard?.parwestId || "—"}</Td>
-                      <Td>{deployment.guard?.name || "—"}</Td>
-                      <Td>{branch.name}</Td>
-                      <Td>{normalizeShift(deployment.shiftType)}</Td>
-                      <Td>{formatDate(deployment.deploymentDate)}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parwest ID</TableHead>
+                      <TableHead>Guard Name</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Shift</TableHead>
+                      <TableHead>Deployment Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExtraRows.map(({ deployment, branch }) => (
+                      <TableRow key={deployment.id}>
+                        <TableCell className="font-mono tabular-nums">{deployment.guard?.parwestId || "—"}</TableCell>
+                        <TableCell className="font-medium">{deployment.guard?.name || "—"}</TableCell>
+                        <TableCell>{branch.name}</TableCell>
+                        <TableCell>{normalizeShift(deployment.shiftType)}</TableCell>
+                        <TableCell className="tabular-nums">{formatDate(deployment.deploymentDate)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {activeTab === "branches" ? (
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">BRANCHES</h2>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Branches</CardTitle>
             {canCreateClient ? (
-              <Link href={`/clients/${client.id}/branches/new`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Branch
-              </Link>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/clients/${client.id}/branches/new`}>
+                  <Plus className="h-4 w-4" />
+                  Add Branch
+                </Link>
+              </Button>
             ) : null}
           </CardHeader>
-          <CardBody className="space-y-4">
+          <CardContent className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="branches">
               <FilterField label="Show" name="show" as="select" defaultValue={show} options={["10", "25", "50", "100"]} />
               <FilterField label="Search:" name="search" defaultValue={listSearch} />
@@ -614,52 +636,56 @@ export default async function ClientDetailPage({
             </LegacyFilterForm>
 
             {filteredBranches.length === 0 ? (
-              <EmptyTableMessage message="No branches found for this client." />
+              <EmptyTableMessage message="No records found." />
             ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>NAME</Th>
-                    <Th>CITY</Th>
-                    <Th>ADDRESS</Th>
-                    <Th>CONTACT PERSON</Th>
-                    <Th>ACTIVE DEPLOYMENTS</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBranches.map((branch) => (
-                    <tr key={branch.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>
-                        <Link href={`/clients/branches/${branch.id}`} className="text-[var(--brand)] hover:underline">
-                          {branch.name}
-                        </Link>
-                      </Td>
-                      <Td>{branch.city || "—"}</Td>
-                      <Td>{branch.address || "—"}</Td>
-                      <Td>{branch.contactPerson || "—"}</Td>
-                      <Td>{(branch.deployments || []).filter((d) => d.status === "ACTIVE").length}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>City</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Contact Person</TableHead>
+                      <TableHead className="text-right">Active Deployments</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBranches.map((branch) => (
+                      <TableRow key={branch.id}>
+                        <TableCell className="font-medium">
+                          <Link href={`/clients/branches/${branch.id}`} className="text-primary hover:underline">
+                            {branch.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{branch.city || "—"}</TableCell>
+                        <TableCell>{branch.address || "—"}</TableCell>
+                        <TableCell>{branch.contactPerson || "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {(branch.deployments || []).filter((d) => d.status === "ACTIVE").length}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {activeTab === "pricing" ? (
         <Card>
           <CardHeader>
-            <h2 className="text-base font-semibold text-[var(--text)]">CONTRACTS &amp; PRICING RATES</h2>
+            <CardTitle className="text-base">Contracts &amp; Pricing Rates</CardTitle>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <PricingManager
               clientId={client.id}
               clientName={client.name}
               branches={client.branches.map((b) => ({ id: b.id, name: b.name }))}
               isBranchless={client.isBranchless}
             />
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
@@ -667,31 +693,39 @@ export default async function ClientDetailPage({
         <div className="space-y-4">
           {/* Summary strip */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-[var(--text)]">{totalDocs}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">Total Files</p>
-            </div>
-            <div className="rounded-[var(--radius-md)] border border-green-200 bg-green-50 px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-green-700">{uploadedDocs}</p>
-              <p className="text-xs text-green-600 mt-0.5">Uploaded</p>
-            </div>
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-[var(--text-muted)]">{client.isBranchless ? "Branchless" : `${client.branches.length} Branch${client.branches.length !== 1 ? "es" : ""}`}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">Client Type</p>
-            </div>
+            <Card>
+              <CardContent className="px-4 py-3 text-center">
+                <p className="text-2xl font-bold tabular-nums">{totalDocs}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Total Files</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900">
+              <CardContent className="px-4 py-3 text-center">
+                <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{uploadedDocs}</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">Uploaded</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-muted">
+              <CardContent className="px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-muted-foreground">
+                  {client.isBranchless ? "Branchless" : `${client.branches.length} Branch${client.branches.length !== 1 ? "es" : ""}`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Client Type</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Client-level attachments */}
           <Card>
-            <CardHeader className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-[var(--brand)]" />
-              <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wide">Client Attachments — {client.name}</h2>
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+              <FileText className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm uppercase tracking-wide">Client Attachments — {client.name}</CardTitle>
             </CardHeader>
-            <CardBody>
+            <CardContent>
               {totalClientDocs === 0 ? (
-                <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 rounded-md border border-dashed px-4 py-5 text-sm text-muted-foreground">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  No attachments uploaded for this client yet.
+                  No records found.
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -706,7 +740,7 @@ export default async function ClientDetailPage({
                   ))}
                 </div>
               )}
-            </CardBody>
+            </CardContent>
           </Card>
 
           {/* Branch-level attachments (branch clients only) */}
@@ -714,29 +748,29 @@ export default async function ClientDetailPage({
             <>
               {branchAttachments.length === 0 ? (
                 <Card>
-                  <CardBody>
-                    <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-4 py-5 text-sm text-[var(--text-muted)]">
+                  <CardContent>
+                    <div className="flex items-center gap-2 rounded-md border border-dashed px-4 py-5 text-sm text-muted-foreground">
                       <Building2 className="h-4 w-4 flex-shrink-0" />
-                      No branches found for this client.
+                      No records found.
                     </div>
-                  </CardBody>
+                  </CardContent>
                 </Card>
               ) : (
                 branchAttachments.map(({ branch: b, additional }) => {
                   const branchTotal = (b.contractUrl ? 1 : 0) + additional.length
                   return (
                     <Card key={b.id}>
-                      <CardHeader className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-[var(--text-muted)]" />
-                        <h2 className="text-sm font-semibold text-[var(--text)] uppercase tracking-wide flex-1">{b.name}</h2>
-                        {b.isHeadOffice && (
-                          <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wide">Head Office</span>
-                        )}
-                        <span className="text-xs text-[var(--text-muted)]">{branchTotal} file{branchTotal !== 1 ? "s" : ""}</span>
+                      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm uppercase tracking-wide flex-1">{b.name}</CardTitle>
+                        {b.isHeadOffice && <Badge>Head Office</Badge>}
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {branchTotal} file{branchTotal !== 1 ? "s" : ""}
+                        </span>
                       </CardHeader>
-                      <CardBody>
+                      <CardContent>
                         {branchTotal === 0 ? (
-                          <p className="text-sm text-[var(--text-muted)] italic">No attachments uploaded for this branch.</p>
+                          <p className="text-sm text-muted-foreground italic">No records found.</p>
                         ) : (
                           <div className="space-y-2">
                             {b.contractUrl && (
@@ -747,7 +781,7 @@ export default async function ClientDetailPage({
                             ))}
                           </div>
                         )}
-                      </CardBody>
+                      </CardContent>
                     </Card>
                   )
                 })
@@ -759,48 +793,52 @@ export default async function ClientDetailPage({
 
       {activeTab === "inventory" ? (
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">INVENTORY</h2>
-            <Link href={inventoryAssignmentHref} className="ui-btn ui-btn-secondary">Open Inventory Assignment</Link>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Inventory</CardTitle>
+            <Button asChild variant="outline" size="sm">
+              <Link href={inventoryAssignmentHref}>Open Inventory Assignment</Link>
+            </Button>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             {client.inventoryAssignments.length === 0 ? (
-              <EmptyTableMessage message="No inventory assigned to this client." />
+              <EmptyTableMessage message="No records found." />
             ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>ITEM</Th>
-                    <Th>CATEGORY</Th>
-                    <Th>UNIQUE NO.</Th>
-                    <Th>ASSIGNED AT</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {client.inventoryAssignments.map((assignment) => (
-                    <tr key={assignment.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{assignment.item?.serialNumber || assignment.item?.uniqueNumber || "—"}</Td>
-                      <Td>{assignment.item?.category?.name || "—"}</Td>
-                      <Td>{assignment.item?.uniqueNumber || "—"}</Td>
-                      <Td>{formatDate(assignment.assignedAt)}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Unique No.</TableHead>
+                      <TableHead>Assigned At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {client.inventoryAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell className="font-medium">{assignment.item?.serialNumber || assignment.item?.uniqueNumber || "—"}</TableCell>
+                        <TableCell>{assignment.item?.category?.name || "—"}</TableCell>
+                        <TableCell className="font-mono tabular-nums">{assignment.item?.uniqueNumber || "—"}</TableCell>
+                        <TableCell className="tabular-nums">{formatDate(assignment.assignedAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {activeTab === "client-invoicing" ? (
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--text)]">CLIENT INVOICING</h2>
-            <Link href="/clients/invoicing" className="ui-btn ui-btn-secondary">
-              Open Invoicing Module
-            </Link>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Client Invoicing</CardTitle>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/clients/invoicing">Open Invoicing Module</Link>
+            </Button>
           </CardHeader>
-          <CardBody className="space-y-4">
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <FieldDisplay label="Client Provinces" value={client.region?.name || "Punjab"} />
               <FieldDisplay label="Client Cities" value={client.city || "Lahore"} />
@@ -816,53 +854,58 @@ export default async function ClientDetailPage({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="ui-btn ui-btn-secondary">Reset</button>
-              <button type="button" className="ui-btn ui-btn-secondary">Submit</button>
-              <button type="button" className="ui-btn ui-btn-secondary">Export In Excel File</button>
-              <button type="button" className="ui-btn ui-btn-secondary">Dismiss</button>
-              <button type="button" className="ui-btn ui-btn-primary">Save</button>
-              <button type="button" className="ui-btn ui-btn-secondary">Close</button>
-              <button type="button" className="ui-btn ui-btn-primary">Generate Invoice</button>
+              <Button type="button" variant="outline" size="sm">Reset</Button>
+              <Button type="button" variant="outline" size="sm">Submit</Button>
+              <Button type="button" variant="outline" size="sm">Export In Excel File</Button>
+              <Button type="button" variant="outline" size="sm">Dismiss</Button>
+              <Button type="button" size="sm">Save</Button>
+              <Button type="button" variant="outline" size="sm">Close</Button>
+              <Button type="button" size="sm">Generate Invoice</Button>
             </div>
 
             {client.invoices.length === 0 ? (
-              <EmptyTableMessage message="No invoice rows available." />
+              <EmptyTableMessage message="No records found." />
             ) : (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>INVOICE #</Th>
-                    <Th>MONTH</Th>
-                    <Th>AMOUNT</Th>
-                    <Th>STATUS</Th>
-                    <Th>DUE DATE</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {client.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                      <Td>{invoice.invoiceNumber}</Td>
-                      <Td>{formatDate(invoice.month)}</Td>
-                      <Td>{invoice.amount.toLocaleString()}</Td>
-                      <Td>{invoice.status}</Td>
-                      <Td>{formatDate(invoice.dueDate)}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableWrapper>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Month</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Due Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {client.invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-mono tabular-nums">{invoice.invoiceNumber}</TableCell>
+                        <TableCell className="tabular-nums">{formatDate(invoice.month)}</TableCell>
+                        <TableCell className="text-right">
+                          <ParwestCurrency value={invoice.amount} />
+                        </TableCell>
+                        <TableCell>
+                          <TabStatusBadge label={invoice.status} status={invoice.status} />
+                        </TableCell>
+                        <TableCell className="tabular-nums">{formatDate(invoice.dueDate)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {activeTab === "contact-information" ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-base font-semibold text-[var(--text)]">CONTACT INFORMATION</h2>
-          </CardHeader>
-          <CardBody className="space-y-6">
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">CLIENT CONTACT</h3>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Client Contact</CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="NAME" value={client.name} />
                 <FieldDisplay label="EMAIL" value={client.email || "—"} />
@@ -873,65 +916,79 @@ export default async function ClientDetailPage({
                 <FieldDisplay label="POSTAL CODE" value={client.postalCode || "—"} />
                 <FieldDisplay label="REGION" value={client.region?.name || "—"} />
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {client.introducerName ? (
-              <div className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">INTRODUCER INFORMATION</h3>
+          {client.introducerName ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Introducer Information</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <FieldDisplay label="INTRODUCER NAME" value={client.introducerName || "—"} />
                   <FieldDisplay label="CONTACT NUMBER" value={client.introducerContactNumber || "—"} />
                   <FieldDisplay label="CNIC" value={client.introducerCnic || "—"} />
                   <FieldDisplay label="ADDRESS" value={client.introducerAddress || "—"} />
                 </div>
-              </div>
-            ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">BRANCH CONTACT INFORMATION</h3>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Branch Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent>
               {client.branches.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No branches found.</p>
+                <EmptyTableMessage message="No records found." />
               ) : (
-                <TableWrapper>
-                  <thead>
-                    <tr>
-                      <Th>BRANCH</Th>
-                      <Th>CITY</Th>
-                      <Th>CONTACT PERSON</Th>
-                      <Th>PHONE</Th>
-                      <Th>EMAIL</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {client.branches.map((b) => (
-                      <tr key={b.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-muted)]">
-                        <Td>{b.name}</Td>
-                        <Td>{b.city || "—"}</Td>
-                        <Td>{b.contactPerson || "—"}</Td>
-                        <Td>{b.contactPhone || "—"}</Td>
-                        <Td>{b.contactEmail || "—"}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </TableWrapper>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Branch</TableHead>
+                        <TableHead>City</TableHead>
+                        <TableHead>Contact Person</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Email</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {client.branches.map((b) => (
+                        <TableRow key={b.id}>
+                          <TableCell className="font-medium">{b.name}</TableCell>
+                          <TableCell>{b.city || "—"}</TableCell>
+                          <TableCell>{b.contactPerson || "—"}</TableCell>
+                          <TableCell className="tabular-nums">{b.contactPhone || "—"}</TableCell>
+                          <TableCell>{b.contactEmail || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">ASSIGNED SUPERVISOR</h3>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Assigned Supervisor</CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FieldDisplay label="SUPERVISOR NAME" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
                 <FieldDisplay label="SUPERVISOR EMAIL" value={client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
                 <FieldDisplay label="BRANCHLESS" value={client.isBranchless ? "Yes" : "No"} />
                 <FieldDisplay label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
               </div>
-            </div>
-          </CardBody>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       <div className="pt-2">
-        <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />
+        <TabStatusBadge label={client.status} status={client.status} />
       </div>
     </div>
   )
@@ -947,9 +1004,9 @@ function InfoCell({
   accent?: boolean
 }) {
   return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
-      <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
-      <p className={accent ? "mt-1 text-sm font-semibold text-emerald-700" : "mt-1 text-sm font-semibold text-[var(--text)]"}>{value}</p>
+    <div className="rounded-md border bg-muted p-3">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={accent ? "mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300" : "mt-1 text-sm font-semibold"}>{value}</p>
     </div>
   )
 }
@@ -957,8 +1014,8 @@ function InfoCell({
 function FieldDisplay({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
-      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)]">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="rounded-md border bg-card px-3 py-2 text-sm">
         {value}
       </div>
     </div>
@@ -967,26 +1024,12 @@ function FieldDisplay({ label, value }: { label: string; value: string }) {
 
 function EmptyTableMessage({ message }: { message: string }) {
   return (
-    <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">
-      {message}
-    </div>
+    <Card className="bg-muted">
+      <CardContent className="px-4 py-8 text-center text-sm text-muted-foreground">
+        {message}
+      </CardContent>
+    </Card>
   )
-}
-
-function TableWrapper({ children }: { children: ReactNode }) {
-  return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-      <table className="min-w-full border-collapse bg-white text-sm">{children}</table>
-    </div>
-  )
-}
-
-function Th({ children }: { children: ReactNode }) {
-  return <th className="bg-[var(--surface-muted)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{children}</th>
-}
-
-function Td({ children }: { children: ReactNode }) {
-  return <td className="px-4 py-3 text-sm text-[var(--text)]">{children}</td>
 }
 
 function LegacyFilterForm({
@@ -999,13 +1042,15 @@ function LegacyFilterForm({
   children: ReactNode
 }) {
   return (
-    <form className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+    <form className="rounded-md border bg-muted p-3">
       <input type="hidden" name="tab" value={tab} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">{children}</div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="submit" formAction={`/clients/${clientId}`} className="ui-btn ui-btn-primary">Search</button>
-        <Link href={`/clients/${clientId}?tab=${tab}`} className="ui-btn ui-btn-secondary">Reset</Link>
-        <button type="button" className="ui-btn ui-btn-secondary">Export In Excel File</button>
+        <Button type="submit" formAction={`/clients/${clientId}`} size="sm">Search</Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/clients/${clientId}?tab=${tab}`}>Reset</Link>
+        </Button>
+        <Button type="button" variant="outline" size="sm">Export In Excel File</Button>
       </div>
     </form>
   )
@@ -1024,25 +1069,23 @@ function AttachmentRow({
   uploadedAt: Date
   dataUrl: string
 }) {
-  const badgeColor =
-    type === "Contract" ? "bg-blue-100 text-blue-700" :
-    type === "Logo" ? "bg-purple-100 text-purple-700" :
-    "bg-gray-100 text-gray-600"
+  const badgeVariant: "default" | "secondary" | "outline" =
+    type === "Contract" ? "default" : type === "Logo" ? "secondary" : "outline"
 
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5">
-      <Paperclip className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]" />
-      <span className="flex-1 text-sm font-medium text-[var(--text)] truncate">{name}</span>
-      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 ${badgeColor}`}>{type}</span>
-      <span className="text-xs text-[var(--text-muted)] flex-shrink-0 hidden sm:block">{source}</span>
-      <span className="text-xs text-[var(--text-muted)] flex-shrink-0 hidden md:block">{formatDate(uploadedAt)}</span>
+    <div className="flex items-center gap-3 rounded-md border bg-card px-3 py-2.5">
+      <Paperclip className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+      <span className="flex-1 text-sm font-medium truncate">{name}</span>
+      <Badge variant={badgeVariant} className="flex-shrink-0">{type}</Badge>
+      <span className="text-xs text-muted-foreground flex-shrink-0 hidden sm:block">{source}</span>
+      <span className="text-xs text-muted-foreground flex-shrink-0 hidden md:block tabular-nums">{formatDate(uploadedAt)}</span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
         <a
           href={dataUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--brand)] hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           View <ExternalLink className="h-3 w-3" />
         </a>
@@ -1068,9 +1111,13 @@ function FilterField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       {as === "select" ? (
-        <select name={name} defaultValue={defaultValue || ""} className="ui-select">
+        <select
+          name={name}
+          defaultValue={defaultValue || ""}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
           {options.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -1078,7 +1125,12 @@ function FilterField({
           ))}
         </select>
       ) : (
-        <input name={name} type={type} defaultValue={defaultValue || ""} className="ui-input" />
+        <input
+          name={name}
+          type={type}
+          defaultValue={defaultValue || ""}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
       )}
     </label>
   )

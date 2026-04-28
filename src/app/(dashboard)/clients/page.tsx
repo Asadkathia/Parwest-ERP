@@ -5,66 +5,76 @@ import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
 import { Plus, Building2, Building, Users, Ban } from "lucide-react"
 import SectionTitle from "@/components/ui/section-title"
-import StatCard from "@/components/ui/stat-card"
-import FilterBar from "@/components/ui/filter-bar"
-import StatusChip from "@/components/ui/status-chip"
+import StatCard from "@/components/shadcn/parwest-stat-card"
 import InlineAlert from "@/components/ui/inline-alert"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
+import ClientsListClient, {
+  type ClientListRow,
+} from "@/components/clients/ClientsListClient"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
-import { Suspense } from "react"
 
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ regionId?: string }>
+  searchParams: Promise<{
+    regionId?: string
+    q?: string
+    status?: string
+    type?: string
+  }>
 }) {
   const session = await auth()
   if (!session) redirect("/login")
 
   const canCreateClient = hasAction(session, "CLIENTS", "CREATE")
   const isSuperAdminUser = isSuperAdmin(session)
-  const { regionId = "" } = await searchParams
+  const {
+    regionId = "",
+    q = "",
+    status: statusParam = "",
+    type: typeParam = "",
+  } = await searchParams
   const needsRegionGate = isSuperAdminUser && !regionId
 
-  const regions = await prisma.region
-    .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
-    .catch(() => [] as { id: string; name: string }[])
-
-  let clients: Array<{
-    id: string
-    name: string
-    type: string
-    city: string | null
-    status: string
-    regionId: string | null
-    regionName: string | null
-    branchCount: number
-    contractCount: number
-    currentRates: { guardType: string; rate: number }[]
-  }> = []
+  let clients: ClientListRow[] = []
+  let typeOptions: { value: string; label: string }[] = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
   const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
   if (!needsRegionGate) try {
-    // Resolve the active regionId filter: explicit URL param (SuperAdmin picker)
-    // or the user's scoped region (regional users). If a regional user tries
-    // to override their scope via the URL param, ignore the param and pin to
-    // their assigned region — keeps the UI usable while preventing leakage.
+    // Resolve the active regionId filter: explicit URL param (driven by the
+    // global topbar region picker) or the user's scoped region (regional
+    // users). If a regional user tries to override their scope via the URL
+    // param, ignore the param and pin to their assigned region — keeps the
+    // UI usable while preventing leakage.
     const requestedRegionId = regionId || undefined
     const paramDenied = managerScopeDenied(scope, { regionId: requestedRegionId })
     const activeRegionId = paramDenied
       ? scope?.regionId ?? undefined
       : requestedRegionId || scope?.regionId || undefined
-    const regionFilter = activeRegionId ? { regionId: activeRegionId } : {}
 
-    const [clientRows, total, active, inactive, totalBranches] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {}
+    if (activeRegionId) where.regionId = activeRegionId
+    if (statusParam) where.status = statusParam
+    if (typeParam) where.type = typeParam
+    if (q.trim()) {
+      where.OR = [
+        { name: { contains: q.trim(), mode: "insensitive" } },
+      ]
+    }
+
+    const countWhere = activeRegionId ? { regionId: activeRegionId } : {}
+
+    const [clientRows, total, active, inactive, totalBranches, clientTypes] = await Promise.all([
       prisma.client.findMany({
-        where: regionFilter,
-        take: 20,
+        where,
+        take: 200,
         orderBy: { createdAt: "desc" },
         include: {
           region: { select: { name: true } },
@@ -80,11 +90,16 @@ export default async function ClientsPage({
           },
         },
       }),
-      prisma.client.count({ where: regionFilter }),
-      prisma.client.count({ where: { status: "ACTIVE", ...regionFilter } }),
-      prisma.client.count({ where: { status: "INACTIVE", ...regionFilter } }),
+      prisma.client.count({ where: countWhere }),
+      prisma.client.count({ where: { status: "ACTIVE", ...countWhere } }),
+      prisma.client.count({ where: { status: "INACTIVE", ...countWhere } }),
       prisma.branch.count({ where: activeRegionId ? { client: { regionId: activeRegionId } } : {} }),
+      prisma.clientType.findMany({
+        orderBy: { label: "asc" },
+        select: { name: true, label: true },
+      }),
     ])
+    typeOptions = clientTypes.map((t) => ({ value: t.name, label: t.label }))
     clients = clientRows.map((c) => {
       const ratesByType = new Map<string, number>()
       for (const contract of c.contracts) {
@@ -140,140 +155,60 @@ export default async function ClientsPage({
       : "Scope: showing clients for your assigned region only."
   }
 
-  // Regional users see only their own region in the picker.
-  const pickerRegions = scope?.regionId
-    ? regions.filter((r) => r.id === scope.regionId)
-    : regions
-
   return (
     <div className="space-y-6">
+      {/* TODO(phase-5): replace SectionTitle with shadcn header primitive
+          when section-title is migrated module-wide. */}
       <SectionTitle
         title="Clients"
         subtitle="Manage clients and their branch locations"
         action={
           canCreateClient ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Branch Client
-              </Link>
-              <Link href="/clients/new?mode=branchless" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Branchless Client
-              </Link>
-            </div>
+            <PermissionGate module="CLIENTS" action="CREATE" mode="hide">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Branch Client
+                </Link>
+                <Link href="/clients/new?mode=branchless" className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Branchless Client
+                </Link>
+              </div>
+            </PermissionGate>
           ) : null
         }
       />
+      {/* TODO(phase-5): replace InlineAlert with shadcn `Alert` when this
+          legacy banner is migrated module-wide. */}
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       {needsRegionGate ? (
-        <div className="ui-card p-10 text-center">
-          <Users className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-          <p className="text-base font-medium text-[var(--text)]">Select a region to view clients.</p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Clients are region-scoped.</p>
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <Users className="h-8 w-8 text-muted-foreground" aria-hidden />
+            <p className="text-base font-medium">Select a region to view clients.</p>
+            <p className="text-sm text-muted-foreground">
+              Clients are region-scoped. Pick a region from the topbar above.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
-        <StatCard label="Active" value={stats.active} icon={<Building2 className="h-5 w-5" />} tone="success" />
-        <StatCard label="Inactive" value={stats.inactive} icon={<Ban className="h-5 w-5" />} tone="warning" />
-        <StatCard label="Total Branches" value={stats.totalBranches} icon={<Building className="h-5 w-5" />} tone="brand" />
-      </div>
+          {/* TODO(phase-5): swap StatCard for shadcn KPI card primitive
+              when StatCard is migrated module-wide. */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
+            <StatCard label="Active" value={stats.active} icon={<Building2 className="h-5 w-5" />} tone="success" />
+            <StatCard label="Inactive" value={stats.inactive} icon={<Ban className="h-5 w-5" />} tone="warning" />
+            <StatCard label="Total Branches" value={stats.totalBranches} icon={<Building className="h-5 w-5" />} tone="brand" />
+          </div>
 
-      <FilterBar>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Suspense>
-            <RegionUrlPicker
-              regions={pickerRegions}
-              locked={Boolean(scope?.regionId)}
-              includeGlobalOption={!scope?.regionId}
-            />
-          </Suspense>
-          <input type="text" placeholder="Search by client name or code..." className="ui-input" />
-          <select className="ui-select">
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-        </div>
-      </FilterBar>
-
-      <section className="ui-card overflow-x-auto">
-        <table className="w-full min-w-[1200px]">
-          <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">City</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Branches</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Region</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Contracts</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Current Rates</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {clients.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-[var(--text-muted)]">
-                  <p className="text-base font-medium text-[var(--text)]">No clients found.</p>
-                </td>
-              </tr>
-            ) : (
-              clients.map((client) => (
-                <tr key={client.id} className="hover:bg-[var(--surface-muted)]">
-                  <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{client.name}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.type}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.city || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.branchCount}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">{client.regionName || "—"}</td>
-                  <td className="px-6 py-4 text-sm text-[var(--text)]">
-                    {client.contractCount === 0 ? (
-                      <span className="text-[var(--text-muted)]">None</span>
-                    ) : (
-                      client.contractCount
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {client.currentRates.length === 0 ? (
-                      <span className="text-[var(--text-muted)]">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {client.currentRates.slice(0, 3).map((r, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 bg-[var(--surface-muted)] rounded px-2 py-0.5 text-xs"
-                          >
-                            <span className="font-medium">{r.guardType}</span>
-                            <span className="text-[var(--text-muted)]">·</span>
-                            <span>PKR {r.rate.toLocaleString()}</span>
-                          </span>
-                        ))}
-                        {client.currentRates.length > 3 && (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            +{client.currentRates.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <StatusChip label={client.status} variant={client.status === "ACTIVE" ? "success" : "warning"} />
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <Link href={`/clients/${client.id}`} className="text-[var(--brand)] hover:underline font-medium">
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+          <ClientsListClient
+            clients={clients}
+            canCreateClient={canCreateClient}
+            typeOptions={typeOptions}
+          />
         </>
       )}
     </div>
