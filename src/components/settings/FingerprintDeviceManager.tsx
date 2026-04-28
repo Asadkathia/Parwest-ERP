@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import InlineAlert from "@/components/ui/inline-alert"
 import SectionTitle from "@/components/ui/section-title"
 import StatusChip from "@/components/ui/status-chip"
@@ -243,12 +243,12 @@ export default function FingerprintDeviceManager() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={() => void bindDevice()} disabled={saving || !newDeviceOfficeId}>
+          <Button onClick={() => void bindDevice()} disabled={saving || !newDeviceOfficeId}>
             {saving ? "Binding..." : "Bind Device"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => void loadDevices()} disabled={isBusy}>
+          </Button>
+          <Button variant="secondary" onClick={() => void loadDevices()} disabled={isBusy}>
             Refresh
-          </ActionButton>
+          </Button>
         </div>
       </section>
 
@@ -307,30 +307,30 @@ export default function FingerprintDeviceManager() {
                 </td>
                 <td className="px-4 py-2 text-sm">
                   <div className="flex gap-2">
-                    <ActionButton
+                    <Button
                       className="px-2 py-1 text-xs"
                       variant="secondary"
                       onClick={() => void testDevice(device.id)}
                       disabled={workingId === device.id}
                     >
                       Test
-                    </ActionButton>
-                    <ActionButton
+                    </Button>
+                    <Button
                       className="px-2 py-1 text-xs"
                       variant="secondary"
                       onClick={() => void queueEnrollment(device.id)}
                       disabled={workingId === device.id}
                     >
                       Queue +1
-                    </ActionButton>
-                    <ActionButton
+                    </Button>
+                    <Button
                       className="px-2 py-1 text-xs"
                       variant="secondary"
                       onClick={() => void deleteDevice(device.id)}
                       disabled={workingId === device.id}
                     >
                       Delete
-                    </ActionButton>
+                    </Button>
                   </div>
                 </td>
               </tr>

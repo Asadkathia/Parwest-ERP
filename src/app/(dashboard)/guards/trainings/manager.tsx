@@ -2,8 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
@@ -233,12 +232,18 @@ export default function TrainingsManager({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-                <SectionTitle title="On Job Training" subtitle="Track OJT sessions and completion status by guard" />
-                <Link href="/guards/trainings/new" className="ui-btn ui-btn-primary">Add New Training</Link>
+            <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight">On Job Training</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Track OJT sessions and completion status by guard</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <Link href="/guards/trainings/new" className="ui-btn ui-btn-primary">Add New Training</Link>
+                </div>
             </div>
 
-            <FilterBar className="space-y-4">
+            <Card>
+                <CardContent className="space-y-4 p-5">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <RegionUrlPicker
                         regions={regions}
@@ -347,7 +352,8 @@ export default function TrainingsManager({
                         exportCsv(missing, "ojt-missing.csv")
                     }}>Missing Training Report</ActionButton>
                 </div>
-            </FilterBar>
+                </CardContent>
+            </Card>
 
             {error && <InlineAlert type="error" message={error} />}
 

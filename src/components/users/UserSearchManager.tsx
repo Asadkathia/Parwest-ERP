@@ -7,7 +7,8 @@ import FilterBar from "@/components/ui/filter-bar"
 import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { AlertCircle } from "lucide-react"
 
 type RoleOption = { id: string; name: string }
 type UserRow = {
@@ -101,7 +102,12 @@ export default function UserSearchManager() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Search Users" subtitle="Search and filter users from backend data." />
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {error ? (
+        <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

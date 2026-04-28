@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>پارویسٹ ERP — اردو</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+/* RTL base */
+html,body,#root{height:100%;margin:0;}
+body{
+  background:var(--bg-page);
+  color:var(--text-primary);
+  font-family:var(--font-urdu);
+  font-size:var(--text-urdu-body);
+  line-height:var(--leading-urdu);
+  -webkit-font-smoothing:antialiased;
+  direction:rtl;
+}
+/* Numbers, IDs, CNIC — always LTR + Plex Mono */
+.ltr,.mono,.tabnum,[data-ltr]{
+  direction:ltr;
+  unicode-bidi:embed;
+  font-family:var(--font-mono);
+  font-size:var(--text-13);
+  line-height:var(--leading-normal);
+  font-variant-numeric:tabular-nums;
+}
+.currency{direction:ltr;unicode-bidi:embed;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+
+/* Shell */
+.shell{display:flex;height:100vh;overflow:hidden;}
+/* Sidebar moves to RIGHT in RTL */
+.sidebar{
+  width:268px;min-width:268px;
+  background:var(--sidebar-bg);
+  border-left:1px solid var(--sidebar-border); /* logical: border-inline-start */
+  display:flex;flex-direction:column;
+  order:2; /* RTL: sidebar on the right */
+}
+.sidebar-logo{padding:20px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--sidebar-border);}
+.logo-mark{width:32px;height:32px;background:var(--brand-600);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;direction:ltr;flex-shrink:0;}
+.logo-text{color:var(--sidebar-text);font-weight:700;font-size:var(--text-urdu-sm);font-family:var(--font-urdu);}
+.logo-sub{color:var(--sidebar-text-muted);font-size:var(--text-11);font-weight:500;letter-spacing:0.3px;text-transform:none;white-space:nowrap;font-family:var(--font-ui);}
+.sidebar-nav{flex:1;overflow-y:auto;padding:12px 8px;scrollbar-width:none;}
+.sidebar-nav::-webkit-scrollbar{display:none;}
+.nav-section-label{padding:8px 12px 4px;font-size:var(--text-11);font-weight:600;color:var(--sidebar-text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-ui);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--sidebar-text-muted);font-size:var(--text-urdu-sm);font-weight:500;transition:all var(--duration-fast);margin-bottom:2px;}
+.nav-item:hover{background:var(--sidebar-hover-bg);color:var(--sidebar-text);}
+.nav-item.active{background:var(--sidebar-active-bg);color:var(--sidebar-active-text);}
+.nav-badge{margin-right:auto;background:var(--danger-600);color:#fff;border-radius:9999px;font-size:10px;font-weight:700;padding:1px 6px;direction:ltr;}
+
+/* Content area — goes to LEFT in RTL (order:1) */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;order:1;}
+
+/* Topbar */
+.topbar{height:56px;background:var(--bg-card);border-bottom:1px solid var(--border-default);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;}
+.topbar-title{font-size:var(--text-urdu-lg);font-weight:700;color:var(--text-primary);flex:1;}
+.tb-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-sm);font-size:var(--text-urdu-sm);font-weight:500;cursor:pointer;transition:all var(--duration-fast);border:1px solid transparent;font-family:var(--font-urdu);}
+.tb-primary{background:var(--brand-600);color:#fff;}
+.tb-ghost{background:transparent;color:var(--text-secondary);border-color:var(--border-default);}
+.tb-icon{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);background:transparent;border:none;}
+.tb-icon:hover{background:var(--bg-subtle);}
+
+/* Screen tabs */
+.screen-tabs{display:flex;gap:0;border-bottom:1px solid var(--border-default);background:var(--bg-card);padding:0 4px;}
+.screen-tab{padding:10px 14px;font-size:var(--text-urdu-sm);font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.screen-tab.active{color:var(--brand-600);border-bottom-color:var(--brand-600);}
+
+/* Scroll */
+.scroll{flex:1;overflow-y:auto;padding:24px;}
+
+/* Cards */
+.card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-xs);}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px;}
+.kpi-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px 18px;}
+.kpi-label{font-size:var(--text-urdu-sm);font-weight:600;color:var(--text-muted);margin-bottom:8px;}
+.kpi-value{font-size:var(--text-24);font-weight:700;color:var(--text-primary);line-height:1.2;direction:ltr;unicode-bidi:embed;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.kpi-trend{font-size:var(--text-12);margin-top:4px;direction:ltr;unicode-bidi:embed;font-family:var(--font-mono);}
+.kpi-trend.up{color:var(--success-600);}
+.kpi-trend.down{color:var(--danger-600);}
+
+/* Chips — stay LTR for short labels */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:9999px;font-size:var(--text-12);font-weight:600;direction:ltr;font-family:var(--font-ui);}
+.chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:var(--text-urdu-sm);}
+.data-table th{padding:9px 14px;text-align:right;font-size:var(--text-11);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-default);white-space:nowrap;font-family:var(--font-ui);}
+.data-table td{padding:0 14px;height:48px;border-bottom:1px solid var(--border-default);color:var(--text-primary);text-align:right;}
+.data-table td.ltr-cell{text-align:left;direction:ltr;unicode-bidi:embed;}
+.data-table tbody tr:hover{background:var(--bg-card-hover);}
+.data-table tbody tr:last-child td{border-bottom:none;}
+
+/* Search */
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-sm);padding:8px 12px;}
+.search-wrap input{border:none;outline:none;background:transparent;font-size:var(--text-urdu-sm);color:var(--text-primary);font-family:var(--font-urdu);flex:1;direction:rtl;}
+.search-wrap input::placeholder{color:var(--text-placeholder);}
+
+/* Filter pills */
+.fpill{display:inline-flex;align-items:center;padding:5px 12px;border-radius:var(--radius-sm);font-size:var(--text-12);font-weight:600;background:var(--bg-card);color:var(--text-muted);cursor:pointer;border:1px solid var(--border-default);font-family:var(--font-ui);direction:ltr;}
+.fpill.act{background:var(--brand-600);color:#fff;border-color:var(--brand-600);}
+
+/* Stat card */
+.stat-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.stat-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* Progress — fills from RIGHT in RTL */
+.prog-bar{height:6px;background:var(--bg-subtle);border-radius:9999px;overflow:hidden;direction:rtl;}
+.prog-fill{height:100%;border-radius:9999px;background:var(--brand-600);}
+
+/* KPI strip */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;background:var(--bg-card);margin-bottom:16px;}
+.kpi-tile{padding:14px 16px;border-left:1px solid var(--border-default);text-align:center;}
+.kpi-tile:last-child{border-left:none;}
+.kpi-tile .v{font-size:var(--text-20);font-weight:700;direction:ltr;unicode-bidi:embed;font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text-primary);}
+.kpi-tile .l{font-size:var(--text-urdu-sm);color:var(--text-muted);font-weight:500;margin-top:2px;}
+
+/* Tabs */
+.tabs-bar{display:flex;border-bottom:1px solid var(--border-default);overflow-x:auto;scrollbar-width:none;}
+.tabs-bar::-webkit-scrollbar{display:none;}
+.tab-it{padding:10px 14px;font-size:var(--text-urdu-sm);font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.tab-it.active{color:var(--brand-600);border-bottom-color:var(--brand-600);}
+
+/* Detail fields */
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.df .fl{font-size:var(--text-urdu-sm);font-weight:700;color:var(--text-muted);margin-bottom:3px;}
+.df .fv{font-size:var(--text-urdu-sm);color:var(--text-primary);font-weight:500;}
+.df .fv.mono-val{direction:ltr;unicode-bidi:embed;font-family:var(--font-mono);font-size:var(--text-13);}
+
+/* Workflow bar */
+.wf-bar{display:flex;border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;margin-bottom:20px;direction:ltr;}
+.wf-stage{flex:1;padding:14px 12px;text-align:center;border-right:1px solid var(--border-default);}
+.wf-stage:last-child{border-right:none;}
+.wf-stage.done{background:var(--brand-50);}
+.wf-stage.current{background:var(--brand-600);}
+.wf-label{font-size:var(--text-11);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-family:var(--font-ui);}
+.wf-stage.done .wf-label{color:var(--brand-700);}
+.wf-stage.current .wf-label{color:#fff;}
+.wf-sub{font-size:10px;color:var(--text-muted);margin-top:2px;font-family:var(--font-ui);}
+.wf-stage.current .wf-sub{color:rgba(255,255,255,0.6);}
+
+/* Attention items */
+.attention-item{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:10px 14px;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:8px;font-size:var(--text-urdu-sm);}
+.attention-item.high{border-right:3px solid var(--danger-600);} /* RTL: accent border on right */
+
+/* Mirroring note banner */
+.mirror-note{background:var(--brand-50);border:1px solid var(--brand-200);border-radius:var(--radius-sm);padding:10px 14px;font-size:var(--text-13);color:var(--brand-700);margin-bottom:16px;display:flex;gap:8px;align-items:flex-start;direction:ltr;font-family:var(--font-ui);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+// SVG icons — chevrons are flipped in RTL via CSS transform
+const Ico = ({n,s=18,c='currentColor',flip=false}) => {
+  const paths={
+    shield:<path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z"/>,
+    grid:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    users:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>,
+    dollar:<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>,
+    bell:<><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    plus:<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    check:<polyline points="20 6 9 17 4 12"/>,
+    alertTri:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    chevRight:<polyline points="9 18 15 12 9 6"/>,
+    menu:<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+    map:<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></>,
+    file:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
+    bar:<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    log:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M9 13h6M9 17h4"/></>,
+    ticket:<path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/>,
+    settings:<><circle cx="12" cy="12" r="3"/></>,
+  };
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{display:'block',flexShrink:0,transform:flip?'scaleX(-1)':undefined}}>
+      {paths[n]}
+    </svg>
+  );
+};
+
+function Chip({label,type='muted'}){
+  const styles={
+    active:{bg:'var(--success-50)',fg:'var(--success-700)',dot:'var(--success-600)'},
+    pending:{bg:'var(--warning-50)',fg:'var(--warning-700)',dot:'var(--warning-500)'},
+    inactive:{bg:'var(--slate-100)',fg:'var(--slate-600)',dot:'var(--slate-400)'},
+    muted:{bg:'var(--slate-100)',fg:'var(--slate-600)',dot:'var(--slate-400)'},
+    danger:{bg:'var(--danger-50)',fg:'var(--danger-700)',dot:'var(--danger-600)'},
+    day:{bg:'#eff6ff',fg:'#1d4ed8',dot:'#3b82f6'},
+    night:{bg:'#eef2ff',fg:'#4338ca',dot:'#818cf8'},
+  };
+  const s=styles[type]||styles.muted;
+  return <span className="chip" style={{background:s.bg,color:s.fg}}><span className="chip-dot" style={{background:s.dot}}/>{label}</span>;
+}
+
+const navItems=[
+  {icon:'grid',    label:'ڈیش بورڈ',    id:'dashboard'},
+  {icon:'users',   label:'گارڈز',       id:'guards'},
+  {icon:'map',     label:'تعیناتیاں',   id:'deployments'},
+  {icon:'shield',  label:'کلائنٹس',     id:'clients'},
+  {icon:'dollar',  label:'تنخواہ',      id:'payroll'},
+  {icon:'file',    label:'انوائسز',     id:'invoicing'},
+  {icon:'ticket',  label:'ٹکٹس',        id:'tickets',badge:12},
+  {icon:'bar',     label:'رپورٹیں',     id:'reports'},
+  {icon:'log',     label:'آڈٹ لاگ',    id:'audit'},
+  {icon:'lock',    label:'RBAC',         id:'rbac'},
+  {icon:'settings',label:'ترتیبات',     id:'settings'},
+];
+
+const GUARDS=[
+  {id:'LHR-00247',name:'محمد عثمان خان',cnic:'42201-1234567-9',desig:'سیکیورٹی گارڈ',shift:'DAY',region:'لاہور',status:'active',statusLabel:'فعال'},
+  {id:'KHI-00892',name:'فاطمہ ظفر',cnic:'42101-9876543-2',desig:'سپروائزر',shift:'NIGHT',region:'کراچی',status:'active',statusLabel:'فعال'},
+  {id:'ISB-00134',name:'عبدالرحمٰن ملک',cnic:'61101-5432109-8',desig:'CPO',shift:'DAY',region:'اسلام آباد',status:'pending',statusLabel:'زیرِ التواء'},
+  {id:'LHR-00318',name:'صادیہ پروین',cnic:'42301-2345678-4',desig:'سیکیورٹی گارڈ',shift:'NIGHT',region:'لاہور',status:'active',statusLabel:'فعال'},
+  {id:'RWP-00056',name:'طارق محمود',cnic:'37401-6789012-7',desig:'ASO',shift:'DAY',region:'راولپنڈی',status:'inactive',statusLabel:'غیر فعال'},
+];
+
+function App(){
+  const [screen,setScreen]=useState('dashboard');
+  const screens={
+    dashboard:<DashboardUR/>,
+    guards:<GuardsUR/>,
+    profile:<ProfileUR/>,
+    payroll:<PayrollUR/>,
+  };
+  return (
+    <div className="shell">
+      {/* Content — left side in RTL (order:1) */}
+      <div className="content">
+        <div className="topbar">
+          <button className="tb-icon"><Ico n="menu" s={17}/></button>
+          <div className="topbar-title">
+            {screen==='dashboard'?'ڈیش بورڈ':screen==='guards'?'گارڈز':screen==='profile'?'گارڈ پروفائل':'تنخواہ — اپریل ۲۰۲۶'}
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <div className="search-wrap" style={{maxWidth:200,padding:'6px 12px'}}>
+              <Ico n="search" s={14} c="var(--text-placeholder)"/>
+              <input placeholder="تلاش کریں…"/>
+            </div>
+            <button className="tb-icon"><Ico n="bell" s={17}/></button>
+            <div style={{width:30,height:30,borderRadius:'50%',background:'var(--brand-700)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,cursor:'pointer',direction:'ltr'}}>AK</div>
+          </div>
+        </div>
+        {/* Screen picker */}
+        <div className="screen-tabs">
+          {[['dashboard','ڈیش بورڈ'],['guards','گارڈز'],['profile','گارڈ پروفائل'],['payroll','تنخواہ']].map(([id,label])=>(
+            <div key={id} className={`screen-tab${screen===id?' active':''}`} onClick={()=>setScreen(id)}>{label}</div>
+          ))}
+        </div>
+        <div className="scroll">
+          <div className="mirror-note">
+            <Ico n="alertTri" s={16} c="var(--brand-600)"/>
+            <div><strong>RTL mirroring rules:</strong> Sidebar → right. Chevrons, arrows, progress bars flip. Status chips, numbers, currency, and IDs stay LTR. Noto Nastaliq Urdu for all body copy; IBM Plex Mono unchanged for numeric data.</div>
+          </div>
+          {screens[screen]}
+        </div>
+      </div>
+      {/* Sidebar — right side in RTL (order:2) */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-mark">P</div>
+          <div><div className="logo-text">پارویسٹ</div><div className="logo-sub">ERP Platform</div></div>
+        </div>
+        <nav className="sidebar-nav">
+          <div className="nav-section-label">مین مینو</div>
+          {navItems.slice(0,5).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id?' active':''}`} onClick={()=>setScreen(it.id)}>
+              <Ico n={it.icon} s={17} c="currentColor"/>
+              <span style={{flex:1}}>{it.label}</span>
+              {it.badge&&<span className="nav-badge">{it.badge}</span>}
+            </div>
+          ))}
+          <div className="nav-section-label" style={{marginTop:8}}>فنانس</div>
+          {navItems.slice(5,8).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id?' active':''}`} onClick={()=>setScreen(it.id)}>
+              <Ico n={it.icon} s={17}/><span>{it.label}</span>
+            </div>
+          ))}
+          <div className="nav-section-label" style={{marginTop:8}}>ایڈمن</div>
+          {navItems.slice(8).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id?' active':''}`} onClick={()=>setScreen(it.id)}>
+              <Ico n={it.icon} s={17}/><span style={{flex:1}}>{it.label}</span>
+            </div>
+          ))}
+        </nav>
+        <div style={{padding:'12px 8px',borderTop:'1px solid var(--sidebar-border)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,cursor:'pointer'}}>
+            <div style={{width:30,height:30,borderRadius:'50%',background:'var(--brand-700)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,direction:'ltr'}}>AK</div>
+            <div><div style={{color:'var(--sidebar-text)',fontSize:'var(--text-urdu-sm)',fontWeight:600}}>اسد خان</div><div style={{fontSize:10,color:'var(--sidebar-text-muted)'}}>سپر ایڈمن</div></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DashboardUR(){
+  const kpis=[
+    {l:'فعال گارڈز',v:'۱,۲۴۷',en:'1,247',trend:'+14',up:true},
+    {l:'تعینات',v:'۱,۱۰۸',en:'1,108',trend:'+8',up:true},
+    {l:'خالی گارڈز',v:'۱۳۹',en:'139',trend:'+6',up:false},
+    {l:'زیرِ التواء منظوری',v:'۲۳',en:'23',trend:'-5',up:true},
+    {l:'کھلے ٹکٹس',v:'۴۱',en:'41',trend:'+12',up:false},
+    {l:'تنخواہ سائیکل',v:<Chip label="مکمل" type="active"/>},
+  ];
+  const attn=[
+    'بارہ گارڈز کے شناختی کارڈ کی میعاد ختم ہو رہی ہے',
+    'MCB بینک — تین شاخوں میں گارڈز کی کمی',
+    '₨ ۸.۴ لاکھ واجب الادا انوائسز (۳۰+ دن)',
+    'طارق محمود — ۴ غیر مجاز غیر حاضریاں',
+  ];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div>
+          <div style={{fontSize:'var(--text-urdu-heading)',fontWeight:700,color:'var(--text-primary)'}}>صبح بخیر، اسد! 👋</div>
+          <div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)',marginTop:4}}>جمعرات، ۲۷ اپریل ۲۰۲۶ — تمام علاقے</div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="tb-btn tb-ghost">فوری اقدامات</button>
+          <button className="tb-btn tb-primary">AI رپورٹ</button>
+        </div>
+      </div>
+
+      {/* KPI grid */}
+      <div className="kpi-grid">
+        {kpis.map((k,i)=>(
+          <div key={i} className="kpi-card">
+            <div className="kpi-label">{k.l}</div>
+            <div className="kpi-value">{k.en||k.v}</div>
+            {k.trend&&<div className={`kpi-trend ${k.up?'up':'down'}`}>{k.up?'▲':'▼'} {k.trend}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Attention strip */}
+      <div style={{display:'flex',gap:10,overflowX:'auto',marginBottom:20,scrollbarWidth:'none'}}>
+        {attn.map((a,i)=>(
+          <div key={i} className="attention-item" style={{borderRightWidth:3,borderRightStyle:'solid',borderRightColor:i<2?'var(--danger-600)':'var(--warning-600)'}}>
+            <Ico n="alertTri" s={14} c={i<2?'var(--danger-600)':'var(--warning-600)'}/>
+            <span>{a}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main grid */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:20}}>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div className="card">
+            <div className="card-header"><span style={{fontWeight:700,fontSize:'var(--text-urdu-sm)',color:'var(--text-primary)'}}>آپریشنل بصیرت</span></div>
+            {[
+              {txt:'۱۳۹ خالی گارڈز — کوئی تعیناتی نہیں',cnt:'139',sev:'high'},
+              {txt:'سه روز سے غیرحاضر گارڈز',cnt:'18',sev:'medium'},
+              {txt:'۳۰+ دن سے زائد المدت انوائسز',cnt:'3',sev:'medium'},
+            ].map((ins,i)=>(
+              <div key={i} style={{padding:'12px 18px',borderBottom:i<2?'1px solid var(--border-default)':'none',display:'flex',alignItems:'center',gap:12,borderRight:`3px solid ${ins.sev==='high'?'var(--danger-600)':'var(--warning-600)'}`,cursor:'pointer'}}>
+                <span style={{minWidth:28,height:20,background:'var(--bg-subtle)',borderRadius:9999,fontSize:10,fontWeight:700,color:'var(--text-muted)',display:'flex',alignItems:'center',justifyContent:'center',direction:'ltr',fontFamily:'var(--font-mono)'}}>{ins.cnt}</span>
+                <span style={{flex:1,fontSize:'var(--text-urdu-sm)',color:'var(--text-primary)'}}>{ins.txt}</span>
+                {/* Chevron flips in RTL */}
+                <Ico n="chevRight" s={14} c="var(--brand-600)" flip={true}/>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <div className="card-header"><span style={{fontWeight:700,fontSize:'var(--text-urdu-sm)'}}>آپریشنز فیڈ</span></div>
+            <div style={{padding:'8px 18px'}}>
+              {[
+                {t:'محمد عثمان خان کو MCB بینک گلبرگ میں تعینات کیا گیا',d:'۲ منٹ قبل'},
+                {t:'اپریل ۲۰۲۶ کی تنخواہ حتمی شکل دی گئی',d:'۱۴ منٹ قبل'},
+                {t:'انگرو کیمیکلز کے لیے انوائس تیار کی گئی',d:'۱ گھنٹہ قبل'},
+              ].map((o,i)=>(
+                <div key={i} style={{display:'flex',gap:10,padding:'10px 0',borderBottom:i<2?'1px solid var(--border-default)':'none'}}>
+                  <div style={{width:6,height:6,borderRadius:'50%',background:'var(--brand-400)',flexShrink:0,marginTop:9}}/>
+                  <div>
+                    <div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-primary)',lineHeight:'var(--leading-urdu)'}}>{o.t}</div>
+                    <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',marginTop:2}}>{o.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Right col */}
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div className="card">
+            <div className="card-header"><span style={{fontWeight:700,fontSize:'var(--text-urdu-sm)'}}>مالی خلاصہ</span></div>
+            <div style={{padding:'4px 0'}}>
+              {[['اپریل ۲۰۲۶ تنخواہ','₨ 4.24Cr'],['ریزرو بیلنس','₨ 1.27Cr'],['واجب الادا انوائسز','₨ 8.4L']].map(([l,v],i)=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px',borderBottom:i<2?'1px solid var(--border-default)':'none'}}>
+                  <span style={{fontSize:'var(--text-urdu-sm)'}}>{l}</span>
+                  <span className="currency" style={{fontWeight:700,fontSize:'var(--text-13)'}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><span style={{fontWeight:700,fontSize:'var(--text-urdu-sm)'}}>میعاد ختم ہونے والے دستاویزات</span></div>
+            <div style={{padding:'4px 0'}}>
+              {[{n:'عبدالرحمٰن ملک',d:'شناختی کارڈ',days:'4d'},{n:'صادیہ پروین',d:'پولیس سرٹیفکیٹ',days:'11d'},{n:'MCB گلبرگ',d:'معاہدہ',days:'22d'}].map((e,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 20px',borderBottom:i<2?'1px solid var(--border-default)':'none'}}>
+                  <div><div style={{fontSize:'var(--text-urdu-sm)',fontWeight:500}}>{e.n}</div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>{e.d}</div></div>
+                  <span className="ltr" style={{fontWeight:700,color:e.days[0]<='9'&&+e.days<=7?'var(--danger-600)':+e.days<=14?'var(--warning-600)':'var(--text-muted)'}}>{e.days}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GuardsUR(){
+  const [status,setStatus]=useState('All');
+  const filtered=status==='All'?GUARDS:GUARDS.filter(g=>g.status===status);
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div><div style={{fontSize:'var(--text-urdu-xl)',fontWeight:700}}>گارڈز</div><div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)'}}>گارڈ پروفائلز اور تعیناتیاں مینیج کریں</div></div>
+        <button className="tb-btn tb-primary"><Ico n="plus" s={14}/>گارڈ شامل کریں</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20}}>
+        {[{l:'کل گارڈز',v:'1,247',c:'var(--brand-600)'},{l:'فعال',v:'1,108',c:'var(--success-600)'},{l:'غیر فعال',v:'89',c:'var(--warning-600)'},{l:'زیرِ التواء',v:'50',c:'var(--text-muted)'}].map(s=>(
+          <div key={s.l} className="stat-card"><div style={{width:36,height:36,borderRadius:10,background:'var(--bg-subtle)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ico n="users" s={18} c={s.c}/></div><div><div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)'}}>{s.l}</div><div className="ltr" style={{fontSize:'var(--text-20)',fontWeight:700,color:s.c}}>{s.v}</div></div></div>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+        <div className="search-wrap" style={{flex:1,maxWidth:280}}>
+          <Ico n="search" s={14} c="var(--text-placeholder)"/>
+          <input placeholder="نام، ID یا شناختی کارڈ سے تلاش کریں…"/>
+        </div>
+        {['All','active','inactive','pending'].map(s=>(
+          <button key={s} className={`fpill${status===s?' act':''}`} onClick={()=>setStatus(s)}>
+            {s==='All'?'تمام':s==='active'?'فعال':s==='inactive'?'غیر فعال':'زیرِ التواء'}
+          </button>
+        ))}
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>پارویسٹ ID</th>
+              <th>نام</th>
+              <th>شناختی کارڈ</th>
+              <th>عہدہ</th>
+              <th>شفٹ</th>
+              <th>علاقہ</th>
+              <th>حیثیت</th>
+              <th>اقدامات</th>
+            </tr>
+          </thead>
+          <tbody>{filtered.map(g=>(
+            <tr key={g.id}>
+              <td><span className="ltr">{g.id}</span></td>
+              <td style={{direction:'rtl'}}>{g.name}</td>
+              <td><span className="ltr">{g.cnic}</span></td>
+              <td style={{direction:'rtl'}}>{g.desig}</td>
+              <td><Chip label={g.shift} type={g.shift==='DAY'?'day':'night'}/></td>
+              <td style={{direction:'rtl'}}>{g.region}</td>
+              <td><Chip label={g.statusLabel} type={g.status}/></td>
+              <td><button className="tb-btn tb-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)',direction:'ltr',fontFamily:'var(--font-ui)'}}>دیکھیں</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProfileUR(){
+  const [tab,setTab]=useState(0);
+  const tabs=['عمومی معلومات','پروفائل','منسلکات','حاضری','ادا شدہ تنخواہ','تعیناتی تاریخ','کورسز','تصدیق','عہد نامے','بینک تفصیلات','رہائش کی تاریخ','ملازمت تربیت','اسٹور','ملازمت کی تاریخ','انشورنس','حیثیت کی تاریخ','PBA دستاویزات','قریبی رشتہ دار'];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <button className="tb-btn tb-ghost" style={{padding:'6px 12px',fontSize:'var(--text-urdu-sm)',display:'flex',alignItems:'center',gap:6}}>
+          {/* Arrow flips in RTL */}
+          <Ico n="chevRight" s={14} flip={true}/>گارڈز
+        </button>
+        <span style={{color:'var(--text-muted)',fontSize:'var(--text-urdu-sm)'}}>/ محمد عثمان خان</span>
+        <div style={{marginRight:'auto',display:'flex',gap:8}}>
+          <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-urdu-sm)'}}>تعیناتی ختم کریں</button>
+          <button className="tb-btn tb-primary" style={{fontSize:'var(--text-urdu-sm)'}}>ترمیم کریں</button>
+        </div>
+      </div>
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{padding:'20px 24px',display:'grid',gridTemplateColumns:'1fr 180px',gap:20}}>
+          <div>
+            <div style={{fontSize:'var(--text-urdu-heading)',fontWeight:800,color:'var(--text-primary)',marginBottom:4}}>محمد عثمان خان</div>
+            <div className="ltr" style={{color:'var(--text-muted)',marginBottom:10}}>LHR-00247</div>
+            <div style={{marginBottom:12}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)',marginBottom:4}}>
+                <span>پروفائل مکمل</span><span className="ltr" style={{fontWeight:600,color:'var(--brand-600)'}}>74%</span>
+              </div>
+              {/* Progress fills RTL */}
+              <div className="prog-bar"><div className="prog-fill" style={{width:'74%'}}/></div>
+            </div>
+            <div style={{display:'flex',gap:8}}><Chip label="فعال" type="active"/><Chip label="سابق فوجی: آرمی" type="active"/></div>
+          </div>
+          <div style={{background:'var(--bg-subtle)',borderRadius:'var(--radius-md)',height:150,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:6}}>
+            <div style={{width:56,height:56,borderRadius:'50%',background:'#1e3aa8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,fontWeight:700,color:'#fff',direction:'ltr'}}>MU</div>
+            <div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)'}}>پروفائل فوٹو</div>
+          </div>
+        </div>
+      </div>
+      <div className="kpi-strip">
+        {[['23','حاضری'],['4','غیر حاضری'],['12','اضافی وقت'],['74%','تصدیق'],['1','تعیناتیاں']].map(([v,l])=>(
+          <div key={l} className="kpi-tile"><div className="v">{v}</div><div className="l">{l}</div></div>
+        ))}
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <div className="tabs-bar" style={{padding:'0 4px'}}>
+          {tabs.map((t,i)=><div key={i} className={`tab-it${tab===i?' active':''}`} onClick={()=>setTab(i)}>{t}</div>)}
+        </div>
+        <div style={{padding:'20px 24px'}}>
+          {tab===0?(
+            <div className="detail-grid">
+              {[['مکمل نام','محمد عثمان خان'],['پارویسٹ ID','LHR-00247'],['شناختی کارڈ','42201-1234567-9'],['تاریخ پیدائش','12/03/1990'],['عمر','36 سال'],['والد کا نام','خالد محمود خان'],['مذہب','اسلام'],['ازدواجی حیثیت','شادی شدہ'],['تعلیم','انٹرمیڈیٹ (۲۰۰۸)'],['بلڈ گروپ','B+'],['قد',"5'9\""],['وزن','74 کلو']].map(([l,v])=>(
+                <div key={l} className="df"><div className="fl">{l}</div><div className={`fv${['شناختی کارڈ','پارویسٹ ID'].includes(l)?' mono-val':''}`}>{v}</div></div>
+              ))}
+            </div>
+          ):(
+            <div style={{padding:'48px',textAlign:'center',color:'var(--text-muted)'}}><div style={{fontSize:'var(--text-urdu-sm)',fontWeight:600,marginBottom:6,color:'var(--text-primary)'}}>{tabs[tab]}</div>کوئی ریکارڈ نہیں۔</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PayrollUR(){
+  const stages=['ڈرافٹ','حساب شدہ','علاقائی لاک','عالمی حتمی','ادا شدہ'];
+  const current=3;
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div style={{fontSize:'var(--text-urdu-xl)',fontWeight:700}}>تنخواہ حیثیت — اپریل ۲۰۲۶</div><div style={{fontSize:'var(--text-urdu-sm)',color:'var(--text-muted)'}}>ماہانہ تنخواہ حتمی کاری ورک فلو</div></div>
+      </div>
+      {/* Workflow bar — stays LTR (direction is inherent to the progress concept) */}
+      <div className="wf-bar">
+        {stages.map((s,i)=>(
+          <div key={i} className={`wf-stage${i<current?' done':i===current?' current':''}`}>
+            <div className={`wf-label${i<current?' done':i===current?' current':''}`}>{i+1}. {s}</div>
+            <div className="wf-sub">{i<current?'مکمل':i===current?'جاری':'زیرِ التواء'}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20}}>
+        {[{l:'کل تنخواہیں',v:'1,108',c:'var(--brand-600)'},{l:'خالص ادائیگی',v:'₨ 4.24Cr',c:'var(--success-600)'},{l:'کل ریزرو',v:'₨ 1.27Cr',c:'var(--warning-600)'},{l:'روکے گئے',v:'4',c:'var(--danger-600)'}].map(s=>(
+          <div key={s.l} className="kpi-card"><div className="kpi-label">{s.l}</div><div className="kpi-value" style={{color:s.c}}>{s.v}</div></div>
+        ))}
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <div className="card-header"><span style={{fontWeight:700,fontSize:'var(--text-urdu-sm)'}}>علاقائی لاک حیثیت</span></div>
+        <table className="data-table">
+          <thead><tr><th>علاقائی دفتر</th><th>حیثیت</th><th>اقدامات</th></tr></thead>
+          <tbody>
+            {[{n:'لاہور – گلبرگ',locked:true},{n:'لاہور – ڈیفینس',locked:true},{n:'کراچی – سائٹ اے',locked:true},{n:'اسلام آباد – ایف-۷',locked:true},{n:'راولپنڈی – صدر',locked:false}].map((r,i)=>(
+              <tr key={i}>
+                <td>{r.n}</td>
+                <td><Chip label={r.locked?'لاک':'زیرِ التواء'} type={r.locked?'pending':'inactive'}/></td>
+                <td><button className="tb-btn tb-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)',direction:'ltr',fontFamily:'var(--font-ui)'}}>{r.locked?'Unlock':'Lock'}</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

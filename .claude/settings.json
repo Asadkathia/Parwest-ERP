@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /Users/asad/Projects/Parwest-ERP/src/app -name \"page.tsx\" -exec grep -l \"use client\" {})"
+      "Bash(find /Users/asad/Projects/Parwest-ERP/src/app -name \"page.tsx\" -exec grep -l \"use client\" {})",
+      "Edit(src/**)",
+      "Write(src/**)",
+      "Edit(prisma/**)",
+      "Edit(scripts/**)",
+      "Edit(e2e/**)",
+      "Edit(docs/**)",
+      "Edit(.claude/**)",
+      "Edit(./*)",
+      "Write(./*)"
     ]
   }
 }

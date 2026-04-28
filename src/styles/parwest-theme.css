@@ -1,0 +1,213 @@
+/* Parwest ERP — Tailwind v4 @theme bridge
+   Maps Parwest v1.0/v1.1 design tokens to Tailwind v4's expected
+   --color-*, --font-*, --radius-*, --shadow-*, --spacing-*, --duration-*,
+   --text-*, --leading-*, --font-weight-* keys.
+
+   References v1.0 token names by var() — no hex values are duplicated.
+   Loaded after tokens.css and tokens-v1.1.css.
+*/
+
+@theme {
+  /* ─── Fonts ──────────────────────────────────────────── */
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+  --font-urdu: var(--font-urdu);
+
+  /* ─── Color: Brand ramp ─────────────────────────────── */
+  --color-brand-50:  var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  /* ─── Color: Slate ramp ─────────────────────────────── */
+  --color-slate-0:   var(--slate-0);
+  --color-slate-50:  var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+  --color-slate-950: var(--slate-950);
+
+  /* ─── Color: Semantic ramps ─────────────────────────── */
+  --color-success-50:  var(--success-50);
+  --color-success-100: var(--success-100);
+  --color-success-500: var(--success-500);
+  --color-success-600: var(--success-600);
+  --color-success-700: var(--success-700);
+
+  --color-warning-50:  var(--warning-50);
+  --color-warning-100: var(--warning-100);
+  --color-warning-500: var(--warning-500);
+  --color-warning-600: var(--warning-600);
+  --color-warning-700: var(--warning-700);
+
+  --color-danger-50:  var(--danger-50);
+  --color-danger-100: var(--danger-100);
+  --color-danger-500: var(--danger-500);
+  --color-danger-600: var(--danger-600);
+  --color-danger-700: var(--danger-700);
+
+  --color-info-50:  var(--info-50);
+  --color-info-100: var(--info-100);
+  --color-info-500: var(--info-500);
+  --color-info-600: var(--info-600);
+
+  --color-emerald-50:  var(--emerald-50);
+  --color-emerald-500: var(--emerald-500);
+  --color-emerald-600: var(--emerald-600);
+
+  --color-amber-50:  var(--amber-50);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+
+  --color-indigo-500: var(--indigo-500);
+  --color-indigo-600: var(--indigo-600);
+  --color-purple-500: var(--purple-500);
+
+  /* ─── Color: shadcn semantic aliases ─────────────────── */
+  --color-primary:               var(--brand-600);
+  --color-primary-foreground:    #ffffff;
+  --color-secondary:             var(--bg-subtle);
+  --color-secondary-foreground:  var(--text-secondary);
+  --color-destructive:           var(--danger-600);
+  --color-destructive-foreground: #ffffff;
+  --color-muted:                 var(--bg-subtle);
+  --color-muted-foreground:      var(--text-muted);
+  --color-accent:                var(--brand-50);
+  --color-accent-foreground:     var(--brand-700);
+  --color-popover:               var(--bg-card);
+  --color-popover-foreground:    var(--text-primary);
+  --color-card:                  var(--bg-card);
+  --color-card-foreground:       var(--text-primary);
+
+  /* ─── Color: Surfaces / text / borders ──────────────── */
+  --color-background:        var(--bg-page);
+  --color-foreground:        var(--text-primary);
+  --color-bg-page:           var(--bg-page);
+  --color-bg-card:           var(--bg-card);
+  --color-bg-card-hover:     var(--bg-card-hover);
+  --color-bg-input:          var(--bg-input);
+  --color-bg-input-focus:    var(--bg-input-focus);
+  --color-bg-subtle:         var(--bg-subtle);
+
+  --color-text-primary:      var(--text-primary);
+  --color-text-secondary:    var(--text-secondary);
+  --color-text-muted:        var(--text-muted);
+  --color-text-placeholder:  var(--text-placeholder);
+  --color-text-inverse:      var(--text-inverse);
+  --color-text-brand:        var(--text-brand);
+  --color-text-danger:       var(--text-danger);
+  --color-text-success:      var(--text-success);
+  --color-text-warning:      var(--text-warning);
+
+  --color-border:         var(--border-default);
+  --color-border-strong:  var(--border-strong);
+  --color-border-focus:   var(--border-focus);
+  --color-border-danger:  var(--border-danger);
+  --color-border-success: var(--border-success);
+  --color-input:          var(--border-default);
+  --color-ring:           var(--brand-600);
+
+  /* ─── Color: Sidebar ─────────────────────────────────── */
+  --color-sidebar-bg:           var(--sidebar-bg);
+  --color-sidebar-surface:      var(--sidebar-surface);
+  --color-sidebar-border:       var(--sidebar-border);
+  --color-sidebar-text:         var(--sidebar-text);
+  --color-sidebar-text-muted:   var(--sidebar-text-muted);
+  --color-sidebar-active-bg:    var(--sidebar-active-bg);
+  --color-sidebar-active-text:  var(--sidebar-active-text);
+  --color-sidebar-hover-bg:     var(--sidebar-hover-bg);
+  --color-sidebar-icon:         var(--sidebar-icon);
+  --color-sidebar-icon-active:  var(--sidebar-icon-active);
+
+  /* shadcn standard sidebar primitive contract — exposes the v1.0 sidebar
+     palette via the names shadcn's sidebar/menu primitives expect, so
+     Tailwind utilities like bg-sidebar, text-sidebar-foreground,
+     bg-sidebar-accent etc. resolve correctly inside the sidebar
+     (command palette, tooltips, menu items). */
+  --color-sidebar-background:         var(--sidebar-bg);
+  --color-sidebar-foreground:         var(--sidebar-text);
+  --color-sidebar-accent:             var(--sidebar-active-bg);
+  --color-sidebar-accent-foreground:  var(--sidebar-active-text);
+  --color-sidebar-primary:            var(--brand-600);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-ring:               var(--brand-600);
+
+  /* ─── Color: Data-viz palette ────────────────────────── */
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-3: var(--viz-3);
+  --color-viz-4: var(--viz-4);
+  --color-viz-5: var(--viz-5);
+  --color-viz-6: var(--viz-6);
+  --color-viz-7: var(--viz-7);
+  --color-viz-8: var(--viz-8);
+
+  /* ─── Type scale (px-named) ──────────────────────────── */
+  --text-11: var(--text-11);
+  --text-12: var(--text-12);
+  --text-13: var(--text-13);
+  --text-14: var(--text-14);
+  --text-16: var(--text-16);
+  --text-18: var(--text-18);
+  --text-20: var(--text-20);
+  --text-24: var(--text-24);
+  --text-28: var(--text-28);
+  --text-32: var(--text-32);
+
+  /* ─── Font weight ────────────────────────────────────── */
+  --font-weight-regular:  var(--weight-regular);
+  --font-weight-medium:   var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold:     var(--weight-bold);
+
+  /* ─── Leading ────────────────────────────────────────── */
+  --leading-tight:   var(--leading-tight);
+  --leading-snug:    var(--leading-snug);
+  --leading-normal:  var(--leading-normal);
+  --leading-relaxed: var(--leading-relaxed);
+
+  /* ─── Spacing (4px base, named like the v1.0 token set) */
+  --spacing-0:  var(--space-0);
+  --spacing-1:  var(--space-1);
+  --spacing-2:  var(--space-2);
+  --spacing-3:  var(--space-3);
+  --spacing-4:  var(--space-4);
+  --spacing-5:  var(--space-5);
+  --spacing-6:  var(--space-6);
+  --spacing-8:  var(--space-8);
+  --spacing-10: var(--space-10);
+  --spacing-12: var(--space-12);
+  --spacing-16: var(--space-16);
+  --spacing-20: var(--space-20);
+
+  /* ─── Radius ─────────────────────────────────────────── */
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  /* ─── Shadow ─────────────────────────────────────────── */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+
+  /* ─── Motion ─────────────────────────────────────────── */
+  --duration-instant: var(--duration-instant);
+  --duration-fast:    var(--duration-fast);
+  --duration-normal:  var(--duration-normal);
+  --duration-slow:    var(--duration-slow);
+  --ease-standard:    var(--ease-standard);
+}

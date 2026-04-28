@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP</title>
+<link rel="stylesheet" href="tokens.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+html,body,#root{height:100%;margin:0;}
+.app-shell{display:flex;height:100vh;overflow:hidden;}
+/* ── Sidebar ── */
+.sidebar{width:272px;min-width:272px;background:var(--sidebar-bg);display:flex;flex-direction:column;border-right:1px solid var(--sidebar-border);transition:width var(--duration-normal) var(--ease-standard);overflow:hidden;}
+.sidebar.collapsed{width:64px;min-width:64px;}
+.sidebar-logo{padding:20px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--sidebar-border);}
+.logo-mark{width:32px;height:32px;background:var(--brand-600);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;color:#fff;font-size:15px;letter-spacing:-0.5px;}
+.logo-text{color:var(--sidebar-text);font-size:var(--text-16);font-weight:700;white-space:nowrap;letter-spacing:-0.3px;}
+.logo-sub{color:var(--sidebar-text-muted);font-size:var(--text-11);font-weight:500;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:12px 8px;scrollbar-width:none;}
+.sidebar-nav::-webkit-scrollbar{display:none;}
+.nav-section-label{padding:8px 12px 4px;font-size:var(--text-11);font-weight:600;color:var(--sidebar-text-muted);text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap;overflow:hidden;}
+.nav-item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--sidebar-text-muted);font-size:var(--text-13);font-weight:500;transition:all var(--duration-fast);white-space:nowrap;margin-bottom:2px;position:relative;}
+.nav-item:hover{background:var(--sidebar-hover-bg);color:var(--sidebar-text);}
+.nav-item.active{background:var(--sidebar-active-bg);color:var(--sidebar-active-text);}
+.nav-item svg{flex-shrink:0;width:18px;height:18px;}
+.nav-badge{margin-left:auto;background:var(--danger-600);color:#fff;border-radius:var(--radius-full);font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;}
+.sidebar-footer{padding:12px 8px;border-top:1px solid var(--sidebar-border);}
+.user-card{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:background var(--duration-fast);}
+.user-card:hover{background:var(--sidebar-hover-bg);}
+.avatar{width:32px;height:32px;border-radius:var(--radius-full);background:var(--brand-700);color:#fff;display:flex;align-items:center;justify-content:center;font-size:var(--text-12);font-weight:700;flex-shrink:0;}
+.user-info{flex:1;min-width:0;}
+.user-name{color:var(--sidebar-text);font-size:var(--text-13);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-role{color:var(--sidebar-text-muted);font-size:var(--text-11);white-space:nowrap;}
+/* ── Top Bar ── */
+.topbar{height:56px;background:var(--bg-card);border-bottom:1px solid var(--border-default);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;}
+.topbar-title{font-size:var(--text-16);font-weight:600;color:var(--text-primary);flex:1;}
+.topbar-sub{font-size:var(--text-13);color:var(--text-muted);}
+.tb-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-sm);font-size:var(--text-13);font-weight:500;cursor:pointer;transition:all var(--duration-fast);border:1px solid transparent;}
+.tb-btn-primary{background:var(--brand-600);color:#fff;border-color:var(--brand-600);}
+.tb-btn-primary:hover{background:var(--brand-700);}
+.tb-btn-ghost{background:transparent;color:var(--text-secondary);border-color:var(--border-default);}
+.tb-btn-ghost:hover{background:var(--bg-subtle);}
+.tb-icon-btn{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);transition:all var(--duration-fast);border:none;background:transparent;}
+.tb-icon-btn:hover{background:var(--bg-subtle);color:var(--text-primary);}
+/* ── Content ── */
+.content-area{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-page);}
+.content-scroll{flex:1;overflow-y:auto;padding:24px;}
+/* ── Cards ── */
+.card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-xs);}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;}
+.card-body{padding:20px;}
+/* ── KPI cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-bottom:24px;}
+.kpi-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px 20px;box-shadow:var(--shadow-xs);}
+.kpi-label{font-size:var(--text-12);font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.kpi-value{font-size:var(--text-24);font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;line-height:1.2;}
+.kpi-trend{font-size:var(--text-12);color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.kpi-trend.up{color:var(--success-600);}
+.kpi-trend.down{color:var(--danger-600);}
+/* ── Chips / Status ── */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:var(--radius-full);font-size:var(--text-12);font-weight:600;letter-spacing:0.2px;}
+.chip-dot{width:6px;height:6px;border-radius:var(--radius-full);flex-shrink:0;}
+.chip-active{background:var(--success-50);color:var(--success-700);}
+.chip-active .chip-dot{background:var(--success-600);}
+.chip-inactive{background:var(--slate-100);color:var(--slate-600);}
+.chip-inactive .chip-dot{background:var(--slate-400);}
+.chip-pending{background:var(--warning-50);color:var(--warning-700);}
+.chip-pending .chip-dot{background:var(--warning-500);}
+.chip-terminated{background:var(--danger-50);color:var(--danger-700);}
+.chip-terminated .chip-dot{background:var(--danger-600);}
+.chip-brand{background:var(--brand-50);color:var(--brand-700);}
+.chip-day{background:#eff6ff;color:#1d4ed8;}
+.chip-night{background:#eef2ff;color:#4338ca;}
+.chip-both{background:#faf5ff;color:#7e22ce;}
+.chip-draft{background:var(--slate-100);color:var(--slate-600);}
+.chip-calculated{background:var(--info-50);color:var(--info-600);}
+.chip-locked{background:var(--warning-50);color:var(--warning-700);}
+.chip-finalized{background:var(--success-50);color:var(--success-700);}
+.chip-paid{background:var(--emerald-50);color:var(--emerald-600);}
+.chip-hold{background:var(--danger-50);color:var(--danger-700);}
+.role-chip{background:var(--brand-50);color:var(--brand-700);border-radius:var(--radius-full);padding:2px 10px;font-size:var(--text-12);font-weight:600;}
+/* ── Table ── */
+.data-table{width:100%;border-collapse:collapse;font-size:var(--text-13);}
+.data-table thead tr{border-bottom:1px solid var(--border-default);}
+.data-table th{padding:10px 14px;text-align:left;font-size:var(--text-12);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;cursor:pointer;user-select:none;}
+.data-table th:hover{color:var(--text-primary);}
+.data-table td{padding:0 14px;color:var(--text-primary);border-bottom:1px solid var(--border-default);white-space:nowrap;}
+.data-table tbody tr{transition:background var(--duration-fast);}
+.data-table tbody tr:hover{background:var(--bg-card-hover);}
+.data-table tbody tr:last-child td{border-bottom:none;}
+.row-comfortable td{height:var(--row-comfortable);}
+.row-compact td{height:var(--row-compact);font-size:var(--text-12);}
+/* ── Filter bar ── */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.search-input{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-sm);padding:8px 12px;flex:1;max-width:320px;}
+.search-input input{border:none;outline:none;background:transparent;font-size:var(--text-13);color:var(--text-primary);width:100%;font-family:var(--font-ui);}
+.search-input input::placeholder{color:var(--text-placeholder);}
+.filter-select{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-sm);padding:8px 12px;font-size:var(--text-13);color:var(--text-primary);font-family:var(--font-ui);cursor:pointer;}
+.filter-select:focus{outline:none;box-shadow:var(--focus-ring);}
+/* ── Stat cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:14px 18px;display:flex;align-items:flex-start;gap:12px;}
+.stat-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.stat-body .label{font-size:var(--text-12);color:var(--text-muted);font-weight:500;margin-bottom:2px;}
+.stat-body .value{font-size:var(--text-20);font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-primary);}
+/* ── Tabs ── */
+.tabs{display:flex;border-bottom:1px solid var(--border-default);overflow-x:auto;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab-item{padding:10px 16px;font-size:var(--text-13);font-weight:500;color:var(--text-muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all var(--duration-fast);flex-shrink:0;}
+.tab-item:hover{color:var(--text-primary);}
+.tab-item.active{color:var(--brand-600);border-bottom-color:var(--brand-600);}
+/* ── Avatar initials ── */
+.guard-avatar{width:28px;height:28px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;}
+/* ── Attention strip ── */
+.attention-strip{display:flex;gap:10px;overflow-x:auto;padding:12px 0;scrollbar-width:none;margin-bottom:20px;}
+.attention-strip::-webkit-scrollbar{display:none;}
+.attention-item{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:10px 14px;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:8px;font-size:var(--text-13);}
+.attention-item.high{border-left:3px solid var(--danger-600);}
+.attention-item.medium{border-left:3px solid var(--warning-600);}
+/* ── Insight rows ── */
+.insight-row{padding:12px 16px;border-left:3px solid transparent;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border-default);cursor:pointer;}
+.insight-row:last-child{border-bottom:none;}
+.insight-row.high{border-left-color:var(--danger-600);}
+.insight-row.medium{border-left-color:var(--warning-500);}
+.insight-row.low{border-left-color:var(--slate-300);}
+.insight-row:hover{background:var(--bg-card-hover);}
+.insight-badge{min-width:28px;height:20px;background:var(--bg-subtle);border-radius:var(--radius-full);font-size:10px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* ── KPI strip (guard) ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;background:var(--bg-card);margin-bottom:20px;}
+.kpi-strip-tile{padding:14px 16px;border-right:1px solid var(--border-default);text-align:center;}
+.kpi-strip-tile:last-child{border-right:none;}
+.kpi-strip-tile .v{font-size:var(--text-20);font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-primary);}
+.kpi-strip-tile .l{font-size:var(--text-11);color:var(--text-muted);font-weight:500;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+/* ── Detail grid ── */
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.detail-field{display:flex;flex-direction:column;gap:2px;}
+.detail-field .fl{font-size:var(--text-11);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;}
+.detail-field .fv{font-size:var(--text-13);color:var(--text-primary);font-weight:500;}
+/* ── Lifecycle progress ── */
+.lifecycle{display:flex;align-items:center;gap:0;overflow:hidden;}
+.lc-step{display:flex;align-items:center;gap:0;flex:1;}
+.lc-node{width:8px;height:8px;border-radius:50%;background:var(--slate-300);flex-shrink:0;}
+.lc-node.done{background:var(--brand-600);}
+.lc-node.current{background:var(--brand-600);box-shadow:0 0 0 3px var(--brand-100);}
+.lc-line{flex:1;height:2px;background:var(--slate-200);}
+.lc-line.done{background:var(--brand-600);}
+.lc-label{font-size:10px;color:var(--text-muted);font-weight:600;text-align:center;margin-top:4px;}
+/* ── Progress bar ── */
+.progress-bar{height:6px;background:var(--bg-subtle);border-radius:var(--radius-full);overflow:hidden;margin-bottom:4px;}
+.progress-fill{height:100%;border-radius:var(--radius-full);background:var(--brand-600);}
+/* ── Stepper ── */
+.stepper{display:flex;align-items:center;gap:0;margin-bottom:28px;}
+.step-node{display:flex;align-items:center;gap:0;flex:1;}
+.step-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-12);font-weight:700;flex-shrink:0;border:2px solid var(--border-default);color:var(--text-muted);background:var(--bg-card);}
+.step-circle.done{background:var(--brand-600);border-color:var(--brand-600);color:#fff;}
+.step-circle.current{background:var(--brand-600);border-color:var(--brand-600);color:#fff;box-shadow:0 0 0 4px var(--brand-100);}
+.step-label{font-size:var(--text-12);font-weight:600;color:var(--text-muted);margin-top:6px;white-space:nowrap;}
+.step-label.active{color:var(--brand-600);}
+.step-line{flex:1;height:2px;background:var(--border-default);margin:0 8px;}
+.step-line.done{background:var(--brand-600);}
+/* ── Form ── */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:var(--text-12);font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;}
+.form-label .req{color:var(--danger-600);}
+.form-input{width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-14);color:var(--text-primary);font-family:var(--font-ui);transition:border-color var(--duration-fast),box-shadow var(--duration-fast);}
+.form-input:focus{outline:none;border-color:var(--border-focus);box-shadow:var(--focus-ring);}
+.form-input.mono{font-family:var(--font-mono);}
+.form-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+.form-section{margin-bottom:28px;}
+.form-section-title{font-size:var(--text-14);font-weight:700;color:var(--text-primary);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border-default);}
+/* ── Payroll workflow ── */
+.workflow-bar{display:flex;align-items:center;background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;margin-bottom:24px;}
+.wf-stage{flex:1;padding:14px 12px;text-align:center;border-right:1px solid var(--border-default);cursor:pointer;transition:background var(--duration-fast);}
+.wf-stage:last-child{border-right:none;}
+.wf-stage.done{background:var(--brand-50);}
+.wf-stage.current{background:var(--brand-600);}
+.wf-stage.current .wf-label{color:#fff;}
+.wf-stage.current .wf-sub{color:rgba(255,255,255,0.7);}
+.wf-label{font-size:var(--text-12);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;}
+.wf-label.done{color:var(--brand-700);}
+.wf-sub{font-size:10px;color:var(--text-muted);margin-top:2px;}
+/* ── Permission matrix ── */
+.perm-matrix{width:100%;border-collapse:collapse;font-size:var(--text-12);}
+.perm-matrix th,.perm-matrix td{padding:8px 10px;border:1px solid var(--border-default);text-align:center;}
+.perm-matrix th{background:var(--bg-subtle);font-weight:600;color:var(--text-muted);}
+.perm-matrix .module-name{text-align:left;font-weight:600;color:var(--text-primary);background:var(--bg-card);}
+.perm-matrix .role-header{background:var(--bg-subtle);font-weight:700;color:var(--text-primary);}
+.perm-check{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border-default);display:flex;align-items:center;justify-content:center;margin:0 auto;cursor:pointer;transition:all var(--duration-fast);}
+.perm-check.granted{background:var(--brand-600);border-color:var(--brand-600);}
+/* ── Audit JSON diff ── */
+.json-diff{background:#0d1117;border-radius:var(--radius-sm);padding:12px;font-family:var(--font-mono);font-size:11px;line-height:1.7;overflow-x:auto;}
+.json-diff .removed{color:#ff6b6b;background:rgba(220,38,38,0.1);}
+.json-diff .added{color:#6bffb8;background:rgba(22,163,74,0.1);}
+.json-diff .unchanged{color:#64748b;}
+/* ── Login ── */
+.login-shell{display:flex;height:100vh;}
+.login-brand{width:480px;background:var(--sidebar-bg);display:flex;flex-direction:column;justify-content:center;padding:64px;}
+.login-form-panel{flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg-page);}
+.login-form-box{width:100%;max-width:400px;padding:0 24px;}
+.login-mark{width:48px;height:48px;background:var(--brand-600);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;margin-bottom:32px;letter-spacing:-1px;}
+/* ── Empty state ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center;}
+.empty-icon{width:48px;height:48px;border-radius:var(--radius-md);background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--text-muted);}
+/* ── Toast ── */
+.toast-stack{position:fixed;top:20px;right:20px;z-index:var(--z-toast);display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:12px 16px;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:10px;font-size:var(--text-13);animation:slideIn var(--duration-normal) var(--ease-standard);}
+.toast.success{border-left:3px solid var(--success-600);}
+.toast.error{border-left:3px solid var(--danger-600);}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+/* ── Density btn ── */
+.density-toggle{display:flex;gap:2px;background:var(--bg-subtle);border-radius:var(--radius-sm);padding:2px;}
+.density-btn{padding:4px 10px;border-radius:6px;font-size:var(--text-12);font-weight:500;cursor:pointer;color:var(--text-muted);transition:all var(--duration-fast);}
+.density-btn.active{background:var(--bg-card);color:var(--text-primary);box-shadow:var(--shadow-xs);}
+/* ── Section title ── */
+.section-title{font-size:var(--text-20);font-weight:700;color:var(--text-primary);}
+.section-sub{font-size:var(--text-13);color:var(--text-muted);margin-top:2px;}
+/* ── Ops feed ── */
+.ops-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-default);}
+.ops-item:last-child{border-bottom:none;}
+.ops-dot{width:8px;height:8px;border-radius:50%;background:var(--brand-400);flex-shrink:0;margin-top:4px;}
+.ops-text{font-size:var(--text-13);color:var(--text-primary);line-height:1.5;}
+.ops-time{font-size:var(--text-11);color:var(--text-muted);margin-top:2px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+
+// ── Data ─────────────────────────────────────────────────────
+const GUARDS = [
+  {id:'LHR-00247',name:'Muhammad Usman Khan',cnic:'42201-1234567-9',dob:'12/03/1990',designation:'Security Guard',shift:'DAY',region:'Lahore',office:'Gulberg Branch',status:'ACTIVE',lifecycle:'ACTIVE',salary:28000},
+  {id:'KHI-00892',name:'Fatima Zafar',cnic:'42101-9876543-2',dob:'22/07/1995',designation:'Supervisor',shift:'NIGHT',region:'Karachi',office:'SITE A',status:'ACTIVE',lifecycle:'ACTIVE',salary:35000},
+  {id:'ISB-00134',name:'Abdul Rehman Malik',cnic:'61101-5432109-8',dob:'05/11/1988',designation:'CPO',shift:'DAY',region:'Islamabad',office:'F-7 Office',status:'PENDING',lifecycle:'PENDING',salary:45000},
+  {id:'LHR-00318',name:'Sadia Parveen',cnic:'42301-2345678-4',dob:'30/06/1992',designation:'Security Guard',shift:'NIGHT',region:'Lahore',office:'DHA Office',status:'ACTIVE',lifecycle:'ACTIVE',salary:26000},
+  {id:'RWP-00056',name:'Tariq Mehmood',cnic:'37401-6789012-7',dob:'14/02/1985',designation:'ASO',shift:'DAY',region:'Rawalpindi',office:'Saddar Branch',status:'INACTIVE',lifecycle:'INACTIVE',salary:30000},
+  {id:'FSB-00071',name:'Zara Hussain',cnic:'33301-3456789-5',dob:'08/09/1997',designation:'Security Guard',shift:'BOTH',region:'Faisalabad',office:'Main Office',status:'ACTIVE',lifecycle:'ACTIVE',salary:25000},
+  {id:'LHR-00512',name:'Bilal Ahmed Qureshi',cnic:'42201-8901234-1',dob:'17/04/1991',designation:'Security Guard',shift:'DAY',region:'Lahore',office:'Gulberg Branch',status:'TERMINATED',lifecycle:'TERMINATED',salary:27000},
+  {id:'KHI-01034',name:'Nadia Iqbal',cnic:'42101-4567890-3',dob:'25/12/1993',designation:'Supervisor',shift:'NIGHT',region:'Karachi',office:'SITE B',status:'ACTIVE',lifecycle:'ACTIVE',salary:34000},
+];
+
+const DEPLOYMENTS = [
+  {id:1,guard:'Muhammad Usman Khan',guardId:'LHR-00247',client:'MCB Bank',clientType:'BANK',branch:'Gulberg Branch',city:'Lahore',shift:'DAY',designation:'Security Guard',rate:930,deployed:'01/04/2026',end:'-',status:'ACTIVE'},
+  {id:2,guard:'Fatima Zafar',guardId:'KHI-00892',client:'Shaukat Khanum Hospital',clientType:'HOSPITAL',branch:'Main Campus',city:'Karachi',shift:'NIGHT',designation:'Supervisor',rate:1167,deployed:'15/02/2026',end:'-',status:'ACTIVE'},
+  {id:3,guard:'Sadia Parveen',guardId:'LHR-00318',client:'Engro Chemicals',clientType:'MANUFACTURER',branch:'Plant Site',city:'Lahore',shift:'NIGHT',designation:'Security Guard',rate:867,deployed:'10/03/2026',end:'-',status:'ACTIVE'},
+  {id:4,guard:'Nadia Iqbal',guardId:'KHI-01034',client:'MCB Bank',clientType:'BANK',branch:'Clifton Branch',city:'Karachi',shift:'NIGHT',designation:'Supervisor',rate:1133,deployed:'01/01/2026',end:'31/03/2026',status:'INACTIVE'},
+];
+
+const PAYROLL_RECORDS = [
+  {guard:'Muhammad Usman Khan',id:'LHR-00247',office:'Gulberg',basic:28000,net:24640,reserve:8400,loans:2000,deductions:840,state:'GLOBAL_FINALIZED',pstatus:'PENDING'},
+  {guard:'Fatima Zafar',id:'KHI-00892',office:'Site A',basic:35000,net:30800,reserve:10500,loans:0,deductions:1050,state:'GLOBAL_FINALIZED',pstatus:'PENDING'},
+  {guard:'Sadia Parveen',id:'LHR-00318',office:'DHA',basic:26000,net:22880,reserve:7800,loans:1500,deductions:780,state:'REGIONAL_LOCKED',pstatus:'PENDING'},
+  {guard:'Abdul Rehman Malik',id:'ISB-00134',office:'F-7',basic:45000,net:39600,reserve:13500,loans:0,deductions:1350,state:'HOLD',pstatus:'PENDING'},
+  {guard:'Tariq Mehmood',id:'RWP-00056',office:'Saddar',basic:30000,net:0,reserve:0,loans:0,deductions:0,state:'DRAFT',pstatus:'PENDING'},
+];
+
+// ── Helpers ───────────────────────────────────────────────────
+const fmt = n => `₨ ${n >= 10000000 ? (n/10000000).toFixed(1)+'Cr' : n >= 100000 ? (n/100000).toFixed(1)+'L' : n >= 1000 ? (n/1000).toFixed(0)+'K' : n}`;
+const fmtFull = n => `₨ ${n.toLocaleString()}`;
+
+function initials(name){return name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+function avatarColor(name){const hues=[210,180,150,30,270,0,300,60];return `hsl(${hues[name.charCodeAt(0)%8]},55%,35%)`;}
+
+function StatusChip({status}){
+  const map={
+    ACTIVE:'active',PRESENT:'active',PAID:'paid',FULFILLED:'paid',
+    INACTIVE:'inactive',ENDED:'inactive',CANCELLED:'inactive',
+    PENDING:'pending',DRAFT:'draft',CALCULATED:'calculated',SENT:'calculated',
+    TERMINATED:'terminated',REJECTED:'terminated',HOLD:'hold',
+    REGIONAL_LOCKED:'locked',GLOBAL_FINALIZED:'finalized',
+    DAY:'day',NIGHT:'night',BOTH:'both',
+    BLACKLISTED:'terminated',
+  };
+  const c=map[status]||'draft';
+  const labels={active:'Active',inactive:'Inactive',pending:'Pending',draft:'Draft',terminated:'Terminated',paid:'Paid',hold:'On Hold',locked:'Locked',finalized:'Finalized',calculated:'Calculated',day:'Day',night:'Night',both:'Both'};
+  return <span className={`chip chip-${c}`}><span className="chip-dot"/>{labels[c]||status}</span>;
+}
+
+// ── SVG Icons ─────────────────────────────────────────────────
+const Icon = ({n,s=18,c='currentColor'}) => {
+  const icons={
+    shield:<><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z"/></>,
+    grid:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    users:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>,
+    map:<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
+    dollar:<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>,
+    box:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>,
+    file:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
+    ticket:<><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></>,
+    bar:<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+    settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    log:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M9 13h6M9 17h4"/></>,
+    bell:<><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    moon:<><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></>,
+    sun:<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>,
+    chevronRight:<><polyline points="9 18 15 12 9 6"/></>,
+    chevronDown:<><polyline points="6 9 12 15 18 9"/></>,
+    plus:<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    check:<><polyline points="20 6 9 17 4 12"/></>,
+    x:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    menu:<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+    arrowLeft:<><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>,
+    alertTri:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    user:<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    layers:<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{icons[n]}</svg>;
+};
+
+// ── App ───────────────────────────────────────────────────────
+function App(){
+  const [screen,setScreen]=useState('login');
+  const [darkMode,setDarkMode]=useState(false);
+  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
+  const [toast,setToast]=useState(null);
+
+  useEffect(()=>{
+    const saved=localStorage.getItem('pw-dark');
+    if(saved==='true') setDarkMode(true);
+  },[]);
+
+  useEffect(()=>{
+    document.documentElement.setAttribute('data-theme',darkMode?'dark':'');
+    localStorage.setItem('pw-dark',darkMode);
+  },[darkMode]);
+
+  const showToast=(msg,type='success')=>{
+    setToast({msg,type});
+    setTimeout(()=>setToast(null),3000);
+  };
+
+  if(screen==='login') return <Login onLogin={()=>setScreen('dashboard')}/>;
+
+  const navItems=[
+    {icon:'grid',label:'Dashboard',id:'dashboard'},
+    {icon:'users',label:'Guards',id:'guards',badge:3},
+    {icon:'map',label:'Deployments',id:'deployments'},
+    {icon:'shield',label:'Clients',id:'clients'},
+    {icon:'dollar',label:'Payroll',id:'payroll'},
+    {icon:'file',label:'Invoicing',id:'invoicing'},
+    {icon:'box',label:'Inventory',id:'inventory'},
+    {icon:'ticket',label:'Tickets',id:'tickets',badge:12},
+    {icon:'bar',label:'Reports',id:'reports'},
+    {icon:'log',label:'Audit Log',id:'audit'},
+    {icon:'lock',label:'RBAC',id:'rbac'},
+    {icon:'settings',label:'Settings',id:'settings'},
+  ];
+
+  const screenMap={
+    dashboard:<DashboardScreen/>,
+    guards:<GuardsScreen onProfile={()=>setScreen('guard-profile')} showToast={showToast}/>,
+    'guard-profile':<GuardProfileScreen onBack={()=>setScreen('guards')}/>,
+    deployments:<DeploymentsScreen/>,
+    payroll:<PayrollScreen showToast={showToast}/>,
+    audit:<AuditScreen/>,
+    rbac:<RBACScreen/>,
+    settings:<SettingsScreen/>,
+    clients:<ClientsScreen onProfile={()=>setScreen('client-profile')}/>,
+    'client-profile':<ClientProfileScreen onBack={()=>setScreen('clients')}/>,
+    inventory:<InventoryScreen/>,
+    invoicing:<InvoicingScreen showToast={showToast}/>,
+    tickets:<TicketsScreen showToast={showToast}/>,
+    reports:<ReportsScreen/>,
+  };
+
+  return (
+    <div className="app-shell">
+      {/* Sidebar */}
+      <aside className="sidebar" style={{width:sidebarCollapsed?64:272,minWidth:sidebarCollapsed?64:272}}>
+        <div className="sidebar-logo" style={{padding:sidebarCollapsed?'20px 16px 12px':'20px 20px 12px'}}>
+          <div className="logo-mark">P</div>
+          {!sidebarCollapsed && <div><div className="logo-text">Parwest</div><div className="logo-sub">ERP Platform</div></div>}
+        </div>
+        <nav className="sidebar-nav">
+          {!sidebarCollapsed && <div className="nav-section-label">Main</div>}
+          {navItems.slice(0,5).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id||screen==='guard-profile'&&it.id==='guards'?' active':''}`}
+              onClick={()=>setScreen(it.id)} title={sidebarCollapsed?it.label:''}>
+              <Icon n={it.icon} s={18}/>
+              {!sidebarCollapsed && <><span style={{flex:1}}>{it.label}</span>{it.badge && <span className="nav-badge">{it.badge}</span>}</>}
+            </div>
+          ))}
+          {!sidebarCollapsed && <div className="nav-section-label" style={{marginTop:8}}>Finance</div>}
+          {navItems.slice(5,8).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id?' active':''}`} onClick={()=>setScreen(it.id)} title={sidebarCollapsed?it.label:''}>
+              <Icon n={it.icon} s={18}/>
+              {!sidebarCollapsed && <span>{it.label}</span>}
+            </div>
+          ))}
+          {!sidebarCollapsed && <div className="nav-section-label" style={{marginTop:8}}>Admin</div>}
+          {navItems.slice(8).map(it=>(
+            <div key={it.id} className={`nav-item${screen===it.id?' active':''}`} onClick={()=>setScreen(it.id)} title={sidebarCollapsed?it.label:''}>
+              <Icon n={it.icon} s={18}/>
+              {!sidebarCollapsed && <><span style={{flex:1}}>{it.label}</span>{it.badge && <span className="nav-badge">{it.badge}</span>}</>}
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <div className="user-card" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>
+            <div className="avatar">AK</div>
+            {!sidebarCollapsed && <div className="user-info"><div className="user-name">Asad Khan</div><div className="user-role">Super Admin</div></div>}
+          </div>
+        </div>
+      </aside>
+
+      {/* Content */}
+      <div className="content-area">
+        <header className="topbar">
+          <button className="tb-icon-btn" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}><Icon n="menu" s={18}/></button>
+          <div style={{display:'flex',alignItems:'center',gap:8,flex:1}}>
+            <div className="topbar-title">{navItems.find(i=>i.id===screen||screen==='guard-profile'&&i.id==='guards')?.label||''}</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div className="search-input" style={{maxWidth:220,padding:'6px 12px'}}>
+              <Icon n="search" s={14} c="var(--text-placeholder)"/>
+              <input placeholder="Search… (⌘K)"/>
+            </div>
+            <button className="tb-icon-btn" onClick={()=>setDarkMode(!darkMode)} title={darkMode?'Light mode':'Dark mode'}>
+              <Icon n={darkMode?'sun':'moon'} s={18}/>
+            </button>
+            <button className="tb-icon-btn"><Icon n="bell" s={18}/></button>
+            <div className="avatar" style={{cursor:'pointer'}}>AK</div>
+          </div>
+        </header>
+        <div className="content-scroll">
+          {screenMap[screen] || <div className="empty-state"><div className="section-title">{navItems.find(i=>i.id===screen)?.label}</div><p style={{color:'var(--text-muted)',marginTop:8}}>This screen is under construction.</p></div>}
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="toast-stack">
+          <div className={`toast ${toast.type}`}>
+            <Icon n={toast.type==='success'?'check':'alertTri'} s={16} c={toast.type==='success'?'var(--success-600)':'var(--danger-600)'}/>
+            {toast.msg}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Login Screen ──────────────────────────────────────────────
+function Login({onLogin}){
+  const [email,setEmail]=useState('');
+  const [pw,setPw]=useState('');
+  const [err,setErr]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const submit=e=>{
+    e.preventDefault();
+    if(!email||!pw){setErr('Please enter your email and password.');return;}
+    setLoading(true);setErr('');
+    setTimeout(()=>{setLoading(false);onLogin();},800);
+  };
+
+  return (
+    <div className="login-shell">
+      <div className="login-brand">
+        <div style={{marginBottom:48}}>
+          <div style={{width:52,height:52,background:'var(--brand-600)',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:800,color:'#fff',marginBottom:24,letterSpacing:-1}}>P</div>
+          <div style={{fontSize:'var(--text-32)',fontWeight:800,color:'#fff',lineHeight:1.2,marginBottom:12,letterSpacing:'-0.5px'}}>Parwest ERP</div>
+          <div style={{fontSize:'var(--text-16)',color:'rgba(226,232,240,0.6)',lineHeight:1.6,maxWidth:320}}>Operational command center for guard force management across Pakistan.</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {[['₨ 4.2Cr','Monthly payroll processed'],['1,247','Active guards managed'],['89','Client sites secured']].map(([v,l])=>(
+            <div key={l} style={{display:'flex',alignItems:'center',gap:12}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:'var(--brand-400)',flexShrink:0}}/>
+              <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-13)',color:'var(--brand-300)',fontVariantNumeric:'tabular-nums'}}>{v}</span>
+              <span style={{fontSize:'var(--text-13)',color:'rgba(226,232,240,0.5)'}}>{l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="login-form-panel">
+        <div className="login-form-box">
+          <div style={{marginBottom:32}}>
+            <div style={{fontSize:'var(--text-24)',fontWeight:700,color:'var(--text-primary)',marginBottom:6}}>Sign in to Parwest</div>
+            <div style={{fontSize:'var(--text-14)',color:'var(--text-muted)'}}>Enter your credentials to access the platform.</div>
+          </div>
+          <form onSubmit={submit}>
+            <div className="form-group">
+              <label className="form-label">Email address</label>
+              <input className="form-input" type="email" placeholder="asad@parwest.com" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <input className="form-input" type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)}/>
+            </div>
+            {err && <div style={{background:'var(--danger-50)',border:'1px solid var(--danger-100)',borderRadius:'var(--radius-sm)',padding:'10px 14px',fontSize:'var(--text-13)',color:'var(--danger-700)',marginBottom:16}}>{err}</div>}
+            <div style={{display:'flex',justifyContent:'flex-end',marginBottom:20}}><a href="#" style={{fontSize:'var(--text-13)',color:'var(--text-brand)',textDecoration:'none'}}>Forgot password?</a></div>
+            <button type="submit" className="tb-btn tb-btn-primary" style={{width:'100%',justifyContent:'center',padding:'11px',fontSize:'var(--text-14)',borderRadius:'var(--radius-sm)',opacity:loading?0.7:1}}>
+              {loading?'Signing in…':'Sign in'}
+            </button>
+          </form>
+          <div style={{marginTop:32,padding:'14px',background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>
+            <strong>Demo:</strong> Type any email + password and press Sign in.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard Screen ──────────────────────────────────────────
+function DashboardScreen(){
+  const [insightTab,setInsightTab]=useState('efficiency');
+  const kpis=[
+    {label:'Active Guards',value:'1,247',trend:'+14',up:true},
+    {label:'Deployed',value:'1,108',trend:'+8',up:true},
+    {label:'Vacant Guards',value:'139',trend:'+6',up:false},
+    {label:'Pending Approvals',value:'23',trend:'-5',up:true},
+    {label:'Open Tickets',value:'41',trend:'+12',up:false},
+    {label:'Payroll Cycle',value:<span className="chip chip-finalized" style={{fontSize:13}}><span className="chip-dot"/>Finalized</span>,sub:true},
+  ];
+  const attentionItems=[
+    {text:'12 guards have expired CNIC documents',sev:'high'},
+    {text:'MCB Bank – 3 branches below guard capacity',sev:'high'},
+    {text:'₨ 8.4L in overdue invoices (>30 days)',sev:'medium'},
+    {text:'Tariq Mehmood — 4 consecutive absences',sev:'medium'},
+    {text:'7 guards pending age approval',sev:'medium'},
+    {text:'Payroll for Peshawar office not yet locked',sev:'high'},
+  ];
+  const insights={
+    efficiency:[
+      {text:'139 vacant guards without active deployment',sev:'high',count:139,amt:'₨ 38.9L idle capacity'},
+      {text:'Guards with attendance gaps >3 days',sev:'medium',count:18,amt:null},
+      {text:'Branches below minimum guard capacity',sev:'medium',count:7,amt:null},
+      {text:'Invoices overdue more than 30 days',sev:'medium',count:3,amt:'₨ 8.4L'},
+    ],
+    anomalies:[
+      {text:'Guards deployed outside regional office scope',sev:'high',count:4,amt:null},
+      {text:'Duplicate CNIC detected across records',sev:'high',count:2,amt:null},
+      {text:'Payroll amounts ±30% from base salary',sev:'medium',count:11,amt:'₨ 2.1L variance'},
+      {text:'Audit log spike: 60+ events from one user in 1h',sev:'medium',count:1,amt:null},
+    ]
+  };
+  const opsItems=[
+    {text:<>Muhammad Usman Khan deployed at <strong>MCB Bank – Gulberg</strong></>       ,time:'2 min ago'},
+    {text:<>Payroll for April 2026 globally finalized by <strong>Asad Khan</strong></>,time:'14 min ago'},
+    {text:<>Invoice <span className="mono">INV-2026-04-0042</span> generated for Engro Chemicals</>,time:'1 hr ago'},
+    {text:<>Fatima Zafar shift changed to NIGHT at Shaukat Khanum</>,time:'2 hr ago'},
+    {text:<>3 guards verified for KHI-01034 profile</>,time:'3 hr ago'},
+  ];
+  return (
+    <div>
+      {/* Greeting row */}
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontSize:'var(--text-20)',fontWeight:700,color:'var(--text-primary)'}}>Good morning, Asad 👋</div>
+          <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',marginTop:2}}>Thursday, 24 April 2026 · All Regions</div>
+        </div>
+        <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+          <span className="role-chip">Super Admin</span>
+          <button className="tb-btn tb-btn-ghost" style={{fontSize:'var(--text-13)'}}>Quick Actions <Icon n="chevronDown" s={14}/></button>
+          <button className="tb-btn tb-btn-primary" style={{fontSize:'var(--text-13)'}}>AI Report</button>
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="kpi-grid">
+        {kpis.map((k,i)=>(
+          <div key={i} className="kpi-card">
+            <div className="kpi-label">{k.label}</div>
+            <div className="kpi-value">{k.value}</div>
+            {k.trend && <div className={`kpi-trend ${k.up?'up':'down'}`}>
+              {k.up?'▲':'▼'} {k.trend} this month
+            </div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Attention strip */}
+      <div className="attention-strip">
+        {attentionItems.map((a,i)=>(
+          <div key={i} className={`attention-item ${a.sev}`}>
+            <Icon n="alertTri" s={14} c={a.sev==='high'?'var(--danger-600)':'var(--warning-600)'}/>
+            <span>{a.text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main grid */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:20}}>
+        <div style={{display:'flex',flexDirection:'column',gap:20}}>
+          {/* Insights */}
+          <div className="card">
+            <div className="card-header">
+              <div style={{fontWeight:700,fontSize:'var(--text-14)',color:'var(--text-primary)'}}>Operational Insights</div>
+              <div style={{display:'flex',gap:4}}>
+                {['efficiency','anomalies'].map(t=>(
+                  <button key={t} className="density-btn" style={{background:insightTab===t?'var(--brand-50)':undefined,color:insightTab===t?'var(--brand-600)':undefined}} onClick={()=>setInsightTab(t)}>
+                    {t==='efficiency'?'✦ Efficiency':'⚠ Anomalies'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {insights[insightTab].map((ins,i)=>(
+              <div key={i} className={`insight-row ${ins.sev}`}>
+                <div className="insight-badge">{ins.count}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'var(--text-13)',color:'var(--text-primary)',fontWeight:500}}>{ins.text}</div>
+                  {ins.amt && <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)',marginTop:2,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{ins.amt}</div>}
+                </div>
+                <div style={{fontSize:'var(--text-12)',color:'var(--text-brand)',cursor:'pointer',flexShrink:0}}>Investigate →</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Ops feed + Finance pulse */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Ops Feed</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {opsItems.map((o,i)=>(
+                  <div key={i} className="ops-item">
+                    <div className="ops-dot"/>
+                    <div><div className="ops-text">{o.text}</div><div className="ops-time">{o.time}</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Finance Pulse</div></div>
+              <div className="card-body">
+                {[
+                  {l:'Payroll Apr 2026',v:'₨ 4.24Cr',sub:'1,108 guards'},
+                  {l:'Reserve Balance',v:'₨ 1.27Cr',sub:'30% held'},
+                  {l:'Outstanding Invoices',v:'₨ 8.4L',sub:'3 overdue'},
+                  {l:'Advance Payments',v:'₨ 2.1L',sub:'6 clients'},
+                ].map((f,i)=>(
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:i<3?'1px solid var(--border-default)':'none'}}>
+                    <div><div style={{fontSize:'var(--text-13)',color:'var(--text-primary)',fontWeight:500}}>{f.l}</div><div style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{f.sub}</div></div>
+                    <div style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',fontWeight:700,fontSize:'var(--text-14)',color:'var(--text-primary)'}}>{f.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right sidebar */}
+        <div style={{display:'flex',flexDirection:'column',gap:20}}>
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>My Queue</div></div>
+            <div className="card-body" style={{padding:'8px 0'}}>
+              {[['Guard Reviews','3','var(--warning-600)'],['Pending Approvals','7','var(--brand-600)'],['Overdue Docs','12','var(--danger-600)']].map(([l,v,c])=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px',cursor:'pointer',transition:'background var(--duration-fast)'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-card-hover)'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                  <span style={{fontSize:'var(--text-13)',color:'var(--text-primary)'}}>{l}</span>
+                  <span style={{background:c,color:'#fff',borderRadius:'var(--radius-full)',padding:'1px 8px',fontSize:11,fontWeight:700}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Expiring Soon</div></div>
+            <div className="card-body" style={{padding:'8px 0'}}>
+              {[
+                {name:'Abdul R. Malik',doc:'CNIC',days:4},
+                {name:'Sadia Parveen',doc:'Police Certificate',days:11},
+                {name:'Zara Hussain',doc:'Medical',days:18},
+                {name:'MCB Bank – Gulberg',doc:'Contract',days:22},
+                {name:'Bilal Qureshi',doc:'Character Cert.',days:29},
+              ].map((e,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 20px',borderBottom:i<4?'1px solid var(--border-default)':'none'}}>
+                  <div><div style={{fontSize:'var(--text-13)',color:'var(--text-primary)',fontWeight:500}}>{e.name}</div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>{e.doc}</div></div>
+                  <span style={{fontSize:'var(--text-12)',fontWeight:600,color:e.days<=7?'var(--danger-600)':e.days<=14?'var(--warning-600)':'var(--text-muted)'}}>in {e.days}d</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Guards List Screen ────────────────────────────────────────
+function GuardsScreen({onProfile,showToast}){
+  const [density,setDensity]=useState('comfortable');
+  const [search,setSearch]=useState('');
+  const [statusFilter,setStatusFilter]=useState('All');
+  const [selected,setSelected]=useState([]);
+  const [sortCol,setSortCol]=useState('id');
+  const [sortDir,setSortDir]=useState('asc');
+
+  const filtered=GUARDS.filter(g=>{
+    const matchSearch=!search||g.name.toLowerCase().includes(search.toLowerCase())||g.id.toLowerCase().includes(search.toLowerCase())||g.cnic.includes(search);
+    const matchStatus=statusFilter==='All'||g.lifecycle===statusFilter;
+    return matchSearch&&matchStatus;
+  });
+
+  const sorted=[...filtered].sort((a,b)=>{
+    const va=a[sortCol]||'', vb=b[sortCol]||'';
+    return (va<vb?-1:va>vb?1:0)*(sortDir==='asc'?1:-1);
+  });
+
+  const toggleSelect=id=>setSelected(sel=>sel.includes(id)?sel.filter(s=>s!==id):[...sel,id]);
+  const toggleAll=()=>setSelected(selected.length===sorted.length?[]:sorted.map(g=>g.id));
+
+  const sortBy=col=>{ if(sortCol===col)setSortDir(d=>d==='asc'?'desc':'asc'); else{setSortCol(col);setSortDir('asc');}};
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Guards</div><div className="section-sub">Manage guard profiles and deployments</div></div>
+        <button className="tb-btn tb-btn-primary"><Icon n="plus" s={15}/> Add Guard</button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="stat-grid">
+        {[
+          {label:'Total Guards',value:'1,247',icon:'users',color:'var(--brand-600)',bg:'var(--brand-50)'},
+          {label:'Active',value:'1,108',icon:'check',color:'var(--success-600)',bg:'var(--success-50)'},
+          {label:'Inactive',value:'89',icon:'alertTri',color:'var(--warning-600)',bg:'var(--warning-50)'},
+          {label:'Pending',value:'50',icon:'user',color:'var(--slate-500)',bg:'var(--slate-100)'},
+        ].map(s=>(
+          <div key={s.label} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg}}><Icon n={s.icon} s={18} c={s.color}/></div>
+            <div className="stat-body"><div className="label">{s.label}</div><div className="value" style={{color:s.color}}>{s.value}</div></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter bar */}
+      <div className="filter-bar">
+        <div className="search-input">
+          <Icon n="search" s={14} c="var(--text-placeholder)"/>
+          <input placeholder="Search by name, Parwest ID, CNIC…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        </div>
+        {['All','ACTIVE','INACTIVE','PENDING','TERMINATED'].map(s=>(
+          <button key={s} className="density-btn" style={{background:statusFilter===s?'var(--brand-600)':undefined,color:statusFilter===s?'#fff':undefined}} onClick={()=>setStatusFilter(s)}>{s==='All'?'All Status':s}</button>
+        ))}
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Density:</span>
+          <div className="density-toggle">
+            <span className={`density-btn${density==='comfortable'?' active':''}`} onClick={()=>setDensity('comfortable')}>Comfortable</span>
+            <span className={`density-btn${density==='compact'?' active':''}`} onClick={()=>setDensity('compact')}>Compact</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk bar */}
+      {selected.length>0 && (
+        <div style={{background:'var(--brand-50)',border:'1px solid var(--brand-200)',borderRadius:'var(--radius-sm)',padding:'10px 16px',display:'flex',alignItems:'center',gap:12,marginBottom:12,fontSize:'var(--text-13)'}}>
+          <strong style={{color:'var(--brand-700)'}}>{selected.length} guard{selected.length>1?'s':''} selected</strong>
+          <button className="tb-btn tb-btn-ghost" style={{padding:'5px 12px',fontSize:'var(--text-12)'}} onClick={()=>{showToast('Export started');setSelected([])}}>Bulk Export</button>
+          <button className="tb-btn tb-btn-ghost" style={{padding:'5px 12px',fontSize:'var(--text-12)'}}>Change Status</button>
+          <button className="tb-icon-btn" style={{marginLeft:'auto'}} onClick={()=>setSelected([])}><Icon n="x" s={15}/></button>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="card" style={{overflow:'hidden'}}>
+        <div style={{overflowX:'auto'}}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{width:40}}><input type="checkbox" checked={selected.length===sorted.length&&sorted.length>0} onChange={toggleAll} style={{cursor:'pointer'}}/></th>
+                {[['id','Parwest ID'],['name','Name'],['cnic','CNIC'],['designation','Designation'],['shift','Shift'],['region','Region / Office'],['lifecycle','Status']].map(([col,label])=>(
+                  <th key={col} onClick={()=>sortBy(col)}>
+                    {label} {sortCol===col?(sortDir==='asc'?'↑':'↓'):''}
+                  </th>
+                ))}
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length===0 ? (
+                <tr><td colSpan={9} style={{textAlign:'center',padding:'48px 0',color:'var(--text-muted)',fontSize:'var(--text-14)'}}>
+                  No guards found matching your search.
+                </td></tr>
+              ) : sorted.map(g=>(
+                <tr key={g.id} className={density==='compact'?'row-compact':'row-comfortable'} onClick={onProfile} style={{cursor:'pointer'}}>
+                  <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selected.includes(g.id)} onChange={()=>toggleSelect(g.id)} style={{cursor:'pointer'}}/></td>
+                  <td><span className="mono" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{g.id}</span></td>
+                  <td>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <div className="guard-avatar" style={{background:avatarColor(g.name)}}>{initials(g.name)}</div>
+                      <span style={{fontWeight:500}}>{g.name}</span>
+                    </div>
+                  </td>
+                  <td><span className="mono" style={{fontSize:'var(--text-12)'}}>{g.cnic}</span></td>
+                  <td>{g.designation}</td>
+                  <td><span className={`chip chip-${g.shift==='DAY'?'day':g.shift==='NIGHT'?'night':'both'}`}>{g.shift}</span></td>
+                  <td><span style={{fontSize:'var(--text-12)'}}>{g.region}</span><span style={{color:'var(--text-muted)',fontSize:'var(--text-11)',display:'block'}}>{g.office}</span></td>
+                  <td><StatusChip status={g.lifecycle}/></td>
+                  <td onClick={e=>e.stopPropagation()}>
+                    <div style={{display:'flex',gap:6}}>
+                      <button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={onProfile}>View</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'12px 16px',borderTop:'1px solid var(--border-default)',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>
+          <span>Showing {sorted.length} of 1,247 guards</span>
+          <div style={{display:'flex',gap:4}}>
+            {[1,2,3,'…',42].map((p,i)=><button key={i} className="density-btn" style={{padding:'4px 8px',background:p===1?'var(--brand-600)':undefined,color:p===1?'#fff':undefined}}>{p}</button>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Guard Profile Screen ──────────────────────────────────────
+function GuardProfileScreen({onBack}){
+  const [activeTab,setActiveTab]=useState(0);
+  const guard=GUARDS[0];
+  const tabs=['General Information','Profile','Attachments','Attendance','Paid Salaries','Deployment History','Courses','Verification','Pledged Documents','Bank Details','Residence History','On-Job Trainings','Store Inventory','Service History','Insurance','Status History','PBA Documents','Nearest Relatives'];
+
+  return (
+    <div>
+      {/* Back + Actions */}
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <button className="tb-btn tb-btn-ghost" style={{padding:'6px 12px',fontSize:'var(--text-13)'}} onClick={onBack}>
+          <Icon n="arrowLeft" s={14}/> Guards
+        </button>
+        <div style={{color:'var(--text-muted)',fontSize:'var(--text-13)'}}>/ {guard.name}</div>
+        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost">End Deployment</button>
+          <button className="tb-btn tb-btn-primary">Edit Guard</button>
+        </div>
+      </div>
+
+      {/* Header card */}
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{padding:'20px 24px',display:'grid',gridTemplateColumns:'1fr 200px',gap:24}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+              <div style={{fontSize:'var(--text-28)',fontWeight:800,color:'var(--text-primary)',letterSpacing:'-0.5px'}}>{guard.name}</div>
+              <div style={{background:'var(--warning-50)',border:'1px solid var(--warning-200)',borderRadius:'var(--radius-sm)',padding:'3px 10px',display:'flex',alignItems:'center',gap:6,fontSize:'var(--text-12)',color:'var(--warning-700)',fontWeight:600}}>
+                <Icon n="alertTri" s={13}/> Age Approval Pending
+              </div>
+            </div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-13)',color:'var(--text-muted)',marginBottom:12}}>{guard.id}</div>
+
+            {/* Profile health */}
+            <div style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',color:'var(--text-muted)',marginBottom:4}}>
+                <span>Profile Completeness</span><span style={{fontWeight:600,color:'var(--brand-600)'}}>74%</span>
+              </div>
+              <div className="progress-bar"><div className="progress-fill" style={{width:'74%'}}/></div>
+            </div>
+
+            {/* Lifecycle */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:'var(--text-11)',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}}>Lifecycle</div>
+              <div style={{display:'flex',alignItems:'center',gap:0}}>
+                {['PENDING','ACTIVE','DEPLOYED','INACTIVE','TERMINATED'].map((step,i,arr)=>{
+                  const currentIdx=1; // ACTIVE
+                  const done=i<=currentIdx;
+                  return (
+                    <div key={step} style={{display:'flex',alignItems:'center',flex:1}}>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1}}>
+                        <div style={{width:10,height:10,borderRadius:'50%',background:done?'var(--brand-600)':'var(--slate-200)',boxShadow:i===currentIdx?'0 0 0 3px var(--brand-100)':undefined,marginBottom:4}}/>
+                        <div style={{fontSize:10,color:done?'var(--brand-600)':'var(--text-muted)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>{step}</div>
+                      </div>
+                      {i<arr.length-1 && <div style={{height:2,width:32,background:i<currentIdx?'var(--brand-600)':'var(--slate-200)',flexShrink:0}}/>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{display:'flex',gap:8}}>
+              <StatusChip status="ACTIVE"/>
+              <span className="chip" style={{background:'var(--emerald-50)',color:'var(--emerald-600)'}}><span className="chip-dot" style={{background:'var(--emerald-500)'}}/>Ex-Service: Army</span>
+            </div>
+          </div>
+          <div style={{background:'var(--bg-subtle)',borderRadius:'var(--radius-md)',height:176,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8}}>
+            <div className="guard-avatar" style={{width:64,height:64,fontSize:22,background:avatarColor(guard.name)}}>{initials(guard.name)}</div>
+            <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Profile Photo</div>
+            <button className="tb-btn tb-btn-ghost" style={{fontSize:'var(--text-12)',padding:'4px 10px'}}>Upload</button>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="kpi-strip" style={{marginBottom:16}}>
+        {[['23','Present Days'],['4','Absent Days'],['12','Total OT Hrs'],['74%','Verification'],['1','Active Deployments']].map(([v,l])=>(
+          <div key={l} className="kpi-strip-tile"><div className="v">{v}</div><div className="l">{l}</div></div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div className="card" style={{overflow:'hidden'}}>
+        <div className="tabs" style={{padding:'0 4px'}}>
+          {tabs.map((t,i)=><div key={i} className={`tab-item${activeTab===i?' active':''}`} onClick={()=>setActiveTab(i)}>{t}</div>)}
+        </div>
+        <div style={{padding:'20px 24px'}}>
+          {activeTab===0 && <GeneralInfoTab guard={guard}/>}
+          {activeTab===3 && <AttendanceTab/>}
+          {activeTab===4 && <PaidSalariesTab/>}
+          {activeTab===5 && <DeploymentHistoryTab/>}
+          {activeTab===9 && <BankDetailsTab/>}
+          {activeTab===15 && <StatusHistoryTab/>}
+          {![0,3,4,5,9,15].includes(activeTab) && (
+            <div className="empty-state">
+              <div className="empty-icon"><Icon n="file" s={22} c="var(--text-muted)"/></div>
+              <div style={{fontWeight:600,marginBottom:6}}>{tabs[activeTab]}</div>
+              <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',marginBottom:16}}>No records found for this guard.</div>
+              <button className="tb-btn tb-btn-ghost" style={{fontSize:'var(--text-13)'}}>Add Record</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneralInfoTab({guard}){
+  const fields=[
+    ['Full Name','Muhammad Usman Khan'],['Parwest ID','LHR-00247'],['CNIC','42201-1234567-9'],
+    ['Date of Birth','12/03/1990'],['Age','36 years'],['Father Name','Khalid Mehmood Khan'],
+    ['Religion','Islam'],['Marital Status','Married'],['Education','Intermediate (2008, BISE Lahore)'],
+    ['Blood Group','B+'],['Height','5\'9"'],['Weight','74 kg'],
+    ['Permanent Address','House 12, Street 5, Samanabad, Lahore'],['Current Address','House 34, Block C, DHA Phase 4, Lahore'],
+    ['Emergency Contact','+92 300 1234567 (Khalid Khan – Father)'],['Identification Mark','Mole on right cheek'],
+  ];
+  const exService=[
+    ['Service Type','ARMY'],['Rank','Lance Naik'],['Regiment','Punjab Regiment'],['Unit','22 Punjab'],
+    ['Service Period','6 years, 4 months'],['Date of Enrolment','01/01/2008'],['Date of Discharge','15/05/2014'],
+  ];
+  return (
+    <div>
+      <div className="form-section">
+        <div className="form-section-title">Personal Details</div>
+        <div className="detail-grid">
+          {fields.map(([l,v])=>(
+            <div key={l} className="detail-field">
+              <div className="fl">{l}</div>
+              <div className="fv" style={{fontFamily:['CNIC','Parwest ID'].includes(l)?'var(--font-mono)':undefined}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="form-section">
+        <div className="form-section-title">Ex-Service Details</div>
+        <div className="detail-grid">
+          {exService.map(([l,v])=>(
+            <div key={l} className="detail-field">
+              <div className="fl">{l}</div>
+              <div className="fv">{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttendanceTab(){
+  const days=Array.from({length:30},(_,i)=>{
+    const statuses=['PRESENT','PRESENT','PRESENT','ABSENT','PRESENT','PRESENT','LEAVE','PRESENT','PRESENT','PRESENT','DOUBLE_DUTY','PRESENT','PRESENT','PRESENT','ABSENT','PRESENT','PRESENT','PRESENT','PRESENT','EXTRA','PRESENT','PRESENT','PRESENT','PRESENT','PRESENT','ABSENT','PRESENT','PRESENT','PRESENT','PRESENT'];
+    return {day:i+1,status:statuses[i]};
+  });
+  const statusColors={PRESENT:'var(--success-600)',ABSENT:'var(--danger-600)',LEAVE:'var(--warning-500)',DOUBLE_DUTY:'var(--info-500)',EXTRA:'var(--purple-500)'};
+  return (
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(10,1fr)',gap:4,marginBottom:20}}>
+        {days.map(d=>(
+          <div key={d.day} title={d.status} style={{aspectRatio:'1',borderRadius:6,background:statusColors[d.status]||'var(--bg-subtle)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#fff',fontWeight:600,cursor:'pointer'}}>{d.day}</div>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:14,marginBottom:16,flexWrap:'wrap'}}>
+        {Object.entries(statusColors).map(([s,c])=>(
+          <div key={s} style={{display:'flex',alignItems:'center',gap:6,fontSize:'var(--text-12)',color:'var(--text-muted)'}}>
+            <div style={{width:10,height:10,borderRadius:2,background:c}}/>{s.replace('_',' ')}
+          </div>
+        ))}
+      </div>
+      <table className="data-table" style={{fontSize:'var(--text-12)'}}>
+        <thead><tr>{['Date','Status','Shift','Client','Hours','Overtime','Type','Note'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+        <tbody>
+          {[
+            ['01/04/2026','PRESENT','DAY','MCB Bank – Gulberg','8','0','REGULAR','—'],
+            ['02/04/2026','PRESENT','DAY','MCB Bank – Gulberg','8','2','REGULAR','Stayed for handover'],
+            ['03/04/2026','ABSENT','—','—','0','0','—','Unauthorised absence'],
+            ['04/04/2026','PRESENT','DAY','MCB Bank – Gulberg','8','0','REGULAR','—'],
+          ].map((r,i)=>(
+            <tr key={i} className="row-comfortable">
+              {r.map((c,j)=><td key={j} style={j===0?{fontFamily:'var(--font-mono)'}:{}}><StatusChip status={r[1]}/>{j===1?null:j===0?r[0]:c}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PaidSalariesTab(){
+  const rows=[
+    {month:'April 2026',basic:28000,net:24640,status:'GLOBAL_FINALIZED',reserve:8400,deductions:840,method:'BANK'},
+    {month:'March 2026',basic:28000,net:24640,status:'PAID',reserve:8400,deductions:840,method:'BANK'},
+    {month:'February 2026',basic:28000,net:23800,status:'PAID',reserve:8400,deductions:1680,method:'CASH'},
+    {month:'January 2026',basic:26000,net:22880,status:'PAID',reserve:7800,deductions:780,method:'BANK'},
+  ];
+  return (
+    <table className="data-table">
+      <thead><tr>{['Month','Basic Salary','Net Salary','Status','Reserve','Deductions','Method'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+      <tbody>{rows.map((r,i)=>(
+        <tr key={i} className="row-comfortable">
+          <td style={{fontWeight:500}}>{r.month}</td>
+          <td className="tabnum">{fmtFull(r.basic)}</td>
+          <td className="tabnum" style={{fontWeight:600}}>{fmtFull(r.net)}</td>
+          <td><StatusChip status={r.status}/></td>
+          <td className="tabnum">{fmtFull(r.reserve)}</td>
+          <td className="tabnum">{fmtFull(r.deductions)}</td>
+          <td><span className="chip chip-brand">{r.method}</span></td>
+        </tr>
+      ))}</tbody>
+    </table>
+  );
+}
+
+function DeploymentHistoryTab(){
+  return (
+    <table className="data-table">
+      <thead><tr>{['Client','Branch','Shift','Designation','Deployed On','End Date','Status','Deployed By'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+      <tbody>{[
+        {client:'MCB Bank',branch:'Gulberg Branch',shift:'DAY',desig:'Security Guard',from:'01/04/2026',end:'—',status:'ACTIVE',by:'Asad Khan'},
+        {client:'Engro Chemicals',branch:'Plant Site',shift:'DAY',desig:'Security Guard',from:'01/12/2025',end:'31/03/2026',status:'INACTIVE',by:'Kamran Mir'},
+      ].map((r,i)=>(
+        <tr key={i} className="row-comfortable">
+          <td style={{fontWeight:500}}>{r.client}</td>
+          <td>{r.branch}</td>
+          <td><span className={`chip chip-${r.shift.toLowerCase()}`}>{r.shift}</span></td>
+          <td>{r.desig}</td>
+          <td className="mono" style={{fontSize:'var(--text-12)'}}>{r.from}</td>
+          <td className="mono" style={{fontSize:'var(--text-12)'}}>{r.end}</td>
+          <td><StatusChip status={r.status}/></td>
+          <td style={{color:'var(--text-muted)'}}>{r.by}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+  );
+}
+
+function BankDetailsTab(){
+  return (
+    <div>
+      <div className="card" style={{marginBottom:16,padding:'20px'}}>
+        <div style={{fontWeight:700,marginBottom:14,fontSize:'var(--text-14)'}}>Primary Bank Account</div>
+        <div className="detail-grid">
+          {[['Bank Name','MCB Bank'],['Account Number','0012345678901'],['Account Type','Current'],['IBAN','PK84MUCB0000010012345678901'],['Branch Code','0123']].map(([l,v])=>(
+            <div key={l} className="detail-field"><div className="fl">{l}</div><div className="fv" style={{fontFamily:'var(--font-mono)'}}>{v}</div></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusHistoryTab(){
+  const history=[
+    {from:'PENDING',to:'ACTIVE',reason:'Documents verified, age approved',by:'Asad Khan',type:'ACTIVATION',date:'15/04/2026'},
+    {from:'—',to:'PENDING',reason:'Guard enrolled via Create Guard form',by:'Kamran Mir',type:'ENROLLMENT',date:'10/04/2026'},
+  ];
+  return (
+    <table className="data-table">
+      <thead><tr>{['From','To','Reason','Changed By','Type','Date'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+      <tbody>{history.map((r,i)=>(
+        <tr key={i} className="row-comfortable">
+          <td>{r.from!=='—'?<StatusChip status={r.from}/>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
+          <td><StatusChip status={r.to}/></td>
+          <td style={{maxWidth:240,whiteSpace:'normal',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{r.reason}</td>
+          <td>{r.by}</td>
+          <td><span className="chip chip-brand">{r.type}</span></td>
+          <td className="mono" style={{fontSize:'var(--text-12)'}}>{r.date}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+  );
+}
+
+// ── Deployments Screen ────────────────────────────────────────
+function DeploymentsScreen(){
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Deployments</div><div className="section-sub">Guard-to-site assignments with shift and contract validation</div></div>
+        <button className="tb-btn tb-btn-primary"><Icon n="plus" s={15}/> Deploy Guard</button>
+      </div>
+      <div className="stat-grid">
+        {[{l:'Total',v:'1,108',c:'var(--brand-600)',bg:'var(--brand-50)'},{l:'Active',v:'1,042',c:'var(--success-600)',bg:'var(--success-50)'},{l:'Ended',v:'66',c:'var(--slate-500)',bg:'var(--slate-100)'}].map(s=>(
+          <div key={s.l} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg}}><Icon n="map" s={18} c={s.c}/></div>
+            <div className="stat-body"><div className="label">{s.l}</div><div className="value" style={{color:s.c}}>{s.v}</div></div>
+          </div>
+        ))}
+        <div/>
+      </div>
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search guard, client…"/></div>
+        <select className="filter-select"><option>All Status</option><option>Active</option><option>Ended</option></select>
+        <select className="filter-select"><option>All Shifts</option><option>Day</option><option>Night</option><option>Both</option></select>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['Guard','Client','Branch','Shift','Designation','Rate (₨)','Deployed On','Status','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{DEPLOYMENTS.map(d=>(
+            <tr key={d.id} className="row-comfortable">
+              <td><div style={{display:'flex',alignItems:'center',gap:8}}><div className="guard-avatar" style={{background:avatarColor(d.guard)}}>{initials(d.guard)}</div><div><div style={{fontWeight:500}}>{d.guard}</div><div className="mono" style={{fontSize:10,color:'var(--text-muted)'}}>{d.guardId}</div></div></div></td>
+              <td><div style={{fontWeight:500}}>{d.client}</div><span className="chip chip-brand" style={{fontSize:10}}>{d.clientType}</span></td>
+              <td><div>{d.branch}</div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>{d.city}</div></td>
+              <td><span className={`chip chip-${d.shift.toLowerCase()}`}>{d.shift}</span></td>
+              <td>{d.designation}</td>
+              <td className="tabnum" style={{fontWeight:600}}>₨ {d.rate.toLocaleString()}</td>
+              <td className="mono" style={{fontSize:'var(--text-12)'}}>{d.deployed}</td>
+              <td><StatusChip status={d.status}/></td>
+              <td><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}}>View</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Payroll Screen ─────────────────────────────────────────────
+function PayrollScreen({showToast}){
+  const stages=['DRAFT','CALCULATED','REGIONAL LOCKED','GLOBAL FINALIZED','PAID'];
+  const currentStage=3; // GLOBAL_FINALIZED
+  const regions=[
+    {name:'Lahore – Gulberg',status:'LOCKED',at:'23/04/2026 14:32',by:'Kamran Mir'},
+    {name:'Lahore – DHA',status:'LOCKED',at:'23/04/2026 15:10',by:'Kamran Mir'},
+    {name:'Karachi – Site A',status:'LOCKED',at:'22/04/2026 11:05',by:'Faisal Raza'},
+    {name:'Islamabad – F-7',status:'LOCKED',at:'22/04/2026 09:45',by:'Tariq Hassan'},
+    {name:'Rawalpindi – Saddar',status:'PENDING',at:'—',by:'—'},
+  ];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Payroll State — April 2026</div><div className="section-sub">Monthly payroll finalization workflow</div></div>
+        <select className="filter-select"><option>April 2026</option><option>March 2026</option></select>
+      </div>
+
+      {/* Workflow bar */}
+      <div className="workflow-bar">
+        {stages.map((s,i)=>(
+          <div key={i} className={`wf-stage${i<currentStage?' done':i===currentStage?' current':''}`}>
+            <div className={`wf-label${i<currentStage?' done':''}`}>{i+1}. {s}</div>
+            <div className="wf-sub">{i<currentStage?'Complete':i===currentStage?'Current':'Pending'}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats */}
+      <div className="stat-grid" style={{marginBottom:20}}>
+        {[
+          {l:'Total Payrolls',v:'1,108',c:'var(--brand-600)',bg:'var(--brand-50)'},
+          {l:'Net Payable',v:'₨ 4.24Cr',c:'var(--success-600)',bg:'var(--success-50)'},
+          {l:'Total Reserve',v:'₨ 1.27Cr',c:'var(--warning-600)',bg:'var(--warning-50)'},
+          {l:'On Hold',v:'4',c:'var(--danger-600)',bg:'var(--danger-50)'},
+        ].map(s=>(
+          <div key={s.l} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg}}><Icon n="dollar" s={18} c={s.c}/></div>
+            <div className="stat-body"><div className="label">{s.l}</div><div className="value tabnum" style={{color:s.c,fontSize:'var(--text-18)'}}>{s.v}</div></div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:20,marginBottom:20}}>
+        {/* Regional locking */}
+        <div className="card">
+          <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Regional Lock Status</div></div>
+          <table className="data-table">
+            <thead><tr>{['Regional Office','Status','Locked At','Locked By','Action'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <tbody>{regions.map((r,i)=>(
+              <tr key={i} className="row-comfortable">
+                <td style={{fontWeight:500}}>{r.name}</td>
+                <td><StatusChip status={r.status==='LOCKED'?'REGIONAL_LOCKED':'PENDING'}/></td>
+                <td className="mono" style={{fontSize:'var(--text-12)'}}>{r.at}</td>
+                <td>{r.by}</td>
+                <td>{r.status==='LOCKED'
+                  ? <button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={()=>showToast('Region unlocked','error')}>Unlock</button>
+                  : <button className="tb-btn tb-btn-primary" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={()=>showToast('Region locked successfully')}>Lock</button>}
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+
+        {/* Global actions */}
+        <div className="card">
+          <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Global Actions</div></div>
+          <div className="card-body" style={{display:'flex',flexDirection:'column',gap:10}}>
+            <button className="tb-btn tb-btn-ghost" style={{justifyContent:'center'}} onClick={()=>showToast('All regions locked')}>Lock All Regions</button>
+            <button className="tb-btn tb-btn-primary" style={{justifyContent:'center',background:'var(--success-600)',borderColor:'var(--success-600)'}} onClick={()=>showToast('Payroll globally finalized')}>Finalize Globally</button>
+            <button className="tb-btn tb-btn-ghost" style={{justifyContent:'center'}} onClick={()=>showToast('Payments marked as paid')}>Mark Paid</button>
+            <div style={{borderTop:'1px solid var(--border-default)',paddingTop:10,marginTop:4}}>
+              <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)',marginBottom:8}}>Super Admin Only</div>
+              <button className="tb-btn" style={{background:'var(--danger-50)',color:'var(--danger-700)',border:'1px solid var(--danger-200)',width:'100%',justifyContent:'center',fontSize:'var(--text-13)'}} onClick={()=>showToast('Emergency release applied','error')}>Emergency Release</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Records table */}
+      <div className="card" style={{overflow:'hidden'}}>
+        <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Payroll Records</div></div>
+        <table className="data-table">
+          <thead><tr>{['Guard','Office','Basic','Net Salary','Reserve','Loans','Deductions','State','Payment'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{PAYROLL_RECORDS.map((r,i)=>(
+            <tr key={i} className="row-comfortable">
+              <td><div style={{fontWeight:500}}>{r.guard}</div><div className="mono" style={{fontSize:10,color:'var(--text-muted)'}}>{r.id}</div></td>
+              <td>{r.office}</td>
+              <td className="tabnum">{fmtFull(r.basic)}</td>
+              <td className="tabnum" style={{fontWeight:600}}>{r.net?fmtFull(r.net):'—'}</td>
+              <td className="tabnum">{r.reserve?fmtFull(r.reserve):'—'}</td>
+              <td className="tabnum">{fmtFull(r.loans)}</td>
+              <td className="tabnum">{r.deductions?fmtFull(r.deductions):'—'}</td>
+              <td><StatusChip status={r.state}/></td>
+              <td><StatusChip status={r.pstatus}/></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Audit Screen ──────────────────────────────────────────────
+function AuditScreen(){
+  const [expanded,setExpanded]=useState(null);
+  const logs=[
+    {ts:'24/04/2026 09:14',user:'Asad Khan',role:'Super Admin',event:'UPDATED',module:'PAYROLL',desc:'Globally finalized April 2026 payroll — 1,108 records',entity:'PayrollMonth',ip:'192.168.1.14'},
+    {ts:'24/04/2026 08:52',user:'Kamran Mir',role:'Manager',event:'CREATED',module:'GUARDS',desc:'Guard LHR-00247 Muhammad Usman Khan enrolled',entity:'Guard',ip:'192.168.1.22'},
+    {ts:'23/04/2026 17:40',user:'Faisal Raza',role:'Regional Admin',event:'UPDATED',module:'DEPLOYMENTS',desc:'Deployment ended for KHI-01034 at MCB Clifton',entity:'Deployment',ip:'10.0.0.5'},
+    {ts:'23/04/2026 14:32',user:'Kamran Mir',role:'Manager',event:'UPDATED',module:'PAYROLL',desc:'Lahore – Gulberg region locked for April 2026',entity:'PayrollRegion',ip:'192.168.1.22'},
+    {ts:'22/04/2026 11:05',user:'Faisal Raza',role:'Regional Admin',event:'DELETED',module:'GUARDS',desc:'Guard KHI-00444 terminated — ABSCONDED',entity:'Guard',ip:'10.0.0.5'},
+  ];
+  const diffData={
+    before:{state:'REGIONAL_LOCKED',lockedAt:null,lockedBy:null},
+    after:{state:'GLOBAL_FINALIZED',lockedAt:'2026-04-24T09:14:00Z',lockedBy:'Asad Khan'},
+  };
+  const eventColors={CREATED:'var(--emerald-600)',UPDATED:'var(--info-600)',DELETED:'var(--danger-600)',STATUS_CHANGED:'var(--warning-600)'};
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Audit Log</div><div className="section-sub">Entity-level change trail across all modules</div></div>
+        <button className="tb-btn tb-btn-ghost"><Icon n="file" s={14}/> Export CSV</button>
+      </div>
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search by user, description…"/></div>
+        <select className="filter-select"><option>All Modules</option><option>GUARDS</option><option>PAYROLL</option><option>DEPLOYMENTS</option><option>INVENTORY</option></select>
+        <select className="filter-select"><option>All Events</option><option>CREATED</option><option>UPDATED</option><option>DELETED</option></select>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['Timestamp','User','Event','Module','Description','Entity','IP Address'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{logs.map((l,i)=>(
+            <>
+              <tr key={i} className="row-compact" style={{cursor:'pointer'}} onClick={()=>setExpanded(expanded===i?null:i)}>
+                <td className="mono" style={{fontSize:'var(--text-11)'}}>{l.ts}</td>
+                <td><div style={{fontWeight:500,fontSize:'var(--text-12)'}}>{l.user}</div><span className="role-chip" style={{fontSize:9}}>{l.role}</span></td>
+                <td><span className="chip" style={{background:l.event==='CREATED'?'var(--emerald-50)':l.event==='UPDATED'?'var(--info-50)':'var(--danger-50)',color:eventColors[l.event]}}>{l.event}</span></td>
+                <td><span className="chip chip-brand" style={{fontSize:10}}>{l.module}</span></td>
+                <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',fontSize:'var(--text-12)'}}>{l.desc}</td>
+                <td style={{color:'var(--text-muted)',fontSize:'var(--text-12)'}}>{l.entity}</td>
+                <td className="mono" style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>{l.ip}</td>
+              </tr>
+              {expanded===i && (
+                <tr key={`exp-${i}`}><td colSpan={7} style={{padding:'0 16px 16px',background:'var(--bg-subtle)'}}>
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:'var(--text-12)',fontWeight:600,color:'var(--text-muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.4px'}}>Field Changes</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                      <div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',marginBottom:4}}>BEFORE</div>
+                        <div className="json-diff">
+                          {Object.entries(diffData.before).map(([k,v])=>(
+                            <div key={k} className={v!==diffData.after[k]?'removed':'unchanged'}>{k}: {JSON.stringify(v)}</div>
+                          ))}
+                        </div>
+                      </div>
+                      <div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',marginBottom:4}}>AFTER</div>
+                        <div className="json-diff">
+                          {Object.entries(diffData.after).map(([k,v])=>(
+                            <div key={k} className={v!==diffData.before[k]?'added':'unchanged'}>{k}: {JSON.stringify(v)}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </td></tr>
+              )}
+            </>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── RBAC Screen ───────────────────────────────────────────────
+function RBACScreen(){
+  const roles=['Admin','Regional Mgr','Supervisor','Accountant','Store Operator'];
+  const modules=[
+    {name:'GUARDS',perms:[[1,1,1,1,0],[1,1,1,0,0],[1,1,0,0,0],[1,0,0,0,0],[0,0,0,0,0]]},
+    {name:'CLIENTS',perms:[[1,1,1,1,0],[1,1,1,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0]]},
+    {name:'DEPLOYMENTS',perms:[[1,1,1,1,0],[1,1,1,0,0],[1,1,0,0,0],[1,0,0,0,0],[0,0,0,0,0]]},
+    {name:'PAYROLL',perms:[[1,1,1,1,0],[1,1,1,0,0],[1,0,0,0,0],[1,1,0,1,0],[0,0,0,0,0]]},
+    {name:'INVENTORY',perms:[[1,1,1,1,1],[1,1,1,0,1],[0,1,0,0,1],[0,0,0,0,0],[1,1,1,0,1]]},
+    {name:'TICKETING',perms:[[1,1,1,1,0],[1,1,1,0,0],[1,1,1,0,0],[1,1,0,0,0],[1,1,0,0,0]]},
+    {name:'USERS',perms:[[1,1,1,1,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]},
+    {name:'AUDIT',perms:[[1,1,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,1,0,0,0],[0,0,0,0,0]]},
+    {name:'REPORTS',perms:[[1,1,0,0,0],[1,1,0,0,0],[0,0,0,0,0],[1,1,0,0,0],[0,0,0,0,0]]},
+    {name:'SETTINGS',perms:[[1,1,1,1,0],[0,1,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]},
+  ];
+  const [matrix,setMatrix]=useState(modules.map(m=>m.perms));
+  const toggle=(mi,ri,pi)=>setMatrix(prev=>prev.map((m,mi2)=>mi2!==mi?m:m.map((r,ri2)=>ri2!==ri?r:r.map((p,pi2)=>pi2!==pi?p:1-p))));
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Role Permissions</div><div className="section-sub">Module access matrix — C=Create V=View U=Update D=Delete R=Requisition</div></div>
+        <button className="tb-btn tb-btn-primary"><Icon n="plus" s={15}/> Add Role</button>
+      </div>
+      <div style={{background:'var(--info-50)',border:'1px solid var(--info-100)',borderRadius:'var(--radius-sm)',padding:'10px 14px',fontSize:'var(--text-13)',color:'var(--info-600)',marginBottom:16,display:'flex',gap:8,alignItems:'center'}}>
+        <Icon n="shield" s={16}/>
+        <span><strong>Super Admin</strong> (Admin role without permission restrictions) has unrestricted access to all modules.</span>
+      </div>
+      <div className="card" style={{overflow:'auto'}}>
+        <table className="perm-matrix">
+          <thead>
+            <tr>
+              <th style={{textAlign:'left',minWidth:120}}>Module</th>
+              {roles.map(r=>(
+                <th key={r} colSpan={5} className="role-header">{r}</th>
+              ))}
+            </tr>
+            <tr>
+              <th/>
+              {roles.map(r=>['C','V','U','D','R'].map(p=><th key={`${r}-${p}`} style={{padding:'4px 6px',fontSize:10}}>{p}</th>))}
+            </tr>
+          </thead>
+          <tbody>{modules.map((m,mi)=>(
+            <tr key={m.name}>
+              <td className="module-name">{m.name}</td>
+              {roles.map((r,ri)=>['C','V','U','D','R'].map((p,pi)=>(
+                <td key={`${ri}-${pi}`} style={{padding:'6px'}}>
+                  <div className={`perm-check${matrix[mi][ri][pi]?' granted':''}`} onClick={()=>toggle(mi,ri,pi)} title={`Toggle ${p} for ${r} on ${m.name}`}>
+                    {matrix[mi][ri][pi] && <Icon n="check" s={10} c="#fff"/>}
+                  </div>
+                </td>
+              )))}
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Clients Screen ─────────────────────────────────────────
+function ClientsScreen({onProfile}){
+  const clients=[
+    {name:'MCB Bank',type:'BANK',city:'Lahore',status:'ACTIVE',branches:12,guards:48,enrolled:'01/01/2020'},
+    {name:'Engro Chemicals',type:'MANUFACTURER',city:'Lahore',status:'ACTIVE',branches:3,guards:18,enrolled:'15/06/2019'},
+    {name:'Shaukat Khanum Hospital',type:'HOSPITAL',city:'Karachi',status:'ACTIVE',branches:2,guards:24,enrolled:'01/03/2021'},
+    {name:'University of Lahore',type:'EDUCATION',city:'Lahore',status:'ACTIVE',branches:5,guards:30,enrolled:'20/08/2022'},
+    {name:'Netsol Technologies',type:'OTHER',city:'Lahore',status:'INACTIVE',branches:1,guards:0,enrolled:'01/07/2018'},
+  ];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Clients</div><div className="section-sub">Client onboarding, contracts, and guard assignments</div></div>
+        <button className="tb-btn tb-btn-primary"><Icon n="plus" s={15}/> Add Client</button>
+      </div>
+      <div className="stat-grid">
+        {[{l:'Total',v:'89',c:'var(--brand-600)',bg:'var(--brand-50)'},{l:'Active',v:'76',c:'var(--success-600)',bg:'var(--success-50)'},{l:'Blacklisted',v:'2',c:'var(--danger-600)',bg:'var(--danger-50)'}].map(s=>(
+          <div key={s.l} className="stat-card"><div className="stat-icon" style={{background:s.bg}}><Icon n="shield" s={18} c={s.c}/></div><div className="stat-body"><div className="label">{s.l}</div><div className="value" style={{color:s.c}}>{s.v}</div></div></div>
+        ))}
+        <div/>
+      </div>
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search clients…"/></div>
+        <select className="filter-select"><option>All Status</option><option>Active</option><option>Inactive</option><option>Blacklisted</option></select>
+        <select className="filter-select"><option>All Types</option><option>Bank</option><option>Hospital</option><option>Manufacturer</option></select>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['Logo','Name','Type','City','Status','Branches','Active Guards','Enrolled','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{clients.map((c,i)=>(
+            <tr key={i} className="row-comfortable">
+              <td><div style={{width:32,height:32,borderRadius:6,background:avatarColor(c.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff'}}>{initials(c.name)}</div></td>
+              <td style={{fontWeight:600}}>{c.name}</td>
+              <td><span className="chip chip-brand" style={{fontSize:11}}>{c.type}</span></td>
+              <td>{c.city}</td>
+              <td><StatusChip status={c.status}/></td>
+              <td className="tabnum" style={{fontWeight:600}}>{c.branches}</td>
+              <td className="tabnum">{c.guards}</td>
+              <td className="mono" style={{fontSize:'var(--text-12)'}}>{c.enrolled}</td>
+              <td><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={onProfile}>View</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Inventory Screen (stub) ──────────────────────────────────
+function InventoryScreen(){
+  const products=[
+    {sku:'WPN-001',name:'Walther P22 Pistol',cat:'Weapon',brand:'Walther',unit:'Piece',onHand:12,held:3,issued:45,reorder:10,status:'ACTIVE'},
+    {sku:'UNF-014',name:'Security Guard Uniform',cat:'Uniform',brand:'—',unit:'Set',onHand:234,held:12,issued:890,reorder:50,status:'ACTIVE'},
+    {sku:'EQP-007',name:'Motorola Radio Set',cat:'Equipment',brand:'Motorola',unit:'Piece',onHand:8,held:2,issued:67,reorder:15,status:'ACTIVE'},
+    {sku:'AMO-003',name:'9mm Ammunition (50 rounds)',cat:'Ammunition',brand:'POF',unit:'Box',onHand:45,held:0,issued:320,reorder:100,status:'ACTIVE'},
+    {sku:'EQP-012',name:'Night Vision Binoculars',cat:'Equipment',brand:'Bushnell',unit:'Piece',onHand:3,held:0,issued:18,reorder:5,status:'ACTIVE'},
+  ];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Store Inventory</div><div className="section-sub">Products, stock levels, and inter-store demands</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost">Demands</button>
+          <button className="tb-btn tb-btn-primary"><Icon n="plus" s={15}/> Create Product</button>
+        </div>
+      </div>
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search by name, SKU…"/></div>
+        <select className="filter-select"><option>All Categories</option><option>Weapon</option><option>Uniform</option><option>Equipment</option><option>Ammunition</option></select>
+        <select className="filter-select"><option>All Status</option><option>Active</option><option>Inactive</option></select>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['SKU','Name','Category','Brand','Unit','Stock (On Hand/Held/Issued)','Reorder Level','Status'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{products.map((p,i)=>(
+            <tr key={i} className="row-comfortable">
+              <td className="mono" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{p.sku}</td>
+              <td style={{fontWeight:500}}>{p.name}</td>
+              <td><span className="chip chip-brand" style={{fontSize:11}}>{p.cat}</span></td>
+              <td>{p.brand}</td>
+              <td>{p.unit}</td>
+              <td>
+                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)',fontWeight:600,color:p.onHand<=p.reorder?'var(--danger-600)':p.onHand<=p.reorder*1.5?'var(--warning-600)':'var(--success-600)'}}>{p.onHand}</span>
+                  <span style={{color:'var(--text-muted)',fontSize:'var(--text-12)'}}>/ {p.held} / {p.issued}</span>
+                </div>
+              </td>
+              <td className="tabnum">{p.reorder}</td>
+              <td><StatusChip status={p.status}/></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Settings Screen ──────────────────────────────────────────
+function SettingsScreen(){
+  const [preset,setPreset]=useState('balanced');
+  const [rules,setRules]=useState({
+    singleActivePerGuard:true, blockInactiveUpdate:true, lockAfterEnd:true,
+    requireActiveGuardStatus:true, requireGuardOfficeConsistency:false,
+    requireEndDate:true, disallowEndDateBeforeDeploymentDate:true,
+    disallowFutureEndDate:true, requireBranchContract:false,
+    requireClientHasBranches:true, requirePendingInitialStatus:true,
+    enforceTransitionMap:true, blockCoreEditsAfterTerminal:true,
+    requireSufficientStockForFulfillment:false,
+  });
+
+  return (
+    <div>
+      <div style={{marginBottom:20}}><div className="section-title">Workflow Rules</div><div className="section-sub">Configure system validation behavior across modules</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:24}}>
+        {[{id:'balanced',label:'Balanced',sub:'Recommended for most deployments. Key guardrails active, flexibility preserved.',rec:true},
+          {id:'strict',label:'Strict',sub:'Maximum guardrails. All rules enforced. Suited to high-compliance operations.'},
+          {id:'relaxed',label:'Relaxed',sub:'Minimal constraints. Operators have full freedom. Use with caution.'}].map(p=>(
+          <div key={p.id} className="card" style={{cursor:'pointer',border:preset===p.id?'2px solid var(--brand-600)':'',background:preset===p.id?'var(--brand-50)':''}} onClick={()=>setPreset(p.id)}>
+            <div style={{padding:'16px 18px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                <div style={{fontWeight:700,fontSize:'var(--text-14)',color:'var(--text-primary)'}}>{p.label}</div>
+                {p.rec && <span className="chip chip-active" style={{fontSize:10}}>Recommended</span>}
+                {preset===p.id && <span style={{marginLeft:'auto'}}><Icon n="check" s={16} c="var(--brand-600)"/></span>}
+              </div>
+              <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)',lineHeight:1.5}}>{p.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="card" style={{overflow:'hidden',marginBottom:16}}>
+        <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Deployment Rules</div></div>
+        <table className="data-table">
+          <thead><tr><th style={{width:220}}>Rule</th><th>Description</th><th style={{width:80,textAlign:'center'}}>Enabled</th></tr></thead>
+          <tbody>{[
+            ['singleActivePerGuard','One active deployment per guard at a time'],
+            ['blockInactiveUpdate','Prevent editing ended deployments'],
+            ['lockAfterEnd','Lock deployment record after end date'],
+            ['requireActiveGuardStatus','Guard must be ACTIVE to deploy'],
+            ['requireGuardOfficeConsistency','Guard and branch must share the same regional office'],
+            ['requireEndDate','End date required when ending a deployment'],
+            ['disallowEndDateBeforeDeploymentDate','End date cannot precede deployment date'],
+            ['disallowFutureEndDate','End date cannot be in the future'],
+            ['requireBranchContract','Branch must have an active contract'],
+            ['requireClientHasBranches','Client must have at least one branch'],
+          ].map(([key,desc])=>(
+            <tr key={key} className="row-comfortable">
+              <td className="mono" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{key}</td>
+              <td style={{fontSize:'var(--text-13)'}}>{desc}</td>
+              <td style={{textAlign:'center'}}>
+                <div style={{width:36,height:20,borderRadius:var_full,background:rules[key]?'var(--brand-600)':'var(--slate-200)',cursor:'pointer',position:'relative',transition:'background var(--duration-normal)',display:'inline-flex',alignItems:'center',padding:'2px'}} onClick={()=>setRules(r=>({...r,[key]:!r[key]}))}>
+                  <div style={{width:16,height:16,borderRadius:'50%',background:'#fff',transition:'transform var(--duration-normal)',transform:rules[key]?'translateX(16px)':'translateX(0)',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}/>
+                </div>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        <button className="tb-btn tb-btn-ghost">Reset to Default</button>
+        <button className="tb-btn tb-btn-primary">Save Changes</button>
+      </div>
+    </div>
+  );
+}
+
+// tiny inline const to avoid JSX template string issue
+const var_full = 'var(--radius-full)';
+
+// ── Client Profile Screen ─────────────────────────────────────
+function ClientProfileScreen({onBack}){
+  const [activeTab,setActiveTab]=useState(0);
+  const client={name:'MCB Bank',type:'BANK',city:'Lahore',status:'ACTIVE',enrolled:'01/01/2020',contractEnd:'31/12/2026',monthlyBilling:487200,totalGuards:48,branches:12,contactName:'Ahsan Tariq',contactPhone:'+92 42 111 000 111',contractRef:'MCB-2024-001'};
+  const branches=[
+    {name:'Gulberg Main',city:'Lahore',guards:6,shift:'DAY',status:'ACTIVE',manager:'Kamran Mir'},
+    {name:'DHA Phase 4',city:'Lahore',guards:4,shift:'NIGHT',status:'ACTIVE',manager:'Kamran Mir'},
+    {name:'Johar Town',city:'Lahore',guards:4,shift:'BOTH',status:'ACTIVE',manager:'Kamran Mir'},
+    {name:'Clifton Branch',city:'Karachi',guards:5,shift:'NIGHT',status:'ACTIVE',manager:'Faisal Raza'},
+    {name:'PECHS',city:'Karachi',guards:4,shift:'DAY',status:'ACTIVE',manager:'Faisal Raza'},
+    {name:'Blue Area',city:'Islamabad',guards:5,shift:'DAY',status:'ACTIVE',manager:'Tariq Hassan'},
+    {name:'F-10 Branch',city:'Islamabad',guards:3,shift:'NIGHT',status:'INACTIVE',manager:'Tariq Hassan'},
+  ];
+  const guards=[
+    {name:'Muhammad Usman Khan',id:'LHR-00247',branch:'Gulberg Main',shift:'DAY',desig:'Security Guard',since:'01/04/2026'},
+    {name:'Fatima Zafar',id:'KHI-00892',branch:'Clifton Branch',shift:'NIGHT',desig:'Supervisor',since:'15/02/2026'},
+    {name:'Sadia Parveen',id:'LHR-00318',branch:'DHA Phase 4',shift:'NIGHT',desig:'Security Guard',since:'10/03/2026'},
+    {name:'Zara Hussain',id:'FSB-00071',branch:'Gulberg Main',shift:'BOTH',desig:'Security Guard',since:'01/01/2026'},
+  ];
+  const invoices=[
+    {no:'INV-2026-04-0042',period:'April 2026',amount:487200,due:'15/05/2026',status:'SENT'},
+    {no:'INV-2026-03-0031',period:'March 2026',amount:481600,due:'15/04/2026',status:'PAID'},
+    {no:'INV-2026-02-0019',period:'February 2026',amount:481600,due:'15/03/2026',status:'PAID'},
+    {no:'INV-2026-01-0009',period:'January 2026',amount:458400,due:'15/02/2026',status:'PAID'},
+  ];
+  const tabs=['Overview','Branches','Guard Assignments','Invoices'];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <button className="tb-btn tb-btn-ghost" style={{padding:'6px 12px',fontSize:'var(--text-13)'}} onClick={onBack}><Icon n="arrowLeft" s={14}/> Clients</button>
+        <div style={{color:'var(--text-muted)',fontSize:'var(--text-13)'}}>/ {client.name}</div>
+        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost">Add Branch</button>
+          <button className="tb-btn tb-btn-primary">Edit Client</button>
+        </div>
+      </div>
+      {/* Header card */}
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{padding:'20px 24px',display:'grid',gridTemplateColumns:'1fr auto',gap:24,alignItems:'start'}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:6}}>
+              <div style={{width:48,height:48,borderRadius:10,background:avatarColor(client.name),display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800,color:'#fff'}}>{initials(client.name)}</div>
+              <div>
+                <div style={{fontSize:'var(--text-24)',fontWeight:800,color:'var(--text-primary)',letterSpacing:'-0.3px'}}>{client.name}</div>
+                <div style={{display:'flex',gap:8,marginTop:4,alignItems:'center'}}>
+                  <span className="chip chip-brand">{client.type}</span>
+                  <StatusChip status={client.status}/>
+                  <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Enrolled {client.enrolled}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,textAlign:'right'}}>
+            {[[client.contactName,'Primary Contact'],[client.contactPhone,'Phone'],[client.contractRef,'Contract Ref'],[`Exp. ${client.contractEnd}`,'Contract End']].map(([v,l])=>(
+              <div key={l}><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.4px'}}>{l}</div><div style={{fontSize:'var(--text-13)',fontWeight:500,color:'var(--text-primary)'}}>{v}</div></div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* KPI strip */}
+      <div className="kpi-strip" style={{marginBottom:16}}>
+        {[['48','Active Guards'],['12','Branches'],['₨ 4.87L','Monthly Billing'],['1','Active Contract'],['3yr 4mo','Tenure']].map(([v,l])=>(
+          <div key={l} className="kpi-strip-tile"><div className="v" style={{fontFamily:v.startsWith('₨')?'var(--font-mono)':undefined}}>{v}</div><div className="l">{l}</div></div>
+        ))}
+      </div>
+      {/* Tabs */}
+      <div className="card" style={{overflow:'hidden'}}>
+        <div className="tabs" style={{padding:'0 4px'}}>
+          {tabs.map((t,i)=><div key={i} className={`tab-item${activeTab===i?' active':''}`} onClick={()=>setActiveTab(i)}>{t}</div>)}
+        </div>
+        <div style={{padding:'20px 24px'}}>
+          {activeTab===0 && (
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+              <div>
+                <div className="form-section-title" style={{marginBottom:12}}>Client Details</div>
+                <div className="detail-grid">
+                  {[['Client Name','MCB Bank'],['Industry Type','Banking / Financial Services'],['Headquarters','Lahore, Pakistan'],['Client Since','01 January 2020'],['Primary Contact','Ahsan Tariq'],['Contact Phone','+92 42 111 000 111'],['Contract Ref','MCB-2024-001'],['Contract Period','01/01/2024 – 31/12/2026'],['Billing Cycle','Monthly'],['Payment Terms','Net 15 days']].map(([l,v])=>(
+                    <div key={l} className="detail-field"><div className="fl">{l}</div><div className="fv">{v}</div></div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="form-section-title" style={{marginBottom:12}}>Guard Distribution by Shift</div>
+                {[['Day Shift','28 guards',58],['Night Shift','14 guards',29],['Both','6 guards',13]].map(([l,v,pct])=>(
+                  <div key={l} style={{marginBottom:14}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}><span style={{color:'var(--text-secondary)',fontWeight:500}}>{l}</span><span style={{color:'var(--text-muted)'}}>{v}</span></div>
+                    <div className="progress-bar" style={{height:8}}><div className="progress-fill" style={{width:`${pct}%`,background:l==='Day Shift'?'var(--brand-600)':l==='Night Shift'?'var(--indigo-500,#6366f1)':'var(--purple-500)'}}></div></div>
+                  </div>
+                ))}
+                <div className="form-section-title" style={{marginBottom:12,marginTop:24}}>Recent Activity</div>
+                {[
+                  {t:'Guard deployed to Gulberg Main',d:'2 days ago'},
+                  {t:'Invoice INV-2026-04-0042 sent',d:'4 days ago'},
+                  {t:'Contract renewed for 2 years',d:'15 Jan 2024'},
+                ].map((a,i)=>(
+                  <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:'1px solid var(--border-default)'}}>
+                    <div style={{width:6,height:6,borderRadius:'50%',background:'var(--brand-400)',flexShrink:0,marginTop:5}}/>
+                    <div><div style={{fontSize:'var(--text-13)',color:'var(--text-primary)'}}>{a.t}</div><div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>{a.d}</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {activeTab===1 && (
+            <table className="data-table">
+              <thead><tr>{['Branch Name','City','Guards','Shift','Status','Manager','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+              <tbody>{branches.map((b,i)=>(
+                <tr key={i} className="row-comfortable">
+                  <td style={{fontWeight:500}}>{b.name}</td>
+                  <td>{b.city}</td>
+                  <td className="tabnum" style={{fontWeight:600}}>{b.guards}</td>
+                  <td><span className={`chip chip-${b.shift.toLowerCase()}`}>{b.shift}</span></td>
+                  <td><StatusChip status={b.status}/></td>
+                  <td style={{color:'var(--text-muted)'}}>{b.manager}</td>
+                  <td><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}}>View</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+          {activeTab===2 && (
+            <table className="data-table">
+              <thead><tr>{['Guard','Parwest ID','Branch','Shift','Designation','Deployed Since','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+              <tbody>{guards.map((g,i)=>(
+                <tr key={i} className="row-comfortable">
+                  <td><div style={{display:'flex',alignItems:'center',gap:8}}><div className="guard-avatar" style={{background:avatarColor(g.name)}}>{initials(g.name)}</div><span style={{fontWeight:500}}>{g.name}</span></div></td>
+                  <td><span className="mono" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{g.id}</span></td>
+                  <td>{g.branch}</td>
+                  <td><span className={`chip chip-${g.shift.toLowerCase()}`}>{g.shift}</span></td>
+                  <td>{g.desig}</td>
+                  <td className="mono" style={{fontSize:'var(--text-12)'}}>{g.since}</td>
+                  <td><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}}>View Profile</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+          {activeTab===3 && (
+            <table className="data-table">
+              <thead><tr>{['Invoice No','Period','Amount','Due Date','Status','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+              <tbody>{invoices.map((inv,i)=>(
+                <tr key={i} className="row-comfortable">
+                  <td><span className="mono" style={{fontSize:'var(--text-12)',color:'var(--brand-600)'}}>{inv.no}</span></td>
+                  <td style={{fontWeight:500}}>{inv.period}</td>
+                  <td className="tabnum" style={{fontWeight:700}}>₨ {inv.amount.toLocaleString()}</td>
+                  <td className="mono" style={{fontSize:'var(--text-12)'}}>{inv.due}</td>
+                  <td><StatusChip status={inv.status}/></td>
+                  <td style={{display:'flex',gap:6}}><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}}>View</button><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}}>Download</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Invoicing Screen ──────────────────────────────────────────
+function InvoicingScreen({showToast}){
+  const [view,setView]=useState('list'); // list | detail
+  const [selected,setSelected]=useState(null);
+  const [statusFilter,setStatusFilter]=useState('All');
+  const invoices=[
+    {no:'INV-2026-04-0042',client:'MCB Bank',type:'BANK',period:'April 2026',guards:48,amount:487200,issued:'22/04/2026',due:'15/05/2026',status:'SENT',overdue:false},
+    {no:'INV-2026-04-0041',client:'Engro Chemicals',type:'MANUFACTURER',period:'April 2026',guards:18,amount:182400,issued:'22/04/2026',due:'07/05/2026',status:'SENT',overdue:false},
+    {no:'INV-2026-04-0040',client:'Shaukat Khanum Hospital',type:'HOSPITAL',period:'April 2026',guards:24,amount:264000,issued:'22/04/2026',due:'30/04/2026',status:'OVERDUE',overdue:true},
+    {no:'INV-2026-03-0031',client:'MCB Bank',type:'BANK',period:'March 2026',guards:48,amount:481600,issued:'22/03/2026',due:'15/04/2026',status:'PAID',overdue:false},
+    {no:'INV-2026-03-0030',client:'University of Lahore',type:'EDUCATION',period:'March 2026',guards:30,amount:312000,issued:'22/03/2026',due:'10/04/2026',status:'PAID',overdue:false},
+    {no:'INV-2026-03-0029',client:'Engro Chemicals',type:'MANUFACTURER',period:'March 2026',guards:18,amount:182400,issued:'22/03/2026',due:'07/04/2026',status:'PAID',overdue:false},
+    {no:'INV-2026-02-0021',client:'Shaukat Khanum Hospital',type:'HOSPITAL',period:'February 2026',guards:24,amount:264000,issued:'22/02/2026',due:'10/03/2026',status:'OVERDUE',overdue:true},
+    {no:'INV-2026-02-0019',client:'MCB Bank',type:'BANK',period:'February 2026',guards:48,amount:481600,issued:'22/02/2026',due:'15/03/2026',status:'PAID',overdue:false},
+  ];
+  const filtered=statusFilter==='All'?invoices:invoices.filter(i=>i.status===statusFilter);
+  const totalOutstanding=invoices.filter(i=>i.status!=='PAID').reduce((s,i)=>s+i.amount,0);
+  const totalOverdue=invoices.filter(i=>i.status==='OVERDUE').reduce((s,i)=>s+i.amount,0);
+  const totalPaid=invoices.filter(i=>i.status==='PAID').reduce((s,i)=>s+i.amount,0);
+
+  if(view==='detail'&&selected){
+    const inv=invoices.find(i=>i.no===selected);
+    return <InvoiceDetail inv={inv} onBack={()=>setView('list')} showToast={showToast}/>;
+  }
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Invoicing</div><div className="section-sub">Monthly billing to clients based on guard deployments</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost"><Icon n="file" s={14}/> Export All</button>
+          <button className="tb-btn tb-btn-primary" onClick={()=>showToast('Invoice generation started')}><Icon n="plus" s={14}/> Generate Invoice</button>
+        </div>
+      </div>
+      {/* Stats */}
+      <div className="stat-grid" style={{marginBottom:20}}>
+        {[
+          {l:'Total This Month',v:`₨ ${(487200+182400+264000).toLocaleString()}`,c:'var(--brand-600)',bg:'var(--brand-50)'},
+          {l:'Outstanding',v:`₨ ${totalOutstanding.toLocaleString()}`,c:'var(--warning-600)',bg:'var(--warning-50)'},
+          {l:'Overdue',v:`₨ ${totalOverdue.toLocaleString()}`,c:'var(--danger-600)',bg:'var(--danger-50)'},
+          {l:'Collected (YTD)',v:`₨ ${totalPaid.toLocaleString()}`,c:'var(--success-600)',bg:'var(--success-50)'},
+        ].map(s=>(
+          <div key={s.l} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg}}><Icon n="dollar" s={18} c={s.c}/></div>
+            <div className="stat-body"><div className="label">{s.l}</div><div className="value tabnum" style={{color:s.c,fontSize:'var(--text-16)'}}>{s.v}</div></div>
+          </div>
+        ))}
+      </div>
+      {/* Filter */}
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search by invoice number, client…"/></div>
+        {['All','SENT','PAID','OVERDUE','DRAFT'].map(s=>(
+          <button key={s} className="density-btn" style={{background:statusFilter===s?'var(--brand-600)':undefined,color:statusFilter===s?'#fff':undefined}} onClick={()=>setStatusFilter(s)}>{s}</button>
+        ))}
+        <select className="filter-select"><option>All Clients</option><option>MCB Bank</option><option>Engro Chemicals</option><option>Shaukat Khanum</option></select>
+        <select className="filter-select"><option>April 2026</option><option>March 2026</option><option>February 2026</option></select>
+      </div>
+      {/* Table */}
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['Invoice No','Client','Period','Guards','Amount (₨)','Issued','Due Date','Status','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{filtered.map((inv,i)=>(
+            <tr key={i} className="row-comfortable" style={{cursor:'pointer'}} onClick={()=>{setSelected(inv.no);setView('detail');}}>
+              <td><span className="mono" style={{fontSize:'var(--text-12)',color:'var(--brand-600)'}}>{inv.no}</span></td>
+              <td><div style={{display:'flex',alignItems:'center',gap:8}}><div className="guard-avatar" style={{background:avatarColor(inv.client)}}>{initials(inv.client)}</div><div><div style={{fontWeight:500}}>{inv.client}</div><span className="chip chip-brand" style={{fontSize:10}}>{inv.type}</span></div></div></td>
+              <td>{inv.period}</td>
+              <td className="tabnum">{inv.guards}</td>
+              <td className="tabnum" style={{fontWeight:700}}>₨ {inv.amount.toLocaleString()}</td>
+              <td className="mono" style={{fontSize:'var(--text-12)'}}>{inv.issued}</td>
+              <td className="mono" style={{fontSize:'var(--text-12)',color:inv.overdue?'var(--danger-600)':undefined,fontWeight:inv.overdue?700:undefined}}>{inv.due}{inv.overdue&&' ⚠'}</td>
+              <td><StatusChip status={inv.status}/></td>
+              <td onClick={e=>e.stopPropagation()}>
+                <div style={{display:'flex',gap:4}}>
+                  <button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={()=>{setSelected(inv.no);setView('detail');}}>View</button>
+                  {inv.status!=='PAID'&&<button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={e=>{e.stopPropagation();showToast(`${inv.no} marked as paid`);}}>Mark Paid</button>}
+                </div>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+        <div style={{padding:'10px 16px',borderTop:'1px solid var(--border-default)',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Showing {filtered.length} of {invoices.length} invoices</div>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceDetail({inv,onBack,showToast}){
+  const lineItems=[
+    {desig:'Security Guard',shift:'DAY',guards:32,days:26,rate:930,amount:774720},
+    {desig:'Supervisor',shift:'NIGHT',guards:8,days:26,rate:1167,amount:242736},
+    {desig:'CPO',shift:'DAY',guards:4,days:26,rate:1458,amount:151632},
+    {desig:'ASO',shift:'DAY',guards:4,days:26,rate:1133,amount:117832},
+  ];
+  const subtotal=lineItems.reduce((s,l)=>s+l.amount,0);
+  const tax=Math.round(subtotal*0.00);
+  const total=subtotal+tax;
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <button className="tb-btn tb-btn-ghost" style={{padding:'6px 12px',fontSize:'var(--text-13)'}} onClick={onBack}><Icon n="arrowLeft" s={14}/> Invoices</button>
+        <span style={{color:'var(--text-muted)',fontSize:'var(--text-13)'}}>/ <span className="mono">{inv.no}</span></span>
+        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost"><Icon n="file" s={14}/> Download PDF</button>
+          {inv.status!=='PAID'&&<button className="tb-btn tb-btn-primary" onClick={()=>showToast(`${inv.no} marked as paid`)}>Mark as Paid</button>}
+        </div>
+      </div>
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{padding:'28px 32px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:32}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+              <div style={{width:40,height:40,borderRadius:10,background:'var(--brand-600)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:16}}>P</div>
+              <div><div style={{fontWeight:700,fontSize:'var(--text-16)',color:'var(--text-primary)'}}>Parwest Security Services</div><div style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>13-B, Gulberg III, Lahore, Pakistan</div></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {[['Invoice No',inv.no],['Period',inv.period],['Issued Date',inv.issued],['Due Date',inv.due]].map(([l,v])=>(
+                <div key={l}><div style={{fontSize:'var(--text-11)',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:2}}>{l}</div><div style={{fontSize:'var(--text-13)',fontWeight:500,fontFamily:['Invoice No'].includes(l)?'var(--font-mono)':undefined,color:l==='Due Date'&&inv.overdue?'var(--danger-600)':undefined}}>{v}</div></div>
+              ))}
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:'var(--text-11)',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:2}}>Bill To</div>
+              <div style={{fontWeight:700,fontSize:'var(--text-16)',color:'var(--text-primary)'}}>{inv.client}</div>
+              <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Accounts Payable Department</div>
+            </div>
+            <div style={{display:'inline-block',textAlign:'left'}}>
+              <StatusChip status={inv.status}/>
+            </div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-32)',fontWeight:800,color:'var(--text-primary)',marginTop:12,letterSpacing:'-1px'}}>₨ {inv.amount.toLocaleString()}</div>
+            <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Total Amount Due</div>
+          </div>
+        </div>
+        {/* Line items */}
+        <div style={{padding:'0 32px 28px'}}>
+          <table className="data-table">
+            <thead><tr>{['Designation','Shift','Guards','Days','Daily Rate (₨)','Amount (₨)'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+            <tbody>{lineItems.map((l,i)=>(
+              <tr key={i} className="row-comfortable">
+                <td style={{fontWeight:500}}>{l.desig}</td>
+                <td><span className={`chip chip-${l.shift.toLowerCase()}`}>{l.shift}</span></td>
+                <td className="tabnum">{l.guards}</td>
+                <td className="tabnum">{l.days}</td>
+                <td className="tabnum">₨ {l.rate.toLocaleString()}</td>
+                <td className="tabnum" style={{fontWeight:600}}>₨ {l.amount.toLocaleString()}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+          <div style={{display:'flex',justifyContent:'flex-end',paddingTop:16}}>
+            <div style={{width:280}}>
+              {[['Subtotal',`₨ ${subtotal.toLocaleString()}`],['Tax (0%)','₨ 0'],['',''],['Total Due',`₨ ${total.toLocaleString()}`]].map(([l,v],i)=>l&&(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:i===3?'none':'1px solid var(--border-default)',fontWeight:i===3?700:400,fontSize:i===3?'var(--text-16)':'var(--text-13)',fontFamily:i===3?'var(--font-mono)':undefined}}>
+                  <span style={{color:i===3?'var(--text-primary)':'var(--text-muted)'}}>{l}</span>
+                  <span style={{color:'var(--text-primary)'}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tickets Screen ────────────────────────────────────────────
+function TicketsScreen({showToast}){
+  const [view,setView]=useState('list');
+  const [selected,setSelected]=useState(null);
+  const [prioFilter,setPrioFilter]=useState('All');
+  const tickets=[
+    {id:'TKT-2026-0241',title:'Guard absent 3 consecutive days — MCB Gulberg',category:'ATTENDANCE',priority:'HIGH',client:'MCB Bank',assignee:'Kamran Mir',created:'24/04/2026',status:'OPEN',desc:'Guard LHR-00247 has been absent for 3 consecutive days (22–24 Apr). Client has complained. Replacement needed urgently.'},
+    {id:'TKT-2026-0240',title:'Walkie-talkie malfunction at Engro plant site',category:'EQUIPMENT',priority:'MEDIUM',client:'Engro Chemicals',assignee:'Store Ops',created:'23/04/2026',status:'IN_PROGRESS',desc:'3 radio sets at Engro Plant Site are not functioning. Guard communication compromised.'},
+    {id:'TKT-2026-0239',title:'Client complaint — guard behavior at Shaukat Khanum',category:'COMPLAINT',priority:'HIGH',client:'Shaukat Khanum Hospital',assignee:'Faisal Raza',created:'22/04/2026',status:'IN_PROGRESS',desc:'Hospital management reported unprofessional conduct by a night shift guard.'},
+    {id:'TKT-2026-0238',title:'Uniform request — 12 new sets for MCB replacements',category:'INVENTORY',priority:'LOW',client:'MCB Bank',assignee:'Store Ops',created:'21/04/2026',status:'OPEN',desc:'12 new uniform sets required for replacement guards at MCB branches.'},
+    {id:'TKT-2026-0237',title:'CNIC expiry alert — Abdul Rehman Malik',category:'COMPLIANCE',priority:'MEDIUM',client:'Internal',assignee:'Tariq Hassan',created:'20/04/2026',status:'RESOLVED',desc:'CNIC expires in 4 days. Guard must renew and provide updated copy.'},
+    {id:'TKT-2026-0236',title:'Shift swap request — Sadia Parveen (DAY to NIGHT)',category:'HR',priority:'LOW',client:'Internal',assignee:'Kamran Mir',created:'19/04/2026',status:'RESOLVED',desc:'Guard requested permanent shift change from DAY to NIGHT due to family circumstances.'},
+    {id:'TKT-2026-0235',title:'Contract renewal due — University of Lahore (30 days)',category:'CONTRACT',priority:'MEDIUM',client:'University of Lahore',assignee:'Asad Khan',created:'18/04/2026',status:'OPEN',desc:'Contract expires 31 May 2026. Renewal discussion to be initiated with client.'},
+  ];
+  const filtered=prioFilter==='All'?tickets:tickets.filter(t=>t.priority===prioFilter);
+  const prioCols={HIGH:'var(--danger-600)',MEDIUM:'var(--warning-600)',LOW:'var(--success-600)'};
+  const prioBg={HIGH:'var(--danger-50)',MEDIUM:'var(--warning-50)',LOW:'var(--success-50)'};
+  const catColors={ATTENDANCE:'var(--brand-50)',EQUIPMENT:'var(--slate-100)',COMPLAINT:'var(--danger-50)',INVENTORY:'var(--warning-50)',COMPLIANCE:'var(--info-50)',HR:'var(--emerald-50)',CONTRACT:'var(--purple-500)'};
+
+  if(view==='detail'&&selected){
+    const tk=tickets.find(t=>t.id===selected);
+    return <TicketDetail ticket={tk} onBack={()=>setView('list')} showToast={showToast} prioCols={prioCols} prioBg={prioBg}/>;
+  }
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Tickets</div><div className="section-sub">Operational issues, complaints, and compliance alerts</div></div>
+        <button className="tb-btn tb-btn-primary" onClick={()=>showToast('Ticket created')}><Icon n="plus" s={14}/> Create Ticket</button>
+      </div>
+      <div className="stat-grid" style={{marginBottom:20}}>
+        {[
+          {l:'Open',v:tickets.filter(t=>t.status==='OPEN').length,c:'var(--danger-600)',bg:'var(--danger-50)'},
+          {l:'In Progress',v:tickets.filter(t=>t.status==='IN_PROGRESS').length,c:'var(--warning-600)',bg:'var(--warning-50)'},
+          {l:'Resolved',v:tickets.filter(t=>t.status==='RESOLVED').length,c:'var(--success-600)',bg:'var(--success-50)'},
+          {l:'High Priority',v:tickets.filter(t=>t.priority==='HIGH').length,c:'var(--brand-600)',bg:'var(--brand-50)'},
+        ].map(s=>(
+          <div key={s.l} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg}}><Icon n="ticket" s={18} c={s.c}/></div>
+            <div className="stat-body"><div className="label">{s.l}</div><div className="value tabnum" style={{color:s.c}}>{s.v}</div></div>
+          </div>
+        ))}
+      </div>
+      <div className="filter-bar">
+        <div className="search-input"><Icon n="search" s={14} c="var(--text-placeholder)"/><input placeholder="Search tickets…"/></div>
+        {['All','HIGH','MEDIUM','LOW'].map(p=>(
+          <button key={p} className="density-btn" style={{background:prioFilter===p?prioCols[p]||'var(--brand-600)':undefined,color:prioFilter===p?'#fff':undefined}} onClick={()=>setPrioFilter(p)}>{p}</button>
+        ))}
+        <select className="filter-select"><option>All Categories</option><option>ATTENDANCE</option><option>COMPLAINT</option><option>EQUIPMENT</option><option>COMPLIANCE</option><option>CONTRACT</option></select>
+        <select className="filter-select"><option>All Status</option><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option></select>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <table className="data-table">
+          <thead><tr>{['ID','Title','Category','Priority','Client','Assignee','Created','Status','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{filtered.map((tk,i)=>(
+            <tr key={i} className="row-comfortable" style={{cursor:'pointer'}} onClick={()=>{setSelected(tk.id);setView('detail');}}>
+              <td><span className="mono" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{tk.id}</span></td>
+              <td style={{maxWidth:240}}><div style={{fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tk.title}</div></td>
+              <td><span className="chip chip-brand" style={{fontSize:10}}>{tk.category}</span></td>
+              <td><span className="chip" style={{background:prioBg[tk.priority],color:prioCols[tk.priority]}}>{tk.priority}</span></td>
+              <td><span style={{fontSize:'var(--text-12)'}}>{tk.client}</span></td>
+              <td style={{color:'var(--text-muted)',fontSize:'var(--text-12)'}}>{tk.assignee}</td>
+              <td className="mono" style={{fontSize:'var(--text-12)'}}>{tk.created}</td>
+              <td><StatusChip status={tk.status==='IN_PROGRESS'?'PENDING':tk.status==='RESOLVED'?'ACTIVE':'PENDING'}/></td>
+              <td onClick={e=>e.stopPropagation()}><button className="tb-btn tb-btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-12)'}} onClick={()=>{setSelected(tk.id);setView('detail');}}>View</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TicketDetail({ticket,onBack,showToast,prioCols,prioBg}){
+  const [comment,setComment]=useState('');
+  const timeline=[
+    {actor:'System',color:'var(--slate-400)',action:'Ticket created automatically from attendance alert',time:'24/04/2026 07:15'},
+    {actor:'Asad Khan',color:'var(--brand-700)',action:'Assigned to Kamran Mir',time:'24/04/2026 08:02'},
+    {actor:'Kamran Mir',color:'var(--success-700)',action:'Contacted guard. No response on phone. Sending replacement.',time:'24/04/2026 09:30'},
+  ];
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
+        <button className="tb-btn tb-btn-ghost" style={{padding:'6px 12px',fontSize:'var(--text-13)'}} onClick={onBack}><Icon n="arrowLeft" s={14}/> Tickets</button>
+        <span style={{color:'var(--text-muted)',fontSize:'var(--text-13)'}}>/ <span className="mono">{ticket.id}</span></span>
+        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+          <button className="tb-btn tb-btn-ghost" onClick={()=>showToast('Ticket reassigned')}>Reassign</button>
+          {ticket.status!=='RESOLVED'&&<button className="tb-btn tb-btn-primary" style={{background:'var(--success-600)',borderColor:'var(--success-600)'}} onClick={()=>showToast('Ticket resolved')}>Mark Resolved</button>}
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:20}}>
+        <div>
+          <div className="card" style={{marginBottom:16}}>
+            <div style={{padding:'20px 24px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:'var(--text-20)',fontWeight:700,color:'var(--text-primary)',marginBottom:8,lineHeight:1.3}}>{ticket.title}</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <span className="chip" style={{background:prioBg[ticket.priority],color:prioCols[ticket.priority]}}>{ticket.priority} PRIORITY</span>
+                    <span className="chip chip-brand">{ticket.category}</span>
+                    <span className="chip chip-brand">{ticket.client}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{fontSize:'var(--text-13)',color:'var(--text-secondary)',lineHeight:1.7,padding:'14px',background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)'}}>{ticket.desc}</div>
+            </div>
+          </div>
+          {/* Timeline */}
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Activity Timeline</div></div>
+            <div style={{padding:'12px 20px'}}>
+              {timeline.map((t,i)=>(
+                <div key={i} style={{display:'flex',gap:12,paddingBottom:16,position:'relative'}}>
+                  {i<timeline.length-1&&<div style={{position:'absolute',left:13,top:28,width:1.5,height:'calc(100% - 8px)',background:'var(--border-default)'}}/>}
+                  <div style={{width:28,height:28,borderRadius:'50%',background:t.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff',flexShrink:0}}>{t.actor.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+                  <div>
+                    <div style={{fontSize:'var(--text-13)',color:'var(--text-primary)'}}><strong>{t.actor}</strong> — {t.action}</div>
+                    <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',marginTop:2,fontFamily:'var(--font-mono)'}}>{t.time}</div>
+                  </div>
+                </div>
+              ))}
+              {/* Comment box */}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <div className="avatar" style={{flexShrink:0}}>AK</div>
+                <div style={{flex:1}}>
+                  <textarea className="filter-select" style={{width:'100%',height:72,resize:'none',padding:'8px 12px',fontFamily:'var(--font-ui)',fontSize:'var(--text-13)',borderRadius:'var(--radius-sm)',background:'var(--bg-input)',border:'1px solid var(--border-default)',color:'var(--text-primary)'}} placeholder="Add a comment or update…" value={comment} onChange={e=>setComment(e.target.value)}/>
+                  <button className="tb-btn tb-btn-primary" style={{marginTop:6,padding:'5px 14px',fontSize:'var(--text-12)'}} onClick={()=>{if(comment.trim()){showToast('Comment added');setComment('');}}}>Add Comment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Sidebar details */}
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-13)'}}>Details</div></div>
+            <div style={{padding:'4px 0'}}>
+              {[['Status',<StatusChip status={ticket.status==='IN_PROGRESS'?'PENDING':'ACTIVE'}/>],['Priority',<span className="chip" style={{background:prioBg[ticket.priority],color:prioCols[ticket.priority]}}>{ticket.priority}</span>],['Category',<span className="chip chip-brand" style={{fontSize:10}}>{ticket.category}</span>],['Client',ticket.client],['Assignee',ticket.assignee],['Created',ticket.created]].map(([l,v])=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 18px',borderBottom:'1px solid var(--border-default)'}}>
+                  <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)',fontWeight:500}}>{l}</span>
+                  <span style={{fontSize:'var(--text-12)',color:'var(--text-primary)',fontWeight:500}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-13)'}}>Quick Actions</div></div>
+            <div style={{padding:'12px',display:'flex',flexDirection:'column',gap:8}}>
+              <button className="tb-btn tb-btn-ghost" style={{justifyContent:'center',fontSize:'var(--text-12)'}} onClick={()=>showToast('Escalated to management')}>Escalate to Management</button>
+              <button className="tb-btn tb-btn-ghost" style={{justifyContent:'center',fontSize:'var(--text-12)'}} onClick={()=>showToast('Linked to guard profile')}>Link Guard Profile</button>
+              <button className="tb-btn tb-btn-ghost" style={{justifyContent:'center',fontSize:'var(--text-12)'}} onClick={()=>showToast('Demand created')}>Create Store Demand</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reports Screen ────────────────────────────────────────────
+function ReportsScreen(){
+  const [activeTab,setActiveTab]=useState(0);
+  const tabs=['Guard Analytics','Payroll','Deployment','Finance'];
+
+  // Bar chart using CSS
+  const BarChart = ({data,color='var(--brand-600)',height=120}) => {
+    const max=Math.max(...data.map(d=>d.v));
+    return (
+      <div style={{display:'flex',alignItems:'flex-end',gap:4,height}}>
+        {data.map((d,i)=>(
+          <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:4}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{d.v>=1000?(d.v/1000).toFixed(1)+'K':d.v}</div>
+            <div style={{width:'100%',background:color,borderRadius:'3px 3px 0 0',height:`${(d.v/max)*100}%`,minHeight:4,transition:'height 0.3s',opacity:i===data.length-1?1:0.6+i*0.05}}/>
+            <div style={{fontSize:9,color:'var(--text-muted)',textAlign:'center',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:40}}>{d.l}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const LineChart = ({data,color='var(--brand-600)'}) => {
+    const max=Math.max(...data.map(d=>d.v));
+    const min=Math.min(...data.map(d=>d.v));
+    const range=max-min||1;
+    const w=100/(data.length-1);
+    const points=data.map((d,i)=>`${i*w},${100-((d.v-min)/range)*85}`).join(' ');
+    return (
+      <div style={{position:'relative',height:80}}>
+        <svg width="100%" height="80" viewBox={`0 0 100 100`} preserveAspectRatio="none">
+          <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+          <polyline points={`0,100 ${points} 100,100`} fill={color} fillOpacity="0.08" stroke="none"/>
+          {data.map((d,i)=><circle key={i} cx={i*w} cy={100-((d.v-min)/range)*85} r="3" fill={color} vectorEffect="non-scaling-stroke"/>)}
+        </svg>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20}}>
+        <div><div className="section-title">Reports & Analytics</div><div className="section-sub">Operational intelligence across guard force, payroll, and finance</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <select className="filter-select"><option>April 2026</option><option>Q1 2026</option><option>FY 2025-26</option></select>
+          <button className="tb-btn tb-btn-ghost"><Icon n="file" s={14}/> Export PDF</button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="tabs" style={{padding:'0 4px',background:'var(--bg-card)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',marginBottom:20}}>
+        {tabs.map((t,i)=><div key={i} className={`tab-item${activeTab===i?' active':''}`} onClick={()=>setActiveTab(i)}>{t}</div>)}
+      </div>
+
+      {activeTab===0 && (
+        <div>
+          {/* KPIs */}
+          <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+            {[{l:'Total Guards',v:'1,247',trend:'+14',up:true},{l:'Deployed',v:'1,108',trend:'88.9%',up:true},{l:'Vacant',v:'139',trend:'11.1%',up:false},{l:'New This Month',v:'23',trend:'+8',up:true}].map((k,i)=>(
+              <div key={i} className="kpi-card"><div className="kpi-label">{k.l}</div><div className="kpi-value">{k.v}</div><div className={`kpi-trend ${k.up?'up':'down'}`}>{k.up?'▲':'▼'} {k.trend}</div></div>
+            ))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+            {/* Guard headcount by region */}
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Guards by Region</div><span style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Active only</span></div>
+              <div className="card-body">
+                <BarChart color="var(--brand-600)" data={[{l:'Lahore',v:412},{l:'Karachi',v:298},{l:'Islamabad',v:187},{l:'Rawalpindi',v:143},{l:'Faisalabad',v:98},{l:'Multan',v:72},{l:'Peshawar',v:64},{l:'Quetta',v:34}]}/>
+              </div>
+            </div>
+            {/* Guard headcount trend */}
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Headcount Trend — 6 Months</div></div>
+              <div className="card-body">
+                <LineChart color="var(--brand-600)" data={[{l:'Nov',v:1163},{l:'Dec',v:1178},{l:'Jan',v:1191},{l:'Feb',v:1208},{l:'Mar',v:1229},{l:'Apr',v:1247}]}/>
+                <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
+                  {['Nov','Dec','Jan','Feb','Mar','Apr'].map(m=><span key={m} style={{fontSize:10,color:'var(--text-muted)'}}>{m}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:20}}>
+            {/* Designation breakdown */}
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>By Designation</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {[['Security Guard',876,70],['Supervisor',187,15],['CPO',125,10],['ASO',59,5]].map(([l,v,pct])=>(
+                  <div key={l} style={{marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}><span style={{color:'var(--text-secondary)',fontWeight:500}}>{l}</span><span className="mono" style={{color:'var(--text-muted)'}}>{v}</span></div>
+                    <div className="progress-bar" style={{height:6}}><div className="progress-fill" style={{width:`${pct}%`}}/></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Shift split */}
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>By Shift</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {[['Day',624,'#eff6ff','#1d4ed8',50],['Night',437,'#eef2ff','#4338ca',35],['Both',187,'#faf5ff','#7e22ce',15]].map(([l,v,bg,fg,pct])=>(
+                  <div key={l} style={{marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}><span className="chip" style={{background:bg,color:fg}}>{l}</span><span className="mono" style={{color:'var(--text-muted)'}}>{v}</span></div>
+                    <div className="progress-bar" style={{height:6}}><div className="progress-fill" style={{width:`${pct}%`,background:fg}}/></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Lifecycle */}
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>By Lifecycle Status</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {[['Active','1,108','var(--success-600)',89],['Inactive',89,'var(--slate-400)',7],['Pending',50,'var(--warning-600)',4]].map(([l,v,c,pct])=>(
+                  <div key={l} style={{marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}><span style={{color:'var(--text-secondary)',fontWeight:500}}>{l}</span><span className="mono" style={{color:'var(--text-muted)'}}>{v}</span></div>
+                    <div className="progress-bar" style={{height:6}}><div className="progress-fill" style={{width:`${pct}%`,background:c}}/></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab===1 && (
+        <div>
+          <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+            {[{l:'Total Payroll Apr',v:'₨ 4.24Cr',trend:'+2.1%',up:true},{l:'Avg Salary',v:'₨ 38,261',trend:'+1.8%',up:true},{l:'Reserve Held',v:'₨ 1.27Cr',trend:'30%',up:true},{l:'On Hold',v:'4',trend:'',up:false}].map((k,i)=>(
+              <div key={i} className="kpi-card"><div className="kpi-label">{k.l}</div><div className="kpi-value" style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-20)'}}>{k.v}</div>{k.trend&&<div className={`kpi-trend ${k.up?'up':'down'}`}>{k.up?'▲':'▼'} {k.trend}</div>}</div>
+            ))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Monthly Payroll Trend (₨ Cr)</div></div>
+              <div className="card-body">
+                <BarChart color="var(--success-600)" height={140} data={[{l:'Nov 25',v:387},{l:'Dec 25',v:392},{l:'Jan 26',v:398},{l:'Feb 26',v:406},{l:'Mar 26',v:415},{l:'Apr 26',v:424}]}/>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Payroll by Region</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {[['Lahore','₨ 1.57Cr',37],['Karachi','₨ 1.14Cr',27],['Islamabad','₨ 0.71Cr',17],['Rawalpindi','₨ 0.55Cr',13],['Others','₨ 0.27Cr',6]].map(([l,v,pct])=>(
+                  <div key={l} style={{marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}><span style={{fontWeight:500}}>{l}</span><span className="mono" style={{color:'var(--text-primary)',fontWeight:600}}>{v}</span></div>
+                    <div className="progress-bar" style={{height:7}}><div className="progress-fill" style={{width:`${pct}%`,background:'var(--success-600)'}}/></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Salary band distribution */}
+          <div className="card">
+            <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Salary Band Distribution</div></div>
+            <div className="card-body">
+              <BarChart color="var(--brand-600)" height={120} data={[{l:'<25K',v:87},{l:'25–28K',v:312},{l:'28–32K',v:428},{l:'32–38K',v:251},{l:'38–45K',v:134},{l:'>45K',v:35}]}/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab===2 && (
+        <div>
+          <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+            {[{l:'Active Deployments',v:'1,108',trend:'+8',up:true},{l:'Clients',v:'89',trend:'+2',up:true},{l:'Client Sites',v:'247',trend:'+5',up:true},{l:'Vacant Guards',v:'139',trend:'',up:false}].map((k,i)=>(
+              <div key={i} className="kpi-card"><div className="kpi-label">{k.l}</div><div className="kpi-value">{k.v}</div>{k.trend&&<div className={`kpi-trend ${k.up?'up':'down'}`}>{k.up?'▲':'▼'} {k.trend}</div>}</div>
+            ))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Deployments by Client Type</div></div>
+              <div className="card-body">
+                <BarChart color="var(--brand-600)" height={120} data={[{l:'Bank',v:312},{l:'Hospital',v:187},{l:'Manufacturer',v:156},{l:'Education',v:143},{l:'Government',v:198},{l:'Other',v:112}]}/>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Deployment Trend — 6 Months</div></div>
+              <div className="card-body">
+                <LineChart color="var(--emerald-500,#10b981)" data={[{l:'Nov',v:1041},{l:'Dec',v:1053},{l:'Jan',v:1067},{l:'Feb',v:1078},{l:'Mar',v:1094},{l:'Apr',v:1108}]}/>
+                <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
+                  {['Nov','Dec','Jan','Feb','Mar','Apr'].map(m=><span key={m} style={{fontSize:10,color:'var(--text-muted)'}}>{m}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab===3 && (
+        <div>
+          <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+            {[{l:'Revenue (Apr)',v:'₨ 9.34L',trend:'+3.2%',up:true},{l:'Payroll Cost',v:'₨ 4.24Cr',trend:'45.4%',up:false},{l:'Outstanding',v:'₨ 9.34L',trend:'3 inv',up:false},{l:'Overdue',v:'₨ 2.64L',trend:'2 inv',up:false}].map((k,i)=>(
+              <div key={i} className="kpi-card"><div className="kpi-label">{k.l}</div><div className="kpi-value tabnum" style={{fontSize:'var(--text-20)',fontFamily:'var(--font-mono)'}}>{k.v}</div>{k.trend&&<div className={`kpi-trend ${k.up?'up':'down'}`}>{k.up?'▲':'▼'} {k.trend}</div>}</div>
+            ))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Revenue vs Payroll Cost (₨ L)</div></div>
+              <div className="card-body">
+                <div style={{display:'flex',alignItems:'flex-end',gap:8,height:120}}>
+                  {[{m:'Nov',rev:847,pay:387},{m:'Dec',rev:864,pay:392},{m:'Jan',rev:878,pay:398},{m:'Feb',rev:903,pay:406},{m:'Mar',rev:921,pay:415},{m:'Apr',rev:934,pay:424}].map((d,i)=>{
+                    const max=950;
+                    return (
+                      <div key={i} style={{flex:1,display:'flex',gap:2,alignItems:'flex-end',flexDirection:'column',justifyContent:'flex-end'}}>
+                        <div style={{width:'100%',display:'flex',gap:2,alignItems:'flex-end',height:100}}>
+                          <div style={{flex:1,background:'var(--brand-200)',borderRadius:'2px 2px 0 0',height:`${(d.rev/max)*100}%`,minHeight:2}}/>
+                          <div style={{flex:1,background:'var(--danger-200)',borderRadius:'2px 2px 0 0',height:`${(d.pay/max)*100}%`,minHeight:2}}/>
+                        </div>
+                        <div style={{fontSize:9,color:'var(--text-muted)',textAlign:'center',width:'100%'}}>{d.m}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{display:'flex',gap:16,marginTop:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,fontSize:'var(--text-11)',color:'var(--text-muted)'}}><div style={{width:10,height:10,borderRadius:2,background:'var(--brand-200)'}}/>Revenue</div>
+                  <div style={{display:'flex',alignItems:'center',gap:4,fontSize:'var(--text-11)',color:'var(--text-muted)'}}><div style={{width:10,height:10,borderRadius:2,background:'var(--danger-200)'}}/>Payroll Cost</div>
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><div style={{fontWeight:700,fontSize:'var(--text-14)'}}>Invoice Aging</div></div>
+              <div className="card-body" style={{padding:'12px 20px'}}>
+                {[['Current (0–15 days)','₨ 6.70L',3,'var(--success-600)',72],['Late (16–30 days)','₨ 1.82L',1,'var(--warning-600)',19],['Overdue (31–60 days)','₨ 0.64L',1,'var(--danger-600)',7],['Overdue (60+ days)','₨ 0.18L',1,'var(--danger-700)',2]].map(([l,v,cnt,c,pct])=>(
+                  <div key={l} style={{marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',marginBottom:4}}>
+                      <span style={{color:'var(--text-secondary)',fontWeight:500}}>{l}</span>
+                      <span className="mono" style={{color:'var(--text-primary)',fontWeight:600}}>{v}</span>
+                    </div>
+                    <div className="progress-bar" style={{height:7}}><div className="progress-fill" style={{width:`${pct}%`,background:c}}/></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

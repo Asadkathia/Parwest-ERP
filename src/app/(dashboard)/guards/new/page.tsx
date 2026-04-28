@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
 import GuardEnrollmentForm from "./form"
 import SectionTitle from "@/components/ui/section-title"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { AlertCircle } from "lucide-react"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { buildManagerScopeWhere, deriveManagerScope } from "@/lib/access/scope"
 
@@ -38,7 +39,12 @@ export default async function NewGuardPage() {
     return (
         <div className="space-y-6">
             <SectionTitle title="Add New Guard" subtitle="Enroll a new security guard into the system" />
-            {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+            {dbWarning ? (
+                <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{dbWarning}</AlertDescription>
+                </Alert>
+            ) : null}
 
             <GuardEnrollmentForm
                 regionalOffices={regionalOffices}

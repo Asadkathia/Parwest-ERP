@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import EmptyState from "@/components/ui/empty-state"
 import FilterBar from "@/components/ui/filter-bar"
 import SectionTitle from "@/components/ui/section-title"
@@ -308,8 +308,8 @@ export default function InvoicePrerequisitesManager({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <ActionButton onClick={onSave}>Submit</ActionButton>
-              <ActionButton variant="secondary" onClick={resetDefaults}>Reset</ActionButton>
+              <Button onClick={onSave}>Submit</Button>
+              <Button variant="secondary" onClick={resetDefaults}>Reset</Button>
             </div>
           </FilterBar>
 
@@ -379,7 +379,7 @@ export default function InvoicePrerequisitesManager({
               <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
             </div>
             <div className="flex items-end">
-              <ActionButton onClick={() => setNotice("Invoice header saved.")}>Submit</ActionButton>
+              <Button onClick={() => setNotice("Invoice header saved.")}>Submit</Button>
             </div>
           </div>
           <EmptyState title="Invoice Header" description="Header presets can be managed here in frontend mode." />
@@ -395,8 +395,8 @@ export default function InvoicePrerequisitesManager({
             <label className="block text-sm text-[var(--text-muted)]">Effective Rate</label>
             <input type="number" className="ui-input" value={editRateValue} onChange={(e) => setEditRateValue(e.target.value)} placeholder="Effective Rate" />
             <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setEditingRate(null)}>Cancel</ActionButton>
-              <ActionButton onClick={onApplyEditRate}>Save</ActionButton>
+              <Button variant="secondary" onClick={() => setEditingRate(null)}>Cancel</Button>
+              <Button onClick={onApplyEditRate}>Save</Button>
             </div>
           </div>
         </FormDialog>

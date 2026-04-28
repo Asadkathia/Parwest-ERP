@@ -1,5 +1,4 @@
 "use client"
-import SectionTitle from "@/components/ui/section-title"
 
 interface TimelineEvent {
     id: string
@@ -18,7 +17,11 @@ interface HistoryTimelineProps {
 export default function HistoryTimeline({ title, events, emptyText = "No events found" }: HistoryTimelineProps) {
     return (
         <div className="space-y-6">
-            <SectionTitle title={title} />
+            <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+                </div>
+            </div>
 
             {events.length === 0 ? (
                 <div className="ui-card p-12 text-center text-[var(--text-muted)]">

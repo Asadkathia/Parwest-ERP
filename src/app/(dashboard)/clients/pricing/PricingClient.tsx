@@ -2,8 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -78,10 +77,12 @@ export default function PricingClient({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Client Pricing"
-        subtitle="Cross-client view of active contracts and current rates. Edit pricing on the client profile."
-      />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Client Pricing</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Cross-client view of active contracts and current rates. Edit pricing on the client profile.</p>
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="ui-card p-4">
@@ -101,7 +102,8 @@ export default function PricingClient({
         </div>
       </div>
 
-      <FilterBar>
+      <Card>
+        <CardContent className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <RegionUrlPicker
             regions={regions}
@@ -133,7 +135,8 @@ export default function PricingClient({
             ))}
           </select>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       {error && (
         <div className="ui-card p-4 text-sm text-red-500">Error loading pricing: {error}</div>

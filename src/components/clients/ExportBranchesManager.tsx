@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Filter } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
-import SectionTitle from "@/components/ui/section-title"
+import { Card, CardContent } from "@/components/shadcn/card"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
@@ -128,7 +127,12 @@ export default function ExportBranchesManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Export Client Branches" subtitle="Filter by manager/client and export branch ownership mapping." />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Export Client Branches</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Filter by manager/client and export branch ownership mapping.</p>
+        </div>
+      </div>
 
       <form
         onSubmit={(event) => {
@@ -137,7 +141,8 @@ export default function ExportBranchesManager({
         }}
         className="space-y-4"
       >
-        <FilterBar className="space-y-4">
+        <Card>
+          <CardContent className="space-y-4 p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <RegionUrlPicker
               regions={regions}
@@ -190,7 +195,8 @@ export default function ExportBranchesManager({
           <div className="flex gap-2">
             <ActionButton type="submit" className="inline-flex items-center gap-2"><Filter className="h-4 w-4" />Submit</ActionButton>
           </div>
-        </FilterBar>
+          </CardContent>
+        </Card>
         <input type="hidden" name="check_box_1" value={selectedLegacyChecks.includes("check_box_1") ? "1" : "0"} />
         <input type="hidden" name="check_box_2" value={selectedLegacyChecks.includes("check_box_2") ? "1" : "0"} />
         <input type="hidden" name="check_box_3" value={selectedLegacyChecks.includes("check_box_3") ? "1" : "0"} />

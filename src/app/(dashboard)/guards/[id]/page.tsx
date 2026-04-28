@@ -4,14 +4,14 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
-import { ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
+import { AlertCircle, ArrowLeft, Edit, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import GuardProfileTabs from "@/components/guards/GuardProfileTabs"
 import ProfileImageCard from "@/components/guards/ProfileImageCard"
 import GuardProfileHealth from "@/components/guards/GuardProfileHealth"
 import MentalHealthBadge from "@/components/guards/MentalHealthBadge"
 import GuardLifecycleProgress from "@/components/guards/GuardLifecycleProgress"
 import GuardStatusSupervisorEditor from "@/components/guards/GuardStatusSupervisorEditor"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { GuardTabModel, NearestRelative } from "@/components/guards/tabs/types"
 
@@ -212,7 +212,10 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
         if (dbWarning) {
             return (
                 <div className="space-y-6">
-                    <InlineAlert type="error" message={dbWarning} />
+                    <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{dbWarning}</AlertDescription>
+                    </Alert>
                     <div className="ui-card p-6 space-y-4">
                         <h1 className="text-2xl font-semibold text-[var(--text)]">Guard profile unavailable</h1>
                         <p className="text-sm text-[var(--text-muted)]">
@@ -364,7 +367,12 @@ export default async function GuardDetailPage({ params }: { params: Promise<{ id
 
     return (
         <div className="space-y-6">
-            {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+            {dbWarning ? (
+                <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{dbWarning}</AlertDescription>
+                </Alert>
+            ) : null}
 
             {/* Header */}
             <div className="flex items-center justify-between">

@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import SectionTitle from "@/components/ui/section-title"
 import EmergencyGuardTable from "@/components/guards/EmergencyGuardTable"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
@@ -80,10 +79,12 @@ export default async function EmergencyGuardsPage({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Emergency Guard Pool"
-        subtitle="Guards that can be temporarily assigned despite incomplete documentation"
-      />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Emergency Guard Pool</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Guards that can be temporarily assigned despite incomplete documentation</p>
+        </div>
+      </div>
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       <section className="ui-card p-5">

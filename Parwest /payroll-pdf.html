@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Payroll Slip — April 2026 — Parwest Security Services</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<link rel="stylesheet" href="print.css"/>
+<style>
+body.print-preview{background:#e5e7eb;display:flex;flex-direction:column;align-items:center;padding:40px;gap:20px;font-family:var(--font-ui);}
+.print-controls{display:flex;gap:12px;align-items:center;width:210mm;}
+.print-controls button{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);font-weight:600;cursor:pointer;border:1px solid transparent;font-family:var(--font-ui);}
+.btn-p{background:var(--brand-600);color:#fff;}
+.btn-p:hover{background:var(--brand-700);}
+.btn-s{background:#fff;color:var(--text-secondary);border-color:var(--border-default);}
+.ctrl-info{font-size:var(--text-12);color:var(--text-muted);margin-left:auto;}
+/* A4 page */
+.print-page{background:white;width:210mm;min-height:297mm;padding:14mm 16mm;box-shadow:0 4px 24px rgba(0,0,0,0.15);border-radius:2px;font-family:var(--font-ui);font-size:9.5pt;color:#000;line-height:1.5;position:relative;box-sizing:border-box;}
+/* Page header */
+.ph{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:6mm;margin-bottom:5mm;border-bottom:2pt solid #000;}
+.ph-mark{width:24pt;height:24pt;background:#000;color:#fff;border-radius:3pt;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13pt;flex-shrink:0;}
+.ph-company{font-size:13pt;font-weight:800;letter-spacing:-0.3pt;}
+.ph-company-sub{font-size:7pt;color:#6b7280;text-transform:uppercase;letter-spacing:0.4pt;}
+.ph-right{text-align:right;}
+.ph-doc-type{font-size:14pt;font-weight:800;}
+.ph-period{font-size:8pt;color:#6b7280;margin-top:1pt;}
+/* Guard info block */
+.guard-block{display:grid;grid-template-columns:1fr 1fr;gap:5mm;padding:5mm;border:0.5pt solid #d1d5db;background:#f9fafb;margin-bottom:5mm;}
+.guard-field{display:flex;flex-direction:column;gap:1pt;}
+.gf-label{font-size:7pt;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5pt;}
+.gf-val{font-size:9.5pt;font-weight:600;color:#000;}
+.gf-val.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+/* Earnings / deductions table */
+.pay-table{width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:9pt;}
+.pay-table th{background:#f9fafb;border:0.5pt solid #d1d5db;padding:2.5pt 5pt;text-align:left;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:0.4pt;color:#6b7280;}
+.pay-table th.r{text-align:right;}
+.pay-table td{border:0.5pt solid #d1d5db;padding:3pt 5pt;vertical-align:middle;}
+.pay-table td.r{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.pay-table tr:nth-child(even) td{background:#fafafa;}
+.pay-table .subtotal td{border-top:0.75pt solid #000;font-weight:700;}
+.pay-table .total td{border-top:1.5pt solid #000;font-size:11pt;font-weight:800;background:none!important;}
+/* 2-col pay layout */
+.pay-cols{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:4mm;}
+.pay-section-title{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#6b7280;border-bottom:0.5pt solid #d1d5db;padding-bottom:2pt;margin-bottom:3pt;}
+/* Summary bar */
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:0.5pt solid #d1d5db;margin-bottom:5mm;}
+.sum-cell{padding:4pt 6pt;border-right:0.5pt solid #d1d5db;text-align:center;}
+.sum-cell:last-child{border-right:none;}
+.sum-label{font-size:7pt;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.4pt;margin-bottom:1pt;}
+.sum-val{font-size:12pt;font-weight:800;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.sum-val.plus{color:#15803d;}
+.sum-val.minus{color:#b91c1c;}
+/* Attendance grid */
+.att-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2pt;margin-bottom:4mm;}
+.att-day{width:14pt;height:14pt;border-radius:2pt;display:flex;align-items:center;justify-content:center;font-size:6.5pt;font-weight:700;}
+.att-present{background:#dcfce7;color:#15803d;border:0.5pt solid #bbf7d0;}
+.att-absent{background:#fee2e2;color:#b91c1c;border:0.5pt solid #fecaca;}
+.att-leave{background:#fef3c7;color:#b45309;border:0.5pt solid #fde68a;}
+.att-holiday{background:#f1f5f9;color:#6b7280;border:0.5pt solid #e2e8f0;}
+/* Status chip print */
+.pchip{display:inline-flex;align-items:center;border:0.75pt solid #6b7280;padding:0.5pt 4pt;border-radius:2pt;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:0.3pt;}
+.pchip.paid{border-color:#15803d;color:#15803d;}
+.pchip.finalized{border-color:#1d4ed8;color:#1d4ed8;}
+/* Signature block */
+.sig-block{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6mm;margin-top:8mm;}
+.sig-line{border-top:0.5pt solid #000;padding-top:3pt;font-size:7pt;color:#6b7280;text-align:center;}
+/* Footer */
+.page-footer{position:absolute;bottom:10mm;left:16mm;right:16mm;border-top:0.5pt solid #d1d5db;padding-top:3pt;display:flex;justify-content:space-between;font-size:7pt;color:#6b7280;}
+</style>
+</head>
+<body class="print-preview">
+
+<div class="print-controls">
+  <button class="btn-p" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button class="btn-s" onclick="window.history.back()">← Back</button>
+  <span class="ctrl-info">A4 · Portrait · Chrome Cmd+P → Save as PDF</span>
+</div>
+
+<!-- Page 1 — Individual Payroll Slip -->
+<div class="print-page">
+  <!-- Header -->
+  <div class="ph">
+    <div style="display:flex;align-items:center;gap:8pt;">
+      <div class="ph-mark">P</div>
+      <div>
+        <div class="ph-company">Parwest Security Services</div>
+        <div class="ph-company-sub">Lahore · Karachi · Islamabad · Rawalpindi</div>
+      </div>
+    </div>
+    <div class="ph-right">
+      <div class="ph-doc-type">Salary Slip</div>
+      <div class="ph-period">April 2026 · Regional Office: Lahore – Gulberg</div>
+      <div style="margin-top:3pt;"><span class="pchip finalized">Global Finalized</span></div>
+    </div>
+  </div>
+
+  <!-- Guard information -->
+  <div class="guard-block">
+    <div class="guard-field"><div class="gf-label">Full Name</div><div class="gf-val">Muhammad Usman Khan</div></div>
+    <div class="guard-field"><div class="gf-label">Parwest ID</div><div class="gf-val mono">LHR-00247</div></div>
+    <div class="guard-field"><div class="gf-label">CNIC</div><div class="gf-val mono">42201-1234567-9</div></div>
+    <div class="guard-field"><div class="gf-label">Designation</div><div class="gf-val">Security Guard</div></div>
+    <div class="guard-field"><div class="gf-label">Shift</div><div class="gf-val">DAY</div></div>
+    <div class="guard-field"><div class="gf-label">Deployed At</div><div class="gf-val">MCB Bank – Gulberg Branch</div></div>
+    <div class="guard-field"><div class="gf-label">Bank Account</div><div class="gf-val mono">MCB · 0012345678901</div></div>
+    <div class="guard-field"><div class="gf-label">Payment Method</div><div class="gf-val">Bank Transfer</div></div>
+  </div>
+
+  <!-- Attendance summary -->
+  <div style="margin-bottom:4mm;">
+    <div class="pay-section-title">Attendance — April 2026 (26 working days)</div>
+    <div class="att-grid">
+      <!-- 26 P, 4 A or H -->
+      <div class="att-day att-present">1</div><div class="att-day att-present">2</div>
+      <div class="att-day att-absent">3</div>
+      <div class="att-day att-present">4</div><div class="att-day att-present">5</div>
+      <div class="att-day att-holiday">6</div>
+      <div class="att-day att-present">7</div><div class="att-day att-present">8</div><div class="att-day att-present">9</div><div class="att-day att-present">10</div>
+      <div class="att-day att-present">11</div><div class="att-day att-present">12</div><div class="att-day att-present">13</div>
+      <div class="att-day att-holiday">14</div>
+      <div class="att-day att-present">15</div><div class="att-day att-present">16</div><div class="att-day att-present">17</div><div class="att-day att-present">18</div><div class="att-day att-present">19</div><div class="att-day att-present">20</div>
+      <div class="att-day att-leave">21</div>
+      <div class="att-day att-present">22</div><div class="att-day att-present">23</div><div class="att-day att-present">24</div><div class="att-day att-present">25</div><div class="att-day att-present">26</div><div class="att-day att-present">27</div>
+      <div class="att-day att-holiday">28</div>
+      <div class="att-day att-present">29</div><div class="att-day att-present">30</div>
+    </div>
+    <div style="display:flex;gap:12pt;font-size:7.5pt;color:#374151;">
+      <span><span style="display:inline-block;width:10pt;height:10pt;background:#dcfce7;border:0.5pt solid #bbf7d0;border-radius:1pt;vertical-align:middle;margin-right:2pt;"></span>Present (26)</span>
+      <span><span style="display:inline-block;width:10pt;height:10pt;background:#fee2e2;border:0.5pt solid #fecaca;border-radius:1pt;vertical-align:middle;margin-right:2pt;"></span>Absent (1)</span>
+      <span><span style="display:inline-block;width:10pt;height:10pt;background:#fef3c7;border:0.5pt solid #fde68a;border-radius:1pt;vertical-align:middle;margin-right:2pt;"></span>Leave (1)</span>
+      <span><span style="display:inline-block;width:10pt;height:10pt;background:#f1f5f9;border:0.5pt solid #e2e8f0;border-radius:1pt;vertical-align:middle;margin-right:2pt;"></span>Holiday (2)</span>
+    </div>
+  </div>
+
+  <!-- Summary bar -->
+  <div class="summary-bar">
+    <div class="sum-cell"><div class="sum-label">Basic Salary</div><div class="sum-val">₨ 28,000</div></div>
+    <div class="sum-cell"><div class="sum-label">Gross Earnings</div><div class="sum-val plus">₨ 29,600</div></div>
+    <div class="sum-cell"><div class="sum-label">Total Deductions</div><div class="sum-val minus">₨ 8,960</div></div>
+    <div class="sum-cell"><div class="sum-label">Net Pay</div><div class="sum-val" style="color:#15803d;font-size:14pt;">₨ 20,640</div></div>
+  </div>
+
+  <!-- Earnings / Deductions -->
+  <div class="pay-cols">
+    <!-- Earnings -->
+    <div>
+      <div class="pay-section-title">Earnings</div>
+      <table class="pay-table">
+        <thead><tr><th>Component</th><th class="r">Amount (₨)</th></tr></thead>
+        <tbody>
+          <tr><td>Basic Salary</td><td class="r">28,000</td></tr>
+          <tr><td>Overtime (4 hrs × ₨ 350)</td><td class="r">1,400</td></tr>
+          <tr><td>Transport Allowance</td><td class="r">200</td></tr>
+          <tr class="subtotal"><td><strong>Gross Earnings</strong></td><td class="r"><strong>29,600</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Deductions -->
+    <div>
+      <div class="pay-section-title">Deductions</div>
+      <table class="pay-table">
+        <thead><tr><th>Component</th><th class="r">Amount (₨)</th></tr></thead>
+        <tbody>
+          <tr><td>Reserve (30%)</td><td class="r">8,400</td></tr>
+          <tr><td>EOBI Contribution</td><td class="r">370</td></tr>
+          <tr><td>Absence Deduction (1 day)</td><td class="r">‒ 933</td></tr>
+          <tr><td>Loan Repayment</td><td class="r">0</td></tr>
+          <tr class="subtotal"><td><strong>Total Deductions</strong></td><td class="r"><strong>8,903</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Net pay -->
+  <table class="pay-table" style="margin-bottom:5mm;">
+    <tbody>
+      <tr class="total">
+        <td style="width:70%"><strong>NET SALARY PAYABLE — April 2026</strong></td>
+        <td class="r"><strong>₨ 20,697</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Signature block -->
+  <div class="sig-block">
+    <div class="sig-line">Guard Acknowledgement<br/><br/>Name: ____________________<br/>CNIC: ____________________<br/>Date: ____________________</div>
+    <div class="sig-line">Regional Manager<br/><br/>Name: ____________________<br/>Designation: Regional Mgr.<br/>Date: ____________________</div>
+    <div class="sig-line">Accounts Department<br/><br/>Verified by: ______________<br/>Paid via: Bank Transfer<br/>Date: ____________________</div>
+  </div>
+
+  <div class="page-footer">
+    <span>Parwest Security Services · NTN 1234567-8 · Lahore</span>
+    <span>Page 1 of 1</span>
+    <span>Generated: 27/04/2026 09:14 · Computer-generated, no signature required</span>
+  </div>
+</div>
+
+<!-- Page 2 — Payroll Summary Report -->
+<div class="print-page" style="margin-top:0;">
+  <div class="ph">
+    <div style="display:flex;align-items:center;gap:8pt;">
+      <div class="ph-mark">P</div>
+      <div>
+        <div class="ph-company">Parwest Security Services</div>
+        <div class="ph-company-sub">Lahore · Karachi · Islamabad · Rawalpindi</div>
+      </div>
+    </div>
+    <div class="ph-right">
+      <div class="ph-doc-type">Payroll Summary Report</div>
+      <div class="ph-period">April 2026 · All Regions · <span class="pchip finalized">Global Finalized</span></div>
+    </div>
+  </div>
+
+  <div class="summary-bar" style="margin-bottom:5mm;">
+    <div class="sum-cell"><div class="sum-label">Total Guards</div><div class="sum-val">1,108</div></div>
+    <div class="sum-cell"><div class="sum-label">Total Basic</div><div class="sum-val">₨ 4.24Cr</div></div>
+    <div class="sum-cell"><div class="sum-label">Total Reserve</div><div class="sum-val">₨ 1.27Cr</div></div>
+    <div class="sum-cell"><div class="sum-label">Total Net Pay</div><div class="sum-val plus">₨ 2.97Cr</div></div>
+  </div>
+
+  <div class="pay-section-title" style="margin-bottom:4pt;">Regional Breakdown</div>
+  <table class="pay-table" style="margin-bottom:5mm;">
+    <thead>
+      <tr>
+        <th>Regional Office</th>
+        <th class="r">Guards</th>
+        <th class="r">Basic Total (₨)</th>
+        <th class="r">Reserve (₨)</th>
+        <th class="r">Deductions (₨)</th>
+        <th class="r">Net Payable (₨)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Lahore – Gulberg</td><td class="r">187</td><td class="r">52,36,000</td><td class="r">15,70,800</td><td class="r">1,57,080</td><td class="r">35,08,120</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Lahore – DHA</td><td class="r">143</td><td class="r">40,04,000</td><td class="r">12,01,200</td><td class="r">1,20,120</td><td class="r">26,82,680</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Karachi – Site A&amp;B</td><td class="r">198</td><td class="r">55,44,000</td><td class="r">16,63,200</td><td class="r">1,66,320</td><td class="r">37,14,480</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Islamabad – F-7</td><td class="r">187</td><td class="r">52,36,000</td><td class="r">15,70,800</td><td class="r">1,57,080</td><td class="r">35,08,120</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Rawalpindi – Saddar</td><td class="r">143</td><td class="r">40,04,000</td><td class="r">12,01,200</td><td class="r">1,20,120</td><td class="r">26,82,680</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Faisalabad – Main</td><td class="r">98</td><td class="r">27,44,000</td><td class="r">8,23,200</td><td class="r">82,320</td><td class="r">18,38,480</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Multan – Central</td><td class="r">72</td><td class="r">20,16,000</td><td class="r">6,04,800</td><td class="r">60,480</td><td class="r">13,50,720</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Peshawar – Ring Road</td><td class="r">64</td><td class="r">17,92,000</td><td class="r">5,37,600</td><td class="r">53,760</td><td class="r">12,00,640</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr><td>Quetta – Main</td><td class="r">16</td><td class="r">4,48,000</td><td class="r">1,34,400</td><td class="r">13,440</td><td class="r">3,00,160</td><td><span class="pchip finalized">Finalized</span></td></tr>
+      <tr class="subtotal"><td><strong>TOTAL</strong></td><td class="r"><strong>1,108</strong></td><td class="r"><strong>3,10,24,000</strong></td><td class="r"><strong>93,07,200</strong></td><td class="r"><strong>9,30,720</strong></td><td class="r"><strong>2,07,85,840</strong></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="pay-section-title" style="margin-bottom:4pt;">Designation Band Summary</div>
+  <table class="pay-table" style="margin-bottom:5mm;">
+    <thead>
+      <tr><th>Designation</th><th class="r">Count</th><th class="r">Avg Basic (₨)</th><th class="r">Total Basic (₨)</th><th class="r">Total Net (₨)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Security Guard</td><td class="r">876</td><td class="r">26,500</td><td class="r">2,32,14,000</td><td class="r">1,62,49,800</td></tr>
+      <tr><td>Supervisor</td><td class="r">187</td><td class="r">34,200</td><td class="r">63,95,400</td><td class="r">44,76,780</td></tr>
+      <tr><td>CPO</td><td class="r">25</td><td class="r">44,000</td><td class="r">11,00,000</td><td class="r">7,70,000</td></tr>
+      <tr><td>ASO</td><td class="r">20</td><td class="r">30,750</td><td class="r">6,15,000</td><td class="r">4,30,500</td></tr>
+    </tbody>
+  </table>
+
+  <div style="padding:5pt 8pt;border:0.5pt solid #d1d5db;background:#f9fafb;font-size:7.5pt;color:#374151;margin-bottom:5mm;">
+    <strong>Reserve Balance Carried Forward:</strong> ₨ 93,07,200 held for April 2026. Reserve is released upon guard resignation, termination, or service completion as per Gratuity rules. EOBI contribution @ ₨ 370/guard/month deducted and remitted separately. All figures in PKR. This report is auto-generated by Parwest ERP on global payroll finalization.
+  </div>
+
+  <div class="page-footer">
+    <span>Parwest Security Services · April 2026 Payroll Summary</span>
+    <span>Page 2 of 2</span>
+    <span>Generated: 27/04/2026 09:14 · Computer-generated, no signature required</span>
+  </div>
+</div>
+
+<script>
+document.documentElement.setAttribute('data-timestamp', new Date().toLocaleString('en-PK'));
+</script>
+</body>
+</html>

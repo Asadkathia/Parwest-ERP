@@ -3,12 +3,12 @@
 import dynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Pencil, Check, X, MapPin, Map } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { AlertCircle, CheckCircle2, Pencil, Check, X, MapPin, Map } from "lucide-react"
 
 // Dynamic import — Leaflet requires window
 const CoordPickerMap = dynamic(() => import("./CoordPickerMap"), {
@@ -220,10 +220,21 @@ export default function RegionalOfficesManager() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Settings: Regional Offices" subtitle="Manage specific offices within regions." />
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? (
+        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Region *</label>
@@ -315,14 +326,15 @@ export default function RegionalOfficesManager() {
         </div>
 
         <div className="flex gap-2">
-          <ActionButton onClick={onCreate} disabled={saving}>
+          <Button onClick={onCreate} disabled={saving}>
             {saving ? "Saving..." : "Create"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>
+          </Button>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading}>
             Refresh
-          </ActionButton>
+          </Button>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       {/* Inline edit map (shown below table when editing) */}
       {editId && showEditMap && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -212,7 +212,8 @@ export default function DeploymentRatesForm() {
       {error ? <InlineAlert type="error" message={error} /> : null}
       {success ? <InlineAlert type="success" message={success} /> : null}
 
-      <FilterBar className="space-y-5">
+      <Card>
+        <CardContent className="space-y-5 p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Region</label>
@@ -302,7 +303,8 @@ export default function DeploymentRatesForm() {
           <ActionButton type="button" variant="secondary" onClick={getPreviousRates}>Get Previous Rates</ActionButton>
           <ActionButton type="button" onClick={saveRate} disabled={loading}>{loading ? "Saving..." : "Save"}</ActionButton>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       <section className="ui-card overflow-x-auto">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-[var(--surface-muted)] px-4 py-3">

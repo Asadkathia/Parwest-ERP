@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -125,9 +125,9 @@ export default function GuardPledgeableDocumentsManager() {
           </div>
         </div>
         <div className="flex gap-2">
-          <ActionButton onClick={save} disabled={saving}>{saving ? "Saving..." : editingId ? "Update" : "Create"}</ActionButton>
-          <ActionButton variant="secondary" onClick={reset}>Reset</ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</ActionButton>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving..." : editingId ? "Update" : "Create"}</Button>
+          <Button variant="secondary" onClick={reset}>Reset</Button>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</Button>
         </div>
       </FilterBar>
 

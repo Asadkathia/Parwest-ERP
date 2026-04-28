@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -296,8 +296,8 @@ export default function ClientTypesLocationsManager() {
               ) : null}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={closeModal}>Close</ActionButton>
-              <ActionButton onClick={submitAdd}>Submit</ActionButton>
+              <Button variant="secondary" onClick={closeModal}>Close</Button>
+              <Button onClick={submitAdd}>Submit</Button>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import InlineAlert from "@/components/ui/inline-alert"
 import { Plus, Users, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
 
@@ -163,10 +163,10 @@ export default function UserTypesManager() {
           subtitle="Create and manage supervisor and manager accounts with region and office assignment."
         />
         {isAdmin && (
-          <ActionButton onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2">
+          <Button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />
             {showForm ? "Cancel" : "Add User"}
-          </ActionButton>
+          </Button>
         )}
       </div>
 
@@ -267,12 +267,12 @@ export default function UserTypesManager() {
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <ActionButton onClick={handleCreate} disabled={submitting}>
+            <Button onClick={handleCreate} disabled={submitting}>
               {submitting ? "Creating..." : "Create User"}
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={() => { setShowForm(false); setError("") }}>
+            </Button>
+            <Button variant="secondary" onClick={() => { setShowForm(false); setError("") }}>
               Cancel
-            </ActionButton>
+            </Button>
           </div>
         </div>
       )}
@@ -346,9 +346,9 @@ export default function UserTypesManager() {
                   <label className="ui-label">Description</label>
                   <input className="ui-input" value={newRoleDesc} onChange={(e) => setNewRoleDesc(e.target.value)} placeholder="Optional description" />
                 </div>
-                <ActionButton onClick={handleCreateRole} disabled={savingRole}>
+                <Button onClick={handleCreateRole} disabled={savingRole}>
                   {savingRole ? "Saving..." : "Add Role"}
-                </ActionButton>
+                </Button>
               </div>
               <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
                 <table className="min-w-full text-sm">

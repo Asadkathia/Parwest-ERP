@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import InlineAlert from "@/components/ui/inline-alert"
 
 type GuardOption = { id: string; parwestId: string; name: string; cnic: string }
@@ -180,7 +180,8 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
             {error && <InlineAlert type="error" message={error} />}
 
             <form onSubmit={onSubmit}>
-                <FilterBar className="space-y-5">
+                <Card>
+                    <CardContent className="space-y-5 p-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                         {/* Regional Office */}
@@ -351,7 +352,8 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
                         <ActionButton type="button" variant="secondary" onClick={() => setForm(EMPTY)}>Reset</ActionButton>
                         <ActionButton type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</ActionButton>
                     </div>
-                </FilterBar>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     )

@@ -1,0 +1,304 @@
+/*
+  Parwest ERP — Design Tokens v1.1
+  Addendum to tokens.css (v1.0). Import AFTER tokens.css.
+  Contains:
+    1. shadcn/ui CSS-variable contract mapping
+    2. RTL layout tokens
+    3. Urdu typography
+    4. Reduced-motion overrides
+    5. Print surface tokens
+  No new visual colors — all references resolve to v1.0 tokens.
+*/
+
+/* ─── 1. shadcn/ui CSS-variable contract ───────────────────────────────────
+   shadcn components read these names. We map them to v1.0 tokens so
+   shadcn components automatically inherit the Parwest palette.
+   Source: https://ui.shadcn.com/docs/theming
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Core surfaces */
+  --background:         var(--bg-page);          /* page bg */
+  --foreground:         var(--text-primary);      /* default text */
+  --card:               var(--bg-card);
+  --card-foreground:    var(--text-primary);
+  --popover:            var(--bg-card);
+  --popover-foreground: var(--text-primary);
+
+  /* Brand */
+  --primary:            var(--brand-600);        /* #2f5bff */
+  --primary-foreground: #ffffff;
+
+  /* Secondary (ghost / outline buttons) */
+  --secondary:          var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+
+  /* Muted (placeholder, helper text, table headers) */
+  --muted:              var(--bg-subtle);
+  --muted-foreground:   var(--text-muted);
+
+  /* Accent (hover fills on nav, sidebar active) */
+  --accent:             var(--brand-50);
+  --accent-foreground:  var(--brand-700);
+
+  /* Destructive */
+  --destructive:        var(--danger-600);       /* #dc2626 */
+  --destructive-foreground: #ffffff;
+
+  /* Structural */
+  --border:             var(--border-default);
+  --input:              var(--border-default);   /* input border */
+  --ring:               var(--brand-600);        /* focus ring base */
+
+  /* Radius — shadcn uses a single --radius; we use --radius-sm for inputs */
+  --radius:             var(--radius-sm);        /* 10px */
+
+  /* Sidebar — v1.0 block, kept for shadcn sidebar primitives */
+  --sidebar-background:         var(--sidebar-bg);
+  --sidebar-foreground:         var(--sidebar-text);
+  --sidebar-primary:            var(--brand-600);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             var(--sidebar-active-bg);
+  --sidebar-accent-foreground:  var(--sidebar-active-text);
+  --sidebar-border:             var(--sidebar-border);
+  --sidebar-ring:               var(--brand-600);
+
+  /* Chart colors — map to v1.0 viz palette */
+  --chart-1: var(--viz-1);  /* cobalt  */
+  --chart-2: var(--viz-2);  /* emerald */
+  --chart-3: var(--viz-3);  /* amber   */
+  --chart-4: var(--viz-4);  /* red     */
+  --chart-5: var(--viz-5);  /* indigo  */
+}
+
+[data-theme="dark"] {
+  --background:         var(--bg-page);
+  --foreground:         var(--text-primary);
+  --card:               var(--bg-card);
+  --card-foreground:    var(--text-primary);
+  --popover:            var(--bg-card);
+  --popover-foreground: var(--text-primary);
+  --primary:            var(--brand-400);        /* lighter in dark */
+  --primary-foreground: #ffffff;
+  --secondary:          var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+  --muted:              var(--bg-subtle);
+  --muted-foreground:   var(--text-muted);
+  --accent:             var(--sidebar-active-bg);
+  --accent-foreground:  var(--sidebar-active-text);
+  --destructive:        var(--danger-500);
+  --destructive-foreground: #ffffff;
+  --border:             var(--border-default);
+  --input:              var(--border-default);
+  --ring:               var(--brand-400);
+}
+
+/* ─── 2. RTL layout tokens ─────────────────────────────────────────────────
+   Logical-property helpers. Components use these to be direction-agnostic.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Sidebar position */
+  --sidebar-side: left;          /* overridden to "right" in [dir=rtl] */
+
+  /* Chevron direction */
+  --chevron-next: rotate(0deg);  /* ChevronRight in LTR */
+  --chevron-prev: rotate(180deg);
+
+  /* Progress/stepper fill direction */
+  --progress-direction: ltr;
+
+  /* Table sort arrow */
+  --sort-asc-icon: '↑';
+  --sort-desc-icon: '↓';
+}
+
+[dir="rtl"] {
+  --sidebar-side: right;
+  --chevron-next: rotate(180deg);  /* ChevronRight flips to point left */
+  --chevron-prev: rotate(0deg);
+  --progress-direction: rtl;
+
+  /* Logical spacing shorthands — consumed by utility classes below */
+  --space-inline-start: var(--space-6);  /* padding-inline-start */
+  --space-inline-end:   var(--space-4);
+}
+
+/* RTL utility classes (use instead of pl-/pr- Tailwind) */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1); /* flip chevrons, arrows */
+}
+
+[dir="rtl"] .rtl-text-start { text-align: right; }
+[dir="rtl"] .rtl-text-end   { text-align: left;  }
+
+/* Progress bars fill from right in RTL */
+[dir="rtl"] .progress-fill {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* Stepper connector flips */
+[dir="rtl"] .step-line {
+  direction: rtl;
+}
+
+/* ─── 3. Urdu typography ────────────────────────────────────────────────────
+   Noto Nastaliq Urdu — Nastaliq script, required for Pakistani market.
+   IBM Plex Mono is kept unchanged for numbers/IDs (always LTR).
+   ───────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-urdu: 'Noto Nastaliq Urdu', 'Noto Serif Urdu', serif;
+
+  /* Urdu-specific type scale — Nastaliq requires larger sizes for legibility */
+  --text-urdu-body:    1rem;       /* 16px (vs 13-14px Latin)  */
+  --text-urdu-sm:      0.9375rem;  /* 15px */
+  --text-urdu-lg:      1.25rem;    /* 20px */
+  --text-urdu-xl:      1.5rem;     /* 24px */
+  --text-urdu-heading: 1.875rem;   /* 30px */
+
+  /* Nastaliq line-height — considerably looser than Latin */
+  --leading-urdu:      2.0;
+  --leading-urdu-tight: 1.75;
+}
+
+[dir="rtl"] body,
+[lang="ur"] {
+  font-family: var(--font-urdu);
+  font-size: var(--text-urdu-body);
+  line-height: var(--leading-urdu);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers and IDs always stay LTR and use Plex Mono */
+[dir="rtl"] .mono,
+[dir="rtl"] .tabnum,
+[dir="rtl"] [data-ltr] {
+  font-family: var(--font-mono);
+  direction: ltr;
+  unicode-bidi: embed;
+  font-size: var(--text-13); /* reset to Latin size */
+  line-height: var(--leading-normal);
+}
+
+/* Currency display in RTL — symbol stays with number, both LTR */
+[dir="rtl"] .currency {
+  direction: ltr;
+  unicode-bidi: embed;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status chips in RTL — chip text is short, allow natural direction */
+[dir="rtl"] .chip {
+  direction: rtl;
+}
+
+/* ─── 4. prefers-reduced-motion overrides ──────────────────────────────────
+   When the user has requested reduced motion:
+   - All durations collapse to 0ms (instant)
+   - Transforms become opacity-only (no movement)
+   - Radix animation tokens are zeroed
+   ───────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* Override all v1.0 duration tokens */
+  :root {
+    --duration-fast:   0ms;
+    --duration-normal: 0ms;
+    --duration-slow:   0ms;
+  }
+
+  /* Kill all transitions and animations */
+  *,
+  *::before,
+  *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+
+  /* Radix UI data-state animation tokens */
+  [data-state="open"],
+  [data-state="closed"],
+  [data-side="top"],
+  [data-side="bottom"],
+  [data-side="left"],
+  [data-side="right"] {
+    --tw-enter-opacity:     1   !important;
+    --tw-enter-scale:       1   !important;
+    --tw-enter-translate-x: 0   !important;
+    --tw-enter-translate-y: 0   !important;
+    --tw-exit-opacity:      1   !important;
+    --tw-exit-scale:        1   !important;
+    --tw-exit-translate-x:  0   !important;
+    --tw-exit-translate-y:  0   !important;
+    animation-duration:     0ms !important;
+  }
+
+  /* Radix Dialog / Sheet enter/exit */
+  [data-radix-dialog-content],
+  [data-radix-sheet-content] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Sonner toasts */
+  [data-sonner-toast] {
+    animation: none !important;
+    transition: opacity 0ms !important;
+  }
+
+  /* Sidebar collapse */
+  .sidebar {
+    transition: none !important;
+  }
+
+  /* Progress bar fill */
+  .progress-fill {
+    transition: none !important;
+  }
+
+  /* Skeleton shimmer — replace moving gradient with static */
+  .skeleton {
+    animation: none !important;
+    background: var(--slate-200) !important;
+  }
+}
+
+/* ─── 5. Print surface tokens ───────────────────────────────────────────────
+   Used by print.css + invoice-pdf.html + payroll-pdf.html.
+   Black-on-white, no shadows, borders only, no chip fills.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --print-bg:       #ffffff;
+  --print-text:     #000000;
+  --print-text-sub: #374151;     /* ~slate-700 equivalent */
+  --print-text-muted: #6b7280;   /* ~slate-500 */
+  --print-border:   #d1d5db;     /* ~slate-300 */
+  --print-header-bg:#f9fafb;     /* ~slate-50  */
+
+  /* Chip overrides for print — border + label, no fill */
+  --print-chip-active-border:   #16a34a;
+  --print-chip-active-text:     #15803d;
+  --print-chip-pending-border:  #d97706;
+  --print-chip-pending-text:    #b45309;
+  --print-chip-danger-border:   #dc2626;
+  --print-chip-danger-text:     #b91c1c;
+  --print-chip-muted-border:    #9ca3af;
+  --print-chip-muted-text:      #4b5563;
+
+  /* Page geometry */
+  --print-page-width:   210mm;
+  --print-page-height:  297mm;
+  --print-margin-v:     16mm;
+  --print-margin-h:     18mm;
+
+  /* Typography — print safe */
+  --print-font-base:  11pt;
+  --print-font-sm:    9pt;
+  --print-font-xs:    8pt;
+  --print-font-h1:    16pt;
+  --print-font-h2:    12pt;
+  --print-font-mono:  9pt;
+}

@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import SectionTitle from "@/components/ui/section-title"
 import SuggestionCard from "@/components/ai/SuggestionCard"
 import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
@@ -67,10 +66,12 @@ export default async function ShshkPage() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="SHSHK System Health Insights"
-        subtitle="AI-based admin recommendations for compliance, staffing, billing, and operations"
-      />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">SHSHK System Health Insights</h2>
+          <p className="mt-1 text-sm text-muted-foreground">AI-based admin recommendations for compliance, staffing, billing, and operations</p>
+        </div>
+      </div>
       {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
 
       {suggestions.length === 0 ? (

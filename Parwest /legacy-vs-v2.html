@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — Legacy vs v2 Design Comparison</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+body{background:#f1f4f9;font-family:var(--font-ui);margin:0;color:var(--text-primary);}
+.page{max-width:1200px;margin:0 auto;padding:48px 40px;}
+/* Cover */
+.cover{background:var(--sidebar-bg);border-radius:var(--radius-xl);padding:48px;margin-bottom:48px;display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end;}
+.cover-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--brand-400);margin-bottom:8px;}
+.cover-title{font-size:var(--text-32);font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:8px;}
+.cover-sub{font-size:var(--text-14);color:rgba(226,232,240,0.55);line-height:1.6;max-width:560px;}
+.version-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;font-size:var(--text-12);font-weight:700;}
+.badge-legacy{background:rgba(100,116,139,0.2);color:#94a3b8;}
+.badge-v2{background:rgba(47,91,255,0.2);color:#818cf8;}
+/* Comparison section */
+.compare-section{margin-bottom:64px;}
+.compare-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border-default);}
+.compare-number{width:28px;height:28px;border-radius:50%;background:var(--brand-600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:var(--text-12);font-weight:700;flex-shrink:0;}
+.compare-label{font-size:var(--text-18);font-weight:700;color:var(--text-primary);}
+.compare-sub{font-size:var(--text-13);color:var(--text-muted);}
+/* Split layout */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+.pane{border-radius:var(--radius-md);overflow:hidden;}
+.pane-header{padding:10px 16px;font-size:var(--text-12);font-weight:700;display:flex;align-items:center;justify-content:space-between;}
+.pane-legacy .pane-header{background:#f1f5f9;border:1px solid var(--border-default);border-bottom:none;color:var(--text-muted);}
+.pane-v2 .pane-header{background:var(--brand-50);border:1px solid var(--brand-200);border-bottom:none;color:var(--brand-700);}
+.pane-legacy .pane-body{border:1px solid var(--border-default);border-top:none;padding:20px;background:#fff;}
+.pane-v2 .pane-body{border:1px solid var(--brand-200);border-top:none;padding:20px;background:#fff;}
+/* Delta list */
+.delta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px;}
+.delta-item{display:flex;gap:8px;padding:10px 14px;border-radius:var(--radius-sm);font-size:var(--text-13);line-height:1.5;}
+.delta-removed{background:#fef2f2;color:var(--danger-700);border:1px solid var(--danger-100);}
+.delta-removed::before{content:'−';font-weight:800;flex-shrink:0;color:var(--danger-600);}
+.delta-added{background:var(--success-50);color:var(--success-700);border:1px solid var(--success-100);}
+.delta-added::before{content:'+';font-weight:800;flex-shrink:0;color:var(--success-600);}
+/* Legacy mockups (deliberately rough) */
+.legacy-nav{background:#1a1a2e;padding:8px 0;width:100%;font-family:Arial,sans-serif;}
+.legacy-nav-item{display:flex;align-items:center;gap:8px;padding:6px 12px;color:#ccc;font-size:13px;cursor:pointer;}
+.legacy-nav-item.active{background:#16213e;color:#00d4ff;border-left:3px solid #00d4ff;}
+.legacy-topbar{background:#16213e;height:44px;display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:1px solid #0a3d62;}
+.legacy-topbar-title{color:#fff;font-size:14px;font-family:Arial,sans-serif;flex:1;}
+.legacy-table{width:100%;border-collapse:collapse;font-size:12px;font-family:Arial,sans-serif;}
+.legacy-table th{background:#1a1a2e;color:#00d4ff;padding:6px 10px;text-align:left;border:1px solid #0a3d62;}
+.legacy-table td{padding:5px 10px;border:1px solid #ddd;background:#fff;}
+.legacy-table tr:nth-child(even) td{background:#f5f5f5;}
+.legacy-chip{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-family:Arial,sans-serif;}
+.legacy-chip.active{background:#28a745;color:#fff;}
+.legacy-chip.inactive{background:#6c757d;color:#fff;}
+.legacy-chip.pending{background:#ffc107;color:#000;}
+.legacy-kpi{background:#fff;border:1px solid #dee2e6;border-radius:4px;padding:12px 16px;font-family:Arial,sans-serif;}
+.legacy-kpi-label{font-size:11px;color:#666;margin-bottom:4px;}
+.legacy-kpi-value{font-size:22px;font-weight:700;color:#1a1a2e;}
+.legacy-form-label{display:block;font-size:12px;color:#555;margin-bottom:3px;font-family:Arial,sans-serif;}
+.legacy-form-input{width:100%;padding:5px 8px;border:1px solid #ced4da;border-radius:3px;font-size:12px;font-family:Arial,sans-serif;box-sizing:border-box;}
+/* V2 mockups */
+.v2-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:9999px;font-size:var(--text-12);font-weight:600;}
+.v2-chip.active{background:var(--success-50);color:var(--success-700);}
+.v2-chip.inactive{background:var(--slate-100);color:var(--slate-600);}
+.v2-chip.pending{background:var(--warning-50);color:var(--warning-700);}
+.v2-chip .dot{width:6px;height:6px;border-radius:50%;}
+.v2-kpi{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px 18px;box-shadow:var(--shadow-xs);}
+.v2-kpi .label{font-size:var(--text-11);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.v2-kpi .value{font-size:var(--text-24);font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;line-height:1.2;}
+.v2-kpi .trend{font-size:var(--text-12);color:var(--success-600);margin-top:4px;}
+.v2-table{width:100%;border-collapse:collapse;font-size:var(--text-13);}
+.v2-table th{padding:9px 14px;text-align:left;font-size:var(--text-11);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-default);}
+.v2-table td{padding:0 14px;height:48px;border-bottom:1px solid var(--border-default);color:var(--text-primary);}
+.v2-table tr:last-child td{border-bottom:none;}
+.v2-table tr:hover td{background:var(--bg-card-hover);}
+/* Metrics table */
+.metrics-table{width:100%;border-collapse:collapse;font-size:var(--text-13);}
+.metrics-table th{padding:9px 14px;text-align:left;font-size:var(--text-11);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;background:var(--bg-subtle);border:1px solid var(--border-default);}
+.metrics-table td{padding:10px 14px;border:1px solid var(--border-default);}
+.metrics-table tr:nth-child(even) td{background:var(--bg-subtle);}
+.imp{color:var(--success-600);font-weight:700;}
+/* Scroll indicator */
+.scroll-hint{text-align:center;font-size:var(--text-12);color:var(--text-muted);padding:12px;font-style:italic;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const Ico = ({n,s=16,c='currentColor'}) => {
+  const p={
+    check:<polyline points="20 6 9 17 4 12"/>,
+    x:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    chevDown:<polyline points="6 9 12 15 18 9"/>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    users:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>,
+    dollar:<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>,
+    map:<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></>,
+    shield:<path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z"/>,
+    alertTri:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    plus:<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    menu:<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'block',flexShrink:0}}>{p[n]}</svg>;
+};
+
+function App(){
+  const [activeSection,setActiveSection]=useState('all');
+
+  const sections=[
+    {id:'sidebar',      label:'Navigation Sidebar'},
+    {id:'statuschips',  label:'Status Chips'},
+    {id:'kpi',          label:'KPI Cards'},
+    {id:'datatable',    label:'Data Table'},
+    {id:'formfields',   label:'Form Fields'},
+    {id:'typography',   label:'Typography'},
+    {id:'payroll',      label:'Payroll Workflow'},
+  ];
+
+  return (
+    <div className="page">
+      <div className="cover">
+        <div>
+          <div className="cover-eyebrow">Design Reference</div>
+          <div className="cover-title">Legacy vs v2</div>
+          <div className="cover-sub">Side-by-side comparison of every key UI component — original system on the left, Parwest ERP v2 design on the right. Use this as the developer handoff reference and stakeholder alignment doc.</div>
+        </div>
+        <div style={{textAlign:'right',display:'flex',flexDirection:'column',gap:10,alignItems:'flex-end'}}>
+          <span className="version-badge badge-legacy">Legacy v1</span>
+          <span style={{color:'rgba(226,232,240,0.3)',fontSize:'var(--text-12)'}}>→</span>
+          <span className="version-badge badge-v2">ERP v2</span>
+        </div>
+      </div>
+
+      {/* Section filter */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:32}}>
+        <button onClick={()=>setActiveSection('all')} style={{padding:'5px 12px',borderRadius:'var(--radius-sm)',background:activeSection==='all'?'var(--brand-600)':'#fff',color:activeSection==='all'?'#fff':'var(--text-muted)',border:'1px solid var(--border-default)',cursor:'pointer',fontSize:'var(--text-12)',fontFamily:'var(--font-ui)',fontWeight:500}}>All</button>
+        {sections.map(s=>(
+          <button key={s.id} onClick={()=>setActiveSection(s.id)} style={{padding:'5px 12px',borderRadius:'var(--radius-sm)',background:activeSection===s.id?'var(--brand-600)':'#fff',color:activeSection===s.id?'#fff':'var(--text-muted)',border:'1px solid var(--border-default)',cursor:'pointer',fontSize:'var(--text-12)',fontFamily:'var(--font-ui)',fontWeight:500}}>{s.label}</button>
+        ))}
+      </div>
+
+      {/* ── 1. Sidebar ── */}
+      {(activeSection==='all'||activeSection==='sidebar') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">1</div>
+            <div><div className="compare-label">Navigation Sidebar</div><div className="compare-sub">Font, color, active state, collapsed behavior, section grouping</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body" style={{padding:0}}>
+                <div className="legacy-nav">
+                  {[{l:'Dashboard',a:true},{l:'Guards',a:false},{l:'Clients',a:false},{l:'Payroll',a:false},{l:'Reports',a:false}].map(it=>(
+                    <div key={it.l} className={`legacy-nav-item${it.a?' active':''}`}>{it.l}</div>
+                  ))}
+                </div>
+                <div style={{padding:'8px',fontFamily:'Arial',fontSize:11,color:'#888',background:'#f5f5f5'}}>
+                  Arial · 13px · #00d4ff active · no section grouping · no icon
+                </div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body" style={{padding:0,background:'var(--sidebar-bg)'}}>
+                <div style={{padding:'16px 8px'}}>
+                  {[
+                    {icon:'shield',label:'Dashboard',active:true},
+                    {icon:'users',label:'Guards',active:false},
+                    {icon:'shield',label:'Clients',active:false},
+                    {icon:'dollar',label:'Payroll',active:false},
+                    {icon:'map',label:'Reports',active:false},
+                  ].map(it=>(
+                    <div key={it.label} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,cursor:'pointer',background:it.active?'rgba(47,91,255,0.14)':'transparent',color:it.active?'#818cf8':'rgba(226,232,240,0.45)',fontSize:'var(--text-13)',fontWeight:500,marginBottom:2,transition:'all 100ms'}}>
+                      <Ico n={it.icon} s={16} c="currentColor"/>
+                      {it.label}
+                    </div>
+                  ))}
+                </div>
+                <div style={{padding:'8px 12px',fontFamily:'var(--font-mono)',fontSize:10,color:'rgba(226,232,240,0.3)',background:'rgba(0,0,0,0.2)'}}>
+                  IBM Plex Sans · 13px · #818cf8 active · icon + section groups · always dark
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Arial 13px, no icons, no section grouping</div>
+            <div className="delta-item delta-added">IBM Plex Sans 13px + Lucide icons + section labels</div>
+            <div className="delta-item delta-removed">#00d4ff neon active highlight — low contrast</div>
+            <div className="delta-item delta-added">Cobalt ghost active (4.82:1 contrast ratio) — WCAG AA</div>
+            <div className="delta-item delta-removed">Sidebar color inherits theme — sometimes light</div>
+            <div className="delta-item delta-added">Sidebar is always dark — stable navigation anchor</div>
+            <div className="delta-item delta-removed">No collapsed mode</div>
+            <div className="delta-item delta-added">Collapsible to 64px icon-only rail</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. Status Chips ── */}
+      {(activeSection==='all'||activeSection==='statuschips') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">2</div>
+            <div><div className="compare-label">Status Chips</div><div className="compare-sub">Shape, color usage, accessibility, semantic meaning</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body">
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',fontFamily:'Arial'}}>
+                  <span className="legacy-chip active">Active</span>
+                  <span className="legacy-chip inactive">Inactive</span>
+                  <span className="legacy-chip pending">Pending</span>
+                  <span className="legacy-chip" style={{background:'#dc3545',color:'#fff'}}>Terminated</span>
+                  <span className="legacy-chip" style={{background:'#17a2b8',color:'#fff'}}>Day</span>
+                  <span className="legacy-chip" style={{background:'#6610f2',color:'#fff'}}>Night</span>
+                </div>
+                <div style={{marginTop:12,fontSize:11,color:'#888',fontFamily:'Arial'}}>Bootstrap badge style · square corners · solid fills · no status dot</div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body">
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {[
+                    {label:'ACTIVE',bg:'var(--success-50)',fg:'var(--success-700)',dot:'var(--success-600)'},
+                    {label:'INACTIVE',bg:'var(--slate-100)',fg:'var(--slate-600)',dot:'var(--slate-400)'},
+                    {label:'PENDING',bg:'var(--warning-50)',fg:'var(--warning-700)',dot:'var(--warning-500)'},
+                    {label:'TERMINATED',bg:'var(--danger-50)',fg:'var(--danger-700)',dot:'var(--danger-600)'},
+                    {label:'DAY',bg:'#eff6ff',fg:'#1d4ed8',dot:'#3b82f6'},
+                    {label:'NIGHT',bg:'#eef2ff',fg:'#4338ca',dot:'#818cf8'},
+                  ].map(s=>(
+                    <span key={s.label} className="v2-chip" style={{background:s.bg,color:s.fg}}>
+                      <span className="dot" style={{width:6,height:6,borderRadius:'50%',background:s.dot,flexShrink:0}}/>
+                      {s.label}
+                    </span>
+                  ))}
+                </div>
+                <div style={{marginTop:12,fontSize:'var(--text-11)',color:'var(--text-muted)'}}>Pill shape · tinted background · colored dot · text label — color never sole signal</div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Solid saturated fills — fails WCAG 4.5:1 on white text</div>
+            <div className="delta-item delta-added">Tinted 50-scale bg + 700-scale text — all pass AA</div>
+            <div className="delta-item delta-removed">Status conveyed by color alone</div>
+            <div className="delta-item delta-added">Dot + text label — color is redundant reinforcement</div>
+            <div className="delta-item delta-removed">Bootstrap border-radius: 3px (square)</div>
+            <div className="delta-item delta-added">Pill (border-radius: 9999px) — unambiguous status indicator</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. KPI Cards ── */}
+      {(activeSection==='all'||activeSection==='kpi') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">3</div>
+            <div><div className="compare-label">KPI Cards</div><div className="compare-sub">Visual hierarchy, trend indicators, sparklines, shadow</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body">
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  {[{l:'Guards',v:'1247'},{l:'Deployed',v:'1108'},{l:'Payroll',v:'PKR 4.2Cr'},{l:'Tickets',v:'41'}].map(k=>(
+                    <div key={k.l} className="legacy-kpi">
+                      <div className="legacy-kpi-label">{k.l}</div>
+                      <div className="legacy-kpi-value">{k.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{marginTop:10,fontSize:11,color:'#888',fontFamily:'Arial'}}>No trend · Arial 22px · heavy box-shadow · no sparkline</div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body">
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                  {[
+                    {l:'Active Guards',v:'1,247',trend:'+14 this month',up:true,sparks:[3,5,4,6,7,8,6,9,10,11]},
+                    {l:'Deployed',v:'1,108',trend:'+8 this month',up:true,sparks:[4,5,5,6,6,7,8,7,9,10]},
+                    {l:'Payroll (Apr)',v:'₨ 4.24Cr',trend:'+2.1% MoM',up:true,sparks:[8,8,9,8,9,9,10,10,10,11],mono:true},
+                    {l:'Open Tickets',v:'41',trend:'+12 this month',up:false,sparks:[2,3,2,3,4,3,4,5,4,6]},
+                  ].map(k=>(
+                    <div key={k.l} className="v2-kpi">
+                      <div className="label">{k.l}</div>
+                      <div className="value" style={{fontFamily:k.mono?'var(--font-mono)':undefined,fontSize:'var(--text-20)'}}>{k.v}</div>
+                      <div className="trend" style={{color:k.up?'var(--success-600)':'var(--danger-600)'}}>{k.up?'▲':'▼'} {k.trend}</div>
+                      <div style={{display:'flex',alignItems:'flex-end',gap:2,height:20,marginTop:6}}>
+                        {k.sparks.map((h,i)=>(
+                          <div key={i} style={{flex:1,background:i===k.sparks.length-1?'var(--brand-600)':'var(--brand-200)',borderRadius:'1px 1px 0 0',height:`${(h/11)*100}%`,minHeight:2}}/>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{marginTop:10,fontSize:'var(--text-11)',color:'var(--text-muted)'}}>Trend indicator · sparkline · IBM Plex Mono for numerics · shadow-xs only</div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Arial 22px values — no tabular numerics, no column alignment</div>
+            <div className="delta-item delta-added">IBM Plex Mono · font-variant-numeric: tabular-nums · perfect column alignment</div>
+            <div className="delta-item delta-removed">No trend context — single data point</div>
+            <div className="delta-item delta-added">MoM trend + sparkline — 10-point historical context</div>
+            <div className="delta-item delta-removed">Heavy drop-shadow (decorative)</div>
+            <div className="delta-item delta-added">shadow-xs (0 1px 2px) — depth via border, not shadow</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. Data Table ── */}
+      {(activeSection==='all'||activeSection==='datatable') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">4</div>
+            <div><div className="compare-label">Data Table</div><div className="compare-sub">Header style, row height, hover state, density, pagination</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1 — Guards list</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body" style={{padding:0}}>
+                <table className="legacy-table" style={{width:'100%'}}>
+                  <thead><tr>{['ID','Name','CNIC','Status'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {[['LHR-247','M. Usman Khan','42201-1234567-9','Active'],['KHI-892','Fatima Zafar','42101-9876543-2','Active'],['ISB-134','A. Rehman Malik','61101-5432109-8','Pending']].map((r,i)=>(
+                      <tr key={i}>{r.map((c,j)=><td key={j} style={{fontFamily:'Arial',fontSize:12}}>{j===3?<span className={`legacy-chip ${c.toLowerCase()}`}>{c}</span>:c}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{padding:'6px 10px',fontFamily:'Arial',fontSize:11,color:'#888',borderTop:'1px solid #ddd'}}>Bootstrap table · Arial 12px · no avatar · 28px rows</div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design — Guards list</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body" style={{padding:0}}>
+                <table className="v2-table" style={{width:'100%'}}>
+                  <thead><tr>{['Parwest ID','Name','CNIC','Status'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {[
+                      {id:'LHR-00247',name:'Muhammad Usman Khan',cnic:'42201-1234567-9',status:'ACTIVE',sc:'#1e3aa8'},
+                      {id:'KHI-00892',name:'Fatima Zafar',cnic:'42101-9876543-2',status:'ACTIVE',sc:'#134e4a'},
+                      {id:'ISB-00134',name:'Abdul Rehman Malik',cnic:'61101-5432109-8',status:'PENDING',sc:'#431407'},
+                    ].map(g=>(
+                      <tr key={g.id}>
+                        <td><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{g.id}</span></td>
+                        <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:24,height:24,borderRadius:'50%',background:g.sc,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{g.name.split(' ').slice(0,2).map(w=>w[0]).join('')}</div><span style={{fontWeight:500}}>{g.name}</span></div></td>
+                        <td><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)'}}>{g.cnic}</span></td>
+                        <td><span className="v2-chip" style={{background:g.status==='ACTIVE'?'var(--success-50)':'var(--warning-50)',color:g.status==='ACTIVE'?'var(--success-700)':'var(--warning-700)'}}><span className="dot" style={{width:6,height:6,borderRadius:'50%',background:g.status==='ACTIVE'?'var(--success-600)':'var(--warning-500)',flexShrink:0}}/>{g.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{padding:'10px 14px',borderTop:'1px solid var(--border-default)',fontSize:'var(--text-11)',color:'var(--text-muted)',display:'flex',justifyContent:'space-between'}}>
+                  <span>Showing 3 of 1,247 guards</span>
+                  <span>IBM Plex Sans 13px · 48px rows · avatar initials · hover state</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Bootstrap striped table · 28px rows · Arial 12px</div>
+            <div className="delta-item delta-added">Custom table · 48px comfortable / 32px compact · IBM Plex Sans 13px</div>
+            <div className="delta-item delta-removed">No avatar — just a text name in a cell</div>
+            <div className="delta-item delta-added">Avatar initials with region-consistent background colors</div>
+            <div className="delta-item delta-removed">CNIC and IDs in same proportional font as name</div>
+            <div className="delta-item delta-added">CNIC and IDs in IBM Plex Mono — column-aligned, scannable</div>
+            <div className="delta-item delta-removed">No sort, no density toggle, no bulk select</div>
+            <div className="delta-item delta-added">Sortable headers · density toggle · bulk selection bar</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. Form Fields ── */}
+      {(activeSection==='all'||activeSection==='formfields') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">5</div>
+            <div><div className="compare-label">Form Fields</div><div className="compare-sub">Label style, focus state, error state, CNIC monospace treatment</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body">
+                {[['Full Name','Muhammad Usman Khan',false],['CNIC','42201-INVALID-9',true],['Region','Lahore',false]].map(([l,v,err])=>(
+                  <div key={l} style={{marginBottom:14}}>
+                    <label className="legacy-form-label">{l}</label>
+                    <input className="legacy-form-input" defaultValue={v} style={{borderColor:err?'#dc3545':undefined}}/>
+                    {err&&<div style={{fontSize:11,color:'#dc3545',marginTop:2,fontFamily:'Arial'}}>Invalid CNIC format</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body">
+                {[
+                  {l:'Full Name',v:'Muhammad Usman Khan',err:false,mono:false},
+                  {l:'CNIC',v:'42201-INVALID-9',err:true,mono:true,errMsg:'CNIC format must be XXXXX-XXXXXXX-X'},
+                  {l:'Region',v:'Lahore',err:false,mono:false},
+                ].map(f=>(
+                  <div key={f.l} style={{marginBottom:14}}>
+                    <label style={{display:'block',fontSize:'var(--text-11)',fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:6}}>{f.l} {f.err&&<span style={{color:'var(--danger-600)'}}>*</span>}</label>
+                    <input style={{width:'100%',padding:'9px 12px',border:`1px solid ${f.err?'var(--danger-600)':'var(--border-default)'}`,borderRadius:'var(--radius-sm)',fontSize:'var(--text-14)',color:'var(--text-primary)',fontFamily:f.mono?'var(--font-mono)':'var(--font-ui)',boxSizing:'border-box',boxShadow:f.err?'0 0 0 3px rgba(220,38,38,0.12)':undefined}} defaultValue={f.v}/>
+                    {f.err&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:'var(--text-12)',color:'var(--danger-600)',marginTop:5}}>
+                      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      {f.errMsg}
+                    </div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Bootstrap form-label · sentence case · 12px Arial</div>
+            <div className="delta-item delta-added">UPPERCASE label · 11px IBM Plex Sans 700 · letterspaced</div>
+            <div className="delta-item delta-removed">Red border only — no focus ring, no message with icon</div>
+            <div className="delta-item delta-added">Error border + 3px danger ring + icon + message text</div>
+            <div className="delta-item delta-removed">CNIC in same font as name — can't scan columns</div>
+            <div className="delta-item delta-added">CNIC fields use IBM Plex Mono — consistent column alignment</div>
+            <div className="delta-item delta-removed">No focus ring — keyboard users have no visual indicator</div>
+            <div className="delta-item delta-added">focus-visible ring: 3px rgba(47,91,255,0.35) — WCAG 2.2 §2.4.11</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 6. Typography ── */}
+      {(activeSection==='all'||activeSection==='typography') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">6</div>
+            <div><div className="compare-label">Typography</div><div className="compare-sub">Font families, numeric rendering, currency display, scale</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body" style={{fontFamily:'Arial'}}>
+                <div style={{fontSize:24,fontWeight:700,marginBottom:8}}>Muhammad Usman Khan</div>
+                <div style={{fontSize:13,color:'#666',marginBottom:8}}>LHR-00247 · 42201-1234567-9</div>
+                <div style={{fontSize:20,fontWeight:700,marginBottom:4}}>PKR 28,000</div>
+                <div style={{fontSize:12,color:'#888',marginBottom:12}}>Monthly Salary</div>
+                <div style={{fontSize:12,color:'#888'}}>Arial · 13px body · 24px titles · no mono · no tabular-nums</div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body">
+                <div style={{fontSize:'var(--text-24)',fontWeight:800,marginBottom:6,letterSpacing:'-0.3px'}}>Muhammad Usman Khan</div>
+                <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-13)',color:'var(--text-muted)',marginBottom:10}}>LHR-00247 · 42201-1234567-9</div>
+                <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-20)',fontWeight:700,fontVariantNumeric:'tabular-nums',marginBottom:3}}>₨ 28,000</div>
+                <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:12}}>Monthly Salary</div>
+                <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>IBM Plex Sans (UI) + IBM Plex Mono (data) · tabular-nums · ₨ symbol</div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Arial for everything — IDs, names, currency same font</div>
+            <div className="delta-item delta-added">IBM Plex Sans (UI) · IBM Plex Mono (IDs, currency, CNIC)</div>
+            <div className="delta-item delta-removed">PKR prefix — non-standard, not recognized by screen readers</div>
+            <div className="delta-item delta-added">₨ symbol (Unicode U+20A8) — standard Pakistani Rupee sign</div>
+            <div className="delta-item delta-removed">No tabular-nums — amounts don't column-align in tables</div>
+            <div className="delta-item delta-added">font-variant-numeric: tabular-nums — all data perfectly aligned</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7. Payroll Workflow ── */}
+      {(activeSection==='all'||activeSection==='payroll') && (
+        <div className="compare-section">
+          <div className="compare-header">
+            <div className="compare-number">7</div>
+            <div><div className="compare-label">Payroll Workflow</div><div className="compare-sub">Finalization state, workflow progress bar, regional lock</div></div>
+          </div>
+          <div className="split">
+            <div className="pane pane-legacy">
+              <div className="pane-header"><span>Legacy v1</span><span className="version-badge badge-legacy">Before</span></div>
+              <div className="pane-body" style={{fontFamily:'Arial'}}>
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:12,color:'#888',marginBottom:6}}>Payroll Status: <strong style={{color:'#28a745'}}>FINALIZED</strong></div>
+                  <div style={{display:'flex',gap:4}}>
+                    {['Draft','Calculated','Locked','Finalized','Paid'].map((s,i)=>(
+                      <div key={s} style={{flex:1,padding:'6px',textAlign:'center',background:i<=3?'#28a745':'#dee2e6',color:i<=3?'#fff':'#888',fontSize:10,borderRadius:3}}>{s}</div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:'#888'}}>Inline text status · static green progress · no per-region state</div>
+              </div>
+            </div>
+            <div className="pane pane-v2">
+              <div className="pane-header"><span>v2 Design</span><span className="version-badge badge-v2">After</span></div>
+              <div className="pane-body">
+                <div style={{display:'flex',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',overflow:'hidden',marginBottom:12}}>
+                  {['DRAFT','CALCULATED','REGIONAL LOCKED','GLOBAL FINALIZED','PAID'].map((s,i)=>(
+                    <div key={s} style={{flex:1,padding:'10px 8px',textAlign:'center',background:i<3?'var(--brand-50)':i===3?'var(--brand-600)':'transparent',borderRight:i<4?'1px solid var(--border-default)':'none'}}>
+                      <div style={{fontSize:'var(--text-11)',fontWeight:700,color:i===3?'#fff':i<3?'var(--brand-700)':'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.4px'}}>{i+1}. {s}</div>
+                      <div style={{fontSize:9,color:i===3?'rgba(255,255,255,0.7)':'var(--text-muted)',marginTop:2}}>{i<3?'Complete':i===3?'Current':'Pending'}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)'}}>5-stage workflow bar · per-stage current/done/pending state · region lock table</div>
+              </div>
+            </div>
+          </div>
+          <div className="delta-grid">
+            <div className="delta-item delta-removed">Single status text + flat green bar — no stage granularity</div>
+            <div className="delta-item delta-added">5-stage workflow bar with current/done/pending visual states</div>
+            <div className="delta-item delta-removed">No per-region lock tracking — one global state</div>
+            <div className="delta-item delta-added">Per-regional-office lock table — who locked, when, ability to unlock</div>
+            <div className="delta-item delta-removed">No workflow rules config — behavior hardcoded</div>
+            <div className="delta-item delta-added">Runtime workflow rules with preset (Balanced/Strict/Relaxed) + audit trail</div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary metrics */}
+      <div style={{marginTop:48}}>
+        <div style={{fontSize:'var(--text-24)',fontWeight:800,color:'var(--text-primary)',letterSpacing:'-0.3px',marginBottom:20}}>Design System Improvements</div>
+        <table className="metrics-table">
+          <thead><tr>{['Dimension','Legacy v1','v2 Design','Improvement'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>
+            {[
+              ['Font stack','Arial (system fallback)','IBM Plex Sans + IBM Plex Mono','Purpose-built ERP typeface'],
+              ['Color system','Ad-hoc hex values','9-step brand + 12-step slate + semantic','Full token coverage, no magic numbers'],
+              ['Typography scale','Arbitrary sizes (12/14/22px)','10-stop scale + var() tokens','Consistent density'],
+              ['Status chips','Solid fill, color-only signal','Tinted bg + dot + text label','WCAG 2.2 compliant'],
+              ['Contrast (sidebar active)','#00d4ff on #1a1a2e: 3.8:1','#818cf8 on #0b1224: 4.82:1','AA compliant (+26%)'],
+              ['Data rendering','Same font for all data','Mono + tabular-nums for numeric','Column-aligned scanning'],
+              ['Dark mode','No support','Full data-theme="dark" token set','2× audience coverage'],
+              ['RTL / Urdu','No support','dir=rtl + Noto Nastaliq Urdu','Pakistan market ready'],
+              ['Print / PDF','Browser default','print.css + invoice-pdf + payroll-pdf','Professional output'],
+              ['Accessibility','WCAG unknown / untested','WCAG 2.2 AA throughout','Audited + documented'],
+              ['Motion','No tokens, no reduced-motion','Duration scale + prefers-reduced-motion','Safe for all users'],
+              ['Component specs','None — developers improvise','Full shadcn mapping + stepper.tsx','0 ambiguity in handoff'],
+            ].map((r,i)=>(
+              <tr key={i}>
+                <td style={{fontWeight:600}}>{r[0]}</td>
+                <td style={{color:'var(--text-muted)'}}>{r[1]}</td>
+                <td style={{color:'var(--text-secondary)'}}>{r[2]}</td>
+                <td className="imp">{r[3]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

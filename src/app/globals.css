@@ -1,28 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/tokens-v1.1.css";
+@import "../styles/parwest-theme.css";
+@import "../styles/print.css";
 
+/* Legacy aliases — kept so existing components that read these
+   custom-property names (--surface, --text, --brand, --border, --danger)
+   continue to render identically while we migrate to v1.0/v1.1 tokens.
+   No new code should reference these. */
 :root {
-  --bg: #eef2ff;
-  --surface: #ffffff;
-  --surface-muted: #f6f8ff;
-  --sidebar-bg: #0b1224;
-  --sidebar-surface: #111a32;
-  --sidebar-border: #1c294c;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --brand: #2f5bff;
-  --brand-600: #2649d4;
-  --border: #e2e8f0;
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-sm: 0 4px 16px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.09);
-  --focus-ring: 0 0 0 3px rgba(47, 91, 255, 0.22);
+  --surface: var(--bg-card);
+  --surface-muted: var(--bg-card-hover);
+  --text: var(--text-primary);
+  --brand: var(--brand-600);
+  --border: var(--border-default);
+  --danger: var(--danger-600);
 }
 
 *,
@@ -33,8 +27,8 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top, #f2f5ff 0%, var(--bg) 45%, #e9efff 100%);
-  color: var(--text);
+  background: var(--bg-page);
+  color: var(--text-primary);
 }
 
 .app-shell {
@@ -182,4 +176,68 @@ body {
 .scrollbar-slim::-webkit-scrollbar {
   height: 4px;
   width: 4px;
+}
+
+/* ── Parwest reduced-motion overrides ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast:   0ms;
+    --duration-normal: 0ms;
+    --duration-slow:   0ms;
+  }
+
+  *, *::before, *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+
+  [data-state],
+  [data-side] {
+    --tw-enter-opacity:     1   !important;
+    --tw-enter-scale:       1   !important;
+    --tw-enter-translate-x: 0   !important;
+    --tw-enter-translate-y: 0   !important;
+    --tw-exit-opacity:      1   !important;
+    --tw-exit-scale:        1   !important;
+    --tw-exit-translate-x:  0   !important;
+    --tw-exit-translate-y:  0   !important;
+    animation-duration:     0ms !important;
+  }
+
+  [data-radix-popper-content-wrapper],
+  [role="dialog"],
+  [role="alertdialog"],
+  [data-radix-select-content] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  [data-sonner-toast],
+  [data-sonner-toaster] {
+    animation: none !important;
+    transition: opacity 0ms !important;
+  }
+
+  .skeleton,
+  [data-skeleton] {
+    animation: none !important;
+    background: hsl(var(--muted)) !important;
+  }
+
+  [data-radix-collapsible-content] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .progress-fill,
+  [role="progressbar"] > * {
+    transition: none !important;
+  }
+
+  .sidebar,
+  [data-sidebar] {
+    transition: none !important;
+  }
 }

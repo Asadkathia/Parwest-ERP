@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — API Error States</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+body{background:#f1f4f9;font-family:var(--font-ui);margin:0;color:var(--text-primary);}
+.page{max-width:1040px;margin:0 auto;padding:48px 40px;}
+.cover{background:var(--sidebar-bg);border-radius:var(--radius-xl);padding:48px;margin-bottom:48px;}
+.cover-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--brand-400);margin-bottom:8px;}
+.cover-title{font-size:var(--text-32);font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:8px;}
+.cover-sub{font-size:var(--text-14);color:rgba(226,232,240,0.55);line-height:1.6;max-width:600px;}
+.section{margin-bottom:48px;}
+.sec-title{font-size:var(--text-20);font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+.sec-sub{font-size:var(--text-13);color:var(--text-muted);margin-bottom:20px;line-height:1.6;}
+.tabs-bar{display:flex;gap:0;background:var(--bg-subtle);border-radius:var(--radius-sm);padding:3px;margin-bottom:28px;}
+.tab{padding:8px 18px;border-radius:6px;font-size:var(--text-13);font-weight:500;color:var(--text-muted);cursor:pointer;transition:all var(--duration-fast);}
+.tab.active{background:#fff;color:var(--text-primary);box-shadow:var(--shadow-xs);}
+.block{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;margin-bottom:16px;}
+.block-label{padding:10px 16px;background:var(--bg-subtle);border-bottom:1px solid var(--border-default);font-size:var(--text-12);font-weight:700;color:var(--text-primary);display:flex;justify-content:space-between;align-items:center;}
+.block-tag{font-size:10px;font-family:var(--font-mono);color:var(--text-muted);font-weight:400;}
+.block-body{padding:24px;}
+/* Code */
+.code{background:#0d1117;border-radius:var(--radius-sm);padding:14px 16px;font-family:var(--font-mono);font-size:11px;color:#e2e8f0;overflow-x:auto;line-height:1.7;}
+.code .kw{color:#c792ea;} .code .fn{color:#82aaff;} .code .str{color:#c3e88d;} .code .cm{color:#546e7a;} .code .num{color:#f78c6c;}
+/* Form */
+.fl{display:block;font-size:var(--text-11);font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;}
+.fi{width:100%;padding:9px 12px;border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-14);color:var(--text-primary);font-family:var(--font-ui);box-sizing:border-box;background:var(--bg-input);}
+.fi.err{border-color:var(--danger-600);box-shadow:0 0 0 3px rgba(220,38,38,0.12);}
+.fm{display:flex;align-items:center;gap:5px;font-size:var(--text-12);color:var(--danger-600);margin-top:5px;}
+.fg{margin-bottom:16px;}
+/* Alert */
+.alert{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);line-height:1.5;}
+.alert-danger{background:var(--danger-50);border:1px solid var(--danger-100);color:var(--danger-700);}
+.alert-warning{background:var(--warning-50);border:1px solid var(--warning-100);color:var(--warning-700);}
+.alert-info{background:var(--info-50);border:1px solid var(--info-100);color:var(--info-600);}
+.alert .at{font-weight:700;margin-bottom:3px;}
+/* Error pages */
+.err-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.err-page{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);min-height:260px;}
+.err-code{font-size:64px;font-weight:900;font-family:var(--font-mono);line-height:1;margin-bottom:8px;}
+.err-title{font-size:var(--text-18);font-weight:700;margin-bottom:6px;}
+.err-sub{font-size:var(--text-13);color:var(--text-muted);line-height:1.6;margin-bottom:20px;max-width:280px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);font-weight:600;cursor:pointer;border:1px solid transparent;font-family:var(--font-ui);}
+.btn-p{background:var(--brand-600);color:#fff;}
+.btn-s{background:transparent;color:var(--text-secondary);border-color:var(--border-default);}
+.btn-p:hover{background:var(--brand-700);}
+/* Table */
+.t{width:100%;border-collapse:collapse;font-size:var(--text-12);}
+.t th{padding:8px 12px;text-align:left;background:var(--bg-subtle);border:1px solid var(--border-default);font-weight:600;color:var(--text-muted);text-transform:uppercase;font-size:10px;letter-spacing:0.5px;}
+.t td{padding:8px 12px;border:1px solid var(--border-default);}
+.t tr:nth-child(even) td{background:var(--bg-subtle);}
+/* Toast */
+.toast{position:fixed;top:20px;right:20px;background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-md);padding:12px 16px;font-size:var(--text-13);display:flex;align-items:flex-start;gap:10px;z-index:500;max-width:400px;animation:slideIn 150ms ease;}
+.toast.t-error{border-left:3px solid var(--danger-600);}
+.toast.t-warning{border-left:3px solid var(--warning-600);}
+.toast.t-success{border-left:3px solid var(--success-600);}
+@keyframes slideIn{from{transform:translateX(32px);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const Ico = ({n,s=16,c='currentColor'}) => {
+  const p={
+    alertTri:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    alertCircle:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    refresh:<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></>,
+    home:<><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+    check:<polyline points="20 6 9 17 4 12"/>,
+    info:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    x:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    externalLink:<><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'block',flexShrink:0}}>{p[n]}</svg>;
+};
+
+function App(){
+  const [tab,setTab]=useState('field');
+  const [fieldErrs,setFieldErrs]=useState({});
+  const [toast,setToast]=useState(null);
+
+  const showToast=(msg,type='t-error')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000);};
+
+  const tabs=[
+    {id:'field',label:'Field errors'},
+    {id:'pages',label:'Error pages'},
+    {id:'workflow',label:'Workflow rule violations'},
+    {id:'envelope',label:'API envelope'},
+    {id:'ref',label:'Quick reference'},
+  ];
+
+  return (
+    <div className="page">
+      <div className="cover">
+        <div className="cover-eyebrow">v1.1 · Pattern 10</div>
+        <div className="cover-title">API Error States</div>
+        <div className="cover-sub">Every API error maps to a specific UI pattern. The <code style={{fontFamily:'var(--font-mono)',background:'rgba(255,255,255,0.1)',padding:'1px 6px',borderRadius:4}}>message</code> field from the error envelope is always shown verbatim — never paraphrased or softened. Click triggers to see states live.</div>
+      </div>
+
+      <div className="tabs-bar">
+        {tabs.map(t=><div key={t.id} className={`tab${tab===t.id?' active':''}`} onClick={()=>setTab(t.id)}>{t.label}</div>)}
+      </div>
+
+      {tab==='envelope' && <EnvelopeTab/>}
+      {tab==='field' && <FieldTab fieldErrs={fieldErrs} setFieldErrs={setFieldErrs} showToast={showToast}/>}
+      {tab==='pages' && <PagesTab/>}
+      {tab==='workflow' && <WorkflowTab/>}
+      {tab==='ref' && <RefTab/>}
+
+      {toast && (
+        <div className={`toast ${toast.type}`}>
+          <Ico n={toast.type==='t-error'?'alertTri':toast.type==='t-warning'?'alertTri':'check'} s={15} c={toast.type==='t-error'?'var(--danger-600)':toast.type==='t-warning'?'var(--warning-600)':'var(--success-600)'}/>
+          <div style={{flex:1}}>{toast.msg}</div>
+          <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',padding:0,flexShrink:0}} onClick={()=>setToast(null)}><Ico n="x" s={14}/></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnvelopeTab(){
+  return (
+    <div className="section">
+      <div className="sec-title">API Error Envelope</div>
+      <div className="sec-sub">All Parwest API errors follow this contract. The UI reads <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 4px',borderRadius:3}}>message</code> verbatim — voice & tone applies (direct, precise, no softening).</div>
+
+      <div className="code">
+        <span className="cm">{'// API error envelope contract (TypeScript)'}</span>{'\n'}
+        <span className="kw">interface</span> ApiError {'{'}{'\n'}
+        {'  '}<span className="fn">success</span>: <span className="kw">false</span>;{'\n'}
+        {'  '}<span className="fn">message</span>: <span className="kw">string</span>; <span className="cm"> // ← Show this verbatim in the UI</span>{'\n'}
+        {'  '}<span className="fn">code</span>:    <span className="kw">string</span>; <span className="cm"> // ← Branch UI behavior on this</span>{'\n'}
+        {'  '}<span className="fn">field</span>?:  <span className="kw">string</span>; <span className="cm"> // ← Which form field to highlight</span>{'\n'}
+        {'  '}<span className="fn">details</span>?: Record{`<string, string[]>`}; <span className="cm"> // ← Per-field messages</span>{'\n'}
+        {'}'}{'\n\n'}
+
+        <span className="cm">{'// Codes and their UI mapping'}</span>{'\n'}
+        <span className="str">"VALIDATION_ERROR"</span>   <span className="cm">→ field FormMessage + shake</span>{'\n'}
+        <span className="str">"DUPLICATE_CNIC"</span>     <span className="cm">→ 409 Alert + CNIC field error + link to existing guard</span>{'\n'}
+        <span className="str">"DUPLICATE_ID"</span>       <span className="cm">→ 409 Alert + ID field error</span>{'\n'}
+        <span className="str">"FORBIDDEN"</span>          <span className="cm">→ 403 page or disabled button + Tooltip</span>{'\n'}
+        <span className="str">"NOT_FOUND"</span>          <span className="cm">→ 404 page</span>{'\n'}
+        <span className="str">"INTERNAL_ERROR"</span>     <span className="cm">→ 500 page with retry</span>{'\n'}
+        <span className="str">"WORKFLOW_RULE"</span>      <span className="cm">→ inline Alert + rule name + Settings link</span>{'\n'}
+        <span className="str">"REGION_SCOPE"</span>       <span className="cm">→ cross-region warning Alert + disabled buttons</span>{'\n'}
+        <span className="str">"SESSION_EXPIRED"</span>    <span className="cm">→ redirect /login + toast</span>{'\n'}
+        <span className="str">"RATE_LIMITED"</span>       <span className="cm">→ toast.warning with retry-after seconds</span>{'\n\n'}
+
+        <span className="cm">{'// Usage in Next.js Server Action / API route'}</span>{'\n'}
+        <span className="kw">try</span> {'{'}{'\n'}
+        {'  '}<span className="kw">const</span> guard = <span className="kw">await</span> <span className="fn">apiFetch</span>{`<Guard>`}(<span className="str">'/api/guards'</span>, options);{'\n'}
+        {'  '}<span className="fn">toast.success</span>(<span className="str">'Guard LHR-00247 created.'</span>);{'\n'}
+        {'} '}<span className="kw">catch</span> (err) {'{'}{'\n'}
+        {'  '}<span className="kw">if</span> (!(err <span className="kw">instanceof</span> ApiError)) <span className="kw">throw</span> err; <span className="cm">// rethrow unknown</span>{'\n'}
+        {'  '}<span className="kw">switch</span> (err.code) {'{'}{'\n'}
+        {'    '}<span className="kw">case</span> <span className="str">'VALIDATION_ERROR'</span>:{'\n'}
+        {'      '}<span className="fn">form.setError</span>(err.field, {'{ message: err.message }'});{'\n'}
+        {'      '}<span className="kw">break</span>;{'\n'}
+        {'    '}<span className="kw">case</span> <span className="str">'DUPLICATE_CNIC'</span>:{'\n'}
+        {'      '}<span className="fn">form.setError</span>(<span className="str">'cnic'</span>, {'{ message: err.message }'});{'\n'}
+        {'      '}<span className="fn">setDuplicateCnicAlert</span>(err.message);{'\n'}
+        {'      '}<span className="kw">break</span>;{'\n'}
+        {'    '}<span className="kw">default</span>:{'\n'}
+        {'      '}<span className="fn">toast.error</span>(err.message); <span className="cm">// Verbatim API message</span>{'\n'}
+        {'  }'}{'\n'}
+        {'}'}
+      </div>
+    </div>
+  );
+}
+
+function FieldTab({fieldErrs,setFieldErrs,showToast}){
+  return (
+    <div className="section">
+      <div className="sec-title">Field-level Errors</div>
+      <div className="sec-sub">react-hook-form <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 4px',borderRadius:3}}>FormMessage</code> reads <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 4px',borderRadius:3}}>err.message</code> directly. Never rephrase.</div>
+
+      <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}>
+        {[
+          ['Simulate validation errors',()=>setFieldErrs({cnic:'42201-7654321-0 is already registered to guard LHR-00892.',dob:'Date of birth is required.'}),],
+          ['409 — duplicate CNIC',()=>showToast('Guard with CNIC 42201-1234567-9 already exists (LHR-00247). Duplicate CNIC not allowed.','t-error')],
+          ['409 — duplicate Parwest ID',()=>showToast('Guard ID LHR-00247 is already assigned. This is auto-generated — contact Super Admin.','t-error')],
+          ['Clear errors',()=>setFieldErrs({})],
+        ].map(([label,fn])=>(
+          <button key={label} className="btn btn-s" onClick={fn}>{label}</button>
+        ))}
+      </div>
+
+      <div className="block">
+        <div className="block-label"><span>Create Guard — Step 1 (server validation)</span><span className="block-tag">shadcn: Form + FormMessage</span></div>
+        <div className="block-body" style={{maxWidth:540}}>
+          {Object.keys(fieldErrs).length>0&&(
+            <div className="alert alert-danger" style={{marginBottom:16}}>
+              <Ico n="alertTri" s={16} c="var(--danger-600)"/>
+              <div><div className="at">{Object.keys(fieldErrs).length} server error{Object.keys(fieldErrs).length>1?'s':''}</div>Fix the highlighted fields and resubmit.</div>
+            </div>
+          )}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div className="fg">
+              <label className="fl">Full Name <span style={{color:'var(--danger-600)'}}>*</span></label>
+              <input className="fi" defaultValue="Muhammad Usman Khan"/>
+            </div>
+            <div className="fg">
+              <label className="fl">Father Name <span style={{color:'var(--danger-600)'}}>*</span></label>
+              <input className="fi" defaultValue="Khalid Mehmood"/>
+            </div>
+            <div className="fg">
+              <label className="fl">CNIC <span style={{color:'var(--danger-600)'}}>*</span></label>
+              <input className={`fi${fieldErrs.cnic?' err':''}`} defaultValue="42201-7654321-0" style={{fontFamily:'var(--font-mono)'}}/>
+              {fieldErrs.cnic&&<div className="fm"><Ico n="alertCircle" s={13} c="var(--danger-600)"/>{fieldErrs.cnic}</div>}
+            </div>
+            <div className="fg">
+              <label className="fl">Date of Birth <span style={{color:'var(--danger-600)'}}>*</span></label>
+              <input className={`fi${fieldErrs.dob?' err':''}`} placeholder="DD/MM/YYYY" style={{fontFamily:'var(--font-mono)'}}/>
+              {fieldErrs.dob&&<div className="fm"><Ico n="alertCircle" s={13} c="var(--danger-600)"/>{fieldErrs.dob}</div>}
+            </div>
+          </div>
+          <div style={{marginTop:8,display:'flex',gap:8}}>
+            <button className="btn btn-p">Continue</button>
+            <button className="btn btn-s">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="block">
+        <div className="block-label"><span>409 Duplicate CNIC — inline guard link</span><span className="block-tag">Alert + link to existing guard</span></div>
+        <div className="block-body" style={{maxWidth:540}}>
+          <div className="alert alert-danger" style={{marginBottom:14}}>
+            <Ico n="alertCircle" s={16} c="var(--danger-600)"/>
+            <div><div className="at">Duplicate CNIC detected</div>Guard with CNIC <span style={{fontFamily:'var(--font-mono)',fontSize:12}}>42201-1234567-9</span> already exists as <a href="#" style={{color:'var(--danger-700)',fontWeight:600}}>LHR-00247 — Muhammad Usman Khan</a>. Review the existing profile before creating a duplicate.</div>
+          </div>
+          <div className="fg">
+            <label className="fl">CNIC</label>
+            <input className="fi err" defaultValue="42201-1234567-9" style={{fontFamily:'var(--font-mono)'}}/>
+            <div className="fm"><Ico n="alertCircle" s={13} c="var(--danger-600)"/>CNIC already registered to guard LHR-00247.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PagesTab(){
+  return (
+    <div className="section">
+      <div className="sec-title">Full-Page Error States</div>
+      <div className="sec-sub">Used when the entire page cannot render — not for inline validation. Each references the API <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 4px',borderRadius:3}}>message</code> verbatim in the subtitle.</div>
+      <div className="err-grid">
+        {/* 404 */}
+        <div className="err-page">
+          <div className="err-code" style={{color:'var(--brand-600)'}}>404</div>
+          <div className="err-title">Page Not Found</div>
+          <div className="err-sub">Guard LHR-99999 not found. The record may have been deleted or the URL is incorrect.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-p"><Ico n="home" s={14}/>Dashboard</button>
+            <button className="btn btn-s">Go Back</button>
+          </div>
+        </div>
+
+        {/* 403 */}
+        <div className="err-page">
+          <div style={{width:52,height:52,borderRadius:'var(--radius-md)',background:'var(--warning-50)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:12}}>
+            <Ico n="lock" s={26} c="var(--warning-600)"/>
+          </div>
+          <div className="err-code" style={{color:'var(--warning-600)',fontSize:48}}>403</div>
+          <div className="err-title">Access Denied</div>
+          <div className="err-sub">You don't have permission to access Payroll. Contact your Super Admin to request this module.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-s">Go Back</button>
+            <button className="btn btn-p">Request Access</button>
+          </div>
+        </div>
+
+        {/* 500 */}
+        <div className="err-page">
+          <div className="err-code" style={{color:'var(--danger-600)'}}>500</div>
+          <div className="err-title">Server Error</div>
+          <div className="err-sub">An unexpected error occurred processing your request. Our team has been notified automatically.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-p"><Ico n="refresh" s={14}/>Retry</button>
+            <button className="btn btn-s"><Ico n="home" s={14}/>Dashboard</button>
+          </div>
+        </div>
+
+        {/* 409 */}
+        <div className="err-page">
+          <div style={{width:52,height:52,borderRadius:'var(--radius-md)',background:'var(--danger-50)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:12}}>
+            <Ico n="alertCircle" s={26} c="var(--danger-600)"/>
+          </div>
+          <div style={{fontSize:24,fontWeight:800,color:'var(--danger-600)',fontFamily:'var(--font-mono)',marginBottom:8}}>409</div>
+          <div className="err-title">Conflict</div>
+          <div className="err-sub">Guard with CNIC 42201-1234567-9 already exists. Review the existing record before retrying.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-s">Go Back</button>
+            <button className="btn btn-p" style={{gap:6}}><Ico n="externalLink" s={14}/>View Existing Guard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowTab(){
+  const violations=[
+    {code:'WORKFLOW_RULE',rule:'requireActiveGuardStatus',message:"Guard cannot be deployed — lifecycle status is INACTIVE. Change guard status to ACTIVE first.",severity:'error',module:'DEPLOYMENTS'},
+    {code:'WORKFLOW_RULE',rule:'singleActivePerGuard',message:"Guard LHR-00247 already has an active deployment at MCB Bank – Gulberg. End the current deployment before creating a new one.",severity:'error',module:'DEPLOYMENTS'},
+    {code:'WORKFLOW_RULE',rule:'enforceTransitionMap',message:"Status transition TERMINATED → ACTIVE is not permitted. Valid transitions from TERMINATED: none.",severity:'error',module:'GUARDS'},
+    {code:'WORKFLOW_RULE',rule:'requireBranchContract',message:"MCB Bank – Johar Town has no active contract. Enable a contract for this branch before deploying guards. (Rule: requireBranchContract is ON)",severity:'error',module:'CLIENTS'},
+    {code:'WORKFLOW_RULE',rule:'disallowFutureEndDate',message:"End date 30/12/2099 is in the future. Set a current or past date.",severity:'error',module:'DEPLOYMENTS'},
+    {code:'WORKFLOW_RULE',rule:'requireGuardOfficeConsistency',message:"Guard LHR-00247 belongs to the Lahore office. The selected branch (Karachi – Clifton) is in a different region. Enable cross-region deployment in Settings to override.",severity:'warning',module:'DEPLOYMENTS'},
+  ];
+  return (
+    <div className="section">
+      <div className="sec-title">Workflow Rule Violations</div>
+      <div className="sec-sub">When the server blocks an action because a workflow rule prevents it, the response has <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 4px',borderRadius:3}}>code: "WORKFLOW_RULE"</code>. Show an inline Alert with the exact message + rule name + Settings link.</div>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {violations.map((v,i)=>(
+          <div className="block" key={i}>
+            <div className="block-label">
+              <span>{v.module} · <span style={{fontFamily:'var(--font-mono)',fontSize:11}}>{v.rule}</span></span>
+              <span className="block-tag">{v.code}</span>
+            </div>
+            <div className="block-body">
+              <div className={`alert${v.severity==='warning'?' alert-warning':' alert-danger'}`}>
+                <Ico n={v.severity==='warning'?'alertTri':'alertCircle'} s={16} c={v.severity==='warning'?'var(--warning-600)':'var(--danger-600)'}/>
+                <div>
+                  <div style={{fontWeight:600,marginBottom:4}}>{v.message}</div>
+                  <div style={{fontSize:'var(--text-12)',opacity:0.8,display:'flex',gap:12,flexWrap:'wrap'}}>
+                    <span>Rule: <span style={{fontFamily:'var(--font-mono)',fontSize:11}}>{v.rule}</span></span>
+                    <a href="#" style={{color:'inherit',fontWeight:600}}>Settings → Workflow Rules →</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RefTab(){
+  const rows=[
+    ['400','VALIDATION_ERROR','Field FormMessage + border-error','form.setError(field, msg)','CNIC format must be XXXXX-XXXXXXX-X'],
+    ['401','SESSION_EXPIRED','Toast + redirect /login','middleware redirect','Session expired. Sign in again.'],
+    ['403','FORBIDDEN','403 page + disabled button + Tooltip','canAccess() guard','You don\'t have permission to access Payroll.'],
+    ['404','NOT_FOUND','404 page','page-level try/catch','Guard LHR-99999 not found.'],
+    ['409','DUPLICATE_CNIC','Field error + inline Alert + link','form.setError(\'cnic\', ...)','CNIC 42201-… registered to LHR-00247.'],
+    ['409','DUPLICATE_ID','Field error + inline Alert','form.setError(\'id\', ...)','Guard ID LHR-00247 is already assigned.'],
+    ['422','WORKFLOW_RULE','Inline Alert + rule name + link','onError handler','Guard cannot be deployed — status is INACTIVE.'],
+    ['422','REGION_SCOPE','Cross-region Alert + disabled buttons','canEdit() guard','Guard LHR-00247 belongs to Lahore. Your scope: Karachi.'],
+    ['429','RATE_LIMITED','toast.warning + retry countdown','global fetch wrapper','Too many requests. Retry in 30 seconds.'],
+    ['500','INTERNAL_ERROR','500 page + retry button','error boundary','An unexpected error occurred. Team notified.'],
+    ['503','SERVICE_UNAVAILABLE','Toast + banner','global health check','Service temporarily unavailable. Estimated restore: 5 min.'],
+  ];
+  return (
+    <div className="section">
+      <div className="sec-title">Quick Reference — All Error Patterns</div>
+      <div className="sec-sub">Complete mapping from HTTP status + code to UI component + message source.</div>
+      <table className="t">
+        <thead>
+          <tr>{['HTTP','Code','UI Pattern','Implementation','Message example'].map(h=><th key={h}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r,i)=>(
+            <tr key={i}>
+              <td><span style={{fontFamily:'var(--font-mono)',fontWeight:700,color:+r[0]>=500?'var(--danger-600)':+r[0]>=400?'var(--warning-700)':'var(--text-primary)'}}>{r[0]}</span></td>
+              <td><span style={{fontFamily:'var(--font-mono)',fontSize:11,background:'var(--bg-subtle)',padding:'1px 6px',borderRadius:3,color:'var(--text-muted)'}}>{r[1]}</span></td>
+              <td style={{color:'var(--text-secondary)'}}>{r[2]}</td>
+              <td style={{fontFamily:'var(--font-mono)',fontSize:11,color:'var(--text-muted)'}}>{r[3]}</td>
+              <td style={{color:'var(--text-secondary)',fontStyle:'italic'}}>{r[4]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div style={{marginTop:20,padding:'14px 18px',background:'var(--info-50)',border:'1px solid var(--info-100)',borderRadius:'var(--radius-sm)',fontSize:'var(--text-13)',color:'var(--info-600)',lineHeight:1.7}}>
+        <strong>Voice rule:</strong> API message is always shown verbatim. Never soften error messages ("There seems to be an issue with…") or add apology language ("We're sorry, but…"). Parwest errors are direct and actionable: what failed, why, what to do next.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

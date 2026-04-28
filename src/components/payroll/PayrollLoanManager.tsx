@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 type GuardOption = {
   id: string
@@ -169,7 +170,19 @@ export default function PayrollLoanManager() {
     <div className="space-y-6">
       <SectionTitle title="Loan" subtitle="Backend-connected loan operations." />
 
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      {notice ? (
+        notice.type === "success" ? (
+          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>{notice.message}</AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{notice.message}</AlertDescription>
+          </Alert>
+        )
+      ) : null}
 
       <section className="ui-card p-4 space-y-4">
         <p className="text-sm font-semibold text-[var(--text)]">Create Loan</p>

@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Download, Loader2, Search, X } from "lucide-react"
+import { AlertCircle, Download, Loader2, Search, X } from "lucide-react"
 import DataTable from "@/components/shared/DataTable"
-import SectionTitle from "@/components/ui/section-title"
 import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
 import SearchSelect from "@/components/ui/SearchSelect"
@@ -250,7 +249,12 @@ export default function SearchGuardsManager({
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Search Guard" subtitle="Search guards with advanced filters." />
+            <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight">Search Guard</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Search guards with advanced filters.</p>
+                </div>
+            </div>
 
             <div className="ui-card p-5">
                 <h2 className="mb-4 text-base font-semibold">Select Fields</h2>
@@ -341,7 +345,12 @@ export default function SearchGuardsManager({
                 </div>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
+            {error ? (
+                <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            ) : null}
 
             {/* Results */}
             {loading ? (

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — Region Scoping Patterns</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+body{background:#f1f4f9;font-family:var(--font-ui);margin:0;color:var(--text-primary);}
+.page{max-width:1100px;margin:0 auto;padding:48px 40px;}
+.cover{background:var(--sidebar-bg);border-radius:var(--radius-xl);padding:48px;margin-bottom:48px;}
+.cover-label{font-size:var(--text-11);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--brand-400);margin-bottom:8px;}
+.cover-title{font-size:var(--text-32);font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:8px;}
+.cover-sub{font-size:var(--text-14);color:rgba(226,232,240,0.55);max-width:580px;line-height:1.6;}
+.section{margin-bottom:56px;}
+.sec-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--brand-600);margin-bottom:6px;}
+.sec-title{font-size:var(--text-24);font-weight:800;color:var(--text-primary);margin-bottom:4px;}
+.sec-sub{font-size:var(--text-13);color:var(--text-muted);margin-bottom:24px;line-height:1.6;max-width:600px;}
+/* Pattern card */
+.pattern-card{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;margin-bottom:16px;}
+.pattern-label{padding:10px 16px;background:var(--bg-subtle);border-bottom:1px solid var(--border-default);font-size:var(--text-12);font-weight:700;color:var(--text-primary);display:flex;align-items:center;justify-content:space-between;}
+.pattern-note{font-size:var(--text-11);font-family:var(--font-mono);color:var(--text-muted);font-weight:400;}
+.pattern-body{padding:24px;}
+/* Topbar mockup */
+.tb-mock{height:56px;background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);display:flex;align-items:center;padding:0 20px;gap:14px;margin-bottom:8px;}
+.tb-title{font-size:var(--text-14);font-weight:600;color:var(--text-primary);flex:1;}
+/* Select component (shadcn style) */
+.shadcn-select{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:#fff;font-size:var(--text-13);color:var(--text-primary);cursor:pointer;min-width:200px;transition:all var(--duration-fast);}
+.shadcn-select:hover{border-color:var(--border-focus);}
+.shadcn-select:focus-within{border-color:var(--border-focus);box-shadow:var(--focus-ring);}
+.shadcn-select select{border:none;outline:none;background:transparent;font-family:var(--font-ui);font-size:var(--text-13);color:var(--text-primary);flex:1;cursor:pointer;}
+/* Badge (shadcn) */
+.shadcn-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;font-size:var(--text-12);font-weight:600;background:var(--brand-50);color:var(--brand-700);border:1px solid var(--brand-200);}
+.shadcn-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--brand-600);}
+/* Alert (shadcn) */
+.shadcn-alert{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:var(--radius-sm);border:1px solid;}
+.shadcn-alert.info{background:var(--info-50);border-color:#bfdbfe;color:var(--info-600);}
+.shadcn-alert.warning{background:var(--warning-50);border-color:#fde68a;color:var(--warning-700);}
+.shadcn-alert.danger{background:var(--danger-50);border-color:#fecaca;color:var(--danger-700);}
+.alert-icon{flex-shrink:0;margin-top:1px;}
+.alert-title{font-weight:700;font-size:var(--text-13);margin-bottom:4px;}
+.alert-desc{font-size:var(--text-13);line-height:1.5;}
+/* Card (shadcn) */
+.shadcn-card{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);}
+.shadcn-card-header{padding:16px 20px;border-bottom:1px solid var(--border-default);}
+.shadcn-card-title{font-size:var(--text-14);font-weight:700;color:var(--text-primary);}
+.shadcn-card-desc{font-size:var(--text-12);color:var(--text-muted);margin-top:2px;}
+.shadcn-card-body{padding:20px;}
+/* Tooltip mock */
+.tooltip-container{position:relative;display:inline-block;}
+.tooltip-box{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--slate-900);color:#fff;font-size:var(--text-12);padding:6px 12px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow-sm);}
+.tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--slate-900);}
+/* Empty state */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;}
+.empty-icon{width:48px;height:48px;border-radius:var(--radius-md);background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+/* Region badge within table */
+.region-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;background:var(--brand-50);color:var(--brand-700);}
+/* Code block */
+.code-block{background:#0d1117;border-radius:var(--radius-sm);padding:14px;font-family:var(--font-mono);font-size:12px;color:#e2e8f0;overflow-x:auto;line-height:1.7;margin-top:12px;}
+.code-block .kw{color:#c792ea;}
+.code-block .fn{color:#82aaff;}
+.code-block .str{color:#c3e88d;}
+.code-block .cm{color:#546e7a;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const Ico = ({n,s=16,c='currentColor'}) => {
+  const p={
+    globe:<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></>,
+    map:<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    alert:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    info:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    users:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>,
+    chevDown:<polyline points="6 9 12 15 18 9"/>,
+    help:<><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'block',flexShrink:0}}>{p[n]}</svg>;
+};
+
+const REGIONS=['Global (All Regions)','Lahore','Karachi','Islamabad','Rawalpindi','Faisalabad','Multan','Peshawar','Quetta'];
+
+function App(){
+  const [role,setRole]=useState('superUser');
+  const [region,setRegion]=useState('Lahore');
+  const [showTooltip,setShowTooltip]=useState(false);
+
+  const isGlobal = role==='superUser'||role==='adminNoPerms';
+  const isRegional = role==='adminWithPerms';
+
+  return (
+    <div className="page">
+      {/* Cover */}
+      <div className="cover">
+        <div className="cover-label">v1.1 · shadcn/ui Pattern</div>
+        <div className="cover-title">Region Scoping</div>
+        <div className="cover-sub">Three UI patterns for regional access control — built on shadcn <code style={{fontFamily:'var(--font-mono)',background:'rgba(255,255,255,0.1)',padding:'1px 6px',borderRadius:4}}>Select</code>, <code style={{fontFamily:'var(--font-mono)',background:'rgba(255,255,255,0.1)',padding:'1px 6px',borderRadius:4}}>Badge</code>, <code style={{fontFamily:'var(--font-mono)',background:'rgba(255,255,255,0.1)',padding:'1px 6px',borderRadius:4}}>Alert</code>, <code style={{fontFamily:'var(--font-mono)',background:'rgba(255,255,255,0.1)',padding:'1px 6px',borderRadius:4}}>Tooltip</code>.</div>
+      </div>
+
+      {/* Role switcher */}
+      <div style={{marginBottom:40,padding:'16px 20px',background:'#fff',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        <span style={{fontSize:'var(--text-13)',fontWeight:600,color:'var(--text-primary)'}}>Simulate role:</span>
+        {[
+          {id:'superUser',label:'Super User',desc:'Global · no restrictions'},
+          {id:'adminNoPerms',label:'Admin (no permissions)',desc:'Global · admin without regional lock'},
+          {id:'adminWithPerms',label:'Admin (with permissions)',desc:'Regional · scoped to one region'},
+        ].map(r=>(
+          <button key={r.id} onClick={()=>setRole(r.id)} style={{padding:'8px 16px',borderRadius:'var(--radius-sm)',background:role===r.id?'var(--brand-600)':'transparent',color:role===r.id?'#fff':'var(--text-secondary)',border:`1px solid ${role===r.id?'var(--brand-600)':'var(--border-default)'}`,cursor:'pointer',fontSize:'var(--text-13)',fontWeight:600,fontFamily:'var(--font-ui)'}}>
+            {r.label}<br/><span style={{fontSize:10,fontWeight:400,opacity:0.7}}>{r.desc}</span>
+          </button>
+        ))}
+        {isRegional && (
+          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Scoped to:</span>
+            <select className="shadcn-select" style={{padding:'5px 10px',minWidth:140}} value={region} onChange={e=>setRegion(e.target.value)}>
+              {REGIONS.slice(1).map(r=><option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Pattern 1 — Topbar region selector */}
+      <div className="section">
+        <div className="sec-eyebrow">Pattern 01</div>
+        <div className="sec-title">Topbar Region Selector</div>
+        <div className="sec-sub">Super User and Admin-without-permissions see a <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 5px',borderRadius:4}}>Select</code> (shadcn) for switching global/regional scope. Regional Admin sees a read-only <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 5px',borderRadius:4}}>Badge</code> (no interaction).</div>
+
+        <div className="pattern-card">
+          <div className="pattern-label">
+            <span>Live preview — {role==='superUser'?'Super User (Global Select)':role==='adminNoPerms'?'Admin, no permissions (Global Select)':'Regional Admin (Badge only)'}</span>
+            <span className="pattern-note">shadcn: {'<Select>'} or {'<Badge>'}</span>
+          </div>
+          <div className="pattern-body">
+            <div className="tb-mock">
+              <div className="tb-title">Guards</div>
+              {isGlobal ? (
+                /* shadcn Select for global users */
+                <div className="shadcn-select" style={{minWidth:220}}>
+                  <Ico n="globe" s={14} c="var(--text-muted)"/>
+                  <select style={{border:'none',outline:'none',background:'transparent',fontFamily:'var(--font-ui)',fontSize:'var(--text-13)',color:'var(--text-primary)',flex:1,cursor:'pointer'}}>
+                    {REGIONS.map(r=><option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <Ico n="chevDown" s={14} c="var(--text-muted)"/>
+                </div>
+              ) : (
+                /* shadcn Badge (read-only) for regional admin */
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span className="shadcn-badge"><span className="dot"/><Ico n="map" s={12} c="var(--brand-600)"/> {region}</span>
+                  <div className="tooltip-container" onMouseEnter={()=>setShowTooltip(true)} onMouseLeave={()=>setShowTooltip(false)}>
+                    <span style={{cursor:'help',color:'var(--text-muted)'}}><Ico n="help" s={15}/></span>
+                    {showTooltip&&<div className="tooltip-box">Your account is scoped to {region}.<br/>Contact Super Admin to change region.</div>}
+                  </div>
+                </div>
+              )}
+              <button style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'var(--brand-600)',color:'#fff',border:'none',cursor:'pointer',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)',fontWeight:500}}>
+                + Add Guard
+              </button>
+            </div>
+            <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)',marginTop:6,fontFamily:'var(--font-mono)'}}>
+              {isGlobal
+                ? `// getUserScope() === 'GLOBAL' → render <Select> with all regions`
+                : `// getUserScope() === 'REGIONAL' → render <Badge readOnly> showing user.regionName`}
+            </div>
+          </div>
+        </div>
+
+        <div className="code-block">
+          <span className="cm">{'// Topbar region selector — src/components/RegionSelector.tsx'}</span>{'\n'}
+          <span className="kw">import</span> {'{ Select, SelectTrigger, SelectContent, SelectItem }'} <span className="kw">from</span> <span className="str">'@/components/ui/select'</span>{'\n'}
+          <span className="kw">import</span> {'{ Badge }'} <span className="kw">from</span> <span className="str">'@/components/ui/badge'</span>{'\n'}
+          <span className="kw">import</span> {'{ Tooltip, TooltipContent, TooltipTrigger }'} <span className="kw">from</span> <span className="str">'@/components/ui/tooltip'</span>{'\n'}
+          <span className="kw">import</span> {'{ getUserScope }'} <span className="kw">from</span> <span className="str">'@/lib/auth'</span>{'\n\n'}
+          <span className="kw">export function</span> <span className="fn">RegionSelector</span>{'({ user, regions, value, onChange }) {'}{'\n'}
+          {'  '}<span className="kw">if</span> {'(getUserScope(user) === '}<span className="str">'GLOBAL'</span>{') return ('}{'\n'}
+          {'    <Select value={value} onValueChange={onChange}>'}{'\n'}
+          {'      <SelectTrigger className="w-[200px]"><Globe className="h-4 w-4 mr-2 text-muted-foreground"/><SelectValue /></SelectTrigger>'}{'\n'}
+          {'      <SelectContent>{regions.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>'}{'\n'}
+          {'    </Select>'}{'\n'}
+          {'  );'}{'\n'}
+          {'  '}<span className="cm">{'// Regional admin — read-only Badge + Tooltip'}</span>{'\n'}
+          {'  return ('}{'\n'}
+          {'    <Tooltip><TooltipTrigger asChild>'}{'\n'}
+          {'      <Badge variant="secondary" className="cursor-help gap-1.5">'}{'\n'}
+          {'        <MapPin className="h-3 w-3" /> {user.regionName}'}{'\n'}
+          {'      </Badge>'}{'\n'}
+          {'    </TooltipTrigger>'}{'\n'}
+          {'    <TooltipContent>Scoped to {user.regionName}. Contact Super Admin to change.</TooltipContent>'}{'\n'}
+          {'    </Tooltip>'}{'\n'}
+          {'  );'}{'\n'}
+          {'}'}
+        </div>
+      </div>
+
+      {/* Pattern 2 — Region-scoped empty state */}
+      <div className="section">
+        <div className="sec-eyebrow">Pattern 02</div>
+        <div className="sec-title">Region-scoped Empty State</div>
+        <div className="sec-sub">When a Regional Admin's scope returns no records — show a region-aware empty state inside a <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 5px',borderRadius:4}}>Card</code>. Never show a generic "No data" — always name the region.</div>
+
+        <div className="pattern-card">
+          <div className="pattern-label">
+            <span>Live preview — {isRegional?`${region} scope (no guards deployed)`:isGlobal?'Global (has data — no empty state shown)':''}</span>
+            <span className="pattern-note">shadcn: {'<Card>'} + empty state</span>
+          </div>
+          <div className="pattern-body">
+            {isRegional ? (
+              <div className="shadcn-card">
+                <div className="shadcn-card-header">
+                  <div className="shadcn-card-title">Guards — {region}</div>
+                  <div className="shadcn-card-desc">Showing records for {region} office only</div>
+                </div>
+                <div className="shadcn-card-body">
+                  <div className="empty-state">
+                    <div className="empty-icon"><Ico n="users" s={22} c="var(--text-muted)"/></div>
+                    <div style={{fontWeight:700,fontSize:'var(--text-14)',color:'var(--text-primary)',marginBottom:4}}>No guards in {region}</div>
+                    <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',marginBottom:16,maxWidth:280,lineHeight:1.5}}>There are no guards assigned to the {region} regional office. Add a guard to get started.</div>
+                    <div style={{display:'flex',gap:10}}>
+                      <button style={{padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'var(--brand-600)',color:'#fff',border:'none',cursor:'pointer',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)',fontWeight:500}}>Add Guard to {region}</button>
+                      <button style={{padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border-default)',cursor:'pointer',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)'}}>Contact Admin</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="shadcn-alert info">
+                <div className="alert-icon"><Ico n="info" s={16} c="var(--info-600)"/></div>
+                <div><div className="alert-title">Global scope active</div><div className="alert-desc">Switch to "Admin (with permissions)" role above to see the region-scoped empty state.</div></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="code-block">
+          <span className="cm">{'// Region-aware empty state — inside any list/table page'}</span>{'\n'}
+          <span className="kw">function</span> <span className="fn">GuardsPage</span>{'({ user }) {'}{'\n'}
+          {'  const { data: guards } = '}<span className="fn">useGuards</span>{'({ regionId: user.scope === '}<span className="str">'REGIONAL'</span>{' ? user.regionId : undefined });'}{'\n\n'}
+          {'  if (!guards?.length) return ('}{'\n'}
+          {'    <Card>'}{'\n'}
+          {'      <CardHeader>'}{'\n'}
+          {'        <CardTitle>Guards{user.scope === '}<span className="str">'REGIONAL'</span>{' && ` — ${user.regionName}`}</CardTitle>'}{'\n'}
+          {'        <CardDescription>{user.scope === '}<span className="str">'REGIONAL'</span>{' ? `Showing ${user.regionName} only` : '}<span className="str">'All regions'</span>{'}</CardDescription>'}{'\n'}
+          {'      </CardHeader>'}{'\n'}
+          {'      <CardContent><EmptyState region={user.regionName} /></CardContent>'}{'\n'}
+          {'    </Card>'}{'\n'}
+          {'  );'}{'\n'}
+          {'}'}
+        </div>
+      </div>
+
+      {/* Pattern 3 — Cross-region read-only warning */}
+      <div className="section">
+        <div className="sec-eyebrow">Pattern 03</div>
+        <div className="sec-title">Cross-region Read-only Warning</div>
+        <div className="sec-sub">When a Regional Admin views data from another region (e.g. via a direct link), show an <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 5px',borderRadius:4}}>Alert</code> + disable all edit actions. Use a <code style={{fontFamily:'var(--font-mono)',fontSize:12,background:'var(--bg-subtle)',padding:'1px 5px',borderRadius:4}}>Tooltip</code> on the disabled buttons to explain why.</div>
+
+        <div className="pattern-card">
+          <div className="pattern-label">
+            <span>Live preview — {isRegional?`${region} admin viewing Karachi record (cross-region)`:isGlobal?'Global admin — no warning shown':''}
+            </span>
+            <span className="pattern-note">shadcn: {'<Alert>'} + disabled {'<Button>'} + {'<Tooltip>'}</span>
+          </div>
+          <div className="pattern-body">
+            {isRegional ? (
+              <div>
+                <div className="shadcn-alert warning" style={{marginBottom:16}}>
+                  <div className="alert-icon"><Ico n="alert" s={16} c="var(--warning-600)"/></div>
+                  <div>
+                    <div className="alert-title">Read-only — out of region</div>
+                    <div className="alert-desc">This guard (KHI-00892) belongs to the <strong>Karachi</strong> office. Your access is scoped to <strong>{region}</strong>. You can view this record but cannot make changes. Contact the Karachi Regional Admin or a Super Admin to edit.</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'var(--bg-card)',color:'var(--text-secondary)',border:'1px solid var(--border-default)',cursor:'default',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)',opacity:0.5}} title={`Edit requires Karachi access. Your scope is ${region}.`}>
+                    <Ico n="lock" s={14} c="var(--text-muted)"/>Edit Guard
+                  </button>
+                  <button style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'var(--bg-card)',color:'var(--danger-600)',border:'1px solid var(--border-default)',cursor:'default',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)',opacity:0.5}} title="Requires Karachi access.">
+                    <Ico n="lock" s={14}/>End Deployment
+                  </button>
+                  <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)',alignSelf:'center',marginLeft:4}}>← Disabled — hover for reason</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{display:'flex',gap:8}}>
+                <button style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'var(--brand-600)',color:'#fff',border:'none',cursor:'pointer',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)'}}>Edit Guard</button>
+                <button style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:'var(--radius-sm)',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border-default)',cursor:'pointer',fontSize:'var(--text-13)',fontFamily:'var(--font-ui)'}}>End Deployment</button>
+                <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)',alignSelf:'center',marginLeft:4}}>← Full access (global scope)</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="code-block">
+          <span className="cm">{'// Cross-region read-only guard — wrap around editable sections'}</span>{'\n'}
+          <span className="kw">function</span> <span className="fn">canEditRecord</span>{'(user, recordRegionId) {'}{'\n'}
+          {'  if (user.scope === '}<span className="str">'GLOBAL'</span>{') return true;'}{'\n'}
+          {'  return user.regionId === recordRegionId;'}{'\n'}
+          {'}\n'}{'\n'}
+          <span className="kw">function</span> <span className="fn">GuardProfile</span>{'({ user, guard }) {'}{'\n'}
+          {'  const editable = '}<span className="fn">canEditRecord</span>{'(user, guard.regionId);'}{'\n\n'}
+          {'  return ('}{'\n'}
+          {'    <div>'}{'\n'}
+          {'      {!editable && ('}{'\n'}
+          {'        <Alert variant="warning" className="mb-4">'}{'\n'}
+          {'          <AlertTriangle className="h-4 w-4" />'}{'\n'}
+          {'          <AlertTitle>Read-only — out of region</AlertTitle>'}{'\n'}
+          {'          <AlertDescription>This record belongs to {guard.regionName}. Your scope is {user.regionName}.</AlertDescription>'}{'\n'}
+          {'        </Alert>'}{'\n'}
+          {'      )}'}{'\n'}
+          {'      <Tooltip>'}{'\n'}
+          {'        <TooltipTrigger asChild>'}{'\n'}
+          {'          <span>{/* span wrapper needed for disabled button tooltip */}'}{'\n'}
+          {'            <Button disabled={!editable}>{editable ? <Pencil /> : <Lock />} Edit Guard</Button>'}{'\n'}
+          {'          </span>'}{'\n'}
+          {'        </TooltipTrigger>'}{'\n'}
+          {'        {!editable && <TooltipContent>Requires {guard.regionName} access.</TooltipContent>}'}{'\n'}
+          {'      </Tooltip>'}{'\n'}
+          {'    </div>'}{'\n'}
+          {'  );'}{'\n'}
+          {'}'}
+        </div>
+      </div>
+
+      {/* Access model table */}
+      <div className="section">
+        <div className="sec-eyebrow">Reference</div>
+        <div className="sec-title">Access Scope Model</div>
+        <div style={{background:'#fff',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',overflow:'hidden'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-13)'}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid var(--border-default)',background:'var(--bg-subtle)'}}>
+                {['Role','Scope','Region Select','Data Filter','Edit Access'].map(h=>(
+                  <th key={h} style={{padding:'10px 16px',textAlign:'left',fontSize:'var(--text-11)',fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                {role:'Super User',scope:'GLOBAL',select:'<Select> — all regions',filter:'None (all data)',edit:'All records'},
+                {role:'Admin (no permissions)',scope:'GLOBAL',select:'<Select> — all regions',filter:'None (all data)',edit:'All records'},
+                {role:'Admin (with permissions)',scope:'REGIONAL',select:'<Badge> read-only',filter:'user.regionId only',edit:'Own region only'},
+                {role:'Regional Manager',scope:'REGIONAL',select:'<Badge> read-only',filter:'user.regionId only',edit:'Own region only'},
+                {role:'Supervisor',scope:'REGIONAL',select:'<Badge> read-only',filter:'user.regionId only',edit:'Limited — no terminate'},
+                {role:'Accountant',scope:'REGIONAL',select:'<Badge> read-only',filter:'user.regionId only',edit:'Finance modules only'},
+              ].map((r,i)=>(
+                <tr key={i} style={{borderBottom:'1px solid var(--border-default)'}}>
+                  <td style={{padding:'10px 16px',fontWeight:600}}>{r.role}</td>
+                  <td style={{padding:'10px 16px'}}><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)',background:r.scope==='GLOBAL'?'var(--brand-50)':'var(--bg-subtle)',color:r.scope==='GLOBAL'?'var(--brand-700)':'var(--text-muted)',padding:'2px 8px',borderRadius:9999,fontWeight:600}}>{r.scope}</span></td>
+                  <td style={{padding:'10px 16px',fontFamily:'var(--font-mono)',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{r.select}</td>
+                  <td style={{padding:'10px 16px',color:'var(--text-muted)'}}>{r.filter}</td>
+                  <td style={{padding:'10px 16px',color:'var(--text-muted)'}}>{r.edit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
 import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
 type RegionRow = {
   id: string
@@ -92,8 +93,18 @@ export default function RegionsManager() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Settings: Regions" subtitle="Manage broad geographical regions." />
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? (
+        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <FilterBar className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -107,12 +118,12 @@ export default function RegionsManager() {
           </div>
         </div>
         <div className="flex gap-2">
-          <ActionButton onClick={create} disabled={saving}>
+          <Button onClick={create} disabled={saving}>
             {saving ? "Saving..." : "Create"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>
+          </Button>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading}>
             Refresh
-          </ActionButton>
+          </Button>
         </div>
       </FilterBar>
 

@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — Add Guard</title>
+<link rel="stylesheet" href="tokens.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+html,body,#root{height:100%;margin:0;}
+body{background:var(--bg-page);font-family:var(--font-ui);color:var(--text-primary);}
+
+/* ── Shell ── */
+.shell{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:260px;min-width:260px;background:var(--sidebar-bg);display:flex;flex-direction:column;}
+.sidebar-top{padding:20px 20px 0;}
+.sidebar-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+.logo-mark{width:32px;height:32px;background:var(--brand-600);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;}
+.logo-text{color:var(--sidebar-text);font-weight:700;font-size:var(--text-14);}
+.create-label{font-size:var(--text-11);font-weight:700;color:var(--sidebar-text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;}
+
+/* ── Step nav ── */
+.step-nav{display:flex;flex-direction:column;gap:2px;padding:0 12px;flex:1;}
+.step-nav-item{display:flex;align-items:flex-start;gap:12px;padding:10px 10px;border-radius:8px;cursor:pointer;transition:background var(--duration-fast);}
+.step-nav-item:hover:not(.active):not(.done){background:var(--sidebar-hover-bg);}
+.step-nav-item.done{cursor:pointer;}
+.step-nav-item.active{background:rgba(47,91,255,0.14);}
+.step-circle{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(226,232,240,0.4);flex-shrink:0;margin-top:1px;transition:all var(--duration-fast);}
+.step-nav-item.done .step-circle{background:var(--brand-600);border-color:var(--brand-600);color:#fff;}
+.step-nav-item.active .step-circle{background:var(--brand-600);border-color:var(--brand-600);color:#fff;box-shadow:0 0 0 3px rgba(47,91,255,0.25);}
+.step-info{flex:1;}
+.step-name{font-size:var(--text-13);font-weight:600;color:rgba(226,232,240,0.45);transition:color var(--duration-fast);}
+.step-nav-item.active .step-name,.step-nav-item.done .step-name{color:var(--sidebar-text);}
+.step-meta{font-size:var(--text-11);color:var(--sidebar-text-muted);margin-top:2px;}
+.step-connector{width:1.5px;height:16px;background:rgba(255,255,255,0.08);margin-left:22px;}
+.step-connector.done{background:var(--brand-600);}
+
+/* ── Discard ── */
+.discard-zone{padding:16px 20px;border-top:1px solid var(--sidebar-border);}
+.discard-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:var(--text-13);color:var(--sidebar-text-muted);cursor:pointer;transition:all var(--duration-fast);width:100%;background:transparent;border:none;}
+.discard-btn:hover{background:rgba(239,68,68,0.1);color:#fca5a5;}
+
+/* ── Main content ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{height:56px;background:var(--bg-card);border-bottom:1px solid var(--border-default);display:flex;align-items:center;padding:0 32px;gap:16px;flex-shrink:0;}
+.topbar-crumb{display:flex;align-items:center;gap:8px;font-size:var(--text-13);color:var(--text-muted);}
+.topbar-crumb strong{color:var(--text-primary);}
+.tb-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);font-weight:600;cursor:pointer;border:1px solid transparent;font-family:var(--font-ui);transition:all var(--duration-fast);}
+.tb-primary{background:var(--brand-600);color:#fff;border-color:var(--brand-600);}
+.tb-primary:hover{background:var(--brand-700);}
+.tb-secondary{background:var(--bg-card);color:var(--text-secondary);border-color:var(--border-default);}
+.tb-secondary:hover{background:var(--bg-subtle);}
+.tb-ghost{background:transparent;color:var(--text-secondary);border-color:transparent;}
+.tb-ghost:hover{background:var(--bg-subtle);}
+.scroll-area{flex:1;overflow-y:auto;padding:32px;}
+.form-canvas{max-width:740px;margin:0 auto;}
+
+/* ── Step header ── */
+.step-header{margin-bottom:28px;}
+.step-header-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--brand-600);margin-bottom:6px;}
+.step-header-title{font-size:var(--text-24);font-weight:800;color:var(--text-primary);letter-spacing:-0.3px;}
+.step-header-sub{font-size:var(--text-13);color:var(--text-muted);margin-top:4px;line-height:1.6;}
+
+/* ── Progress bar ── */
+.progress-strip{height:3px;background:var(--border-default);margin:0 -32px;margin-top:-1px;}
+.progress-fill{height:100%;background:var(--brand-600);transition:width var(--duration-slow) var(--ease-standard);}
+
+/* ── Section ── */
+.form-section{margin-bottom:28px;}
+.form-section-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border-default);}
+.form-section-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.form-section-title{font-size:var(--text-14);font-weight:700;color:var(--text-primary);}
+.form-section-sub{font-size:var(--text-12);color:var(--text-muted);margin-left:auto;}
+
+/* ── Form fields ── */
+.field-group{display:grid;gap:14px;}
+.g2{grid-template-columns:1fr 1fr;}
+.g3{grid-template-columns:1fr 1fr 1fr;}
+.g1{grid-template-columns:1fr;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field-label{font-size:var(--text-11);font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+.field-label .req{color:var(--danger-600);}
+.field-hint{font-size:var(--text-11);color:var(--text-muted);}
+.field-hint.err{color:var(--danger-600);}
+.inp{padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-14);color:var(--text-primary);font-family:var(--font-ui);width:100%;box-sizing:border-box;transition:border-color var(--duration-fast),box-shadow var(--duration-fast);}
+.inp:focus{outline:none;border-color:var(--border-focus);box-shadow:var(--focus-ring);}
+.inp.mono{font-family:var(--font-mono);}
+.inp.err{border-color:var(--danger-600);}
+.inp-icon-wrap{position:relative;}
+.inp-icon-wrap .inp{padding-left:36px;}
+.inp-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
+.inp-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-family:var(--font-mono);font-size:var(--text-13);color:var(--text-muted);pointer-events:none;}
+.inp-prefix+.inp{padding-left:28px;}
+
+/* ── Switch ── */
+.switch-row{display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--bg-subtle);border-radius:var(--radius-sm);border:1px solid var(--border-default);}
+.switch{width:36px;height:20px;border-radius:var(--radius-full);position:relative;cursor:pointer;transition:background var(--duration-normal);flex-shrink:0;margin-top:2px;}
+.switch.on{background:var(--brand-600);}
+.switch.off{background:var(--slate-300);}
+.switch-thumb{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform var(--duration-normal);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.switch.on .switch-thumb{transform:translateX(16px);}
+.switch-info .title{font-size:var(--text-13);font-weight:600;color:var(--text-primary);}
+.switch-info .sub{font-size:var(--text-12);color:var(--text-muted);margin-top:2px;}
+
+/* ── Radio group ── */
+.radio-group{display:grid;gap:8px;}
+.radio-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--border-default);border-radius:var(--radius-sm);cursor:pointer;transition:all var(--duration-fast);background:var(--bg-card);}
+.radio-card.sel{border-color:var(--brand-600);background:var(--brand-50);}
+.radio-card:hover:not(.sel){background:var(--bg-subtle);}
+.radio-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border-default);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all var(--duration-fast);}
+.radio-dot.sel{border-color:var(--brand-600);}
+.radio-dot.sel::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--brand-600);}
+.radio-card-title{font-size:var(--text-13);font-weight:600;color:var(--text-primary);}
+.radio-card-sub{font-size:var(--text-11);color:var(--text-muted);margin-top:1px;}
+
+/* ── Shift cards ── */
+.shift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.shift-card{padding:14px;border:1.5px solid var(--border-default);border-radius:var(--radius-sm);cursor:pointer;text-align:center;transition:all var(--duration-fast);background:var(--bg-card);}
+.shift-card.sel{border-color:var(--brand-600);background:var(--brand-50);}
+.shift-card:hover:not(.sel){background:var(--bg-subtle);}
+.shift-card-icon{font-size:20px;margin-bottom:6px;}
+.shift-card-label{font-size:var(--text-13);font-weight:700;color:var(--text-primary);}
+.shift-card-sub{font-size:var(--text-11);color:var(--text-muted);margin-top:2px;}
+
+/* ── Document upload ── */
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.doc-card{border:1.5px dashed var(--border-default);border-radius:var(--radius-sm);padding:16px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all var(--duration-fast);background:var(--bg-card);}
+.doc-card:hover{border-color:var(--brand-400);background:var(--brand-50);}
+.doc-card.uploaded{border-style:solid;border-color:var(--success-600);background:var(--success-50);}
+.doc-card.required-missing{border-color:var(--danger-400);}
+.doc-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.doc-name{font-size:var(--text-12);font-weight:600;color:var(--text-primary);text-align:center;}
+.doc-req{font-size:10px;font-weight:700;color:var(--danger-600);text-transform:uppercase;letter-spacing:0.5px;}
+.doc-opt{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;}
+.doc-status{font-size:10px;font-weight:600;color:var(--success-600);display:flex;align-items:center;gap:3px;}
+
+/* ── Age warning ── */
+.age-warning{background:var(--warning-50);border:1px solid #fde68a;border-radius:var(--radius-sm);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:var(--text-13);color:var(--warning-700);}
+
+/* ── Review ── */
+.review-section{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);margin-bottom:16px;overflow:hidden;}
+.review-section-head{padding:12px 18px;background:var(--bg-subtle);border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;}
+.review-section-title{font-size:var(--text-13);font-weight:700;color:var(--text-primary);}
+.review-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;}
+.review-field{padding:12px 18px;border-bottom:1px solid var(--border-default);border-right:1px solid var(--border-default);}
+.review-field:nth-child(3n){border-right:none;}
+.review-field:nth-last-child(-n+3){border-bottom:none;}
+.review-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;}
+.review-val{font-size:var(--text-13);color:var(--text-primary);font-weight:500;}
+
+/* ── Success state ── */
+.success-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:48px;}
+.success-mark{width:64px;height:64px;border-radius:50%;background:var(--success-50);display:flex;align-items:center;justify-content:center;margin-bottom:20px;}
+
+/* ── Toast ── */
+.toast-stack{position:fixed;top:20px;right:20px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.toast{background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:12px 16px;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:10px;font-size:var(--text-13);animation:slideIn 150ms ease;pointer-events:all;}
+.toast.warn{border-left:3px solid var(--warning-600);}
+.toast.err{border-left:3px solid var(--danger-600);}
+@keyframes slideIn{from{transform:translateX(32px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Footer nav ── */
+.footer-bar{height:68px;background:var(--bg-card);border-top:1px solid var(--border-default);display:flex;align-items:center;padding:0 32px;gap:12;flex-shrink:0;}
+.step-indicator{font-size:var(--text-12);color:var(--text-muted);font-family:var(--font-mono);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect} = React;
+
+// ── Icon ────────────────────────────────────────────────────
+const Ico = ({n,s=16,c='currentColor'}) => {
+  const paths = {
+    check: <polyline points="20 6 9 17 4 12"/>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    chevRight: <polyline points="9 18 15 12 9 6"/>,
+    chevLeft: <polyline points="15 18 9 12 15 6"/>,
+    user: <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    shield: <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z"/>,
+    map: <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
+    dollar: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>,
+    file: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
+    star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
+    alert: <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></>,
+    upload: <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    edit: <><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{paths[n]}</svg>;
+};
+
+// ── Steps config ────────────────────────────────────────────
+const STEPS = [
+  {id:'personal',   label:'Personal Information', meta:'Name, CNIC, DOB, ex-service'},
+  {id:'service',    label:'Service Details',       meta:'Designation, shift, office assignment'},
+  {id:'address',    label:'Address & Contact',     meta:'Permanent, current, emergency contact'},
+  {id:'bank',       label:'Bank & Finance',        meta:'Account details, salary, reserve %'},
+  {id:'documents',  label:'Documents',             meta:'CNIC copy, photo, police certificate'},
+  {id:'review',     label:'Review & Submit',       meta:'Confirm all details before saving'},
+];
+
+// ── Field components ─────────────────────────────────────────
+const Field = ({label, req, hint, error, children}) => (
+  <div className="field">
+    {label && <div className="field-label">{label}{req && <span className="req"> *</span>}</div>}
+    {children}
+    {error ? <div className="field-hint err">{error}</div> : hint ? <div className="field-hint">{hint}</div> : null}
+  </div>
+);
+
+const Inp = ({mono, prefix, icon, error, ...props}) => (
+  <div className={icon||prefix ? 'inp-icon-wrap' : ''} style={{position:'relative'}}>
+    {icon && <span className="inp-icon"><Ico n={icon} s={14} c="var(--text-muted)"/></span>}
+    {prefix && <span className="inp-prefix">{prefix}</span>}
+    <input className={`inp${mono?' mono':''}${error?' err':''}`} {...props}/>
+  </div>
+);
+
+const Sel = ({children,...props}) => <select className="inp" {...props}>{children}</select>;
+
+const Switch = ({on, onToggle, title, sub}) => (
+  <div className="switch-row" onClick={onToggle} style={{cursor:'pointer'}}>
+    <div className={`switch ${on?'on':'off'}`}><div className="switch-thumb"/></div>
+    <div className="switch-info"><div className="title">{title}</div>{sub && <div className="sub">{sub}</div>}</div>
+  </div>
+);
+
+const SectionHead = ({icon, iconBg, iconColor, title, sub}) => (
+  <div className="form-section-head">
+    <div className="form-section-icon" style={{background:iconBg}}><Ico n={icon} s={15} c={iconColor}/></div>
+    <div className="form-section-title">{title}</div>
+    {sub && <div className="form-section-sub">{sub}</div>}
+  </div>
+);
+
+// ── Main App ─────────────────────────────────────────────────
+function App() {
+  const [step, setStep] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  // Form state
+  const [personal, setPersonal] = useState({
+    fullName:'', fatherName:'', cnic:'', dob:'', gender:'MALE',
+    religion:'ISLAM', marital:'SINGLE', bloodGroup:'', height:'', weight:'',
+    education:'', educationYear:'', educationBoard:'', identMark:'',
+    isExService:false, serviceType:'ARMY', rank:'', regiment:'', unit:'',
+    enrollDate:'', dischargeDate:'',
+  });
+  const [service, setService] = useState({
+    designation:'Security Guard', shift:'DAY', region:'', office:'',
+    joiningDate:'24/04/2026', salary:'', reservePct:30,
+  });
+  const [address, setAddress] = useState({
+    permAddress:'', permCity:'', permDistrict:'', permProvince:'',
+    currAddress:'', currCity:'', sameAsPerm:false,
+    phone:'', altPhone:'', email:'',
+    emgName:'', emgRelation:'', emgPhone:'',
+  });
+  const [bank, setBank] = useState({
+    bankName:'', accountNo:'', iban:'', accountType:'CURRENT', branchCode:'',
+    paymentMethod:'BANK',
+  });
+  const [documents, setDocuments] = useState({
+    cnicCopy: true, photo: false, policeCert: false,
+    medicalCert: false, characterCert: false, exServiceCert: false,
+    educationCert: false, nokForm: false,
+  });
+
+  const showToast = (msg, type='warn') => {
+    setToast({msg, type});
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const calcAge = dob => {
+    if (!dob) return null;
+    const [d,m,y] = dob.split('/');
+    if (!d||!m||!y) return null;
+    const birth = new Date(+y,+m-1,+d);
+    const now = new Date(2026,3,24);
+    let age = now.getFullYear() - birth.getFullYear();
+    const md = now.getMonth() - birth.getMonth();
+    if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const age = calcAge(personal.dob);
+  const ageWarning = age !== null && (age < 18 || age > 45);
+
+  const validateStep = () => {
+    const errs = {};
+    if (step === 0) {
+      if (!personal.fullName.trim()) errs.fullName = 'Full name is required.';
+      if (!personal.cnic.match(/^\d{5}-\d{7}-\d$/)) errs.cnic = 'Enter a valid CNIC: XXXXX-XXXXXXX-X';
+      if (!personal.dob) errs.dob = 'Date of birth is required.';
+      if (!personal.fatherName.trim()) errs.fatherName = 'Father name is required.';
+    }
+    if (step === 1) {
+      if (!service.region) errs.region = 'Region is required.';
+      if (!service.salary) errs.salary = 'Basic salary is required.';
+    }
+    if (step === 2) {
+      if (!address.permAddress.trim()) errs.permAddress = 'Permanent address is required.';
+      if (!address.phone.trim()) errs.phone = 'Mobile number is required.';
+      if (!address.emgName.trim()) errs.emgName = 'Emergency contact name is required.';
+      if (!address.emgPhone.trim()) errs.emgPhone = 'Emergency contact phone is required.';
+    }
+    if (step === 3) {
+      if (!bank.bankName.trim()) errs.bankName = 'Bank name is required.';
+      if (!bank.accountNo.trim()) errs.accountNo = 'Account number is required.';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const next = () => {
+    if (!validateStep()) {
+      showToast('Please fix the highlighted errors before continuing.', 'err');
+      return;
+    }
+    if (step < STEPS.length - 1) setStep(s => s + 1);
+  };
+
+  const prev = () => { if (step > 0) { setStep(s => s - 1); setErrors({}); }};
+
+  const submit = () => {
+    showToast('Saving guard profile…');
+    setTimeout(() => setSubmitted(true), 1200);
+  };
+
+  const progressPct = ((step + (step === STEPS.length-1 ? 1 : 0)) / STEPS.length) * 100;
+
+  const pf = (key, val) => setPersonal(p => ({...p, [key]:val}));
+  const sf = (key, val) => setService(p => ({...p, [key]:val}));
+  const af = (key, val) => setAddress(p => ({...p, [key]:val}));
+  const bf = (key, val) => setBank(p => ({...p, [key]:val}));
+
+  if (submitted) return <SuccessScreen name={personal.fullName||'New Guard'}/>;
+
+  return (
+    <div className="shell">
+      {/* ── Sidebar step nav ── */}
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <div className="sidebar-logo">
+            <div className="logo-mark">P</div>
+            <div className="logo-text">Parwest ERP</div>
+          </div>
+          <div className="create-label">New Guard</div>
+        </div>
+
+        <div className="step-nav">
+          {STEPS.map((s,i) => (
+            <div key={s.id}>
+              <div
+                className={`step-nav-item${i===step?' active':i<step?' done':''}`}
+                onClick={() => { if(i < step) { setStep(i); setErrors({}); }}}
+              >
+                <div className="step-circle">
+                  {i < step ? <Ico n="check" s={11} c="#fff"/> : i+1}
+                </div>
+                <div className="step-info">
+                  <div className="step-name">{s.label}</div>
+                  <div className="step-meta">{s.meta}</div>
+                </div>
+              </div>
+              {i < STEPS.length - 1 && <div className={`step-connector${i < step?' done':''}`}/>}
+            </div>
+          ))}
+        </div>
+
+        <div className="discard-zone">
+          <button className="discard-btn"><Ico n="trash" s={15}/>Discard Draft</button>
+        </div>
+      </aside>
+
+      {/* ── Main panel ── */}
+      <div className="main">
+        {/* Topbar */}
+        <div className="topbar">
+          <div className="topbar-crumb">
+            <span>Guards</span>
+            <Ico n="chevRight" s={14}/>
+            <strong>Add Guard</strong>
+            <Ico n="chevRight" s={14}/>
+            <span>{STEPS[step].label}</span>
+          </div>
+          <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+            <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>Save as Draft</button>
+          </div>
+        </div>
+
+        {/* Progress strip */}
+        <div className="progress-strip">
+          <div className="progress-fill" style={{width:`${progressPct}%`}}/>
+        </div>
+
+        {/* Scroll area */}
+        <div className="scroll-area">
+          <div className="form-canvas">
+            {step === 0 && <Step1Personal data={personal} set={pf} errors={errors} age={age} ageWarning={ageWarning}/>}
+            {step === 1 && <Step2Service data={service} set={sf} errors={errors}/>}
+            {step === 2 && <Step3Address data={address} set={af} errors={errors}/>}
+            {step === 3 && <Step4Bank data={bank} set={bf} errors={errors}/>}
+            {step === 4 && <Step5Documents data={documents} set={setDocuments}/>}
+            {step === 5 && <Step6Review personal={personal} service={service} address={address} bank={bank} documents={documents} age={age}/>}
+          </div>
+        </div>
+
+        {/* Footer nav */}
+        <div className="footer-bar">
+          <span className="step-indicator">Step {step+1} / {STEPS.length}</span>
+          <div style={{marginLeft:'auto',display:'flex',gap:10}}>
+            {step > 0 && (
+              <button className="tb-btn tb-secondary" onClick={prev}><Ico n="chevLeft" s={14}/>Back</button>
+            )}
+            {step < STEPS.length - 1 ? (
+              <button className="tb-btn tb-primary" onClick={next}>
+                Continue <Ico n="chevRight" s={14}/>
+              </button>
+            ) : (
+              <button className="tb-btn tb-primary" style={{background:'var(--success-600)',borderColor:'var(--success-600)'}} onClick={submit}>
+                <Ico n="check" s={14}/>Submit Guard Profile
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="toast-stack">
+          <div className={`toast ${toast.type}`}>
+            <Ico n={toast.type==='err'?'alert':'alert'} s={15} c={toast.type==='err'?'var(--danger-600)':'var(--warning-600)'}/>
+            {toast.msg}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 1: Personal Information ─────────────────────────────
+function Step1Personal({data, set, errors, age, ageWarning}) {
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 1 of 6</div>
+        <div className="step-header-title">Personal Information</div>
+        <div className="step-header-sub">Core identity details. The CNIC is used as the primary unique identifier — double-check it before proceeding.</div>
+      </div>
+
+      {/* Core identity */}
+      <div className="form-section">
+        <SectionHead icon="user" iconBg="var(--brand-50)" iconColor="var(--brand-600)" title="Core Identity"/>
+        <div className="field-group g2">
+          <Field label="Full Name" req error={errors.fullName}>
+            <Inp placeholder="e.g. Muhammad Usman Khan" value={data.fullName} onChange={e=>set('fullName',e.target.value)} error={!!errors.fullName}/>
+          </Field>
+          <Field label="Father's Name" req error={errors.fatherName}>
+            <Inp placeholder="e.g. Khalid Mehmood Khan" value={data.fatherName} onChange={e=>set('fatherName',e.target.value)} error={!!errors.fatherName}/>
+          </Field>
+        </div>
+        <div className="field-group g2" style={{marginTop:14}}>
+          <Field label="CNIC" req hint="Format: XXXXX-XXXXXXX-X" error={errors.cnic}>
+            <Inp mono placeholder="42201-1234567-9" value={data.cnic} onChange={e=>set('cnic',e.target.value)} maxLength={15} error={!!errors.cnic}/>
+          </Field>
+          <Field label="Date of Birth" req hint={age!==null?`Age: ${age} years${ageWarning?' — ⚠ Age approval required':''}`:''} error={errors.dob}>
+            <Inp placeholder="DD/MM/YYYY" mono value={data.dob} onChange={e=>set('dob',e.target.value)} error={!!errors.dob}/>
+          </Field>
+        </div>
+
+        {ageWarning && (
+          <div className="age-warning" style={{marginTop:14}}>
+            <Ico n="alert" s={16} c="var(--warning-600)"/>
+            <div>
+              <strong>Age {age} is outside the 18–45 range.</strong> This guard will require a <strong>Manager age approval</strong> before activation. The profile will be created in PENDING state.
+            </div>
+          </div>
+        )}
+
+        <div className="field-group g3" style={{marginTop:14}}>
+          <Field label="Gender">
+            <Sel value={data.gender} onChange={e=>set('gender',e.target.value)}>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+              <option value="OTHER">Other</option>
+            </Sel>
+          </Field>
+          <Field label="Marital Status">
+            <Sel value={data.marital} onChange={e=>set('marital',e.target.value)}>
+              <option value="SINGLE">Single</option>
+              <option value="MARRIED">Married</option>
+              <option value="WIDOWED">Widowed</option>
+              <option value="DIVORCED">Divorced</option>
+            </Sel>
+          </Field>
+          <Field label="Religion">
+            <Sel value={data.religion} onChange={e=>set('religion',e.target.value)}>
+              <option value="ISLAM">Islam</option>
+              <option value="CHRISTIANITY">Christianity</option>
+              <option value="HINDUISM">Hinduism</option>
+              <option value="OTHER">Other</option>
+            </Sel>
+          </Field>
+          <Field label="Blood Group">
+            <Sel value={data.bloodGroup} onChange={e=>set('bloodGroup',e.target.value)}>
+              <option value="">Select…</option>
+              {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(bg=><option key={bg} value={bg}>{bg}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Height" hint="In feet & inches (e.g. 5'9&quot;)">
+            <Inp placeholder="5'9&quot;" value={data.height} onChange={e=>set('height',e.target.value)}/>
+          </Field>
+          <Field label="Weight" hint="In kg">
+            <Inp placeholder="74" value={data.weight} onChange={e=>set('weight',e.target.value)}/>
+          </Field>
+        </div>
+
+        <div className="field-group g1" style={{marginTop:14}}>
+          <Field label="Identification Mark" hint="Physical identifying feature (optional)">
+            <Inp placeholder="e.g. Mole on right cheek" value={data.identMark} onChange={e=>set('identMark',e.target.value)}/>
+          </Field>
+        </div>
+      </div>
+
+      {/* Education */}
+      <div className="form-section">
+        <SectionHead icon="file" iconBg="var(--slate-100)" iconColor="var(--slate-600)" title="Education"/>
+        <div className="field-group g3">
+          <Field label="Highest Qualification">
+            <Sel value={data.education} onChange={e=>set('education',e.target.value)}>
+              <option value="">Select…</option>
+              {['Primary','Middle','Matriculation','Intermediate','Bachelor','Master','Other'].map(e=><option key={e} value={e}>{e}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Passing Year">
+            <Inp mono placeholder="e.g. 2008" value={data.educationYear} onChange={e=>set('educationYear',e.target.value)} maxLength={4}/>
+          </Field>
+          <Field label="Board / University">
+            <Inp placeholder="e.g. BISE Lahore" value={data.educationBoard} onChange={e=>set('educationBoard',e.target.value)}/>
+          </Field>
+        </div>
+      </div>
+
+      {/* Ex-service */}
+      <div className="form-section">
+        <SectionHead icon="shield" iconBg="var(--brand-50)" iconColor="var(--brand-700)" title="Ex-Service Details" sub="Optional"/>
+        <div style={{marginBottom:14}}>
+          <Switch
+            on={data.isExService}
+            onToggle={()=>set('isExService',!data.isExService)}
+            title="This guard is an ex-serviceman"
+            sub="Army, Navy, Air Force, Police, or Paramilitary"
+          />
+        </div>
+        {data.isExService && (
+          <div className="field-group g3">
+            <Field label="Service Type">
+              <Sel value={data.serviceType} onChange={e=>set('serviceType',e.target.value)}>
+                {['ARMY','NAVY','AIR FORCE','POLICE','RANGERS','FC'].map(t=><option key={t} value={t}>{t}</option>)}
+              </Sel>
+            </Field>
+            <Field label="Rank">
+              <Inp placeholder="e.g. Lance Naik" value={data.rank} onChange={e=>set('rank',e.target.value)}/>
+            </Field>
+            <Field label="Regiment / Wing">
+              <Inp placeholder="e.g. Punjab Regiment" value={data.regiment} onChange={e=>set('regiment',e.target.value)}/>
+            </Field>
+            <Field label="Unit">
+              <Inp placeholder="e.g. 22 Punjab" value={data.unit} onChange={e=>set('unit',e.target.value)}/>
+            </Field>
+            <Field label="Date of Enrolment">
+              <Inp mono placeholder="DD/MM/YYYY" value={data.enrollDate} onChange={e=>set('enrollDate',e.target.value)}/>
+            </Field>
+            <Field label="Date of Discharge">
+              <Inp mono placeholder="DD/MM/YYYY" value={data.dischargeDate} onChange={e=>set('dischargeDate',e.target.value)}/>
+            </Field>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2: Service Details ───────────────────────────────────
+function Step2Service({data, set, errors}) {
+  const regions = ['Lahore','Karachi','Islamabad','Rawalpindi','Faisalabad','Multan','Peshawar','Quetta'];
+  const officesByRegion = {
+    Lahore:['Gulberg Branch','DHA Office','Johar Town'],
+    Karachi:['Site A','Site B','Clifton Branch'],
+    Islamabad:['F-7 Office','G-8 Office'],
+    Rawalpindi:['Saddar Branch'],
+    Faisalabad:['Main Office'],
+    Multan:['Central Office'],
+    Peshawar:['Ring Road Office'],
+    Quetta:['Main Branch'],
+  };
+  const offices = data.region ? (officesByRegion[data.region]||[]) : [];
+
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 2 of 6</div>
+        <div className="step-header-title">Service Details</div>
+        <div className="step-header-sub">Designation, shift preference, and office assignment. These determine payroll rate bands and regional workflow routing.</div>
+      </div>
+
+      {/* Designation */}
+      <div className="form-section">
+        <SectionHead icon="shield" iconBg="var(--brand-50)" iconColor="var(--brand-600)" title="Role & Assignment"/>
+        <div className="field-group g2">
+          <Field label="Designation" req>
+            <Sel value={data.designation} onChange={e=>set('designation',e.target.value)}>
+              {['Security Guard','Supervisor','CPO','ASO','Sub-Inspector','Inspector'].map(d=><option key={d} value={d}>{d}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Joining Date" req>
+            <Inp mono value={data.joiningDate} onChange={e=>set('joiningDate',e.target.value)}/>
+          </Field>
+          <Field label="Region" req error={errors.region}>
+            <Sel value={data.region} onChange={e=>{set('region',e.target.value);set('office','');}}>
+              <option value="">Select region…</option>
+              {regions.map(r=><option key={r} value={r}>{r}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Regional Office" req>
+            <Sel value={data.office} onChange={e=>set('office',e.target.value)} disabled={!data.region}>
+              <option value="">{data.region?'Select office…':'Select region first'}</option>
+              {offices.map(o=><option key={o} value={o}>{o}</option>)}
+            </Sel>
+          </Field>
+        </div>
+      </div>
+
+      {/* Shift */}
+      <div className="form-section">
+        <SectionHead icon="star" iconBg="var(--slate-100)" iconColor="var(--slate-600)" title="Shift Preference"/>
+        <div className="shift-grid">
+          {[
+            {val:'DAY',icon:'☀️',label:'Day Shift',sub:'Standard 8-hr daytime duty'},
+            {val:'NIGHT',icon:'🌙',label:'Night Shift',sub:'Night patrol / overnight cover'},
+            {val:'BOTH',icon:'⚡',label:'Both Shifts',sub:'Flexible — deployable day or night'},
+          ].map(s=>(
+            <div key={s.val} className={`shift-card${data.shift===s.val?' sel':''}`} onClick={()=>set('shift',s.val)}>
+              <div className="shift-card-icon">{s.icon}</div>
+              <div className="shift-card-label">{s.label}</div>
+              <div className="shift-card-sub">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Salary */}
+      <div className="form-section">
+        <SectionHead icon="dollar" iconBg="var(--success-50)" iconColor="var(--success-600)" title="Salary Configuration"/>
+        <div className="field-group g3">
+          <Field label="Basic Salary (₨)" req error={errors.salary}>
+            <div className="inp-icon-wrap" style={{position:'relative'}}>
+              <span className="inp-prefix">₨</span>
+              <input className={`inp mono${errors.salary?' err':''}`} placeholder="28,000" value={data.salary} onChange={e=>set('salary',e.target.value)} style={{paddingLeft:28}}/>
+            </div>
+          </Field>
+          <Field label="Reserve %" hint="Withheld from monthly net">
+            <Sel value={data.reservePct} onChange={e=>set('reservePct',+e.target.value)}>
+              {[10,20,25,30,33,40,50].map(p=><option key={p} value={p}>{p}%</option>)}
+            </Sel>
+          </Field>
+          <Field label="Est. Net Salary">
+            <div style={{padding:'9px 12px',background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border-default)',fontFamily:'var(--font-mono)',fontSize:'var(--text-14)',color:'var(--text-muted)'}}>
+              {data.salary ? `₨ ${Math.round(Number(data.salary.replace(/,/g,'')) * (1 - data.reservePct/100)).toLocaleString()}` : '—'}
+            </div>
+          </Field>
+        </div>
+        <div style={{marginTop:12,padding:'10px 14px',background:'var(--info-50)',border:'1px solid #bfdbfe',borderRadius:'var(--radius-sm)',fontSize:'var(--text-12)',color:'var(--info-600)'}}>
+          Net salary = Basic × (1 − Reserve%). Additional deductions (EOBI, loans) are applied per payroll cycle.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3: Address & Contact ─────────────────────────────────
+function Step3Address({data, set, errors}) {
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 3 of 6</div>
+        <div className="step-header-title">Address & Contact</div>
+        <div className="step-header-sub">Permanent address is used for document verification. Emergency contact is mandatory for operational records.</div>
+      </div>
+
+      {/* Permanent address */}
+      <div className="form-section">
+        <SectionHead icon="map" iconBg="var(--brand-50)" iconColor="var(--brand-600)" title="Permanent Address"/>
+        <div className="field-group g1">
+          <Field label="Street Address" req error={errors.permAddress}>
+            <Inp placeholder="House #, Street, Area" value={data.permAddress} onChange={e=>set('permAddress',e.target.value)} error={!!errors.permAddress}/>
+          </Field>
+        </div>
+        <div className="field-group g3" style={{marginTop:14}}>
+          <Field label="City" req>
+            <Inp placeholder="Lahore" value={data.permCity} onChange={e=>set('permCity',e.target.value)}/>
+          </Field>
+          <Field label="District">
+            <Inp placeholder="Lahore" value={data.permDistrict} onChange={e=>set('permDistrict',e.target.value)}/>
+          </Field>
+          <Field label="Province">
+            <Sel value={data.permProvince} onChange={e=>set('permProvince',e.target.value)}>
+              <option value="">Select…</option>
+              {['Punjab','Sindh','KPK','Balochistan','AJK','GB','ICT'].map(p=><option key={p} value={p}>{p}</option>)}
+            </Sel>
+          </Field>
+        </div>
+      </div>
+
+      {/* Current address */}
+      <div className="form-section">
+        <SectionHead icon="map" iconBg="var(--slate-100)" iconColor="var(--slate-600)" title="Current Address"/>
+        <div style={{marginBottom:14}}>
+          <Switch
+            on={data.sameAsPerm}
+            onToggle={()=>set('sameAsPerm',!data.sameAsPerm)}
+            title="Same as permanent address"
+            sub="Current residence matches permanent address"
+          />
+        </div>
+        {!data.sameAsPerm && (
+          <>
+            <div className="field-group g1">
+              <Field label="Street Address">
+                <Inp placeholder="House #, Street, Area" value={data.currAddress} onChange={e=>set('currAddress',e.target.value)}/>
+              </Field>
+            </div>
+            <div className="field-group g2" style={{marginTop:14}}>
+              <Field label="City"><Inp placeholder="Lahore" value={data.currCity} onChange={e=>set('currCity',e.target.value)}/></Field>
+              <div/>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Contact info */}
+      <div className="form-section">
+        <SectionHead icon="user" iconBg="var(--emerald-50)" iconColor="var(--emerald-600)" title="Contact Information"/>
+        <div className="field-group g3">
+          <Field label="Mobile Number" req error={errors.phone}>
+            <Inp mono placeholder="+92 3XX XXXXXXX" value={data.phone} onChange={e=>set('phone',e.target.value)} error={!!errors.phone}/>
+          </Field>
+          <Field label="Alternate Phone" hint="Optional">
+            <Inp mono placeholder="+92 3XX XXXXXXX" value={data.altPhone} onChange={e=>set('altPhone',e.target.value)}/>
+          </Field>
+          <Field label="Email" hint="Optional">
+            <Inp placeholder="email@example.com" value={data.email} onChange={e=>set('email',e.target.value)}/>
+          </Field>
+        </div>
+      </div>
+
+      {/* Emergency contact */}
+      <div className="form-section">
+        <SectionHead icon="alert" iconBg="var(--danger-50)" iconColor="var(--danger-600)" title="Emergency Contact" sub="Mandatory"/>
+        <div className="field-group g3">
+          <Field label="Contact Name" req error={errors.emgName}>
+            <Inp placeholder="Full name" value={data.emgName} onChange={e=>set('emgName',e.target.value)} error={!!errors.emgName}/>
+          </Field>
+          <Field label="Relationship">
+            <Sel value={data.emgRelation} onChange={e=>set('emgRelation',e.target.value)}>
+              <option value="">Select…</option>
+              {['Father','Mother','Spouse','Brother','Sister','Son','Daughter','Other'].map(r=><option key={r} value={r}>{r}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Phone" req error={errors.emgPhone}>
+            <Inp mono placeholder="+92 3XX XXXXXXX" value={data.emgPhone} onChange={e=>set('emgPhone',e.target.value)} error={!!errors.emgPhone}/>
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 4: Bank & Finance ────────────────────────────────────
+function Step4Bank({data, set, errors}) {
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 4 of 6</div>
+        <div className="step-header-title">Bank & Finance</div>
+        <div className="step-header-sub">Bank account details are used for salary transfers. IBAN is required for all bank transfer methods.</div>
+      </div>
+
+      {/* Payment method */}
+      <div className="form-section">
+        <SectionHead icon="dollar" iconBg="var(--success-50)" iconColor="var(--success-600)" title="Payment Method"/>
+        <div className="radio-group" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+          {[
+            {val:'BANK',title:'Bank Transfer',sub:'Directly to account — IBAN required'},
+            {val:'CASH',title:'Cash in Hand',sub:'Collected at regional office'},
+            {val:'CHEQUE',title:'Cheque',sub:'Drawn against company account'},
+          ].map(m=>(
+            <div key={m.val} className={`radio-card${data.paymentMethod===m.val?' sel':''}`} onClick={()=>set('paymentMethod',m.val)}>
+              <div className={`radio-dot${data.paymentMethod===m.val?' sel':''}`}/>
+              <div><div className="radio-card-title">{m.title}</div><div className="radio-card-sub">{m.sub}</div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bank account */}
+      {data.paymentMethod !== 'CASH' && (
+        <div className="form-section">
+          <SectionHead icon="file" iconBg="var(--brand-50)" iconColor="var(--brand-600)" title="Bank Account Details"/>
+          <div className="field-group g2">
+            <Field label="Bank Name" req error={errors.bankName}>
+              <Sel value={data.bankName} onChange={e=>set('bankName',e.target.value)}>
+                <option value="">Select bank…</option>
+                {['MCB Bank','HBL','UBL','ABL','Meezan Bank','Bank Al Habib','Faysal Bank','NBP','Bank Al Falah','JS Bank','Askari Bank'].map(b=><option key={b} value={b}>{b}</option>)}
+              </Sel>
+            </Field>
+            <Field label="Account Type">
+              <Sel value={data.accountType} onChange={e=>set('accountType',e.target.value)}>
+                <option value="CURRENT">Current</option>
+                <option value="SAVINGS">Savings</option>
+              </Sel>
+            </Field>
+            <Field label="Account Number" req error={errors.accountNo}>
+              <Inp mono placeholder="0012345678901" value={data.accountNo} onChange={e=>set('accountNo',e.target.value)} error={!!errors.accountNo}/>
+            </Field>
+            <Field label="Branch Code">
+              <Inp mono placeholder="0123" value={data.branchCode} onChange={e=>set('branchCode',e.target.value)}/>
+            </Field>
+          </div>
+          <div className="field-group g1" style={{marginTop:14}}>
+            <Field label="IBAN" hint="PK format: PK84XXXX0000010012345678901">
+              <Inp mono placeholder="PK84MUCB0000010012345678901" value={data.iban} onChange={e=>set('iban',e.target.value)}/>
+            </Field>
+          </div>
+          <div style={{marginTop:12,padding:'10px 14px',background:'var(--warning-50)',border:'1px solid #fde68a',borderRadius:'var(--radius-sm)',fontSize:'var(--text-12)',color:'var(--warning-700)',display:'flex',gap:8,alignItems:'flex-start'}}>
+            <Ico n="alert" s={14} c="var(--warning-600)"/>
+            Account details will be verified against CNIC before the first salary transfer. Mismatches will hold the payment.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 5: Documents ─────────────────────────────────────────
+function Step5Documents({data, set}) {
+  const docs = [
+    {key:'cnicCopy',   label:'CNIC Copy',           req:true},
+    {key:'photo',      label:'Passport Photo',      req:true},
+    {key:'policeCert', label:'Police Certificate',  req:true},
+    {key:'medicalCert',label:'Medical Certificate', req:false},
+    {key:'characterCert',label:'Character Cert.',  req:false},
+    {key:'exServiceCert',label:'Ex-Service Cert.',  req:false},
+    {key:'educationCert',label:'Education Cert.',  req:false},
+    {key:'nokForm',    label:'NOK Form',            req:false},
+  ];
+  const reqMissing = docs.filter(d=>d.req && !data[d.key]).length;
+
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 5 of 6</div>
+        <div className="step-header-title">Documents</div>
+        <div className="step-header-sub">Upload or mark as pending. Required documents must be uploaded before the guard can be activated. Optional documents can be added later via the Attachments tab.</div>
+      </div>
+
+      {reqMissing > 0 && (
+        <div className="age-warning" style={{marginBottom:20}}>
+          <Ico n="alert" s={16} c="var(--warning-600)"/>
+          <div><strong>{reqMissing} required document{reqMissing>1?'s':''} missing.</strong> The guard will be created in PENDING status until all required documents are uploaded and verified.</div>
+        </div>
+      )}
+
+      <div className="doc-grid">
+        {docs.map(doc=>(
+          <div
+            key={doc.key}
+            className={`doc-card${data[doc.key]?' uploaded':doc.req?' required-missing':''}`}
+            onClick={()=>set(prev=>({...prev,[doc.key]:!prev[doc.key]}))}
+          >
+            <div className="doc-icon" style={{background:data[doc.key]?'var(--success-50)':'var(--bg-subtle)'}}>
+              {data[doc.key]
+                ? <Ico n="check" s={18} c="var(--success-600)"/>
+                : <Ico n="upload" s={18} c="var(--text-muted)"/>}
+            </div>
+            <div className="doc-name">{doc.label}</div>
+            {doc.req ? <div className="doc-req">Required</div> : <div className="doc-opt">Optional</div>}
+            {data[doc.key]
+              ? <div className="doc-status"><Ico n="check" s={10} c="var(--success-600)"/>Uploaded</div>
+              : <div style={{fontSize:10,color:'var(--text-muted)'}}>Click to mark uploaded</div>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{marginTop:20,padding:'12px 16px',background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)',fontSize:'var(--text-12)',color:'var(--text-muted)',lineHeight:1.6}}>
+        <strong style={{color:'var(--text-secondary)'}}>Note:</strong> In production, clicking a document card opens a file picker. Documents are stored encrypted and linked to the guard's profile. All uploads are logged in the Audit trail.
+      </div>
+    </div>
+  );
+}
+
+// ── Step 6: Review & Submit ───────────────────────────────────
+function Step6Review({personal, service, address, bank, documents, age}) {
+  const reqDocs = ['cnicCopy','photo','policeCert'];
+  const missingReq = reqDocs.filter(k=>!documents[k]);
+
+  return (
+    <div>
+      <div className="step-header">
+        <div className="step-header-eyebrow">Step 6 of 6</div>
+        <div className="step-header-title">Review & Submit</div>
+        <div className="step-header-sub">Check all details carefully. Once submitted, the guard profile will be created in <strong>PENDING</strong> status and queued for manager review.</div>
+      </div>
+
+      {/* Warnings */}
+      {(missingReq.length > 0 || (age && (age<18||age>45))) && (
+        <div style={{marginBottom:20,display:'flex',flexDirection:'column',gap:10}}>
+          {age && (age<18||age>45) && (
+            <div className="age-warning">
+              <Ico n="alert" s={16} c="var(--warning-600)"/>
+              <span>Guard age <strong>{age}</strong> requires manager approval — profile will be created in PENDING status.</span>
+            </div>
+          )}
+          {missingReq.length > 0 && (
+            <div className="age-warning">
+              <Ico n="alert" s={16} c="var(--warning-600)"/>
+              <span><strong>{missingReq.length} required document{missingReq.length>1?'s':''} not uploaded.</strong> Guard will remain in PENDING until documents are verified.</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Personal */}
+      <div className="review-section">
+        <div className="review-section-head">
+          <div className="review-section-title">Personal Information</div>
+          <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-12)',padding:'4px 10px',color:'var(--brand-600)'}}><Ico n="edit" s={13}/> Edit</button>
+        </div>
+        <div className="review-grid">
+          {[
+            ['Full Name', personal.fullName||'—'],
+            ['Father Name', personal.fatherName||'—'],
+            ['CNIC', personal.cnic||'—'],
+            ['Date of Birth', personal.dob||'—'],
+            ['Age', age ? `${age} years${age<18||age>45?' ⚠':''}` : '—'],
+            ['Gender', personal.gender||'—'],
+            ['Marital Status', personal.marital||'—'],
+            ['Religion', personal.religion||'—'],
+            ['Blood Group', personal.bloodGroup||'—'],
+            ['Height', personal.height||'—'],
+            ['Weight', personal.weight ? `${personal.weight} kg` : '—'],
+            ['Identification Mark', personal.identMark||'—'],
+            ...(personal.isExService ? [
+              ['Ex-Service', personal.serviceType],
+              ['Rank', personal.rank||'—'],
+              ['Regiment', personal.regiment||'—'],
+            ] : [['Ex-Service', 'No']]),
+          ].map(([l,v])=>(
+            <div key={l} className="review-field">
+              <div className="review-label">{l}</div>
+              <div className="review-val" style={{fontFamily:['CNIC'].includes(l)?'var(--font-mono)':undefined,color:v.includes&&v.includes('⚠')?'var(--warning-600)':undefined}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Service */}
+      <div className="review-section">
+        <div className="review-section-head">
+          <div className="review-section-title">Service Details</div>
+          <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-12)',padding:'4px 10px',color:'var(--brand-600)'}}><Ico n="edit" s={13}/> Edit</button>
+        </div>
+        <div className="review-grid">
+          {[
+            ['Designation', service.designation],
+            ['Shift', service.shift],
+            ['Region', service.region||'—'],
+            ['Office', service.office||'—'],
+            ['Joining Date', service.joiningDate],
+            ['Basic Salary', service.salary ? `₨ ${Number(service.salary.replace(/,/g,'')).toLocaleString()}` : '—'],
+            ['Reserve %', `${service.reservePct}%`],
+            ['Est. Net Salary', service.salary ? `₨ ${Math.round(Number(service.salary.replace(/,/g,'')) * (1-service.reservePct/100)).toLocaleString()}` : '—'],
+          ].map(([l,v])=>(
+            <div key={l} className="review-field">
+              <div className="review-label">{l}</div>
+              <div className="review-val" style={{fontFamily:['Basic Salary','Est. Net Salary'].includes(l)?'var(--font-mono)':undefined}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Contact */}
+      <div className="review-section">
+        <div className="review-section-head">
+          <div className="review-section-title">Address & Contact</div>
+          <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-12)',padding:'4px 10px',color:'var(--brand-600)'}}><Ico n="edit" s={13}/> Edit</button>
+        </div>
+        <div className="review-grid">
+          {[
+            ['Perm. Address', address.permAddress||'—'],
+            ['City', address.permCity||'—'],
+            ['Province', address.permProvince||'—'],
+            ['Mobile', address.phone||'—'],
+            ['Emergency Contact', address.emgName||'—'],
+            ['Emg. Phone', address.emgPhone||'—'],
+          ].map(([l,v])=>(
+            <div key={l} className="review-field">
+              <div className="review-label">{l}</div>
+              <div className="review-val">{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Documents checklist */}
+      <div className="review-section">
+        <div className="review-section-head">
+          <div className="review-section-title">Documents</div>
+          <button className="tb-btn tb-ghost" style={{fontSize:'var(--text-12)',padding:'4px 10px',color:'var(--brand-600)'}}><Ico n="edit" s={13}/> Edit</button>
+        </div>
+        <div style={{padding:'14px 18px',display:'flex',gap:10,flexWrap:'wrap'}}>
+          {[
+            ['cnicCopy','CNIC Copy',true],['photo','Photo',true],['policeCert','Police Cert.',true],
+            ['medicalCert','Medical Cert.',false],['characterCert','Character Cert.',false],
+            ['exServiceCert','Ex-Service Cert.',false],['educationCert','Education Cert.',false],
+            ['nokForm','NOK Form',false],
+          ].map(([k,label,req])=>(
+            <span key={k} style={{
+              display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',
+              borderRadius:'var(--radius-full)',fontSize:'var(--text-12)',fontWeight:600,
+              background:documents[k]?'var(--success-50)':req?'var(--danger-50)':'var(--slate-100)',
+              color:documents[k]?'var(--success-700)':req?'var(--danger-700)':'var(--slate-500)',
+            }}>
+              {documents[k] ? <Ico n="check" s={11} c="var(--success-600)"/> : '—'} {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Submit info */}
+      <div style={{padding:'16px 18px',background:'var(--brand-50)',border:'1px solid var(--brand-200)',borderRadius:'var(--radius-md)',fontSize:'var(--text-13)',color:'var(--brand-700)',lineHeight:1.6}}>
+        <strong>After submission:</strong> Guard profile is created with Parwest ID in format <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)'}}>{(service.region||'XXX').slice(0,3).toUpperCase()}-XXXXX</span>. A notification is sent to your Regional Admin for review. The guard will remain in <strong>PENDING</strong> until approved and activated.
+      </div>
+    </div>
+  );
+}
+
+// ── Success ───────────────────────────────────────────────────
+function SuccessScreen({name}) {
+  return (
+    <div className="shell" style={{justifyContent:'center',alignItems:'center',background:'var(--bg-page)'}}>
+      <div className="success-screen">
+        <div className="success-mark">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--success-600)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div style={{fontSize:'var(--text-24)',fontWeight:800,color:'var(--text-primary)',marginBottom:8,letterSpacing:'-0.3px'}}>Guard Profile Created</div>
+        <div style={{fontSize:'var(--text-14)',color:'var(--text-muted)',marginBottom:8}}>{name}</div>
+        <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-13)',color:'var(--brand-600)',background:'var(--brand-50)',padding:'6px 16px',borderRadius:'var(--radius-full)',marginBottom:28}}>LHR-01248</div>
+        <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',marginBottom:28,maxWidth:360,lineHeight:1.6}}>The profile has been created in <strong>PENDING</strong> status. Your Regional Admin has been notified for review and activation.</div>
+        <div style={{display:'flex',gap:12}}>
+          <button className="tb-btn tb-secondary" onClick={()=>window.location.reload()}>Create Another</button>
+          <button className="tb-btn tb-primary">View Profile →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

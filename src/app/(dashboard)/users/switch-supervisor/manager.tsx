@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import ActionButton from "@/components/ui/action-button"
-import SectionTitle from "@/components/ui/section-title"
 import StatusChip from "@/components/ui/status-chip"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -162,7 +161,12 @@ export default function SwitchSupervisorManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Switch Supervisor" subtitle="region -> reigional office -> From Supervisor -> To supervisor" />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Switch Supervisor</h2>
+          <p className="mt-1 text-sm text-muted-foreground">region -&gt; reigional office -&gt; From Supervisor -&gt; To supervisor</p>
+        </div>
+      </div>
       {notice ? <InlineAlert type="success" message={notice} /> : null}
       {error ? <InlineAlert type="error" message={error} /> : null}
 

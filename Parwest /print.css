@@ -1,0 +1,315 @@
+/*
+ * Parwest ERP — Print Stylesheet v1.1
+ * Uses print tokens from tokens-v1.1.css.
+ * Import in invoice-pdf.html and payroll-pdf.html.
+ *
+ * Rules:
+ *   - A4 portrait (210×297mm)
+ *   - Black-on-white, no shadows, no colored chip fills
+ *   - Borders + labels only for status chips
+ *   - Tabular numerics on all data columns
+ *   - Header: wordmark + region + period
+ *   - Footer: page X of Y + timestamp + disclaimer
+ */
+
+@page {
+  size: A4 portrait;
+  margin: var(--print-margin-v) var(--print-margin-h);
+}
+
+@media print {
+  /* ── Reset ── */
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html, body {
+    background: var(--print-bg) !important;
+    color: var(--print-text) !important;
+    font-family: var(--font-ui) !important;
+    font-size: var(--print-font-base) !important;
+    line-height: 1.5 !important;
+  }
+
+  /* ── Page breaks ── */
+  .page-break-before { page-break-before: always; }
+  .page-break-after  { page-break-after: always; }
+  .no-break          { page-break-inside: avoid; }
+
+  /* ── Hide UI chrome ── */
+  .no-print,
+  .topbar,
+  .sidebar,
+  nav,
+  button:not(.print-visible),
+  .filter-bar,
+  .density-toggle,
+  .tb-btn,
+  .toast-stack {
+    display: none !important;
+  }
+
+  /* ── Typography ── */
+  h1 { font-size: var(--print-font-h1); font-weight: 800; margin-bottom: 4pt; }
+  h2 { font-size: var(--print-font-h2); font-weight: 700; margin-bottom: 3pt; }
+  p  { font-size: var(--print-font-base); margin: 0 0 4pt; }
+
+  .mono, .tabnum {
+    font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-size: var(--print-font-mono) !important;
+  }
+
+  /* ── Cards / panels → plain bordered boxes ── */
+  .card,
+  .print-card {
+    background: var(--print-bg) !important;
+    border: 1pt solid var(--print-border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin-bottom: 8pt !important;
+    page-break-inside: avoid;
+  }
+
+  .card-header,
+  .print-card-header {
+    background: var(--print-header-bg) !important;
+    border-bottom: 1pt solid var(--print-border) !important;
+    padding: 4pt 8pt !important;
+    font-weight: 700;
+    font-size: var(--print-font-sm);
+    color: var(--print-text) !important;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--print-font-base);
+    page-break-inside: auto;
+  }
+
+  thead { display: table-header-group; }
+  tr    { page-break-inside: avoid; }
+
+  th {
+    background: var(--print-header-bg) !important;
+    color: var(--print-text-sub) !important;
+    border: 0.5pt solid var(--print-border) !important;
+    padding: 3pt 6pt;
+    text-align: left;
+    font-size: var(--print-font-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+  }
+
+  td {
+    border: 0.5pt solid var(--print-border) !important;
+    padding: 3pt 6pt;
+    color: var(--print-text) !important;
+    vertical-align: middle;
+  }
+
+  tr:nth-child(even) td {
+    background: #f9fafb !important;
+  }
+
+  /* ── Chips → border + label, no fill ── */
+  .chip,
+  .status-chip,
+  [class*="chip-"] {
+    background: none !important;
+    border: 0.75pt solid var(--print-chip-muted-border) !important;
+    color: var(--print-chip-muted-text) !important;
+    border-radius: 2pt !important;
+    padding: 1pt 5pt !important;
+    font-size: var(--print-font-xs) !important;
+    font-weight: 700 !important;
+  }
+
+  .chip-active,
+  [data-status="ACTIVE"],
+  [data-status="PAID"] {
+    border-color: var(--print-chip-active-border) !important;
+    color: var(--print-chip-active-text) !important;
+  }
+
+  .chip-pending,
+  .chip-locked,
+  [data-status="PENDING"],
+  [data-status="REGIONAL_LOCKED"] {
+    border-color: var(--print-chip-pending-border) !important;
+    color: var(--print-chip-pending-text) !important;
+  }
+
+  .chip-terminated,
+  .chip-hold,
+  [data-status="TERMINATED"],
+  [data-status="HOLD"] {
+    border-color: var(--print-chip-danger-border) !important;
+    color: var(--print-chip-danger-text) !important;
+  }
+
+  /* Remove chip dot in print */
+  .chip-dot { display: none !important; }
+
+  /* ── Progress bars → text percentage only ── */
+  .progress-bar { display: none !important; }
+
+  /* ── KPI cards → plain ── */
+  .kpi-card,
+  .stat-card {
+    background: none !important;
+    border: 0.5pt solid var(--print-border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Links ── */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: var(--print-font-xs);
+    color: var(--print-text-muted);
+  }
+
+  a[href^="#"]::after,
+  a[href^="javascript"]::after {
+    content: "";
+  }
+
+  /* ── Print header ── */
+  .print-header {
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 8pt;
+    margin-bottom: 8pt;
+    border-bottom: 2pt solid var(--print-text) !important;
+  }
+
+  .print-wordmark {
+    display: flex !important;
+    align-items: center;
+    gap: 8pt;
+  }
+
+  .print-mark {
+    width: 24pt;
+    height: 24pt;
+    background: var(--print-text) !important;
+    color: var(--print-bg) !important;
+    border-radius: 4pt;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 12pt;
+  }
+
+  .print-company {
+    font-size: 14pt;
+    font-weight: 800;
+    color: var(--print-text) !important;
+    letter-spacing: -0.3pt;
+  }
+
+  .print-company-sub {
+    font-size: 7pt;
+    color: var(--print-text-muted) !important;
+    margin-top: 1pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+  }
+
+  .print-meta {
+    text-align: right;
+    font-size: var(--print-font-sm);
+  }
+
+  .print-meta-row {
+    display: flex;
+    gap: 6pt;
+    justify-content: flex-end;
+    margin-bottom: 1pt;
+  }
+
+  .print-meta-label {
+    color: var(--print-text-muted);
+  }
+
+  .print-meta-value {
+    color: var(--print-text);
+    font-weight: 600;
+  }
+
+  /* ── Print footer ── */
+  @page {
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: var(--font-ui);
+      font-size: 7pt;
+      color: var(--print-text-muted);
+    }
+    @bottom-left {
+      content: "Computer-generated document. No signature required.";
+      font-family: var(--font-ui);
+      font-size: 7pt;
+      color: var(--print-text-muted);
+    }
+    @bottom-right {
+      content: "Printed: " attr(data-timestamp);
+      font-family: var(--font-ui);
+      font-size: 7pt;
+      color: var(--print-text-muted);
+    }
+  }
+
+  .print-footer {
+    border-top: 0.5pt solid var(--print-border);
+    padding-top: 4pt;
+    margin-top: 12pt;
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--print-font-xs);
+    color: var(--print-text-muted);
+  }
+
+  /* ── Amounts / totals ── */
+  .print-total-row td {
+    font-weight: 700 !important;
+    border-top: 1.5pt solid var(--print-text) !important;
+    background: none !important;
+  }
+
+  .print-subtotal-row td {
+    font-weight: 600 !important;
+    border-top: 0.5pt solid var(--print-border) !important;
+  }
+}
+
+/* ── Screen preview (when not printing) ── */
+@media screen {
+  body.print-preview {
+    background: #e5e7eb;
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .print-page {
+    background: white;
+    width: 210mm;
+    min-height: 297mm;
+    padding: var(--print-margin-v) var(--print-margin-h);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    border-radius: 2px;
+    font-family: var(--font-ui);
+    font-size: var(--print-font-base);
+    color: var(--print-text);
+    line-height: 1.5;
+  }
+}

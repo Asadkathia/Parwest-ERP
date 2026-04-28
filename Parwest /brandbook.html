@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — Brandbook</title>
+<link rel="stylesheet" href="tokens.css"/>
+<style>
+body{background:#f1f4f9;color:var(--text-primary);font-family:var(--font-ui);margin:0;}
+.page{max-width:1160px;margin:0 auto;padding:60px 40px;}
+
+/* ── Section headers ── */
+.section{margin-bottom:72px;}
+.section-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--brand-600);margin-bottom:10px;}
+.section-title{font-size:var(--text-32);font-weight:800;color:var(--slate-900);letter-spacing:-0.5px;margin-bottom:6px;line-height:1.15;}
+.section-sub{font-size:var(--text-16);color:var(--slate-500);line-height:1.6;max-width:560px;margin-bottom:36px;}
+.divider{height:1px;background:var(--slate-200);margin-bottom:36px;}
+
+/* ── Cover ── */
+.cover{background:var(--sidebar-bg);border-radius:var(--radius-xl);padding:80px;margin-bottom:72px;display:grid;grid-template-columns:1fr auto;gap:40px;align-items:end;}
+.cover-wordmark{font-size:56px;font-weight:900;color:#fff;letter-spacing:-2px;line-height:1;}
+.cover-wordmark span{color:var(--brand-400);}
+.cover-sub{font-size:var(--text-16);color:rgba(226,232,240,0.55);margin-top:12px;line-height:1.6;max-width:480px;}
+.cover-meta{text-align:right;}
+.cover-meta .label{font-size:var(--text-11);color:rgba(226,232,240,0.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.cover-meta .value{font-size:var(--text-13);color:rgba(226,232,240,0.6);}
+
+/* ── Logo section ── */
+.logo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.logo-card{border-radius:var(--radius-md);padding:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;border:1px solid var(--slate-200);}
+.logo-card.dark{background:var(--sidebar-bg);border-color:transparent;}
+.logo-card.light{background:#fff;}
+.logo-card.brand{background:var(--brand-600);border-color:transparent;}
+.logo-label{font-size:var(--text-11);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:8px;}
+.logo-dark .logo-label{color:rgba(226,232,240,0.4);}
+
+/* Wordmark lockup */
+.wordmark{display:flex;align-items:center;gap:14px;}
+.wm-mark{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;letter-spacing:-1px;}
+.wm-mark-dark{background:var(--brand-600);color:#fff;}
+.wm-mark-light{background:#fff;color:var(--brand-600);}
+.wm-mark-white{background:rgba(255,255,255,0.15);color:#fff;}
+.wm-text{font-size:22px;font-weight:800;letter-spacing:-0.5px;}
+.wm-text-dark{color:#fff;}
+.wm-text-light{color:var(--slate-900);}
+.wm-sub{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-top:1px;}
+.wm-sub-dark{color:rgba(226,232,240,0.45);}
+.wm-sub-light{color:var(--slate-400);}
+
+/* Shield icon mark */
+.shield-mark{position:relative;}
+.shield-mark svg{display:block;}
+
+/* ── Color swatches ── */
+.swatch-row{display:flex;gap:0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:12px;}
+.swatch{flex:1;height:64px;display:flex;flex-direction:column;justify-content:flex-end;padding:8px 10px;cursor:default;transition:transform var(--duration-fast);}
+.swatch:hover{transform:scaleY(1.06);z-index:1;}
+.swatch-val{font-size:10px;font-weight:700;font-family:var(--font-mono);opacity:0.8;}
+.swatch-step{font-size:9px;font-weight:600;opacity:0.5;margin-bottom:1px;font-family:var(--font-mono);}
+.semantic-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.sem-card{border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--slate-200);}
+.sem-top{height:72px;}
+.sem-body{padding:12px 14px;background:#fff;}
+.sem-name{font-size:var(--text-13);font-weight:700;color:var(--text-primary);}
+.sem-hex{font-size:var(--text-11);font-family:var(--font-mono);color:var(--text-muted);margin-top:2px;}
+.sem-row{display:flex;gap:6px;margin-top:8px;}
+.sem-chip{width:24px;height:24px;border-radius:4px;}
+
+/* ── Type specimens ── */
+.type-specimen{margin-bottom:28px;padding:24px;background:#fff;border-radius:var(--radius-md);border:1px solid var(--slate-200);}
+.type-meta{display:flex;gap:24px;margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100);}
+.type-meta-item{font-size:var(--text-11);color:var(--text-muted);font-family:var(--font-mono);}
+.type-meta-item strong{color:var(--text-secondary);font-weight:600;}
+.type-scale-row{display:flex;align-items:baseline;gap:24px;padding:12px 0;border-bottom:1px solid var(--slate-100);}
+.type-scale-row:last-child{border-bottom:none;}
+.type-scale-label{font-size:10px;font-family:var(--font-mono);color:var(--text-muted);width:80px;flex-shrink:0;}
+.type-scale-sample{color:var(--text-primary);line-height:1.2;}
+
+/* ── Spacing ruler ── */
+.spacing-grid{display:flex;flex-direction:column;gap:0;}
+.spacing-row{display:flex;align-items:center;gap:20px;padding:10px 0;border-bottom:1px solid var(--slate-100);}
+.spacing-row:last-child{border-bottom:none;}
+.spacing-label{font-size:var(--text-11);font-family:var(--font-mono);color:var(--text-muted);width:120px;flex-shrink:0;}
+.spacing-bar-wrap{flex:1;}
+.spacing-bar{background:var(--brand-100);border-radius:2px;display:flex;align-items:center;padding:0 8px;}
+.spacing-bar-inner{background:var(--brand-600);height:20px;border-radius:2px;}
+.spacing-val{font-size:var(--text-11);font-family:var(--font-mono);color:var(--brand-700);margin-left:10px;white-space:nowrap;}
+
+/* ── Radius scale ── */
+.radius-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
+.radius-card{background:#fff;border:1px solid var(--slate-200);padding:24px;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.radius-box{width:64px;height:64px;background:var(--brand-100);border:2px solid var(--brand-600);}
+.radius-name{font-size:var(--text-12);font-weight:700;color:var(--text-primary);}
+.radius-val{font-size:var(--text-11);font-family:var(--font-mono);color:var(--text-muted);}
+.radius-token{font-size:10px;font-family:var(--font-mono);color:var(--brand-600);}
+
+/* ── Shadow scale ── */
+.shadow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+.shadow-card{background:#fff;border-radius:var(--radius-md);padding:28px 24px;display:flex;flex-direction:column;gap:12px;}
+.shadow-box{width:100%;height:56px;background:#fff;border-radius:var(--radius-sm);border:1px solid var(--slate-100);}
+.shadow-name{font-size:var(--text-13);font-weight:700;color:var(--text-primary);}
+.shadow-val{font-size:10px;font-family:var(--font-mono);color:var(--text-muted);line-height:1.6;}
+
+/* ── Motion ── */
+.motion-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.motion-card{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:20px;}
+.motion-demo{height:48px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+.motion-ball{width:16px;height:16px;border-radius:50%;background:var(--brand-600);}
+.motion-name{font-size:var(--text-13);font-weight:700;color:var(--text-primary);}
+.motion-val{font-size:var(--text-11);font-family:var(--font-mono);color:var(--text-muted);margin-top:4px;}
+.motion-use{font-size:var(--text-12);color:var(--text-muted);margin-top:8px;line-height:1.5;}
+
+/* ── Viz palette ── */
+.viz-row{display:flex;gap:12px;flex-wrap:wrap;}
+.viz-chip{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.viz-swatch{width:48px;height:48px;border-radius:var(--radius-sm);}
+.viz-label{font-size:10px;font-family:var(--font-mono);color:var(--text-muted);}
+
+/* ── Voice & tone ── */
+.voice-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.voice-card{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:20px 24px;}
+.voice-card-title{font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.voice-row{padding:10px 0;border-bottom:1px solid var(--slate-100);font-size:var(--text-13);color:var(--text-secondary);line-height:1.5;}
+.voice-row:last-child{border-bottom:none;}
+.do-dont-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;}
+.do-card{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);overflow:hidden;}
+.do-card-header{padding:10px 16px;font-size:var(--text-12);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;}
+.do-card-header.do{background:var(--success-50);color:var(--success-700);}
+.do-card-header.dont{background:var(--danger-50);color:var(--danger-700);}
+.do-item{padding:10px 16px;border-top:1px solid var(--slate-100);font-size:var(--text-13);color:var(--text-primary);display:flex;gap:8px;align-items:flex-start;}
+.do-item::before{content:'✓';color:var(--success-600);font-weight:700;flex-shrink:0;}
+.dont-item{padding:10px 16px;border-top:1px solid var(--slate-100);font-size:var(--text-13);color:var(--text-primary);display:flex;gap:8px;align-items:flex-start;}
+.dont-item::before{content:'✕';color:var(--danger-600);font-weight:700;flex-shrink:0;}
+
+/* ── Accessibility ── */
+.a11y-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.a11y-card{border-radius:var(--radius-md);padding:16px 18px;border:1px solid var(--slate-200);}
+.a11y-ratio{font-size:var(--text-24);font-weight:800;font-family:var(--font-mono);margin-bottom:4px;}
+.a11y-label{font-size:var(--text-12);color:var(--text-muted);}
+.a11y-pass{display:inline-flex;align-items:center;gap:4px;font-size:var(--text-11);font-weight:700;padding:2px 8px;border-radius:var(--radius-full);margin-top:6px;}
+.a11y-pass.aa{background:var(--success-50);color:var(--success-700);}
+.a11y-pass.aaa{background:var(--brand-50);color:var(--brand-700);}
+
+/* ── Sidebar specimen ── */
+.sidebar-spec{background:var(--sidebar-bg);border-radius:var(--radius-md);padding:20px;width:240px;}
+.spec-token-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);}
+.spec-token-row:last-child{border-bottom:none;}
+.spec-swatch{width:20px;height:20px;border-radius:4px;flex-shrink:0;}
+.spec-token{font-size:10px;font-family:var(--font-mono);color:rgba(226,232,240,0.5);flex:1;}
+.spec-val{font-size:10px;font-family:var(--font-mono);color:rgba(226,232,240,0.3);}
+
+/* Animation for motion cards */
+@keyframes slide-across{0%{transform:translateX(-40px);opacity:0}50%{opacity:1}100%{transform:translateX(40px);opacity:0}}
+.motion-card:hover .motion-ball{animation:slide-across 1s var(--ease-standard) infinite;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Cover -->
+  <div class="cover">
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--brand-400);margin-bottom:16px;">Brand Reference Document</div>
+      <div class="cover-wordmark">Par<span>west</span><br/>ERP</div>
+      <div class="cover-sub">Design language, visual identity, component tokens, and writing principles for the Parwest guard force management platform.</div>
+    </div>
+    <div class="cover-meta">
+      <div class="label">Version</div><div class="value" style="margin-bottom:16px;">1.0 — April 2026</div>
+      <div class="label">Industry</div><div class="value" style="margin-bottom:16px;">Private Security / Pakistan</div>
+      <div class="label">Aesthetic</div><div class="value" style="margin-bottom:16px;">Technical Precision</div>
+      <div class="label">Primary Font</div><div class="value">IBM Plex Sans</div>
+    </div>
+  </div>
+
+  <!-- 1. LOGO -->
+  <div class="section">
+    <div class="section-eyebrow">01 — Identity</div>
+    <div class="section-title">Logo & Lockups</div>
+    <div class="section-sub">The Parwest wordmark pairs a shield icon-mark with a two-weight logotype. The icon mark is a rounded shield — referencing the security industry — with a bold "P" counter. Always use the approved lockup; never recreate the mark from scratch.</div>
+    <div class="logo-grid">
+
+      <!-- Dark background lockup -->
+      <div class="logo-card dark">
+        <div class="wordmark">
+          <div class="wm-mark wm-mark-dark">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="white"/><text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="9" fill="#2f5bff">P</text></svg>
+          </div>
+          <div>
+            <div class="wm-text wm-text-dark">Parwest</div>
+            <div class="wm-sub wm-sub-dark">ERP Platform</div>
+          </div>
+        </div>
+        <div class="logo-label" style="color:rgba(226,232,240,0.3)">On Dark — Primary</div>
+      </div>
+
+      <!-- Light background lockup -->
+      <div class="logo-card light">
+        <div class="wordmark">
+          <div class="wm-mark wm-mark-dark">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="#2f5bff"/><text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="9" fill="white">P</text></svg>
+          </div>
+          <div>
+            <div class="wm-text wm-text-light">Parwest</div>
+            <div class="wm-sub wm-sub-light">ERP Platform</div>
+          </div>
+        </div>
+        <div class="logo-label">On Light — Primary</div>
+      </div>
+
+      <!-- Brand color lockup -->
+      <div class="logo-card brand">
+        <div class="wordmark">
+          <div class="wm-mark" style="background:rgba(255,255,255,0.15);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="white"/><text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="9" fill="#2f5bff">P</text></svg>
+          </div>
+          <div>
+            <div class="wm-text" style="color:#fff;">Parwest</div>
+            <div class="wm-sub" style="color:rgba(255,255,255,0.55);">ERP Platform</div>
+          </div>
+        </div>
+        <div class="logo-label" style="color:rgba(255,255,255,0.4)">On Brand — Cobalt</div>
+      </div>
+
+      <!-- Icon mark only — dark -->
+      <div class="logo-card dark" style="min-height:140px;">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="#2f5bff"/>
+          <text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="8" fill="white">P</text>
+        </svg>
+        <div class="logo-label" style="color:rgba(226,232,240,0.3)">Icon Mark — Dark</div>
+      </div>
+
+      <!-- Icon mark only — light -->
+      <div class="logo-card light" style="min-height:140px;">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="#2f5bff"/>
+          <text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="8" fill="white">P</text>
+        </svg>
+        <div class="logo-label">Icon Mark — Light</div>
+      </div>
+
+      <!-- Monochrome -->
+      <div class="logo-card light" style="min-height:140px;background:var(--slate-100);">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z" fill="#334155"/>
+          <text x="12" y="15.5" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-weight="900" font-size="8" fill="white">P</text>
+        </svg>
+        <div class="logo-label">Icon Mark — Mono</div>
+      </div>
+    </div>
+
+    <!-- Clear space note -->
+    <div style="margin-top:16px;padding:14px 18px;background:var(--warning-50);border:1px solid var(--warning-100);border-radius:var(--radius-sm);font-size:var(--text-13);color:var(--warning-700);">
+      <strong>Clear space rule:</strong> Maintain a minimum clear space equal to the height of the "P" letterform on all sides of the logo lockup. Never stretch, rotate, recolor, or add effects to the mark.
+    </div>
+  </div>
+
+  <!-- 2. COLORS -->
+  <div class="section">
+    <div class="section-eyebrow">02 — Color</div>
+    <div class="section-title">Color System</div>
+    <div class="section-sub">All colors are defined as CSS custom properties in <code style="font-family:var(--font-mono);font-size:13px;background:var(--slate-100);padding:1px 6px;border-radius:4px;">tokens.css</code>. No hardcoded hex values appear anywhere outside the token file.</div>
+
+    <!-- Brand ramp -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:10px;">Brand — Cobalt Blue</div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#eef2ff;"><span class="swatch-step" style="color:#334155">50</span><span class="swatch-val" style="color:#334155">#eef2ff</span></div>
+        <div class="swatch" style="background:#e0e7ff;"><span class="swatch-step" style="color:#334155">100</span><span class="swatch-val" style="color:#334155">#e0e7ff</span></div>
+        <div class="swatch" style="background:#c7d2fe;"><span class="swatch-step" style="color:#334155">200</span><span class="swatch-val" style="color:#334155">#c7d2fe</span></div>
+        <div class="swatch" style="background:#a5b4fc;"><span class="swatch-step" style="color:#334155">300</span><span class="swatch-val" style="color:#334155">#a5b4fc</span></div>
+        <div class="swatch" style="background:#818cf8;"><span class="swatch-step" style="color:#fff">400</span><span class="swatch-val" style="color:#fff">#818cf8</span></div>
+        <div class="swatch" style="background:#4f6ef7;"><span class="swatch-step" style="color:#fff">500</span><span class="swatch-val" style="color:#fff">#4f6ef7</span></div>
+        <div class="swatch" style="background:#2f5bff;position:relative;"><div style="position:absolute;top:6px;right:8px;background:#fff;color:#2f5bff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;">PRIMARY</div><span class="swatch-step" style="color:#fff">600</span><span class="swatch-val" style="color:#fff">#2f5bff</span></div>
+        <div class="swatch" style="background:#2649d4;"><span class="swatch-step" style="color:#fff">700</span><span class="swatch-val" style="color:#fff">#2649d4</span></div>
+        <div class="swatch" style="background:#1e3aa8;"><span class="swatch-step" style="color:#fff">800</span><span class="swatch-val" style="color:#fff">#1e3aa8</span></div>
+        <div class="swatch" style="background:#172d82;"><span class="swatch-step" style="color:#fff">900</span><span class="swatch-val" style="color:#fff">#172d82</span></div>
+      </div>
+    </div>
+
+    <!-- Neutral ramp -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:10px;">Neutral — Slate (12-step)</div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#ffffff;border:1px solid #e2e8f0;"><span class="swatch-step" style="color:#94a3b8">0</span><span class="swatch-val" style="color:#94a3b8">#ffffff</span></div>
+        <div class="swatch" style="background:#f8fafc;"><span class="swatch-step" style="color:#94a3b8">50</span><span class="swatch-val" style="color:#94a3b8">#f8fafc</span></div>
+        <div class="swatch" style="background:#f1f5f9;"><span class="swatch-step" style="color:#94a3b8">100</span><span class="swatch-val" style="color:#94a3b8">#f1f5f9</span></div>
+        <div class="swatch" style="background:#e2e8f0;"><span class="swatch-step" style="color:#475569">200</span><span class="swatch-val" style="color:#475569">#e2e8f0</span></div>
+        <div class="swatch" style="background:#cbd5e1;"><span class="swatch-step" style="color:#334155">300</span><span class="swatch-val" style="color:#334155">#cbd5e1</span></div>
+        <div class="swatch" style="background:#94a3b8;"><span class="swatch-step" style="color:#fff">400</span><span class="swatch-val" style="color:#fff">#94a3b8</span></div>
+        <div class="swatch" style="background:#64748b;"><span class="swatch-step" style="color:#fff">500</span><span class="swatch-val" style="color:#fff">#64748b</span></div>
+        <div class="swatch" style="background:#475569;"><span class="swatch-step" style="color:#fff">600</span><span class="swatch-val" style="color:#fff">#475569</span></div>
+        <div class="swatch" style="background:#334155;"><span class="swatch-step" style="color:#fff">700</span><span class="swatch-val" style="color:#fff">#334155</span></div>
+        <div class="swatch" style="background:#1e293b;"><span class="swatch-step" style="color:#fff">800</span><span class="swatch-val" style="color:#fff">#1e293b</span></div>
+        <div class="swatch" style="background:#0f172a;"><span class="swatch-step" style="color:#fff">900</span><span class="swatch-val" style="color:#fff">#0f172a</span></div>
+        <div class="swatch" style="background:#020617;"><span class="swatch-step" style="color:#fff">950</span><span class="swatch-val" style="color:#fff">#020617</span></div>
+      </div>
+    </div>
+
+    <!-- Semantic colors -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:12px;">Semantic Colors</div>
+      <div class="semantic-grid">
+        <div class="sem-card">
+          <div class="sem-top" style="background:linear-gradient(135deg,#f0fdf4,#22c55e);"></div>
+          <div class="sem-body">
+            <div class="sem-name">Success</div>
+            <div class="sem-hex">--success-600: #16a34a</div>
+            <div class="sem-row"><div class="sem-chip" style="background:#f0fdf4;border:1px solid #dcfce7;"></div><div class="sem-chip" style="background:#22c55e;"></div><div class="sem-chip" style="background:#16a34a;"></div><div class="sem-chip" style="background:#15803d;"></div></div>
+          </div>
+        </div>
+        <div class="sem-card">
+          <div class="sem-top" style="background:linear-gradient(135deg,#fffbeb,#f59e0b);"></div>
+          <div class="sem-body">
+            <div class="sem-name">Warning</div>
+            <div class="sem-hex">--warning-600: #d97706</div>
+            <div class="sem-row"><div class="sem-chip" style="background:#fffbeb;border:1px solid #fef3c7;"></div><div class="sem-chip" style="background:#f59e0b;"></div><div class="sem-chip" style="background:#d97706;"></div><div class="sem-chip" style="background:#b45309;"></div></div>
+          </div>
+        </div>
+        <div class="sem-card">
+          <div class="sem-top" style="background:linear-gradient(135deg,#fef2f2,#ef4444);"></div>
+          <div class="sem-body">
+            <div class="sem-name">Danger</div>
+            <div class="sem-hex">--danger-600: #dc2626</div>
+            <div class="sem-row"><div class="sem-chip" style="background:#fef2f2;border:1px solid #fee2e2;"></div><div class="sem-chip" style="background:#ef4444;"></div><div class="sem-chip" style="background:#dc2626;"></div><div class="sem-chip" style="background:#b91c1c;"></div></div>
+          </div>
+        </div>
+        <div class="sem-card">
+          <div class="sem-top" style="background:linear-gradient(135deg,#eff6ff,#3b82f6);"></div>
+          <div class="sem-body">
+            <div class="sem-name">Info</div>
+            <div class="sem-hex">--info-600: #2563eb</div>
+            <div class="sem-row"><div class="sem-chip" style="background:#eff6ff;border:1px solid #dbeafe;"></div><div class="sem-chip" style="background:#3b82f6;"></div><div class="sem-chip" style="background:#2563eb;"></div><div class="sem-chip" style="background:#1d4ed8;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar tokens -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:12px;">Sidebar — Always Dark (never inherits content theme)</div>
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div class="sidebar-spec">
+          <div class="spec-token-row"><div class="spec-swatch" style="background:#0b1224;border:1px solid rgba(255,255,255,0.1);"></div><div class="spec-token">--sidebar-bg</div><div class="spec-val">#0b1224</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:#111a32;"></div><div class="spec-token">--sidebar-surface</div><div class="spec-val">#111a32</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);"></div><div class="spec-token">--sidebar-border</div><div class="spec-val">rgba(255,255,255,0.08)</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:#e2e8f0;"></div><div class="spec-token">--sidebar-text</div><div class="spec-val">#e2e8f0</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:#64748b;"></div><div class="spec-token">--sidebar-text-muted</div><div class="spec-val">#64748b</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:rgba(47,91,255,0.18);"></div><div class="spec-token">--sidebar-active-bg</div><div class="spec-val">rgba(47,91,255,.18)</div></div>
+          <div class="spec-token-row"><div class="spec-swatch" style="background:#818cf8;"></div><div class="spec-token">--sidebar-active-text</div><div class="spec-val">#818cf8</div></div>
+        </div>
+        <div style="flex:1;font-size:var(--text-13);color:var(--text-muted);line-height:1.7;padding-top:4px;">
+          <p style="margin:0 0 12px;"><strong style="color:var(--text-primary);">The sidebar is always dark.</strong> It does not respond to the content-area light/dark toggle. This is intentional — the persistent dark chrome provides a stable navigation anchor regardless of content state.</p>
+          <p style="margin:0 0 12px;">The active nav item uses a cobalt ghost background (<code style="font-family:var(--font-mono);font-size:12px;background:var(--slate-100);padding:1px 5px;border-radius:3px;">rgba(47,91,255,0.18)</code>) with the brand-400 indigo text — intentionally softer than a solid fill to avoid competing with the active page content.</p>
+          <p style="margin:0;">Hover state uses <code style="font-family:var(--font-mono);font-size:12px;background:var(--slate-100);padding:1px 5px;border-radius:3px;">rgba(255,255,255,0.06)</code> — barely perceptible, preserving the "receding chrome" feel.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data-viz palette -->
+    <div>
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:12px;">Data Visualization — 8-Color Palette (colorblind-safe)</div>
+      <div class="viz-row">
+        <div class="viz-chip"><div class="viz-swatch" style="background:#2f5bff;"></div><div class="viz-label">#2f5bff</div><div class="viz-label">Cobalt</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#10b981;"></div><div class="viz-label">#10b981</div><div class="viz-label">Emerald</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#f59e0b;"></div><div class="viz-label">#f59e0b</div><div class="viz-label">Amber</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#ef4444;"></div><div class="viz-label">#ef4444</div><div class="viz-label">Red</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#6366f1;"></div><div class="viz-label">#6366f1</div><div class="viz-label">Indigo</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#06b6d4;"></div><div class="viz-label">#06b6d4</div><div class="viz-label">Cyan</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#8b5cf6;"></div><div class="viz-label">#8b5cf6</div><div class="viz-label">Violet</div></div>
+        <div class="viz-chip"><div class="viz-swatch" style="background:#f97316;"></div><div class="viz-label">#f97316</div><div class="viz-label">Orange</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:var(--text-12);color:var(--text-muted);">Verified safe for Deuteranopia and Protanopia. Blue–orange and blue–red pairs are primary discriminating combinations; never pair red–green as the sole differentiator.</div>
+    </div>
+  </div>
+
+  <!-- 3. TYPOGRAPHY -->
+  <div class="section">
+    <div class="section-eyebrow">03 — Typography</div>
+    <div class="section-title">Type System</div>
+    <div class="section-sub">IBM Plex Sans for all UI copy. IBM Plex Mono for data — IDs, currency, timestamps, CNICs, any value that must column-align. Both families include true tabular numeral variants.</div>
+
+    <!-- Specimens -->
+    <div class="type-specimen">
+      <div style="font-size:40px;font-weight:800;color:var(--slate-900);letter-spacing:-1px;line-height:1.1;">Guard Force<br/>Command Platform</div>
+      <div class="type-meta">
+        <div class="type-meta-item"><strong>Family</strong> IBM Plex Sans</div>
+        <div class="type-meta-item"><strong>Weight</strong> 800 ExtraBold</div>
+        <div class="type-meta-item"><strong>Size</strong> 40px / 2.5rem</div>
+        <div class="type-meta-item"><strong>Leading</strong> 1.1</div>
+        <div class="type-meta-item"><strong>Tracking</strong> -1px</div>
+        <div class="type-meta-item"><strong>Use</strong> Hero / Cover titles only</div>
+      </div>
+    </div>
+    <div class="type-specimen">
+      <div style="font-size:28px;font-weight:700;color:var(--slate-900);letter-spacing:-0.4px;">Muhammad Usman Khan</div>
+      <div class="type-meta">
+        <div class="type-meta-item"><strong>Family</strong> IBM Plex Sans</div>
+        <div class="type-meta-item"><strong>Weight</strong> 700 Bold</div>
+        <div class="type-meta-item"><strong>Size</strong> 28px</div>
+        <div class="type-meta-item"><strong>Use</strong> Guard profile name, page titles</div>
+      </div>
+    </div>
+    <div class="type-specimen">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--slate-700);">LHR-00247 &nbsp; ₨ 4,24,00,000 &nbsp; 42201-1234567-9</div>
+      <div class="type-meta">
+        <div class="type-meta-item"><strong>Family</strong> IBM Plex Mono</div>
+        <div class="type-meta-item"><strong>Weight</strong> 500 Medium</div>
+        <div class="type-meta-item"><strong>Size</strong> 18px</div>
+        <div class="type-meta-item"><strong>Numeric</strong> tabular-nums</div>
+        <div class="type-meta-item"><strong>Use</strong> IDs, currency, CNIC, timestamps</div>
+      </div>
+    </div>
+
+    <!-- Scale -->
+    <div style="background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:20px 24px;margin-top:20px;">
+      <div style="font-size:var(--text-13);font-weight:700;color:var(--text-primary);margin-bottom:16px;">Type Scale</div>
+      <div class="spacing-grid">
+        <div class="type-scale-row"><div class="type-scale-label">11px / 0.69rem</div><div class="type-scale-sample" style="font-size:11px;">Section labels · Timestamps · Meta</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">12px / 0.75rem</div><div class="type-scale-sample" style="font-size:12px;">Table headers · Chip labels · Form labels · Compact body</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">13px / 0.81rem</div><div class="type-scale-sample" style="font-size:13px;">Nav items · Sidebar text · Table body · Default body</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">14px / 0.875rem</div><div class="type-scale-sample" style="font-size:14px;">Form inputs · Card body · Comfortable density</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">16px / 1rem</div><div class="type-scale-sample" style="font-size:16px;">Topbar title · Login form</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">18px / 1.125rem</div><div class="type-scale-sample" style="font-size:18px;">Stat card values · Finance pulse numbers</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">20px / 1.25rem</div><div class="type-scale-sample" style="font-size:20px;">Section titles · Greeting line</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">24px / 1.5rem</div><div class="type-scale-sample" style="font-size:24px;">KPI values · Login heading</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">28px / 1.75rem</div><div class="type-scale-sample" style="font-size:28px;font-weight:700;">Guard profile name</div></div>
+        <div class="type-scale-row"><div class="type-scale-label">32px / 2rem</div><div class="type-scale-sample" style="font-size:32px;font-weight:800;">Cover / brandbook titles</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. SPACING -->
+  <div class="section">
+    <div class="section-eyebrow">04 — Spacing</div>
+    <div class="section-title">Spacing Scale</div>
+    <div class="section-sub">4px base grid. All spacing values are multiples of 4. Never use odd pixel values or percentages for internal padding/margins.</div>
+    <div style="background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:20px 24px;">
+      <div class="spacing-grid">
+        <div class="spacing-row"><div class="spacing-label">--space-1 / 4px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:4px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">4px — icon gap, chip padding</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-2 / 8px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:8px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">8px — inline gap, small padding</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-3 / 12px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:12px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">12px — sidebar item padding</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-4 / 16px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:16px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">16px — card padding, filter gaps</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-5 / 20px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:20px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">20px — card body, column gap</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-6 / 24px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:24px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">24px — content scroll padding</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-8 / 32px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:32px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">32px — section gap</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-10 / 40px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:40px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">40px — section gap (xl)</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-12 / 48px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:48px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">48px — comfortable row height</div></div>
+        <div class="spacing-row"><div class="spacing-label">--space-16 / 64px</div><div class="spacing-bar-wrap"><div style="display:flex;align-items:center;"><div style="width:64px;height:20px;background:var(--brand-600);border-radius:2px;"></div></div></div><div class="spacing-val">64px — sidebar collapsed width</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. RADIUS & SHADOW -->
+  <div class="section">
+    <div class="section-eyebrow">05 — Shape</div>
+    <div class="section-title">Radius & Shadow</div>
+    <div class="section-sub">Low-elevation shadows only. Parwest uses borders as the primary depth signal — shadows serve as a secondary indicator, never decorative.</div>
+    <div class="radius-grid" style="margin-bottom:28px;">
+      <div class="radius-card"><div class="radius-box" style="border-radius:10px;"></div><div class="radius-name">Small</div><div class="radius-val">10px</div><div class="radius-token">--radius-sm</div><div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Buttons · Inputs · Chips</div></div>
+      <div class="radius-card"><div class="radius-box" style="border-radius:14px;"></div><div class="radius-name">Medium</div><div class="radius-val">14px</div><div class="radius-token">--radius-md</div><div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Cards · Panels · Modals</div></div>
+      <div class="radius-card"><div class="radius-box" style="border-radius:18px;"></div><div class="radius-name">Large</div><div class="radius-val">18px</div><div class="radius-token">--radius-lg</div><div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Drawer · Sheets</div></div>
+      <div class="radius-card"><div class="radius-box" style="border-radius:24px;"></div><div class="radius-name">XL</div><div class="radius-val">24px</div><div class="radius-token">--radius-xl</div><div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Cover blocks · Hero</div></div>
+      <div class="radius-card"><div class="radius-box" style="border-radius:9999px;"></div><div class="radius-name">Full</div><div class="radius-val">9999px</div><div class="radius-token">--radius-full</div><div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Badges · Avatars · Toggles</div></div>
+    </div>
+    <div class="shadow-grid">
+      <div class="shadow-card" style="box-shadow:none;border:1px solid var(--slate-200);">
+        <div class="shadow-box" style="box-shadow:none;"></div>
+        <div class="shadow-name">None</div>
+        <div class="shadow-val">box-shadow: none<br/>Most table cells, inputs</div>
+      </div>
+      <div class="shadow-card" style="box-shadow:var(--shadow-xs);border:1px solid var(--slate-100);">
+        <div class="shadow-box" style="box-shadow:var(--shadow-xs);"></div>
+        <div class="shadow-name">XS</div>
+        <div class="shadow-val">0 1px 2px rgba(15,23,42,.06)<br/>Cards · Table container</div>
+      </div>
+      <div class="shadow-card" style="box-shadow:var(--shadow-sm);border:1px solid var(--slate-100);">
+        <div class="shadow-box" style="box-shadow:var(--shadow-sm);"></div>
+        <div class="shadow-name">SM</div>
+        <div class="shadow-val">0 4px 16px rgba(15,23,42,.06)<br/>Dropdowns · Tooltips</div>
+      </div>
+      <div class="shadow-card" style="box-shadow:var(--shadow-md);border:1px solid var(--slate-100);">
+        <div class="shadow-box" style="box-shadow:var(--shadow-md);"></div>
+        <div class="shadow-name">MD</div>
+        <div class="shadow-val">0 10px 24px rgba(15,23,42,.09)<br/>Modals · Command palette</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. MOTION -->
+  <div class="section">
+    <div class="section-eyebrow">06 — Motion</div>
+    <div class="section-title">Motion Principles</div>
+    <div class="section-sub">Motion is functional, not decorative. Transitions must communicate state — never delay or distract. Data tables never animate. Hover over each card to preview.</div>
+    <div class="motion-grid">
+      <div class="motion-card">
+        <div class="motion-demo"><div class="motion-ball"></div></div>
+        <div class="motion-name">Instant — 0ms</div>
+        <div class="motion-val">--duration-instant</div>
+        <div class="motion-use">Focus ring appearance. Checkbox checks. Toggle state. Any interaction that feels tapped, not animated.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-demo"><div class="motion-ball" style="transition:transform 100ms cubic-bezier(0.4,0,0.2,1);"></div></div>
+        <div class="motion-name">Fast — 100ms</div>
+        <div class="motion-val">--duration-fast</div>
+        <div class="motion-use">Button hover fills. Nav item highlights. Chip color changes. All micro-interactions.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-demo"><div class="motion-ball" style="transition:transform 150ms cubic-bezier(0.4,0,0.2,1);"></div></div>
+        <div class="motion-name">Normal — 150ms</div>
+        <div class="motion-val">--duration-normal</div>
+        <div class="motion-use">Sidebar collapse. Toast slide-in. Dropdown open. The default for most UI transitions.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-demo"><div class="motion-ball" style="transition:transform 250ms cubic-bezier(0.4,0,0.2,1);"></div></div>
+        <div class="motion-name">Slow — 250ms</div>
+        <div class="motion-val">--duration-slow</div>
+        <div class="motion-use">Modal entrance. Drawer slide. Page-level transitions. Use sparingly — never on repeated actions.</div>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:16px 20px;background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);font-size:var(--text-13);color:var(--text-secondary);line-height:1.7;">
+      <strong style="color:var(--text-primary);">Easing standard:</strong> <code style="font-family:var(--font-mono);font-size:12px;">cubic-bezier(0.4, 0, 0.2, 1)</code> — the Material ease-in-out equivalent. Provides quick acceleration from rest and smooth deceleration to stop. Never use spring physics or bounce easing on data-dense interfaces — it reads as frivolous in a professional ERP context.
+    </div>
+  </div>
+
+  <!-- 7. VOICE & TONE -->
+  <div class="section">
+    <div class="section-eyebrow">07 — Writing</div>
+    <div class="section-title">Voice & Tone</div>
+    <div class="section-sub">Parwest writes like a competent senior colleague — direct, precise, never condescending. Copy earns trust through accuracy, not warmth.</div>
+    <div class="voice-grid" style="margin-bottom:24px;">
+      <div class="voice-card">
+        <div class="voice-card-title">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--brand-600);"></div>
+          Personality
+        </div>
+        <div class="voice-row"><strong>Authoritative</strong> — We know what we're doing. Commands are clear and unambiguous.</div>
+        <div class="voice-row"><strong>Precise</strong> — Every label earns its place. No filler words. Numbers are exact.</div>
+        <div class="voice-row"><strong>Trustworthy</strong> — We tell the user when something goes wrong. Errors are honest, not euphemistic.</div>
+        <div class="voice-row"><strong>Confident</strong> — We don't hedge. "Guard cannot be deployed" not "There may be an issue with deploying."</div>
+      </div>
+      <div class="voice-card">
+        <div class="voice-card-title">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--brand-600);"></div>
+          Formulas
+        </div>
+        <div class="voice-row"><strong>Buttons:</strong> Verb-first, ≤3 words. "Deploy Guard" · "Lock Region" · "Generate Invoice"</div>
+        <div class="voice-row"><strong>Errors:</strong> What happened + why + what to do. "Guard cannot be deployed — lifecycle status is INACTIVE. Change status to ACTIVE first."</div>
+        <div class="voice-row"><strong>Empty states:</strong> What this is + why empty + action. "No deployments found · This client has no active guard assignments · Deploy a Guard"</div>
+        <div class="voice-row"><strong>Confirmations:</strong> Summarize impact. "Lock Lahore – Gulberg? 47 payroll records will be locked for April 2026."</div>
+      </div>
+    </div>
+
+    <!-- Do / Don't -->
+    <div class="do-dont-grid">
+      <div class="do-card">
+        <div class="do-card-header do">✓ Do</div>
+        <div class="do-item">Deploy Guard</div>
+        <div class="do-item">End Deployment</div>
+        <div class="do-item">Lock Region</div>
+        <div class="do-item">Guard cannot be deployed — status is INACTIVE.</div>
+        <div class="do-item">3 guards selected</div>
+        <div class="do-item">No guards found · Add your first guard</div>
+        <div class="do-item">₨ 4.2L (with full value in tooltip)</div>
+        <div class="do-item">Showing 1–50 of 1,247 guards</div>
+      </div>
+      <div class="do-card">
+        <div class="do-card-header dont">✕ Don't</div>
+        <div class="dont-item">Click here to deploy a guard to a client site</div>
+        <div class="dont-item">Terminate Deployment Assignment</div>
+        <div class="dont-item">Please Lock This Regional Office</div>
+        <div class="dont-item">There might be an issue with the guard's current status.</div>
+        <div class="dont-item">You have selected 3 items</div>
+        <div class="dont-item">It looks like there's nothing here yet! 🎉</div>
+        <div class="dont-item">Rs. 4,200,000.00</div>
+        <div class="dont-item">Displaying records 1 to 50 of 1247 total guard profiles</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. ACCESSIBILITY -->
+  <div class="section">
+    <div class="section-eyebrow">08 — Accessibility</div>
+    <div class="section-title">Accessibility Charter</div>
+    <div class="section-sub">Minimum WCAG 2.2 AA across all surfaces. AAA for body text at ≥14px. Color is never the sole signal for status.</div>
+    <div class="a11y-grid">
+      <div class="a11y-card" style="background:#fff;">
+        <div class="a11y-ratio" style="color:#2f5bff;">8.59:1</div>
+        <div class="a11y-label">Brand-600 on white — body text</div>
+        <div><span class="a11y-pass aaa">AAA Pass</span></div>
+      </div>
+      <div class="a11y-card" style="background:#fff;">
+        <div class="a11y-ratio" style="color:#0f172a;">19.1:1</div>
+        <div class="a11y-label">Slate-900 on white — primary text</div>
+        <div><span class="a11y-pass aaa">AAA Pass</span></div>
+      </div>
+      <div class="a11y-card" style="background:#fff;">
+        <div class="a11y-ratio" style="color:#64748b;">4.61:1</div>
+        <div class="a11y-label">Slate-500 on white — muted text</div>
+        <div><span class="a11y-pass aa">AA Pass (≥14px)</span></div>
+      </div>
+      <div class="a11y-card" style="background:var(--sidebar-bg);">
+        <div class="a11y-ratio" style="color:#818cf8;">4.82:1</div>
+        <div class="a11y-label" style="color:rgba(226,232,240,0.5);">Brand-400 on sidebar-bg — active nav</div>
+        <div><span class="a11y-pass aa">AA Pass</span></div>
+      </div>
+      <div class="a11y-card" style="background:#fff;">
+        <div class="a11y-ratio" style="color:#16a34a;">4.54:1</div>
+        <div class="a11y-label">Success-600 on white — status label</div>
+        <div><span class="a11y-pass aa">AA Pass</span></div>
+      </div>
+      <div class="a11y-card" style="background:#fff;">
+        <div class="a11y-ratio" style="color:#dc2626;">4.49:1</div>
+        <div class="a11y-label">Danger-600 on white — error label</div>
+        <div><span class="a11y-pass aa">AA Pass</span></div>
+      </div>
+    </div>
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div style="padding:16px;background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);font-size:var(--text-13);color:var(--text-secondary);line-height:1.6;">
+        <div style="font-weight:700;color:var(--text-primary);margin-bottom:8px;">Focus Ring</div>
+        Status chips, buttons, inputs, and all interactive elements must show <code style="font-family:var(--font-mono);font-size:11px;">--focus-ring</code> on keyboard focus: <code style="font-family:var(--font-mono);font-size:11px;">0 0 0 3px rgba(47,91,255,.35)</code>.
+      </div>
+      <div style="padding:16px;background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);font-size:var(--text-13);color:var(--text-secondary);line-height:1.6;">
+        <div style="font-weight:700;color:var(--text-primary);margin-bottom:8px;">Status signals</div>
+        Every status chip includes a label — never just a colored dot. The dot is a redundant reinforcement, not the primary signal. Guard lifecycle chips always show the text: "Active", "Pending", etc.
+      </div>
+      <div style="padding:16px;background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);font-size:var(--text-13);color:var(--text-secondary);line-height:1.6;">
+        <div style="font-weight:700;color:var(--text-primary);margin-bottom:8px;">Keyboard model</div>
+        Every primary workflow must be completable without a mouse. Data tables: J/K for row navigation, <code style="font-family:var(--font-mono);font-size:11px;">/</code> to focus search, Space for row select. Forms: Enter to advance step.
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="border-top:1px solid var(--slate-200);padding-top:32px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:28px;height:28px;background:var(--brand-600);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;">P</div>
+      <span style="font-size:var(--text-13);font-weight:600;color:var(--text-secondary);">Parwest ERP Brandbook</span>
+    </div>
+    <div style="font-size:var(--text-12);color:var(--text-muted);font-family:var(--font-mono);">v1.0 · April 2026 · Private Security / Pakistan</div>
+  </div>
+
+</div>
+</body>
+</html>

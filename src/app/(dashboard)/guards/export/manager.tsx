@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Download, X } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import ActionButton from "@/components/ui/action-button"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -104,9 +103,15 @@ export default function ExportGuardsManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Export Guards" subtitle="Filter and export guard records to Excel." />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Export Guards</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Filter and export guard records to Excel.</p>
+        </div>
+      </div>
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="Parwest ID" name="parwestId" value={parwestId} onChange={setParwestId} />
           <Field label="Name" name="name" value={name} onChange={setName} />
@@ -211,7 +216,8 @@ export default function ExportGuardsManager() {
             {exporting ? "Exporting..." : "Export to CSV"}
           </ActionButton>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       {notice ? <InlineAlert type="success" message={notice} /> : null}
     </div>

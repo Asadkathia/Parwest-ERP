@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
 import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
@@ -144,7 +144,8 @@ export default function ClientBlacklistManager({
     <div className="space-y-6">
       <SectionTitle title="Black Listed Clients" subtitle="Manage blacklisted clients by email." />
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <RegionUrlPicker
             regions={regions}
@@ -164,11 +165,12 @@ export default function ClientBlacklistManager({
           </div>
         </div>
         <div className="flex gap-2">
-          <ActionButton onClick={onAdd}>Add</ActionButton>
-          <ActionButton variant="secondary" onClick={() => setConfirmAction("reset")}>Reset</ActionButton>
-          <ActionButton variant="secondary" onClick={() => setConfirmAction("submit")}>Submit</ActionButton>
+          <Button onClick={onAdd}>Add</Button>
+          <Button variant="secondary" onClick={() => setConfirmAction("reset")}>Reset</Button>
+          <Button variant="secondary" onClick={() => setConfirmAction("submit")}>Submit</Button>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       {error ? <InlineAlert type="error" message={error} /> : null}
       {notice ? <InlineAlert type="success" message={notice} /> : null}
@@ -258,8 +260,8 @@ function ConfirmDialog({
         <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
         <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
-          <ActionButton onClick={onYes}>Yes</ActionButton>
+          <Button variant="secondary" onClick={onNo}>No</Button>
+          <Button onClick={onYes}>Yes</Button>
         </div>
       </div>
     </div>

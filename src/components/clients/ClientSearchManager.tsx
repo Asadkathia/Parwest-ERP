@@ -4,11 +4,10 @@ import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Search, RotateCcw } from "lucide-react"
+import { AlertCircle, Search, RotateCcw } from "lucide-react"
 import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
-import InlineAlert from "@/components/ui/inline-alert"
-import SectionTitle from "@/components/ui/section-title"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import DataTable from "@/components/shared/DataTable"
 import StatusChip from "@/components/ui/status-chip"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
@@ -131,9 +130,15 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
 
   return (
     <div className="space-y-6">
-      <SectionTitle title={title} subtitle={subtitle} />
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+      </div>
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <RegionUrlPicker
             regions={regions}
@@ -235,9 +240,15 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             <option>other</option>
           </select>
         </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {error ? (
+        <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <DataTable
         rows={loading ? [] : filtered}

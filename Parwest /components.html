@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Parwest ERP — Component Library</title>
+<link rel="stylesheet" href="tokens.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+body{background:#f1f4f9;font-family:var(--font-ui);margin:0;color:var(--text-primary);}
+.layout{display:flex;min-height:100vh;}
+/* ── Left nav ── */
+.comp-nav{width:220px;min-width:220px;background:var(--sidebar-bg);position:sticky;top:0;height:100vh;overflow-y:auto;padding:20px 0;scrollbar-width:none;}
+.comp-nav::-webkit-scrollbar{display:none;}
+.comp-nav-title{padding:0 16px 12px;font-size:var(--text-11);font-weight:700;color:var(--sidebar-text-muted);text-transform:uppercase;letter-spacing:1px;}
+.comp-nav-item{padding:7px 16px;font-size:var(--text-12);color:var(--sidebar-text-muted);cursor:pointer;display:block;text-decoration:none;transition:color var(--duration-fast);}
+.comp-nav-item:hover{color:var(--sidebar-text);}
+.comp-nav-item.active{color:var(--sidebar-active-text);}
+.comp-nav-group{margin-bottom:20px;}
+/* ── Main ── */
+.comp-main{flex:1;padding:40px 48px;max-width:1060px;}
+/* ── Section ── */
+.comp-section{margin-bottom:64px;scroll-margin-top:24px;}
+.comp-section-eyebrow{font-size:var(--text-11);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--brand-600);margin-bottom:6px;}
+.comp-section-title{font-size:var(--text-24);font-weight:800;color:var(--slate-900);letter-spacing:-0.3px;margin-bottom:4px;}
+.comp-section-sub{font-size:var(--text-13);color:var(--text-muted);margin-bottom:28px;line-height:1.6;}
+/* ── Component block ── */
+.comp-block{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-md);margin-bottom:20px;overflow:hidden;}
+.comp-block-header{padding:12px 20px;background:var(--slate-50);border-bottom:1px solid var(--slate-200);display:flex;align-items:center;justify-content:space-between;}
+.comp-block-name{font-size:var(--text-12);font-weight:700;color:var(--text-primary);}
+.comp-block-note{font-size:var(--text-11);color:var(--text-muted);font-family:var(--font-mono);}
+.comp-block-body{padding:24px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;}
+.comp-block-body.vertical{flex-direction:column;}
+.comp-block-body.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+/* ── State label ── */
+.state-group{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.state-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;}
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);font-weight:600;cursor:pointer;border:1px solid transparent;transition:all var(--duration-fast);font-family:var(--font-ui);line-height:1;}
+.btn-primary{background:var(--brand-600);color:#fff;border-color:var(--brand-600);}
+.btn-primary:hover{background:var(--brand-700);}
+.btn-primary:active{background:var(--brand-800);}
+.btn-secondary{background:#fff;color:var(--text-primary);border-color:var(--border-default);}
+.btn-secondary:hover{background:var(--bg-subtle);}
+.btn-ghost{background:transparent;color:var(--text-secondary);border-color:transparent;}
+.btn-ghost:hover{background:var(--bg-subtle);}
+.btn-danger{background:var(--danger-600);color:#fff;border-color:var(--danger-600);}
+.btn-danger:hover{background:var(--danger-700);}
+.btn-icon{width:34px;height:34px;padding:0;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--border-default);color:var(--text-secondary);}
+.btn-icon:hover{background:var(--bg-subtle);}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:0.4;cursor:not-allowed;pointer-events:none;}
+.btn-loading{position:relative;color:transparent;}
+.btn-loading::after{content:'';position:absolute;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn-sm{padding:5px 10px;font-size:var(--text-12);}
+.btn-lg{padding:11px 22px;font-size:var(--text-14);}
+/* ── Inputs ── */
+.input-wrap{display:flex;flex-direction:column;gap:4px;width:100%;}
+.input-label{font-size:var(--text-11);font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+.input{padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--radius-sm);font-size:var(--text-14);color:var(--text-primary);font-family:var(--font-ui);width:100%;box-sizing:border-box;transition:border-color var(--duration-fast),box-shadow var(--duration-fast);}
+.input:focus{outline:none;border-color:var(--border-focus);box-shadow:var(--focus-ring);}
+.input:disabled{background:var(--bg-subtle);color:var(--text-muted);cursor:not-allowed;}
+.input.error{border-color:var(--danger-600);box-shadow:0 0 0 3px rgba(220,38,38,0.15);}
+.input.success{border-color:var(--success-600);}
+.input-icon-wrap{position:relative;}
+.input-icon-wrap .input{padding-left:36px;}
+.input-icon-wrap .icon-left{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);}
+.input-hint{font-size:var(--text-11);color:var(--text-muted);margin-top:2px;}
+.input-hint.error{color:var(--danger-600);}
+.input-mono{font-family:var(--font-mono);}
+/* ── Checkbox / Radio / Switch ── */
+.check-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;}
+.check-box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border-default);background:#fff;display:flex;align-items:center;justify-content:center;transition:all var(--duration-fast);flex-shrink:0;}
+.check-box.checked{background:var(--brand-600);border-color:var(--brand-600);}
+.check-box.indeterminate{background:var(--brand-600);border-color:var(--brand-600);}
+.radio-box{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border-default);background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.radio-box.checked{border-color:var(--brand-600);}
+.radio-box.checked::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--brand-600);}
+.switch{width:36px;height:20px;border-radius:var(--radius-full);background:var(--slate-200);position:relative;cursor:pointer;transition:background var(--duration-normal);flex-shrink:0;}
+.switch.on{background:var(--brand-600);}
+.switch-thumb{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform var(--duration-normal);box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.switch.on .switch-thumb{transform:translateX(16px);}
+.check-label{font-size:var(--text-13);color:var(--text-primary);}
+/* ── Chips & Badges ── */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--radius-full);font-size:var(--text-12);font-weight:600;}
+.chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.badge{display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border-radius:var(--radius-full);padding:1px 6px;min-width:18px;}
+.badge-dot{width:8px;height:8px;border-radius:50%;}
+/* ── Avatar ── */
+.avatar{border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0;}
+.avatar-xs{width:20px;height:20px;font-size:8px;}
+.avatar-sm{width:28px;height:28px;font-size:11px;}
+.avatar-md{width:36px;height:36px;font-size:14px;}
+.avatar-lg{width:48px;height:48px;font-size:18px;}
+.avatar-xl{width:64px;height:64px;font-size:24px;}
+/* ── Tooltip ── */
+.tooltip-wrap{position:relative;display:inline-flex;}
+.tooltip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--slate-900);color:#fff;font-size:var(--text-12);padding:5px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow-sm);}
+.tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--slate-900);}
+/* ── Tabs ── */
+.tabs-pill{display:flex;gap:4px;background:var(--bg-subtle);border-radius:var(--radius-sm);padding:3px;}
+.tab-pill{padding:6px 14px;border-radius:6px;font-size:var(--text-13);font-weight:500;color:var(--text-muted);cursor:pointer;transition:all var(--duration-fast);}
+.tab-pill.active{background:#fff;color:var(--text-primary);box-shadow:var(--shadow-xs);}
+.tabs-underline{display:flex;border-bottom:1px solid var(--border-default);}
+.tab-underline{padding:9px 16px;font-size:var(--text-13);font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all var(--duration-fast);}
+.tab-underline.active{color:var(--brand-600);border-bottom-color:var(--brand-600);}
+/* ── Progress / Spinner / Skeleton ── */
+.spinner{width:20px;height:20px;border:2px solid var(--brand-100);border-top-color:var(--brand-600);border-radius:50%;animation:spin 0.7s linear infinite;}
+.spinner-sm{width:14px;height:14px;}
+.spinner-lg{width:32px;height:32px;}
+.progress-bar{height:6px;background:var(--bg-subtle);border-radius:var(--radius-full);overflow:hidden;}
+.progress-fill{height:100%;border-radius:var(--radius-full);transition:width var(--duration-slow);}
+.skeleton{background:linear-gradient(90deg,var(--slate-100) 25%,var(--slate-200) 50%,var(--slate-100) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ── KPI Card ── */
+.kpi-card{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:18px 20px;min-width:180px;}
+.kpi-card .label{font-size:var(--text-11);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;}
+.kpi-card .value{font-size:var(--text-28);font-weight:800;color:var(--text-primary);font-variant-numeric:tabular-nums;line-height:1.1;}
+.kpi-card .trend{font-size:var(--text-12);margin-top:6px;display:flex;align-items:center;gap:4px;}
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:28px;margin-top:10px;}
+.spark-bar{width:6px;border-radius:2px 2px 0 0;background:var(--brand-200);}
+.spark-bar.hi{background:var(--brand-600);}
+/* ── Toast ── */
+.toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border-default);background:#fff;box-shadow:var(--shadow-md);font-size:var(--text-13);min-width:280px;}
+.toast-success{border-left:3px solid var(--success-600);}
+.toast-warning{border-left:3px solid var(--warning-600);}
+.toast-error{border-left:3px solid var(--danger-600);}
+.toast-info{border-left:3px solid var(--info-600);}
+/* ── Alert / Banner ── */
+.alert{padding:12px 16px;border-radius:var(--radius-sm);font-size:var(--text-13);display:flex;gap:10px;align-items:flex-start;}
+.alert-success{background:var(--success-50);border:1px solid #bbf7d0;color:var(--success-700);}
+.alert-warning{background:var(--warning-50);border:1px solid #fde68a;color:var(--warning-700);}
+.alert-danger{background:var(--danger-50);border:1px solid #fecaca;color:var(--danger-700);}
+.alert-info{background:var(--info-50);border:1px solid #bfdbfe;color:var(--info-600);}
+/* ── Modal ── */
+.modal-backdrop{position:relative;background:rgba(15,23,42,0.48);border-radius:var(--radius-md);padding:32px;display:flex;align-items:center;justify-content:center;min-height:180px;}
+.modal{background:#fff;border-radius:var(--radius-md);box-shadow:var(--shadow-md);width:100%;}
+.modal-header{padding:18px 20px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:var(--text-16);font-weight:700;}
+.modal-body{padding:20px;}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border-default);display:flex;justify-content:flex-end;gap:8px;}
+/* ── Empty / Error states ── */
+.state-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;background:#fff;border-radius:var(--radius-md);border:1px solid var(--border-default);}
+.state-icon{width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.state-title{font-size:var(--text-14);font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+.state-sub{font-size:var(--text-13);color:var(--text-muted);line-height:1.5;margin-bottom:16px;max-width:260px;}
+/* ── Table ── */
+.data-table{width:100%;border-collapse:collapse;font-size:var(--text-13);}
+.data-table th{padding:10px 14px;text-align:left;font-size:var(--text-11);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-default);white-space:nowrap;}
+.data-table td{padding:0 14px;height:48px;border-bottom:1px solid var(--border-default);color:var(--text-primary);}
+.data-table tbody tr:last-child td{border-bottom:none;}
+.data-table tbody tr:hover{background:var(--bg-card-hover);}
+.data-table tbody tr.selected{background:var(--brand-50);}
+/* ── Stepper ── */
+.stepper{display:flex;align-items:flex-start;gap:0;}
+.step{display:flex;flex-direction:column;align-items:center;flex:1;}
+.step-circ{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-12);font-weight:700;border:2px solid var(--border-default);color:var(--text-muted);background:#fff;}
+.step-circ.done{background:var(--brand-600);border-color:var(--brand-600);color:#fff;}
+.step-circ.current{background:var(--brand-600);border-color:var(--brand-600);color:#fff;box-shadow:0 0 0 4px var(--brand-100);}
+.step-lbl{font-size:10px;font-weight:600;color:var(--text-muted);margin-top:6px;text-align:center;}
+.step-lbl.active{color:var(--brand-600);}
+.step-line{flex:1;height:2px;background:var(--border-default);margin-top:15px;}
+.step-line.done{background:var(--brand-600);}
+/* ── Dropdown menu ── */
+.dropdown-menu{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-md);min-width:180px;overflow:hidden;}
+.dropdown-item{padding:9px 14px;font-size:var(--text-13);color:var(--text-primary);cursor:pointer;display:flex;align-items:center;gap:10px;transition:background var(--duration-fast);}
+.dropdown-item:hover{background:var(--bg-subtle);}
+.dropdown-item.danger{color:var(--danger-600);}
+.dropdown-divider{height:1px;background:var(--border-default);margin:4px 0;}
+/* ── Filter bar ── */
+.filter-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--radius-full);border:1px solid var(--border-default);font-size:var(--text-12);font-weight:500;background:#fff;cursor:pointer;transition:all var(--duration-fast);}
+.filter-pill.active{background:var(--brand-50);border-color:var(--brand-300);color:var(--brand-700);}
+.filter-pill:hover{background:var(--bg-subtle);}
+/* ── Activity feed ── */
+.feed-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-default);}
+.feed-item:last-child{border-bottom:none;}
+.feed-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;margin-top:2px;}
+.feed-line{flex:1;}
+.feed-text{font-size:var(--text-13);color:var(--text-primary);line-height:1.5;}
+.feed-meta{font-size:var(--text-11);color:var(--text-muted);margin-top:2px;}
+/* ── Approval card ── */
+.approval-card{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px;width:280px;}
+.approval-status-bar{height:3px;border-radius:var(--radius-full);margin-bottom:14px;}
+/* ── Breadcrumb ── */
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:var(--text-13);}
+.breadcrumb-item{color:var(--text-muted);cursor:pointer;}
+.breadcrumb-item:hover{color:var(--text-primary);}
+.breadcrumb-item.current{color:var(--text-primary);font-weight:500;pointer-events:none;}
+.breadcrumb-sep{color:var(--text-muted);}
+/* ── Permission gate ── */
+.perm-gate{background:var(--slate-50);border:1px dashed var(--border-default);border-radius:var(--radius-md);padding:20px;display:flex;align-items:center;gap:12px;font-size:var(--text-13);color:var(--text-muted);}
+/* ── Command palette ── */
+.cmd-palette{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-md);overflow:hidden;width:560px;}
+.cmd-input-wrap{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border-default);}
+.cmd-input{border:none;outline:none;font-size:var(--text-16);color:var(--text-primary);background:transparent;flex:1;font-family:var(--font-ui);}
+.cmd-group-label{padding:8px 14px 4px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;}
+.cmd-item{padding:9px 14px;font-size:var(--text-13);color:var(--text-primary);cursor:pointer;display:flex;align-items:center;gap:10px;}
+.cmd-item.focused{background:var(--brand-50);color:var(--brand-700);}
+.cmd-item:hover{background:var(--bg-subtle);}
+.cmd-kbd{font-family:var(--font-mono);font-size:10px;background:var(--bg-subtle);border:1px solid var(--border-default);padding:2px 5px;border-radius:4px;color:var(--text-muted);margin-left:auto;}
+/* ── Notification flyout ── */
+.notif-flyout{background:#fff;border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-md);width:340px;overflow:hidden;}
+.notif-header{padding:12px 16px;border-bottom:1px solid var(--border-default);display:flex;justify-content:space-between;align-items:center;font-size:var(--text-13);font-weight:700;}
+.notif-item{padding:12px 16px;border-bottom:1px solid var(--border-default);cursor:pointer;transition:background var(--duration-fast);}
+.notif-item:hover{background:var(--bg-subtle);}
+.notif-item.unread{background:var(--brand-50);}
+.notif-item:last-child{border-bottom:none;}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:var(--brand-600);flex-shrink:0;margin-top:4px;}
+/* ── 403/404/500 pages ── */
+.error-page{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;background:#fff;border-radius:var(--radius-md);border:1px solid var(--border-default);}
+.error-code{font-size:64px;font-weight:900;font-family:var(--font-mono);line-height:1;margin-bottom:8px;}
+/* section anchor */
+[id]{scroll-margin-top:24px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const Ico = ({n,s=16,c='currentColor'}) => {
+  const p={
+    check:<polyline points="20 6 9 17 4 12"/>,
+    x:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    plus:<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    shield:<path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5z"/>,
+    alert:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    info:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    trash:<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    user:<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    bell:<><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></>,
+    chevRight:<polyline points="9 18 15 12 9 6"/>,
+    filter:<><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
+    cmd:<><path d="M18 3a3 3 0 00-3 3v12a3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3H6a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3V6a3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3h12a3 3 0 003-3 3 3 0 00-3-3z"/></>,
+    zap:<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+  };
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{p[n]}</svg>;
+};
+
+const SL = ({label}) => <div className="state-label">{label}</div>;
+
+const Block = ({name, note, children, vertical, grid2}) => (
+  <div className="comp-block">
+    <div className="comp-block-header">
+      <span className="comp-block-name">{name}</span>
+      {note && <span className="comp-block-note">{note}</span>}
+    </div>
+    <div className={`comp-block-body${vertical?' vertical':grid2?' grid-2':''}`}>{children}</div>
+  </div>
+);
+
+const navSections = [
+  {label:'Foundational',items:[
+    {id:'buttons',label:'Button'},
+    {id:'inputs',label:'Input'},
+    {id:'selects',label:'Select & Combobox'},
+    {id:'checkboxes',label:'Checkbox · Radio · Switch'},
+    {id:'chips',label:'Chip · Badge · Tag'},
+    {id:'avatar',label:'Avatar'},
+    {id:'tooltip',label:'Tooltip & Popover'},
+    {id:'tabs',label:'Tabs'},
+    {id:'feedback',label:'Spinner · Skeleton · Progress'},
+  ]},
+  {label:'ERP Critical',items:[
+    {id:'table',label:'Data Table'},
+    {id:'filter',label:'Filter Bar'},
+    {id:'kpi',label:'KPI Card'},
+    {id:'stepper',label:'Stepper'},
+    {id:'formlayouts',label:'Form Layouts'},
+    {id:'activityfeed',label:'Activity Feed'},
+    {id:'approvalcard',label:'Approval Card'},
+    {id:'cmdpalette',label:'Command Palette'},
+    {id:'notifications',label:'Notification Center'},
+  ]},
+  {label:'Feedback',items:[
+    {id:'toasts',label:'Toast'},
+    {id:'alerts',label:'Alert · Banner'},
+    {id:'modals',label:'Modal & Drawer'},
+    {id:'emptystates',label:'Empty States'},
+    {id:'errorpages',label:'Error Pages'},
+  ]},
+  {label:'Navigation',items:[
+    {id:'breadcrumb',label:'Breadcrumb'},
+    {id:'dropdown',label:'Dropdown Menu'},
+    {id:'permgate',label:'Permission Gate'},
+  ]},
+];
+
+function App() {
+  const [activeNav, setActiveNav] = useState('buttons');
+  const [sw1,setSw1]=useState(true);
+  const [sw2,setSw2]=useState(false);
+  const [cb1,setCb1]=useState(true);
+  const [cb2,setCb2]=useState(false);
+  const [tabPill,setTabPill]=useState(0);
+  const [tabUnder,setTabUnder]=useState(0);
+  const [progress,setProgress]=useState(65);
+  const [tableSelected,setTableSelected]=useState([1]);
+  const [cmdVal,setCmdVal]=useState('');
+
+  const scrollTo = id => {
+    setActiveNav(id);
+    const el = document.getElementById(id);
+    if(el) el.scrollIntoView({block:'start'});
+  };
+
+  const guardColors=['#1e3aa8','#15803d','#b45309','#b91c1c','#4338ca'];
+  const avatarColor = i => guardColors[i%guardColors.length];
+
+  return (
+    <div className="layout">
+      {/* Left nav */}
+      <nav className="comp-nav">
+        <div style={{padding:'20px 16px 16px',display:'flex',alignItems:'center',gap:8}}>
+          <div style={{width:28,height:28,background:'var(--brand-600)',borderRadius:7,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:13}}>P</div>
+          <span style={{color:'var(--sidebar-text)',fontWeight:700,fontSize:'var(--text-13)'}}>Components</span>
+        </div>
+        {navSections.map(s=>(
+          <div key={s.label} className="comp-nav-group">
+            <div className="comp-nav-title">{s.label}</div>
+            {s.items.map(it=>(
+              <a key={it.id} className={`comp-nav-item${activeNav===it.id?' active':''}`} href={`#${it.id}`} onClick={e=>{e.preventDefault();scrollTo(it.id);}}>{it.label}</a>
+            ))}
+          </div>
+        ))}
+      </nav>
+
+      {/* Main content */}
+      <main className="comp-main">
+        <div style={{marginBottom:48}}>
+          <div style={{fontSize:'var(--text-11)',fontWeight:700,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--brand-600)',marginBottom:6}}>Parwest ERP</div>
+          <div style={{fontSize:'var(--text-32)',fontWeight:800,color:'var(--slate-900)',letterSpacing:'-0.5px',marginBottom:6}}>Component Library</div>
+          <div style={{fontSize:'var(--text-14)',color:'var(--text-muted)'}}>All components shown in all 7 states: default · hover · focus · active · disabled · loading · error</div>
+        </div>
+
+        {/* ── BUTTONS ── */}
+        <div className="comp-section" id="buttons">
+          <div className="comp-section-eyebrow">Foundational</div>
+          <div className="comp-section-title">Button</div>
+          <div className="comp-section-sub">Verb-first labels ≤3 words. Never use rounded-full on primary buttons.</div>
+
+          <Block name="Button — Variants">
+            {[['Primary','btn-primary'],['Secondary','btn-secondary'],['Ghost','btn-ghost'],['Danger','btn-danger']].map(([v,cls])=>(
+              <div key={v} className="state-group">
+                <SL label={v}/>
+                <button className={`btn ${cls}`}><Ico n="plus" s={14}/>{v}</button>
+              </div>
+            ))}
+            <div className="state-group"><SL label="Icon Only"/>
+              <button className="btn-icon"><Ico n="plus" s={15}/></button>
+            </div>
+          </Block>
+
+          <Block name="Button — All 7 States (Primary)">
+            {[
+              {l:'Default',el:<button className="btn btn-primary">Deploy Guard</button>},
+              {l:'Hover',el:<button className="btn btn-primary" style={{background:'var(--brand-700)'}}>Deploy Guard</button>},
+              {l:'Focus',el:<button className="btn btn-primary" style={{boxShadow:'var(--focus-ring)'}}>Deploy Guard</button>},
+              {l:'Active',el:<button className="btn btn-primary" style={{background:'var(--brand-800)'}}>Deploy Guard</button>},
+              {l:'Disabled',el:<button className="btn btn-primary" disabled>Deploy Guard</button>},
+              {l:'Loading',el:<button className="btn btn-primary btn-loading" style={{minWidth:120}}>Deploy Guard</button>},
+              {l:'Error',el:<button className="btn btn-danger">Action Failed</button>},
+            ].map(({l,el})=>(
+              <div key={l} className="state-group"><SL label={l}/>{el}</div>
+            ))}
+          </Block>
+
+          <Block name="Button — Sizes">
+            <div className="state-group"><SL label="Small"/>
+              <button className="btn btn-primary btn-sm">Add Guard</button>
+            </div>
+            <div className="state-group"><SL label="Default"/>
+              <button className="btn btn-primary">Deploy Guard</button>
+            </div>
+            <div className="state-group"><SL label="Large"/>
+              <button className="btn btn-primary btn-lg">Finalize Globally</button>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── INPUTS ── */}
+        <div className="comp-section" id="inputs">
+          <div className="comp-section-title">Input</div>
+          <div className="comp-section-sub">All inputs use tabular-nums on numeric variants. CNIC and Parwest ID fields use monospace.</div>
+
+          <Block name="Input — All 7 States" grid2>
+            <div className="input-wrap"><div className="input-label">Default</div><input className="input" placeholder="Enter full name"/></div>
+            <div className="input-wrap"><div className="input-label">Focus</div><input className="input" placeholder="Enter full name" style={{borderColor:'var(--border-focus)',boxShadow:'var(--focus-ring)'}} defaultValue="Muhammad Usman"/></div>
+            <div className="input-wrap"><div className="input-label">Filled</div><input className="input" defaultValue="Muhammad Usman Khan"/></div>
+            <div className="input-wrap"><div className="input-label">Error</div><input className="input error" defaultValue="invalid@"/><div className="input-hint error">Enter a valid email address.</div></div>
+            <div className="input-wrap"><div className="input-label">Success</div><input className="input success" defaultValue="asad@parwest.com"/></div>
+            <div className="input-wrap"><div className="input-label">Disabled</div><input className="input" disabled defaultValue="LHR-00247"/></div>
+          </Block>
+
+          <Block name="Input — ERP Variants" vertical>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16}}>
+              <div className="input-wrap">
+                <div className="input-label">Search</div>
+                <div className="input-icon-wrap">
+                  <span className="icon-left"><Ico n="search" s={14} c="var(--text-muted)"/></span>
+                  <input className="input" placeholder="Search guards…"/>
+                </div>
+              </div>
+              <div className="input-wrap">
+                <div className="input-label">CNIC <span style={{color:'var(--danger-600)'}}>*</span></div>
+                <input className="input input-mono" placeholder="XXXXX-XXXXXXX-X" defaultValue="42201-1234567-9"/>
+                <div className="input-hint">Pakistani National Identity Card</div>
+              </div>
+              <div className="input-wrap">
+                <div className="input-label">Currency (₨)</div>
+                <div className="input-icon-wrap">
+                  <span className="icon-left" style={{fontFamily:'var(--font-mono)',fontSize:13,fontWeight:600}}>₨</span>
+                  <input className="input input-mono" placeholder="0.00" defaultValue="28,000"/>
+                </div>
+              </div>
+              <div className="input-wrap">
+                <div className="input-label">Date</div>
+                <input className="input" type="date" defaultValue="2026-04-24"/>
+              </div>
+              <div className="input-wrap">
+                <div className="input-label">Parwest ID (read-only)</div>
+                <input className="input input-mono" readOnly defaultValue="LHR-00247" style={{background:'var(--bg-subtle)',color:'var(--text-muted)'}}/>
+              </div>
+              <div className="input-wrap">
+                <div className="input-label">Phone</div>
+                <input className="input input-mono" placeholder="+92 3XX XXXXXXX" defaultValue="+92 300 1234567"/>
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── SELECT & COMBOBOX ── */}
+        <div className="comp-section" id="selects">
+          <div className="comp-section-title">Select & Combobox</div>
+          <Block name="Select — States" grid2>
+            <div className="input-wrap"><div className="input-label">Default</div>
+              <select className="input"><option>Select designation…</option><option>Security Guard</option><option>Supervisor</option><option>CPO</option><option>ASO</option></select>
+            </div>
+            <div className="input-wrap"><div className="input-label">Filled</div>
+              <select className="input" defaultValue="Security Guard"><option>Security Guard</option><option>Supervisor</option><option>CPO</option></select>
+            </div>
+            <div className="input-wrap"><div className="input-label">Disabled</div>
+              <select className="input" disabled><option>Security Guard</option></select>
+            </div>
+            <div className="input-wrap"><div className="input-label">Error</div>
+              <select className="input error"><option>Select a region…</option></select>
+              <div className="input-hint error">Region is required.</div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── CHECKBOX RADIO SWITCH ── */}
+        <div className="comp-section" id="checkboxes">
+          <div className="comp-section-title">Checkbox · Radio · Switch</div>
+          <Block name="Checkbox — States">
+            {[
+              {l:'Unchecked',checked:false,ind:false},
+              {l:'Checked',checked:true,ind:false},
+              {l:'Indeterminate',checked:true,ind:true},
+              {l:'Disabled',checked:false,ind:false,dis:true},
+              {l:'Disabled checked',checked:true,ind:false,dis:true},
+            ].map(s=>(
+              <div key={s.l} className="state-group"><SL label={s.l}/>
+                <label className="check-wrap" style={{opacity:s.dis?0.4:1}}>
+                  <div className={`check-box${s.checked?' checked':''}`}>{s.ind?<div style={{width:8,height:2,background:'#fff',borderRadius:1}}/>:s.checked?<Ico n="check" s={10} c="#fff"/>:null}</div>
+                  <span className="check-label">Ex-Service</span>
+                </label>
+              </div>
+            ))}
+          </Block>
+
+          <Block name="Radio — States">
+            {[{l:'Unchecked',c:false},{l:'Checked',c:true},{l:'Disabled',c:false,d:true}].map(s=>(
+              <div key={s.l} className="state-group"><SL label={s.l}/>
+                <label className="check-wrap" style={{opacity:s.d?0.4:1}}>
+                  <div className={`radio-box${s.c?' checked':''}`}/>
+                  <span className="check-label">Army</span>
+                </label>
+              </div>
+            ))}
+          </Block>
+
+          <Block name="Switch — States">
+            {[{l:'Off',v:false},{l:'On',v:true},{l:'Disabled off',v:false,d:true},{l:'Disabled on',v:true,d:true}].map(s=>(
+              <div key={s.l} className="state-group"><SL label={s.l}/>
+                <div style={{display:'flex',alignItems:'center',gap:8,opacity:s.d?0.4:1}}>
+                  <div className={`switch${s.v?' on':''}`}><div className="switch-thumb"/></div>
+                  <span style={{fontSize:'var(--text-13)',color:'var(--text-primary)'}}>Is Ex-Service</span>
+                </div>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── CHIPS & BADGES ── */}
+        <div className="comp-section" id="chips">
+          <div className="comp-section-title">Chip · Badge · Tag</div>
+          <Block name="Status Chips — Lifecycle">
+            {[
+              ['ACTIVE','#f0fdf4','#16a34a','#22c55e'],
+              ['PENDING','#fffbeb','#b45309','#f59e0b'],
+              ['INACTIVE','#f8fafc','#475569','#94a3b8'],
+              ['TERMINATED','#fef2f2','#b91c1c','#ef4444'],
+              ['DRAFT','#f8fafc','#475569','#94a3b8'],
+              ['GLOBAL_FINALIZED','#f0fdf4','#15803d','#22c55e'],
+              ['HOLD','#fef2f2','#b91c1c','#ef4444'],
+              ['DAY','#eff6ff','#1d4ed8','#3b82f6'],
+              ['NIGHT','#eef2ff','#4338ca','#6366f1'],
+              ['BOTH','#faf5ff','#7e22ce','#a855f7'],
+            ].map(([label,bg,fg,dot])=>(
+              <span key={label} className="chip" style={{background:bg,color:fg}}>
+                <span className="chip-dot" style={{background:dot}}/>
+                {label}
+              </span>
+            ))}
+          </Block>
+
+          <Block name="Badges">
+            <div className="state-group"><SL label="Count"/>
+              <span className="badge" style={{background:'var(--danger-600)',color:'#fff'}}>12</span>
+            </div>
+            <div className="state-group"><SL label="Brand"/>
+              <span className="badge" style={{background:'var(--brand-600)',color:'#fff'}}>3</span>
+            </div>
+            <div className="state-group"><SL label="Muted"/>
+              <span className="badge" style={{background:'var(--slate-200)',color:'var(--slate-600)'}}>47</span>
+            </div>
+            <div className="state-group"><SL label="Dot — unread"/>
+              <span className="badge-dot" style={{background:'var(--brand-600)'}}/>
+            </div>
+            <div className="state-group"><SL label="Dot — alert"/>
+              <span className="badge-dot" style={{background:'var(--danger-600)'}}/>
+            </div>
+            <div className="state-group"><SL label="Category"/>
+              <span className="chip" style={{background:'var(--brand-50)',color:'var(--brand-700)'}}>BANK</span>
+            </div>
+            <div className="state-group"><SL label="Role"/>
+              <span className="chip" style={{background:'var(--brand-50)',color:'var(--brand-700)',borderRadius:'var(--radius-full)'}}>Super Admin</span>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── AVATAR ── */}
+        <div className="comp-section" id="avatar">
+          <div className="comp-section-title">Avatar</div>
+          <Block name="Avatar — Sizes & States">
+            {['xs','sm','md','lg','xl'].map((sz,i)=>(
+              <div key={sz} className="state-group"><SL label={sz.toUpperCase()}/>
+                <div className={`avatar avatar-${sz}`} style={{background:avatarColor(i)}}>
+                  {sz==='xs'?'MU':sz==='sm'?'MU':sz==='md'?'MU':sz==='lg'?'MU':'MU'}
+                </div>
+              </div>
+            ))}
+            <div className="state-group"><SL label="Group"/>
+              <div style={{display:'flex',marginLeft:8}}>
+                {['#1e3aa8','#15803d','#b45309','#b91c1c'].map((c,i)=>(
+                  <div key={i} className="avatar avatar-sm" style={{background:c,marginLeft:i?-8:0,border:'2px solid #fff',zIndex:4-i}}>MK</div>
+                ))}
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── TOOLTIP ── */}
+        <div className="comp-section" id="tooltip">
+          <div className="comp-section-title">Tooltip & Popover</div>
+          <Block name="Tooltip — Persistent (hover in production)">
+            <div className="state-group"><SL label="Default"/>
+              <div className="tooltip-wrap" style={{marginTop:32}}>
+                <button className="btn btn-secondary">₨ 4.2L</button>
+                <div className="tooltip">₨ 4,20,000 full value</div>
+              </div>
+            </div>
+            <div className="state-group"><SL label="Long content"/>
+              <div className="tooltip-wrap" style={{marginTop:32}}>
+                <button className="btn btn-ghost"><Ico n="alert" s={14} c="var(--warning-600)"/></button>
+                <div className="tooltip" style={{maxWidth:200,whiteSpace:'normal',textAlign:'center'}}>Guard age is outside 18–45 range. Age approval required.</div>
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── TABS ── */}
+        <div className="comp-section" id="tabs">
+          <div className="comp-section-title">Tabs</div>
+          <Block name="Pill Tabs" vertical>
+            <div className="tabs-pill">
+              {['Efficiency','Anomalies','Reports'].map((t,i)=>(
+                <div key={t} className={`tab-pill${tabPill===i?' active':''}`} onClick={()=>setTabPill(i)}>{t}</div>
+              ))}
+            </div>
+          </Block>
+          <Block name="Underline Tabs (18-tab guard profile style)" vertical>
+            <div className="tabs-underline">
+              {['General Information','Profile','Attachments','Attendance','Paid Salaries','Deployment History'].map((t,i)=>(
+                <div key={t} className={`tab-underline${tabUnder===i?' active':''}`} onClick={()=>setTabUnder(i)}>{t}</div>
+              ))}
+            </div>
+          </Block>
+        </div>
+
+        {/* ── SPINNER SKELETON PROGRESS ── */}
+        <div className="comp-section" id="feedback">
+          <div className="comp-section-title">Spinner · Skeleton · Progress</div>
+          <Block name="Spinner — Sizes">
+            {[['Small','spinner spinner-sm'],['Default','spinner'],['Large','spinner spinner-lg']].map(([l,cls])=>(
+              <div key={l} className="state-group"><SL label={l}/><div className={cls}/></div>
+            ))}
+          </Block>
+          <Block name="Skeleton">
+            <div style={{width:200}}>
+              <div className="skeleton" style={{height:14,width:'60%',marginBottom:8}}/>
+              <div className="skeleton" style={{height:10,width:'90%',marginBottom:6}}/>
+              <div className="skeleton" style={{height:10,width:'75%'}}/>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div className="skeleton" style={{width:36,height:36,borderRadius:'50%',flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div className="skeleton" style={{height:12,width:'80%',marginBottom:6}}/>
+                <div className="skeleton" style={{height:10,width:'50%'}}/>
+              </div>
+            </div>
+          </Block>
+          <Block name="Progress Bar — States" vertical>
+            {[
+              {l:'25% — Draft',pct:25,c:'var(--slate-400)'},
+              {l:'50% — In Progress',pct:50,c:'var(--brand-600)'},
+              {l:'74% — Profile Completeness',pct:74,c:'var(--brand-600)'},
+              {l:'100% — Complete',pct:100,c:'var(--success-600)'},
+            ].map(p=>(
+              <div key={p.l} style={{width:'100%'}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:'var(--text-12)',color:'var(--text-muted)',marginBottom:4}}><span>{p.l}</span><span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>{p.pct}%</span></div>
+                <div className="progress-bar"><div className="progress-fill" style={{width:`${p.pct}%`,background:p.c}}/></div>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── DATA TABLE ── */}
+        <div className="comp-section" id="table">
+          <div className="comp-section-eyebrow">ERP Critical</div>
+          <div className="comp-section-title">Data Table</div>
+          <div className="comp-section-sub">Sortable headers, row selection, bulk action bar, density toggle, sticky header. Tabular numerics on all data columns.</div>
+
+          <Block name="Data Table — Full Featured" vertical>
+            {tableSelected.length>0&&(
+              <div style={{background:'var(--brand-50)',border:'1px solid var(--brand-200)',borderRadius:'var(--radius-sm)',padding:'8px 14px',display:'flex',alignItems:'center',gap:12,fontSize:'var(--text-13)'}}>
+                <strong style={{color:'var(--brand-700)'}}>{tableSelected.length} guard selected</strong>
+                <button className="btn btn-secondary btn-sm">Bulk Export</button>
+                <button className="btn btn-secondary btn-sm">Change Status</button>
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={()=>setTableSelected([])}>✕ Clear</button>
+              </div>
+            )}
+            <div style={{overflow:'auto',border:'1px solid var(--border-default)',borderRadius:'var(--radius-sm)'}}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{width:40}}><input type="checkbox" onChange={e=>setTableSelected(e.target.checked?[1,2,3]:[])}/></th>
+                    {['Parwest ID ↑','Name','CNIC','Designation','Shift','Status','Actions'].map(h=><th key={h}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    {id:1,pid:'LHR-00247',name:'Muhammad Usman Khan',cnic:'42201-1234567-9',desig:'Security Guard',shift:'DAY',status:'ACTIVE',sc:'#1e293b'},
+                    {id:2,pid:'KHI-00892',name:'Fatima Zafar',cnic:'42101-9876543-2',desig:'Supervisor',shift:'NIGHT',status:'ACTIVE',sc:'#134e4a'},
+                    {id:3,pid:'ISB-00134',name:'Abdul Rehman Malik',cnic:'61101-5432109-8',desig:'CPO',shift:'DAY',status:'PENDING',sc:'#431407'},
+                    {id:4,pid:'LHR-00318',name:'Sadia Parveen',cnic:'42301-2345678-4',desig:'Security Guard',shift:'NIGHT',status:'INACTIVE',sc:'#1e293b'},
+                  ].map(g=>(
+                    <tr key={g.id} className={tableSelected.includes(g.id)?'selected':''}>
+                      <td><input type="checkbox" checked={tableSelected.includes(g.id)} onChange={e=>{setTableSelected(s=>e.target.checked?[...s,g.id]:s.filter(x=>x!==g.id));}}/></td>
+                      <td><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)',color:'var(--text-muted)'}}>{g.pid}</span></td>
+                      <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:26,height:26,borderRadius:'50%',background:g.sc,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff'}}>{g.name.split(' ').slice(0,2).map(w=>w[0]).join('')}</div><span style={{fontWeight:500}}>{g.name}</span></div></td>
+                      <td><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--text-12)'}}>{g.cnic}</span></td>
+                      <td>{g.desig}</td>
+                      <td><span className="chip" style={{background:g.shift==='DAY'?'#eff6ff':g.shift==='NIGHT'?'#eef2ff':'#faf5ff',color:g.shift==='DAY'?'#1d4ed8':g.shift==='NIGHT'?'#4338ca':'#7e22ce'}}>{g.shift}</span></td>
+                      <td><span className="chip" style={{background:g.status==='ACTIVE'?'#f0fdf4':g.status==='PENDING'?'#fffbeb':'#f8fafc',color:g.status==='ACTIVE'?'#16a34a':g.status==='PENDING'?'#b45309':'#475569'}}><span className="chip-dot" style={{background:g.status==='ACTIVE'?'#22c55e':g.status==='PENDING'?'#f59e0b':'#94a3b8'}}/>{g.status}</span></td>
+                      <td><button className="btn btn-secondary btn-sm">View</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'var(--text-12)',color:'var(--text-muted)',paddingTop:4}}>
+              <span>Showing 4 of 1,247 guards</span>
+              <div style={{display:'flex',gap:4}}>
+                {[1,2,3,'…',42].map((p,i)=><button key={i} className="btn btn-secondary btn-sm" style={{padding:'3px 8px',background:p===1?'var(--brand-600)':undefined,color:p===1?'#fff':undefined,borderColor:p===1?'var(--brand-600)':undefined}}>{p}</button>)}
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── FILTER BAR ── */}
+        <div className="comp-section" id="filter">
+          <div className="comp-section-title">Filter Bar</div>
+          <Block name="Pill Filters + Saved Views" vertical>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,background:'#fff',border:'1px solid var(--border-default)',borderRadius:'var(--radius-sm)',padding:'7px 12px',flex:1,maxWidth:280}}>
+                <Ico n="search" s={14} c="var(--text-muted)"/>
+                <input style={{border:'none',outline:'none',background:'transparent',fontSize:'var(--text-13)',color:'var(--text-primary)',fontFamily:'var(--font-ui)',width:'100%'}} placeholder="Search guards, CNICs, IDs…"/>
+              </div>
+              {[['All Status',false],['ACTIVE',true],['PENDING',false],['INACTIVE',false]].map(([l,a])=>(
+                <span key={l} className={`filter-pill${a?' active':''}`}>{l}</span>
+              ))}
+              <span className="filter-pill"><Ico n="filter" s={12}/>More Filters</span>
+              <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}}>Saved Views ▾</button>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── KPI CARD ── */}
+        <div className="comp-section" id="kpi">
+          <div className="comp-section-title">KPI Card</div>
+          <Block name="KPI Card — Variants">
+            {[
+              {l:'Active Guards',v:'1,247',trend:'+14',up:true,sparks:[3,5,4,6,5,7,8,6,9,10]},
+              {l:'Net Payable',v:'₨ 4.2Cr',trend:'+2.1%',up:true,sparks:[6,5,7,6,8,7,9,8,10,9],mono:true},
+              {l:'Vacant Guards',v:'139',trend:'+6',up:false,sparks:[2,3,2,4,3,5,4,6,5,7]},
+              {l:'Payroll Cycle',v:<span className="chip" style={{background:'var(--success-50)',color:'var(--success-700)',fontSize:14,padding:'4px 10px'}}><span className="chip-dot" style={{background:'var(--success-600)'}}/>Finalized</span>,sparks:null},
+            ].map((k,i)=>(
+              <div key={i} className="kpi-card">
+                <div className="label">{k.l}</div>
+                <div className="value" style={{fontFamily:k.mono?'var(--font-mono)':undefined,fontSize:k.sparks?undefined:'var(--text-18)'}}>{k.v}</div>
+                {k.trend&&<div className="trend" style={{color:k.up?'var(--success-600)':'var(--danger-600)'}}>{k.up?'▲':'▼'} {k.trend} vs last month</div>}
+                {k.sparks&&<div className="sparkline">{k.sparks.map((h,j)=><div key={j} className={`spark-bar${j===k.sparks.length-1?' hi':''}`} style={{height:`${h*3}px`}}/>)}</div>}
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── STEPPER ── */}
+        <div className="comp-section" id="stepper">
+          <div className="comp-section-title">Stepper Wizard</div>
+          <Block name="Guard Create — 6 Step Stepper" vertical>
+            <div className="stepper">
+              {['Personal Info','Service Details','Address & Contact','Bank & Finance','Documents','Review'].map((s,i)=>(
+                <div key={s} style={{display:'flex',alignItems:'flex-start',flex:1}}>
+                  <div className="step">
+                    <div className={`step-circ${i<2?' done':i===2?' current':''}`}>
+                      {i<2?<Ico n="check" s={12} c="#fff"/>:i+1}
+                    </div>
+                    <div className={`step-lbl${i===2?' active':''}`}>{s}</div>
+                  </div>
+                  {i<5&&<div className={`step-line${i<2?' done':''}`}/>}
+                </div>
+              ))}
+            </div>
+          </Block>
+        </div>
+
+        {/* ── FORM LAYOUTS ── */}
+        <div className="comp-section" id="formlayouts">
+          <div className="comp-section-title">Form Layouts</div>
+          <Block name="2-Column Grouped Form" vertical>
+            <div style={{background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)',padding:'14px 16px',marginBottom:16}}>
+              <div style={{fontSize:'var(--text-13)',fontWeight:700,color:'var(--text-primary)',marginBottom:12}}>Personal Information</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                {[['Full Name *','Muhammad Usman Khan'],['CNIC *','42201-1234567-9'],['Date of Birth','12/03/1990'],['Blood Group','B+']].map(([l,v])=>(
+                  <div key={l} className="input-wrap"><div className="input-label">{l}</div><input className={l.includes('CNIC') ? 'input input-mono' : 'input'} defaultValue={v}/></div>
+                ))}
+              </div>
+            </div>
+            <div style={{background:'var(--bg-subtle)',borderRadius:'var(--radius-sm)',padding:'14px 16px'}}>
+              <div style={{fontSize:'var(--text-13)',fontWeight:700,color:'var(--text-primary)',marginBottom:12}}>Ex-Service Details</div>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <div className={`switch on`}><div className="switch-thumb"/></div>
+                <span style={{fontSize:'var(--text-13)'}}>Is Ex-Service</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
+                {[['Service Type','ARMY'],['Rank','Lance Naik'],['Regiment','Punjab Regiment']].map(([l,v])=>(
+                  <div key={l} className="input-wrap"><div className="input-label">{l}</div><input className="input" defaultValue={v}/></div>
+                ))}
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── ACTIVITY FEED ── */}
+        <div className="comp-section" id="activityfeed">
+          <div className="comp-section-title">Activity Feed</div>
+          <Block name="Ops Feed / Timeline" vertical>
+            {[
+              {actor:'Asad Khan',color:'#1e3aa8',action:'globally finalized',entity:'April 2026 payroll — 1,108 records',time:'2 min ago'},
+              {actor:'Kamran Mir',color:'#15803d',action:'enrolled',entity:'Guard LHR-00247 Muhammad Usman Khan',time:'14 min ago'},
+              {actor:'Faisal Raza',color:'#b45309',action:'ended deployment for',entity:'KHI-01034 at MCB Clifton Branch',time:'1 hr ago'},
+              {actor:'System',color:'#475569',action:'generated invoice',entity:'INV-2026-04-0042 for Engro Chemicals',time:'2 hr ago'},
+            ].map((item,i)=>(
+              <div key={i} className="feed-item">
+                <div className="feed-avatar" style={{background:item.color}}>{item.actor.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+                <div className="feed-line">
+                  <div className="feed-text"><strong>{item.actor}</strong> {item.action} <span style={{color:'var(--brand-600)',fontWeight:500}}>{item.entity}</span></div>
+                  <div className="feed-meta">{item.time}</div>
+                </div>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── APPROVAL CARD ── */}
+        <div className="comp-section" id="approvalcard">
+          <div className="comp-section-title">Approval Card</div>
+          <Block name="Approval Card — 3 States">
+            {[
+              {status:'PENDING',color:'var(--warning-600)',bg:'var(--warning-50)',label:'Awaiting Approval',title:'Guard Age Exception',sub:'LHR-00247 · Age 47 · Outside 18–45 range'},
+              {status:'APPROVED',color:'var(--success-600)',bg:'var(--success-50)',label:'Approved',title:'Guard Age Exception',sub:'Approved by Asad Khan · 22/04/2026'},
+              {status:'REJECTED',color:'var(--danger-600)',bg:'var(--danger-50)',label:'Rejected',title:'Guard Age Exception',sub:'Rejected: Age too far outside policy limit'},
+            ].map(c=>(
+              <div key={c.status} className="approval-card">
+                <div className="approval-status-bar" style={{background:c.color}}/>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                  <div style={{fontSize:'var(--text-13)',fontWeight:700,color:'var(--text-primary)'}}>{c.title}</div>
+                  <span className="chip" style={{background:c.bg,color:c.color,fontSize:11}}>{c.label}</span>
+                </div>
+                <div style={{fontSize:'var(--text-12)',color:'var(--text-muted)',marginBottom:14}}>{c.sub}</div>
+                {c.status==='PENDING'&&<div style={{display:'flex',gap:8}}>
+                  <button className="btn btn-primary btn-sm">Approve</button>
+                  <button className="btn btn-secondary btn-sm">Reject</button>
+                </div>}
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── COMMAND PALETTE ── */}
+        <div className="comp-section" id="cmdpalette">
+          <div className="comp-section-title">Command Palette</div>
+          <Block name="⌘K Command Palette" vertical>
+            <div className="cmd-palette">
+              <div className="cmd-input-wrap">
+                <Ico n="search" s={18} c="var(--text-muted)"/>
+                <input className="cmd-input" placeholder="Search guards, clients, actions…" value={cmdVal} onChange={e=>setCmdVal(e.target.value)}/>
+                <span style={{fontFamily:'var(--font-mono)',fontSize:11,background:'var(--bg-subtle)',border:'1px solid var(--border-default)',padding:'2px 6px',borderRadius:4,color:'var(--text-muted)'}}>Esc</span>
+              </div>
+              <div className="cmd-group-label">Recent</div>
+              <div className="cmd-item focused"><Ico n="user" s={15} c="var(--brand-600)"/>Muhammad Usman Khan <span className="mono" style={{fontSize:11,color:'var(--text-muted)',marginLeft:4}}>LHR-00247</span><span className="cmd-kbd">Guard</span></div>
+              <div className="cmd-item"><Ico n="shield" s={15} c="var(--text-muted)"/>MCB Bank – Gulberg Branch<span className="cmd-kbd">Client</span></div>
+              <div className="cmd-group-label">Actions</div>
+              <div className="cmd-item"><Ico n="plus" s={15} c="var(--text-muted)"/>Add Guard<span className="cmd-kbd">⌘G</span></div>
+              <div className="cmd-item"><Ico n="zap" s={15} c="var(--text-muted)"/>Deploy Guard<span className="cmd-kbd">⌘D</span></div>
+              <div className="cmd-item"><Ico n="bell" s={15} c="var(--text-muted)"/>Generate Invoice<span className="cmd-kbd">⌘I</span></div>
+              <div style={{padding:'8px 14px',borderTop:'1px solid var(--border-default)',display:'flex',gap:12,fontSize:10,color:'var(--text-muted)'}}>
+                <span><kbd style={{fontFamily:'var(--font-mono)'}}>↑↓</kbd> navigate</span>
+                <span><kbd style={{fontFamily:'var(--font-mono)'}}>↵</kbd> open</span>
+                <span><kbd style={{fontFamily:'var(--font-mono)'}}>Esc</kbd> close</span>
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── NOTIFICATIONS ── */}
+        <div className="comp-section" id="notifications">
+          <div className="comp-section-title">Notification Center</div>
+          <Block name="Notification Flyout" vertical>
+            <div className="notif-flyout">
+              <div className="notif-header">
+                <span>Notifications</span>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span className="badge" style={{background:'var(--brand-600)',color:'#fff'}}>4</span>
+                  <span style={{fontSize:'var(--text-12)',color:'var(--text-brand)',cursor:'pointer'}}>Mark all read</span>
+                </div>
+              </div>
+              {[
+                {msg:'Payroll for April 2026 globally finalized.',time:'2 min ago',read:false,icon:'dollar'},
+                {msg:'Guard Abdul Rehman Malik pending age approval.',time:'1 hr ago',read:false,icon:'alert'},
+                {msg:'MCB Bank – Gulberg contract expires in 22 days.',time:'3 hr ago',read:false,icon:'alert'},
+                {msg:'Invoice INV-2026-04-0042 generated.',time:'5 hr ago',read:true,icon:'check'},
+              ].map((n,i)=>(
+                <div key={i} className={`notif-item${n.read?'':' unread'}`}>
+                  <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+                    {!n.read&&<div className="notif-dot"/>}
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'var(--text-13)',color:'var(--text-primary)',lineHeight:1.5}}>{n.msg}</div>
+                      <div style={{fontSize:'var(--text-11)',color:'var(--text-muted)',marginTop:2}}>{n.time}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Block>
+        </div>
+
+        {/* ── TOASTS ── */}
+        <div className="comp-section" id="toasts">
+          <div className="comp-section-eyebrow">Feedback</div>
+          <div className="comp-section-title">Toast</div>
+          <Block name="Toast — All 4 Types" vertical>
+            {[
+              {cls:'toast-success',icon:'check',ic:'var(--success-600)',msg:'Payroll globally finalized — 1,108 records locked.',label:'Success'},
+              {cls:'toast-warning',icon:'alert',ic:'var(--warning-600)',msg:'Guard age exception pending approval before activation.',label:'Warning'},
+              {cls:'toast-error',icon:'alert',ic:'var(--danger-600)',msg:'Guard cannot be deployed — status is INACTIVE.',label:'Error'},
+              {cls:'toast-info',icon:'info',ic:'var(--info-600)',msg:'Payroll calculations for April 2026 are running.',label:'Info'},
+            ].map(t=>(
+              <div key={t.label} className={`toast ${t.cls}`}>
+                <Ico n={t.icon} s={16} c={t.ic}/>
+                <span style={{flex:1}}>{t.msg}</span>
+                <Ico n="x" s={14} c="var(--text-muted)"/>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── ALERTS ── */}
+        <div className="comp-section" id="alerts">
+          <div className="comp-section-title">Alert · Banner</div>
+          <Block name="Inline Alerts" vertical>
+            {[
+              {cls:'alert-success',icon:'check',ic:'var(--success-600)',msg:'Guard profile successfully verified. Ready for deployment.'},
+              {cls:'alert-warning',icon:'alert',ic:'var(--warning-600)',msg:'Branch has no active contract. Enable "requireBranchContract" rule may block this deployment.'},
+              {cls:'alert-danger',icon:'alert',ic:'var(--danger-600)',msg:'Guard cannot be deployed — lifecycle status is INACTIVE. Change status to ACTIVE before deploying.'},
+              {cls:'alert-info',icon:'info',ic:'var(--info-600)',msg:'Payroll is currently locked for regional review. Contact your Regional Admin to unlock.'},
+            ].map((a,i)=>(
+              <div key={i} className={`alert ${a.cls}`}>
+                <Ico n={a.icon} s={16} c={a.ic}/>
+                <span>{a.msg}</span>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── MODALS ── */}
+        <div className="comp-section" id="modals">
+          <div className="comp-section-title">Modal & Drawer</div>
+          <Block name="Destructive Confirm Dialog" vertical>
+            <div className="modal-backdrop">
+              <div className="modal" style={{maxWidth:420}}>
+                <div className="modal-header">
+                  <div className="modal-title" style={{color:'var(--danger-600)'}}>Terminate Guard</div>
+                  <Ico n="x" s={18} c="var(--text-muted)"/>
+                </div>
+                <div className="modal-body">
+                  <div style={{display:'flex',gap:12,marginBottom:16}}>
+                    <div style={{width:36,height:36,borderRadius:'var(--radius-md)',background:'var(--danger-50)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Ico n="alert" s={18} c="var(--danger-600)"/>
+                    </div>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:'var(--text-14)',marginBottom:4}}>Terminate Muhammad Usman Khan?</div>
+                      <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',lineHeight:1.5}}>This will end all active deployments and move the guard to TERMINATED status. This action cannot be undone.</div>
+                    </div>
+                  </div>
+                  <div className="input-wrap"><div className="input-label">Termination Reason <span style={{color:'var(--danger-600)'}}>*</span></div>
+                    <select className="input"><option>Select reason…</option><option>RESIGNED</option><option>FIRED</option><option>ABSCONDED</option><option>DECEASED</option><option>OTHER</option></select>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary">Cancel</button>
+                  <button className="btn btn-danger">Terminate Guard</button>
+                </div>
+              </div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── EMPTY STATES ── */}
+        <div className="comp-section" id="emptystates">
+          <div className="comp-section-title">Empty States</div>
+          <Block name="Empty State — Variants">
+            {[
+              {icon:'users',bg:'var(--brand-50)',ic:'var(--brand-600)',title:'No guards deployed',sub:'This client has no active guard assignments.',action:'Deploy a Guard'},
+              {icon:'search',bg:'var(--slate-100)',ic:'var(--slate-500)',title:'No results found',sub:'Try adjusting your search or filter criteria.',action:'Clear Filters'},
+              {icon:'lock',bg:'var(--warning-50)',ic:'var(--warning-600)',title:'Payroll not generated',sub:'Salary slips for April 2026 have not been calculated yet.',action:'Calculate Payroll'},
+            ].map(e=>(
+              <div key={e.title} className="state-box" style={{flex:1,minWidth:200}}>
+                <div className="state-icon" style={{background:e.bg}}><Ico n={e.icon} s={22} c={e.ic}/></div>
+                <div className="state-title">{e.title}</div>
+                <div className="state-sub">{e.sub}</div>
+                <button className="btn btn-secondary btn-sm">{e.action}</button>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── ERROR PAGES ── */}
+        <div className="comp-section" id="errorpages">
+          <div className="comp-section-title">Error Pages</div>
+          <Block name="403 · 404 · 500">
+            {[
+              {code:'403',color:'var(--warning-600)',title:'Access Denied',sub:"You don't have permission to view this module. Contact your administrator to request access.",action:'Go to Dashboard'},
+              {code:'404',color:'var(--brand-600)',title:'Page Not Found',sub:'The page you are looking for does not exist or has been moved.',action:'Go Back'},
+              {code:'500',color:'var(--danger-600)',title:'Server Error',sub:'Something went wrong on our end. Try refreshing the page or contact support if the issue persists.',action:'Retry'},
+            ].map(e=>(
+              <div key={e.code} className="error-page" style={{flex:1}}>
+                <div className="error-code" style={{color:e.color}}>{e.code}</div>
+                <div style={{fontSize:'var(--text-16)',fontWeight:700,color:'var(--text-primary)',marginBottom:8}}>{e.title}</div>
+                <div style={{fontSize:'var(--text-13)',color:'var(--text-muted)',lineHeight:1.6,marginBottom:20,maxWidth:220}}>{e.sub}</div>
+                <button className="btn btn-secondary btn-sm">{e.action}</button>
+              </div>
+            ))}
+          </Block>
+        </div>
+
+        {/* ── BREADCRUMB ── */}
+        <div className="comp-section" id="breadcrumb">
+          <div className="comp-section-eyebrow">Navigation</div>
+          <div className="comp-section-title">Breadcrumb · Dropdown · Permission Gate</div>
+          <Block name="Breadcrumb">
+            <div className="breadcrumb">
+              <span className="breadcrumb-item">Guards</span>
+              <span className="breadcrumb-sep"><Ico n="chevRight" s={14}/></span>
+              <span className="breadcrumb-item">Muhammad Usman Khan</span>
+              <span className="breadcrumb-sep"><Ico n="chevRight" s={14}/></span>
+              <span className="breadcrumb-item current">Deployment History</span>
+            </div>
+          </Block>
+
+          <Block name="Dropdown Menu">
+            <div className="dropdown-menu">
+              <div className="dropdown-item"><Ico n="user" s={15} c="var(--text-muted)"/>View Profile</div>
+              <div className="dropdown-item"><Ico n="zap" s={15} c="var(--text-muted)"/>Deploy Guard</div>
+              <div className="dropdown-item">Edit Details</div>
+              <div className="dropdown-divider"/>
+              <div className="dropdown-item danger"><Ico n="trash" s={15} c="var(--danger-600)"/>Terminate Guard</div>
+            </div>
+          </Block>
+        </div>
+
+        {/* ── PERMISSION GATE ── */}
+        <div className="comp-section" id="permgate">
+          <div className="comp-section-title">Permission Gate</div>
+          <Block name="Permission-gated Components" vertical>
+            <div className="perm-gate">
+              <Ico n="lock" s={20} c="var(--text-muted)"/>
+              <div>
+                <div style={{fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>Create Guard — Permission Required</div>
+                <div>Your role (Supervisor) does not include CREATE access to the GUARDS module. Contact your administrator.</div>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <button className="btn btn-primary">Edit Guard</button>
+              <button className="btn btn-secondary" disabled aria-disabled="true" title="Requires DELETE permission">
+                <Ico n="lock" s={13}/>Terminate
+              </button>
+              <span style={{fontSize:'var(--text-12)',color:'var(--text-muted)'}}>← Disabled, locked to role</span>
+            </div>
+          </Block>
+        </div>
+
+        <div style={{height:80}}/>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

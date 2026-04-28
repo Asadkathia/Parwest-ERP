@@ -39,6 +39,8 @@
     "node_modules",
     "prisma/seed.ts",
     "e2e",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "Parwest /**",
+    "Parwest /"
   ]
 }

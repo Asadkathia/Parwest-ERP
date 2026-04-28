@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
 import InlineAlert from "@/components/ui/inline-alert"
 
@@ -95,7 +95,8 @@ export default function ClientTypesManager() {
             {notice && <InlineAlert type="success" message={notice} />}
             {error && <InlineAlert type="error" message={error} />}
 
-            <FilterBar className="space-y-4">
+            <Card>
+                <CardContent className="space-y-4 p-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="mb-1 block text-sm text-[var(--text-muted)]">New Client Type Label</label>
@@ -121,14 +122,15 @@ export default function ClientTypesManager() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <ActionButton onClick={create} disabled={saving}>
+                    <Button onClick={create} disabled={saving}>
                         {saving ? "Saving…" : "Add Type"}
-                    </ActionButton>
-                    <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>
+                    </Button>
+                    <Button variant="secondary" onClick={() => void load()} disabled={loading}>
                         Refresh
-                    </ActionButton>
+                    </Button>
                 </div>
-            </FilterBar>
+                </CardContent>
+            </Card>
 
             <DataTable
                 rows={visibleRows}

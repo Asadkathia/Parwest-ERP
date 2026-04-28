@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>INV-2026-04-0041 — MCB Bank — Parwest Security Services</title>
+<link rel="stylesheet" href="tokens.css"/>
+<link rel="stylesheet" href="tokens-v1.1.css"/>
+<link rel="stylesheet" href="print.css"/>
+<style>
+/* Screen preview styles */
+body.print-preview {
+  background: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  gap: 24px;
+  font-family: var(--font-ui);
+}
+.print-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 210mm;
+}
+.print-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-13);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: var(--font-ui);
+  transition: all var(--duration-fast);
+}
+.btn-p { background: var(--brand-600); color: #fff; border-color: var(--brand-600); }
+.btn-p:hover { background: var(--brand-700); }
+.btn-s { background: #fff; color: var(--text-secondary); border-color: var(--border-default); }
+.ctrl-info { font-size: var(--text-12); color: var(--text-muted); margin-left: auto; }
+.print-page {
+  background: white;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 16mm 18mm;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: 11pt;
+  color: #000;
+  line-height: 1.5;
+  position: relative;
+}
+/* Page header */
+.ph { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8mm; margin-bottom: 6mm; border-bottom: 2pt solid #000; }
+.ph-left { display: flex; align-items: center; gap: 10pt; }
+.ph-mark { width: 28pt; height: 28pt; background: #000; color: #fff; border-radius: 4pt; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14pt; flex-shrink: 0; }
+.ph-company { font-size: 15pt; font-weight: 800; letter-spacing: -0.3pt; }
+.ph-company-sub { font-size: 7pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; margin-top: 1pt; }
+.ph-right { text-align: right; }
+.ph-inv-no { font-size: 20pt; font-weight: 800; letter-spacing: -0.5pt; font-family: var(--font-mono); }
+.ph-inv-label { font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; }
+/* Two-col billing block */
+.billing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-bottom: 6mm; }
+.billing-block-label { font-size: 7pt; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.6pt; margin-bottom: 3pt; }
+.billing-block-name { font-size: 13pt; font-weight: 700; }
+.billing-block-sub { font-size: 9pt; color: #374151; margin-top: 1pt; }
+/* Meta grid */
+.meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 0.5pt solid #d1d5db; border-radius: 0; margin-bottom: 6mm; }
+.meta-cell { padding: 4pt 6pt; border-right: 0.5pt solid #d1d5db; }
+.meta-cell:last-child { border-right: none; }
+.meta-label { font-size: 7pt; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 2pt; }
+.meta-val { font-size: 10pt; font-weight: 600; font-family: var(--font-mono); }
+.meta-val.status { font-family: var(--font-ui); border: 0.75pt solid #6b7280; padding: 0pt 4pt; border-radius: 2pt; font-size: 8pt; display: inline-block; }
+/* Line items table */
+.line-table { width: 100%; border-collapse: collapse; margin-bottom: 6mm; font-size: 9pt; }
+.line-table th { background: #f9fafb; border: 0.5pt solid #d1d5db; padding: 3pt 6pt; text-align: left; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4pt; color: #6b7280; }
+.line-table th.r { text-align: right; }
+.line-table td { border: 0.5pt solid #d1d5db; padding: 4pt 6pt; vertical-align: middle; }
+.line-table td.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.line-table tr:nth-child(even) td { background: #f9fafb; }
+.line-table .total-row td { font-weight: 800; border-top: 1.5pt solid #000; font-size: 11pt; background: none !important; }
+.line-table .subtotal-row td { font-weight: 600; border-top: 0.5pt solid #d1d5db; }
+/* Notes */
+.note-box { border: 0.5pt solid #d1d5db; padding: 5pt 8pt; background: #f9fafb; font-size: 8pt; color: #374151; margin-bottom: 6mm; }
+.note-box strong { color: #000; }
+/* Footer */
+.page-footer { position: absolute; bottom: 12mm; left: 18mm; right: 18mm; border-top: 0.5pt solid #d1d5db; padding-top: 4pt; display: flex; justify-content: space-between; font-size: 7pt; color: #6b7280; }
+/* Status chip (print-safe) */
+.pchip { display: inline-flex; align-items: center; gap: 3pt; border: 0.75pt solid #6b7280; padding: 0.5pt 4pt; border-radius: 2pt; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3pt; }
+.pchip.sent { border-color: #1d4ed8; color: #1d4ed8; }
+.pchip.paid { border-color: #15803d; color: #15803d; }
+.pchip.overdue { border-color: #b91c1c; color: #b91c1c; }
+/* Amount block */
+.amount-block { display: flex; justify-content: flex-end; margin-bottom: 6mm; }
+.amount-table { width: 72mm; border-collapse: collapse; }
+.amount-table td { padding: 3pt 0; font-size: 9pt; }
+.amount-table td.l { color: #6b7280; }
+.amount-table td.r { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.amount-total td { font-size: 13pt; font-weight: 800; border-top: 1.5pt solid #000; padding-top: 4pt; }
+.amount-total td.r { font-size: 14pt; }
+</style>
+</head>
+<body class="print-preview">
+
+<div class="print-controls">
+  <button class="btn-p" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button class="btn-s" onclick="window.history.back()">← Back</button>
+  <span class="ctrl-info">A4 · Portrait · Chrome "Save as PDF" recommended</span>
+</div>
+
+<div class="print-page">
+  <!-- Header -->
+  <div class="ph">
+    <div class="ph-left">
+      <div class="ph-mark">P</div>
+      <div>
+        <div class="ph-company">Parwest Security Services</div>
+        <div class="ph-company-sub">NTN: 1234567-8 · STR: 12-34-5678-001-90 · Lahore, Pakistan</div>
+      </div>
+    </div>
+    <div class="ph-right">
+      <div class="ph-inv-label">Tax Invoice</div>
+      <div class="ph-inv-no">INV-2026-04-0041</div>
+    </div>
+  </div>
+
+  <!-- Billing parties -->
+  <div class="billing-grid">
+    <div>
+      <div class="billing-block-label">Service Provider</div>
+      <div class="billing-block-name">Parwest Security Services (Pvt.) Ltd.</div>
+      <div class="billing-block-sub">13-B, Gulberg III, Lahore 54000, Pakistan<br/>Tel: +92 42 3578 0000 · Email: billing@parwest.com</div>
+    </div>
+    <div>
+      <div class="billing-block-label">Bill To</div>
+      <div class="billing-block-name">MCB Bank Ltd.</div>
+      <div class="billing-block-sub">Accounts Payable Department<br/>MCB House, F-8 Markaz, Islamabad, Pakistan<br/>Contact: Ahsan Tariq · +92 51 111 000 111</div>
+    </div>
+  </div>
+
+  <!-- Meta cells -->
+  <div class="meta-grid">
+    <div class="meta-cell">
+      <div class="meta-label">Invoice No.</div>
+      <div class="meta-val">INV-2026-04-0041</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Service Period</div>
+      <div class="meta-val">April 2026</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Issue Date</div>
+      <div class="meta-val">22/04/2026</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Due Date</div>
+      <div class="meta-val">15/05/2026</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Status</div>
+      <div class="meta-val"><span class="pchip sent">● Sent — Awaiting Payment</span></div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Payment Terms</div>
+      <div class="meta-val">Net 15 Days</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Contract Ref</div>
+      <div class="meta-val">MCB-2024-001</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-label">Total Guards</div>
+      <div class="meta-val">48</div>
+    </div>
+  </div>
+
+  <!-- Line items -->
+  <table class="line-table">
+    <thead>
+      <tr>
+        <th>Designation</th>
+        <th>Shift</th>
+        <th>Branches</th>
+        <th class="r">Guards</th>
+        <th class="r">Duty Days</th>
+        <th class="r">Daily Rate (₨)</th>
+        <th class="r">Amount (₨)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Security Guard</strong></td>
+        <td>Day</td>
+        <td>Gulberg Main, DHA Ph4, Johar Town</td>
+        <td class="r">24</td>
+        <td class="r">26</td>
+        <td class="r">930</td>
+        <td class="r">579,840</td>
+      </tr>
+      <tr>
+        <td><strong>Security Guard</strong></td>
+        <td>Night</td>
+        <td>DHA Ph4, Clifton, PECHS</td>
+        <td class="r">12</td>
+        <td class="r">26</td>
+        <td class="r">1,008</td>
+        <td class="r">314,496</td>
+      </tr>
+      <tr>
+        <td><strong>Supervisor</strong></td>
+        <td>Day</td>
+        <td>Gulberg Main, Blue Area</td>
+        <td class="r">6</td>
+        <td class="r">26</td>
+        <td class="r">1,167</td>
+        <td class="r">182,052</td>
+      </tr>
+      <tr>
+        <td><strong>Supervisor</strong></td>
+        <td>Night</td>
+        <td>Clifton, F-10</td>
+        <td class="r">4</td>
+        <td class="r">26</td>
+        <td class="r">1,260</td>
+        <td class="r">130,968</td>
+      </tr>
+      <tr>
+        <td><strong>CPO (Close Protection)</strong></td>
+        <td>Day</td>
+        <td>Blue Area HQ</td>
+        <td class="r">2</td>
+        <td class="r">26</td>
+        <td class="r">1,458</td>
+        <td class="r">75,816</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="6"><strong>Subtotal — Guard Services</strong></td>
+        <td class="r"><strong>1,283,172</strong></td>
+      </tr>
+      <tr>
+        <td colspan="6">Transport Allowance (48 guards × ₨ 400/month)</td>
+        <td class="r">19,200</td>
+      </tr>
+      <tr>
+        <td colspan="6">Equipment Maintenance Levy</td>
+        <td class="r">8,400</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="6"><strong>Sub-Total (before tax)</strong></td>
+        <td class="r"><strong>1,310,772</strong></td>
+      </tr>
+      <tr>
+        <td colspan="6">General Sales Tax (GST) @ 0% (Zero-rated per SRO 592)</td>
+        <td class="r">0</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="6"><strong>TOTAL AMOUNT DUE</strong></td>
+        <td class="r"><strong>₨ 1,310,772</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Notes -->
+  <div class="note-box">
+    <strong>Bank Transfer Details:</strong> Habib Bank Limited · Account: 0001-79004209-01 · IBAN: PK84HABB0001790042090100 · Branch Code: 0001 (Main Branch, Lahore)<br/>
+    <strong>Note:</strong> Please quote invoice number <strong>INV-2026-04-0041</strong> in your payment reference. Late payments attract a surcharge of 2% per month after the due date. This invoice is computer-generated and requires no physical signature.
+  </div>
+
+  <!-- Amounts summary (right-aligned) -->
+  <div class="amount-block">
+    <table class="amount-table">
+      <tr><td class="l">Guard Services</td><td class="r">₨ 1,283,172</td></tr>
+      <tr><td class="l">Allowances &amp; Levies</td><td class="r">₨ 27,600</td></tr>
+      <tr><td class="l">GST (0%)</td><td class="r">₨ 0</td></tr>
+      <tr class="amount-total"><td class="l"><strong>Amount Due</strong></td><td class="r"><strong>₨ 1,310,772</strong></td></tr>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="page-footer">
+    <span>Parwest Security Services (Pvt.) Ltd. · NTN 1234567-8 · 13-B Gulberg III, Lahore</span>
+    <span>Page 1 of 1</span>
+    <span>Generated: 27/04/2026 09:14 · Computer-generated, no signature required</span>
+  </div>
+</div>
+
+<script>
+// Set timestamp for footer
+document.documentElement.setAttribute('data-timestamp', new Date().toLocaleString('en-PK'));
+</script>
+</body>
+</html>
