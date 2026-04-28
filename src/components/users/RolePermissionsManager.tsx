@@ -26,6 +26,16 @@ import {
     TableRow,
 } from "@/components/shadcn/table"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
 
 type ActionName = (typeof ACTIONS)[number]
 type PermMap = Record<ActionName, boolean>
@@ -72,6 +82,7 @@ export default function RolePermissionsManager({ roles }: Props) {
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [query, setQuery] = useState("")
+    const [discardOpen, setDiscardOpen] = useState(false)
 
     useEffect(() => {
         if (!selectedRoleId) return
@@ -144,10 +155,14 @@ export default function RolePermissionsManager({ roles }: Props) {
         }))
     }
 
-    const cancel = () => {
+    const requestCancel = () => {
         if (!isDirty) return
-        if (!window.confirm("Discard unsaved permission changes?")) return
+        setDiscardOpen(true)
+    }
+
+    const confirmDiscard = () => {
         setPerms(clonePerms(initialPerms))
+        setDiscardOpen(false)
     }
 
     const save = async () => {
@@ -334,11 +349,25 @@ export default function RolePermissionsManager({ roles }: Props) {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={cancel}
+                        onClick={requestCancel}
                         disabled={!isDirty || saving || loading}
                     >
                         Cancel
                     </Button>
+                    <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Discard unsaved permission changes?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Pending edits to this role&apos;s permissions will be reverted.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Keep editing</AlertDialogCancel>
+                                <AlertDialogAction onClick={confirmDiscard}>Discard</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     <PermissionGate module="USERS" action="UPDATE" mode="disable">
                         <Button
                             type="button"

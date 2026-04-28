@@ -99,12 +99,20 @@ export default async function UsersPage({
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 flex items-start justify-between gap-4 ui-btn ui-btn-primary inline-flex items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{"Users"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage system users and their permissions"}</p></div><div className="flex shrink-0 items-center gap-2">{(canCreateUser ? (
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Users</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Manage system users and their permissions</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {canCreateUser ? (
             <Link href="/users/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add User
             </Link>
-          ) : null)}</div></div>
+          ) : null}
+        </div>
+      </div>
       {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
       {needsRegionGate ? (

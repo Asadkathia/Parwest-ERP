@@ -2,11 +2,10 @@ import { auth } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { Plus, Building2, Building, Users, Ban, AlertCircle } from "lucide-react"
 import StatCard from "@/components/shadcn/parwest-stat-card"
-import { Card, CardContent } from "@/components/shadcn/card"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import ClientsListClient, {
   type ClientListRow,
@@ -29,14 +28,12 @@ export default async function ClientsPage({
   if (!session) redirect("/login")
 
   const canCreateClient = hasAction(session, "CLIENTS", "CREATE")
-  const isSuperAdminUser = isSuperAdmin(session)
   const {
     regionId = "",
     q = "",
     status: statusParam = "",
     type: typeParam = "",
   } = await searchParams
-  const needsRegionGate = isSuperAdminUser && !regionId
 
   let clients: ClientListRow[] = []
   let typeOptions: { value: string; label: string }[] = []
@@ -45,7 +42,7 @@ export default async function ClientsPage({
   const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
-  if (!needsRegionGate) try {
+  try {
     // Resolve the active regionId filter: explicit URL param (driven by the
     // global topbar region picker) or the user's scoped region (regional
     // users). If a regional user tries to override their scope via the URL
@@ -176,34 +173,20 @@ export default async function ClientsPage({
           legacy banner is migrated module-wide. */}
       {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
-      {needsRegionGate ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-            <Users className="h-8 w-8 text-muted-foreground" aria-hidden />
-            <p className="text-base font-medium">Select a region to view clients.</p>
-            <p className="text-sm text-muted-foreground">
-              Clients are region-scoped. Pick a region from the topbar above.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* TODO(phase-5): swap StatCard for shadcn KPI card primitive
-              when StatCard is migrated module-wide. */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
-            <StatCard label="Active" value={stats.active} icon={<Building2 className="h-5 w-5" />} tone="success" />
-            <StatCard label="Inactive" value={stats.inactive} icon={<Ban className="h-5 w-5" />} tone="warning" />
-            <StatCard label="Total Branches" value={stats.totalBranches} icon={<Building className="h-5 w-5" />} tone="brand" />
-          </div>
+      {/* TODO(phase-5): swap StatCard for shadcn KPI card primitive
+          when StatCard is migrated module-wide. */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Clients" value={stats.total} icon={<Users className="h-5 w-5" />} tone="brand" />
+        <StatCard label="Active" value={stats.active} icon={<Building2 className="h-5 w-5" />} tone="success" />
+        <StatCard label="Inactive" value={stats.inactive} icon={<Ban className="h-5 w-5" />} tone="warning" />
+        <StatCard label="Total Branches" value={stats.totalBranches} icon={<Building className="h-5 w-5" />} tone="brand" />
+      </div>
 
-          <ClientsListClient
-            clients={clients}
-            canCreateClient={canCreateClient}
-            typeOptions={typeOptions}
-          />
-        </>
-      )}
+      <ClientsListClient
+        clients={clients}
+        canCreateClient={canCreateClient}
+        typeOptions={typeOptions}
+      />
     </div>
   )
 }

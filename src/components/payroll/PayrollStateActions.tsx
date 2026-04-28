@@ -3,9 +3,9 @@
 /**
  * Action buttons + modals for the Payroll state machine.
  *
- * Modal pattern reused from `src/components/payroll/PayrollOtherDeductionsManager.tsx`
- * (`fixed inset-0 z-50 ... ui-card max-w-* p-6`). Buttons are shadcn `Button`
- * from `src/components/shadcn/button.tsx`. Errors come from the API
+ * Destructive transitions (Lock Region, Globally Finalize, Emergency Release)
+ * use shadcn `AlertDialog`; non-destructive transitions still use the bespoke
+ * ModalShell below pending Phase 9 cleanup. Errors come from the API
  * envelope's `data.message`.
  */
 

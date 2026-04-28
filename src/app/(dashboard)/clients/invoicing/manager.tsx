@@ -19,6 +19,17 @@ import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/shadcn/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/shadcn/alert-dialog"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import InvoiceComposer from "./InvoiceComposer"
 import InvoiceList from "./InvoiceList"
@@ -50,6 +61,7 @@ export default function ClientInvoicingManager(_props: {
 
   const [detail, setDetail] = useState<InvoiceRow | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
 
   // Load clients (scoped to URL regionId for SuperAdmin; REGIONAL users are
   // auto-scoped server-side).
@@ -162,16 +174,7 @@ export default function ClientInvoicingManager(_props: {
   }
 
   const runBulkGenerate = async () => {
-    if (!period) {
-      toast.error("Select a period.")
-      return
-    }
-    if (
-      !confirm(
-        `Generate draft invoices for all clients in your scope for ${period}?`
-      )
-    )
-      return
+    setBulkConfirmOpen(false)
     setBulkBusy(true)
     try {
       const res = await fetch("/api/invoices/generate-monthly", {
@@ -195,11 +198,54 @@ export default function ClientInvoicingManager(_props: {
 
   return (
     <div className="space-y-4">
-      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Client Invoicing"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Compose, auto-fill and track invoices. Advances are auto-applied on creation."}</p></div><div className="flex shrink-0 items-center gap-2">{(<PermissionGate module="CLIENTS" action="CREATE" mode="hide">
-            <Button onClick={runBulkGenerate} disabled={bulkBusy || !period}>
-              {bulkBusy ? "Generating…" : "Bulk generate (period)"}
-            </Button>
-          </PermissionGate>)}</div></div>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Client Invoicing</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Compose, auto-fill and track invoices. Advances are auto-applied on creation.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
+            <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={bulkBusy || !period}
+                  onClick={() => {
+                    if (!period) {
+                      toast.error("Select a period.")
+                      return
+                    }
+                    setBulkConfirmOpen(true)
+                  }}
+                >
+                  {bulkBusy ? "Generating…" : "Bulk generate (period)"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Generate draft invoices for {period}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Draft invoices will be created for all clients in your scope. Existing invoices for the period are skipped.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault()
+                      void runBulkGenerate()
+                    }}
+                    disabled={bulkBusy}
+                  >
+                    {bulkBusy ? "Generating…" : "Generate"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </PermissionGate>
+        </div>
+      </div>
 
       <InvoiceSummaryTiles rows={invoices} />
 

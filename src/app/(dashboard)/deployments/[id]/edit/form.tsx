@@ -933,7 +933,7 @@ export default function ChangeDeploymentForm({
                 <div className="flex gap-3 pt-2 border-t border-border">
                   <PermissionGate
                     module="GUARDS"
-                    action="UPDATE"
+                    action="CREATE"
                     mode="disable"
                   >
                     <Button

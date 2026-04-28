@@ -16,6 +16,7 @@ import {
 } from "@/components/shadcn/guard-status-badge"
 import { Input } from "@/components/shadcn/input"
 import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { RegionSelector } from "@/components/shadcn/region-selector"
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/shadcn/select"
+import { useRegions } from "@/lib/hooks/useRegions"
 export type GuardListRow = {
   id: string
   parwestId: string
@@ -103,6 +105,12 @@ export default function GuardsListClient({
   const status = searchParams.get("status") ?? ""
   const officeId = searchParams.get("officeId") ?? ""
   const designation = searchParams.get("designation") ?? ""
+  const regionParam = searchParams.get("regionId") ?? null
+  const regionValue: string | null =
+    !regionParam || regionParam === "all" || regionParam === "__GLOBAL__"
+      ? null
+      : regionParam
+  const { regions } = useRegions()
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const pushParam = React.useCallback(
@@ -149,6 +157,19 @@ export default function GuardsListClient({
     pushParam((p) => {
       if (val && val !== ALL_VALUE) p.set("officeId", val)
       else p.delete("officeId")
+    })
+  }
+
+  const handleRegion = (next: string | null) => {
+    pushParam((p) => {
+      if (next === null) p.delete("regionId")
+      else p.set("regionId", next)
+      // Clear region-dependent params so we don't fetch stale office data
+      // under a different region (mirrors the topbar contract).
+      p.delete("regionalOfficeId")
+      p.delete("officeId")
+      p.delete("branchId")
+      p.delete("clientId")
     })
   }
 
@@ -251,6 +272,17 @@ export default function GuardsListClient({
     <div className="space-y-4">
       {/* Filter toolbar */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">
+            Region
+          </label>
+          <RegionSelector
+            regions={regions}
+            value={regionValue}
+            onChange={handleRegion}
+            className="w-full"
+          />
+        </div>
         <div>
           <label className="mb-1 block text-sm text-muted-foreground">
             Search

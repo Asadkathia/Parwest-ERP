@@ -6,6 +6,7 @@ import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockDeploymentsList } from "@/lib/mockData/deployments"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest) {
         if (!session) {
             return unauthorized()
         }
+        if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
         const body = await request.json()

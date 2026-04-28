@@ -363,7 +363,7 @@ export default function InvoiceDetailModal({
           <div className="flex-1" />
           {!isVoid ? (
             <>
-              <PermissionGate module="CLIENTS" action="UPDATE" mode="hide">
+              <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
                 <Button
                   variant="secondary"
                   onClick={() => setPaymentOpen((s) => !s)}
@@ -372,7 +372,7 @@ export default function InvoiceDetailModal({
                   Record Payment
                 </Button>
               </PermissionGate>
-              <PermissionGate module="CLIENTS" action="UPDATE" mode="hide">
+              <PermissionGate module="PAYROLL" action="UPDATE" mode="hide">
                 <Button
                   onClick={markPaid}
                   disabled={invoice.status === "PAID" || submitting}
@@ -380,7 +380,7 @@ export default function InvoiceDetailModal({
                   Mark as PAID
                 </Button>
               </PermissionGate>
-              <PermissionGate module="CLIENTS" action="DELETE" mode="hide">
+              <PermissionGate module="PAYROLL" action="CREATE" mode="hide">
                 <Button
                   variant="ghost"
                   className="text-destructive hover:text-destructive"

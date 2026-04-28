@@ -458,7 +458,7 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
               <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <PermissionGate
                   module="GUARDS"
-                  action="UPDATE"
+                  action="CREATE"
                   mode="disable"
                 >
                   <AlertDialogTrigger asChild>
