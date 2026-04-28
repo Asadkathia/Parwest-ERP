@@ -1,1398 +1,1431 @@
-/**
- * Parwest ERP — Guard Create Wizard (Phase 3b' reskin)
- * ─────────────────────────────────────────────────────────────────────────
- * 6-step shadcn Stepper form. Reskin only — validation rules, API endpoint
- * (`POST /api/guards`), OCR autofill behaviour, and photo upload contract
- * are unchanged.
- *
- * Steps:
- *   1. Personal Information
- *   2. Service Details
- *   3. Address & Contact
- *   4. Bank & Finance
- *   5. Documents
- *   6. Review & Submit
- *
- * The unified zod schema lives at `src/lib/schemas/guard-create.ts`.
- */
-
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { type ReactNode, useMemo, useRef, useState, useEffect, useCallback } from "react"
+import { useForm, useWatch } from "react-hook-form"
 import { useRouter } from "next/navigation"
-import { FormProvider, useForm, useFormContext, type Path } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { toast } from "sonner"
-import {
-  ArrowLeft,
-  ArrowRight,
-  Camera,
-  Check,
-  FileText,
-  IdCard,
-  Loader2,
-  ShieldCheck,
-} from "lucide-react"
-
-import {
-  guardCreateSchema,
-  STEP_FIELDS,
-  type GuardCreateForm,
-} from "@/lib/schemas/guard-create"
-import { calculateAgeYears } from "@/lib/validation/formats"
-import {
-  Stepper,
-  type StepConfig,
-} from "@/components/shadcn/stepper"
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/shadcn/form"
-import { Input } from "@/components/shadcn/input"
-import { Label } from "@/components/shadcn/label"
-import { Button } from "@/components/shadcn/button"
-import { Switch } from "@/components/shadcn/switch"
-import { Checkbox } from "@/components/shadcn/checkbox"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn/avatar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/shadcn/select"
-import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/shadcn/alert-dialog"
-import ParwestAIAutofill from "@/components/ocr/ParwestAIAutofill"
-
-// ────────────────────────────────────────────────────────────────────────────
-// Types & constants
-// ────────────────────────────────────────────────────────────────────────────
+import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react"
+import Link from "next/link"
+import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
+import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
+import type { GuardBankAccount } from "@/lib/guards/bank-accounts"
+import PhoneInput from "@/components/ui/PhoneInput"
+import CnicInput from "@/components/ui/CnicInput"
+import { isValidGuardAge } from "@/lib/validation/formats"
 
 type RegionalOffice = {
   id: string
   name: string
-  region: { id: string; name: string }
+  region: {
+    id: string
+    name: string
+  }
 }
 
 type Props = {
   regionalOffices: RegionalOffice[]
   currentUserName: string
+  /** When set, the user is locked to a single regional office — selector is hidden and value hardcoded. */
   lockedRegionalOfficeId?: string | null
+  /** When set, the user is regionally scoped — informational; office list is already pre-filtered server-side. */
   lockedRegionId?: string | null
 }
 
-const STEPS: StepConfig[] = [
-  { id: "personal", label: "Personal", meta: "Name, CNIC, DOB" },
-  { id: "service", label: "Service", meta: "Office, supervisor, shift" },
-  { id: "address", label: "Address", meta: "Permanent, current, contact" },
-  { id: "bank", label: "Bank", meta: "Account & finance" },
-  { id: "documents", label: "Documents", meta: "CNIC, photo, certificates" },
-  { id: "review", label: "Review", meta: "Confirm & submit" },
+type SectionConfig = {
+  id: string
+  label: string
+  required?: boolean
+}
+
+const SECTION_CONFIG: SectionConfig[] = [
+  { id: "general", label: "GENERAL INFORMATION" },
+  { id: "bankAccount", label: "GUARD BANK ACCOUNT DETAILS" },
+  { id: "previousEmployment", label: "PREVIOUS EMPLOYMENT DETAILS" },
+  { id: "address", label: "ADDRESS DETAIL" },
+  { id: "education", label: "EDUCATION" },
+  { id: "introducer", label: "INTRODUCER" },
+  { id: "physical", label: "PHYSICAL DETAILS" },
+  { id: "family", label: "ADD FAMILY MEMBER DETAIL", required: true },
+  { id: "nearestRelative", label: "ADD NEAREST RELATIVE DETAIL", required: true },
 ]
 
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const
-const MARITAL_STATUSES = [
-  "single",
-  "married",
-  "divorced",
-  "widowed",
-  "separated",
-  "engaged",
-] as const
-const RELIGIONS = ["Islam", "Christianity", "Hinduism", "Other"] as const
-const EDUCATION_LEVELS = [
-  "Primary",
-  "Middle",
-  "Matric",
-  "Intermediate",
-  "Graduate",
-  "B.A",
-  "BSc",
-  "M.A",
-  "Msc",
-] as const
-const SHIFTS = [
-  { value: "DAY", label: "Day" },
-  { value: "NIGHT", label: "Night" },
-  { value: "ROTATING", label: "Rotating" },
-] as const
 
-// ────────────────────────────────────────────────────────────────────────────
-// Main wizard
-// ────────────────────────────────────────────────────────────────────────────
+const EDUCATION_LEVELS = ["Primary", "Middle", "Matric", "Intermediate", "Graduate", "B.A", "BSc", "M.A", "Msc"]
+const BLOOD_GROUPS = ["O+ve", "A+ve", "B+ve", "AB+ve", "O-ve", "A-ve", "B-ve", "AB-ve"]
+const MARITAL_STATUSES = ["single", "married", "divorced", "widowed", "separated", "engaged"]
+const PREREQUISITE_ITEMS_FALLBACK = [
+  "NADRA Verification",
+  "Health Certificate Verification",
+  "Police Verification",
+  "Eyesight Certificate",
+  "Character Verification",
+  "Mental Health Check",
+  "3rd Guarantor Verification",
+  "Company Card & CNIC",
+]
 
-export default function GuardEnrollmentForm({
-  regionalOffices,
-  currentUserName,
-  lockedRegionalOfficeId = null,
-  lockedRegionId = null,
-}: Props) {
+function useSectionChecklist() {
+  const initial = Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, true])) as Record<string, boolean>
+
+  const [sections, setSections] = useState<Record<string, boolean>>(initial)
+  const allSelected = useMemo(() => Object.values(sections).every(Boolean), [sections])
+
+  const toggle = (id: string) => {
+    const cfg = SECTION_CONFIG.find((s) => s.id === id)
+    if (cfg?.required) return
+    setSections((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+  const setAll = (value: boolean) => {
+    setSections(Object.fromEntries(
+      SECTION_CONFIG.map((s) => [s.id, s.required ? true : value])
+    ) as Record<string, boolean>)
+  }
+
+  const setSection = (id: string, value: boolean) =>
+    setSections((prev) => ({ ...prev, [id]: value }))
+
+  return { sections, toggle, allSelected, setAll, setSection }
+}
+
+function calculateAge(dateOfBirth: string, referenceDate?: string) {
+  if (!dateOfBirth) return ""
+
+  const birth = new Date(dateOfBirth)
+  if (Number.isNaN(birth.getTime())) return ""
+
+  const reference = referenceDate ? new Date(referenceDate) : new Date()
+  if (Number.isNaN(reference.getTime())) return ""
+
+  let age = reference.getFullYear() - birth.getFullYear()
+  const monthDiff = reference.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birth.getDate())) {
+    age--
+  }
+  return age >= 0 ? String(age) : ""
+}
+
+export default function GuardEnrollmentForm({ regionalOffices, currentUserName, lockedRegionalOfficeId = null, lockedRegionId: _lockedRegionId = null }: Props) {
+  void _lockedRegionId
   const router = useRouter()
-  const [step, setStep] = useState(0)
-  const [submitting, setSubmitting] = useState(false)
-  const [discardOpen, setDiscardOpen] = useState(false)
-  const [successInfo, setSuccessInfo] = useState<{ id: string | null; parwestId: string } | null>(null)
-  const [errorInfo, setErrorInfo] = useState<{ title: string; message: string; cleared: boolean } | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const { sections, toggle, allSelected, setAll, setSection } = useSectionChecklist()
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(SECTION_CONFIG.map((s) => [s.id, false])) as Record<string, boolean>
+  )
+  const [dbPrereqItems, setDbPrereqItems] = useState<string[]>(PREREQUISITE_ITEMS_FALLBACK)
+  const [prerequisites, setPrerequisites] = useState<Record<string, boolean>>({})
 
-  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], [])
+  const loadPrereqItems = useCallback(async () => {
+    try {
+      const res = await fetch("/api/guard-document-types?activeOnly=true")
+      if (!res.ok) return
+      const data: { name: string }[] = await res.json()
+      if (data.length > 0) {
+        const names = data.map((d) => d.name)
+        setDbPrereqItems(names)
+        setPrerequisites(Object.fromEntries(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+      } else {
+        setPrerequisites(Object.fromEntries(PREREQUISITE_ITEMS_FALLBACK.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+      }
+    } catch {
+      setPrerequisites(Object.fromEntries(PREREQUISITE_ITEMS_FALLBACK.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), false])))
+    }
+  }, [])
 
-  const form = useForm<GuardCreateForm>({
-    resolver: zodResolver(guardCreateSchema),
-    mode: "onBlur",
+  useEffect(() => { loadPrereqItems() }, [loadPrereqItems])
+
+  const [familyRows, setFamilyRows] = useState([0])
+  const [nearestRows, setNearestRows] = useState([0])
+  const familyCounterRef = useRef(1)
+  const nearestCounterRef = useRef(1)
+  const [contactRows, setContactRows] = useState<number[]>([])
+  const contactCounterRef = useRef(2)
+  const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(lockedRegionalOfficeId || "")
+  const [dateOfBirth, setDateOfBirth] = useState("")
+  // Joining date is always the day of enrollment — locked, no picker.
+  const joiningDate = useMemo(() => new Date().toISOString().split("T")[0], [])
+  const [maritalStatus, setMaritalStatus] = useState("")
+
+  // Local RHF form to back GuardAccountsEditor (post-shadcn migration requires `control`).
+  // The serialized JSON is mirrored into a hidden form input below so the FormData
+  // submit pipeline sees `bankAccounts` exactly as before.
+  const accountsForm = useForm<{ bankAccounts: GuardBankAccount[] }>({
     defaultValues: {
-      // Personal
-      name: "",
-      fatherName: "",
-      motherName: "",
-      cnic: "",
-      dateOfBirth: "",
-      gender: "MALE",
-      maritalStatus: "",
-      religion: "Islam",
-      bloodGroup: "",
-      height: "",
-      weight: "",
-      identificationMark: "",
-      education: "",
-      passingYear: "",
-      educationInstitute: "",
-      isExService: false,
-      exServiceType: "CIVILIAN",
-      rank: "",
-      unit: "",
-      // Service
-      regionalOfficeId: lockedRegionalOfficeId ?? "",
-      regionId: lockedRegionId ?? "",
-      supervisorId: "",
-      managerName: "",
-      designation: "Security Guard",
-      shift: "DAY",
-      joiningDate: todayIso,
-      policeStation: "",
-      nationality: "Pakistani",
-      nextOfKin: "",
-      // Address
-      addressPermanent: "",
-      permanentAddressContact: "",
-      addressCurrent: "",
-      currentAddressContact: "",
-      phone: "",
-      emergencyContactName: "",
-      emergencyContactRelation: "",
-      emergencyContactPhone: "",
-      locationPin: "",
-      // Bank
-      bankName: "",
-      accountNumber: "",
-      accountTitle: "",
-      branchLocation: "",
-      iban: "",
-      accountType: "CURRENT",
-      salary: "",
-      reservePct: 30,
-      // Documents
-      cnicCopyReceived: false,
-      photoReceived: false,
-      policeCertReceived: false,
-      photoDataUrl: "",
+      bankAccounts: [
+        {
+          id: `acc-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`,
+          bankName: "",
+          accountTitle: "",
+          accountNumber: "",
+          iban: "",
+          branchCode: "",
+          branchLocation: "",
+          accountType: "SAVINGS",
+          accountStatus: "ACTIVE",
+          walletType: "BANK",
+          isActive: true,
+        },
+      ],
     },
   })
+  const watchedAccounts = useWatch({ control: accountsForm.control, name: "bankAccounts" })
+  const serializedAccounts = useMemo(
+    () => JSON.stringify(watchedAccounts ?? []),
+    [watchedAccounts],
+  )
 
-  // Sync regionId when regionalOfficeId changes (server expects a regionId fallback)
-  const watchedOffice = form.watch("regionalOfficeId")
+  // Dynamic ex-service types
+  const [exServiceTypeOptions, setExServiceTypeOptions] = useState<string[]>([])
+  type PreviousEmp = {
+    type: string
+    isExService: boolean
+    // Ex-service fields
+    registrationNo: string
+    rank: string
+    unit: string
+    // Civilian fields
+    nameOfCompany: string
+    designation: string
+    reasonForLeaving: string
+    // Common fields
+    dateOfEnrollment: string
+    dateOfDischarge: string
+    years: string
+    months: string
+    remarks: string
+  }
+  const emptyEmp = (): PreviousEmp => ({ type: "", isExService: false, registrationNo: "", rank: "", unit: "", nameOfCompany: "", designation: "", reasonForLeaving: "", dateOfEnrollment: "", dateOfDischarge: "", years: "", months: "", remarks: "" })
+  const [prevEmployments, setPrevEmployments] = useState<PreviousEmp[]>([])
+  const [guardEmploymentType, setGuardEmploymentType] = useState<string>("")
+  const empCounterRef = useRef(0)
+
   useEffect(() => {
-    if (!watchedOffice) return
-    const office = regionalOffices.find((o) => o.id === watchedOffice)
-    if (office) {
-      form.setValue("regionId", office.region.id, { shouldDirty: false })
-    }
-  }, [watchedOffice, regionalOffices, form])
+    fetch("/api/guard-ex-service-types?activeOnly=true")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ name: string }>) => setExServiceTypeOptions(data.map((d) => d.name)))
+      .catch(() => setExServiceTypeOptions([]))
+  }, [])
+  const ageValue = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth])
+  const joiningAgeValue = useMemo(() => calculateAge(dateOfBirth, joiningDate), [dateOfBirth, joiningDate])
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
-  const goNext = async () => {
-    const fields = STEP_FIELDS[step]
-    if (fields.length === 0) {
-      // Review step has no fields — submit
-      await onSubmit()
+  const toggleSectionCollapse = (id: string) => {
+    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const handleGuardEmploymentTypeChange = (next: string) => {
+    setGuardEmploymentType(next)
+    if (next && next !== "CIVILIAN") {
+      // Force-enable the section, expand it, and seed an empty matching ex-service
+      // row so the user can immediately fill in Registration No / Rank / Unit.
+      setSection("previousEmployment", true)
+      setCollapsed((prev) => ({ ...prev, previousEmployment: false }))
+      setPrevEmployments((prev) =>
+        prev.some((e) => e.type === next)
+          ? prev
+          : [...prev, { ...emptyEmp(), type: next, isExService: true }]
+      )
+    }
+  }
+
+  const toggleChecklistSection = (id: string) => {
+    toggle(id)
+    setCollapsed((prev) => ({ ...prev, [id]: false }))
+  }
+
+  const allPrerequisitesSelected = useMemo(
+    () => Object.values(prerequisites).length > 0 && Object.values(prerequisites).every(Boolean),
+    [prerequisites]
+  )
+
+  const togglePrerequisite = (key: string) => {
+    setPrerequisites((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const toggleAllPrerequisites = (value: boolean) => {
+    setPrerequisites(
+      Object.fromEntries(dbPrereqItems.map((n) => [n.toLowerCase().replace(/[^a-z0-9]+/g, "_"), value])) as Record<string, boolean>
+    )
+  }
+
+  const applyOcrFields = (fields: Record<string, string>) => {
+    const form = formRef.current
+
+    Object.entries(fields).forEach(([name, value]) => {
+      // Update React-controlled state first
+      if (name === "dateOfBirth") { setDateOfBirth(value); return }
+      if (name === "maritalStatus") { setMaritalStatus(value); return }
+
+      // For all other fields update the DOM input directly
+      if (!form) return
+      const input = form.elements.namedItem(name) as
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLSelectElement
+        | null
+      if (!input) return
+
+      // Use React's synthetic event so React-uncontrolled inputs pick up the value
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : input instanceof HTMLSelectElement
+            ? HTMLSelectElement.prototype
+            : HTMLInputElement.prototype,
+        "value"
+      )?.set
+      nativeSetter?.call(input, value)
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+      input.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    setSuccess("")
+
+    const formData = new FormData(e.currentTarget)
+    const data = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>
+    const cnicValue = String(data.cnic || "").trim()
+    const ageValue = String(data.age || "").trim()
+    const contactNumbers = Object.entries(data)
+      .filter(([key]) => key === "phone" || key.startsWith("phone_secondary_"))
+      .map(([, value]) => String(value || "").trim())
+      .filter(Boolean)
+    const familyAgeValues = Object.entries(data)
+      .filter(([key]) => key.includes("_age"))
+      .map(([, value]) => String(value || "").trim())
+
+    if (cnicValue && !/^\d{5}-\d{7}-\d$/.test(cnicValue)) {
+      setError("CNIC format must be XXXXX-XXXXXXX-X")
+      setLoading(false)
       return
     }
-    const valid = await form.trigger(fields as readonly Path<GuardCreateForm>[])
-    if (!valid) {
-      // Focus first invalid field
-      const firstError = fields.find((f) => form.getFieldState(f as Path<GuardCreateForm>).invalid)
-      if (firstError) {
-        form.setFocus(firstError as Path<GuardCreateForm>)
+
+    const dobForAge = String(data.dateOfBirth || "").trim()
+    if (!dobForAge || !isValidGuardAge(dobForAge)) {
+      setError("Guard must be between 18 and 65 years old.")
+      setLoading(false)
+      return
+    }
+
+    if (contactNumbers.length === 0) {
+      setError("At least one contact number is required.")
+      setLoading(false)
+      return
+    }
+
+    for (const number of contactNumbers) {
+      if (!/^\+92-\d{3}-\d{7}$/.test(number)) {
+        setError("Contact format must be +92-300-1234567")
+        setLoading(false)
+        return
       }
-      toast.error("Please fix the highlighted errors before continuing.")
+    }
+
+    // Validate address contact numbers when the address section is included
+    if (sections.address) {
+      const currentContact = String(data.currentAddressContact || "").trim()
+      const permanentContact = String(data.permanentAddressContact || "").trim()
+      if (currentContact && !/^\+92-\d{3}-\d{7}$/.test(currentContact)) {
+        setError("Current Address Contact No format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
+      if (permanentContact && !/^\+92-\d{3}-\d{7}$/.test(permanentContact)) {
+        setError("Permanent Address Contact No format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
+    }
+
+    // Validate CNIC dates
+    const cnicIssueDate = formData.get("cnicIssueDate") as string
+    const cnicExpiryDate = formData.get("cnicExpiryDate") as string
+    if (cnicIssueDate && cnicExpiryDate) {
+      if (new Date(cnicIssueDate) >= new Date(cnicExpiryDate)) {
+        setError("CNIC Issue Date must be before the CNIC Expiry Date.")
+        setLoading(false)
+        return
+      }
+    }
+
+    if (ageValue && (!Number.isFinite(Number(ageValue)) || Number(ageValue) < 0)) {
+      setError("Please enter a valid age")
+      setLoading(false)
       return
     }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1))
-  }
 
-  const goPrev = () => setStep((s) => Math.max(s - 1, 0))
-
-  const goToStep = (i: number) => {
-    if (i < step) setStep(i)
-  }
-
-  // ── Cancel / discard guard ─────────────────────────────────────────────────
-  const handleCancelClick = () => {
-    if (form.formState.isDirty) {
-      setDiscardOpen(true)
-    } else {
-      router.push("/guards")
+    for (const familyAge of familyAgeValues) {
+      if (familyAge && (!Number.isFinite(Number(familyAge)) || Number(familyAge) < 0)) {
+        setError("Please enter a valid age")
+        setLoading(false)
+        return
+      }
     }
-  }
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
-  const onSubmit = async () => {
-    // Validate the entire schema as a final safety net.
-    const valid = await form.trigger()
-    if (!valid) {
-      toast.error("Please complete all required fields.")
+    // Validate general section required fields that HTML required can't catch (hidden inputs + selects)
+    if (sections.general) {
+      if (!String(data.supervisorId || "").trim()) {
+        setError("Supervisor is required.")
+        setLoading(false)
+        return
+      }
+      if (!String(data.bloodGroup || "").trim()) {
+        setError("Blood Group is required.")
+        setLoading(false)
+        return
+      }
+      if (!String(data.maritalStatus || "").trim()) {
+        setError("Marital Status is required.")
+        setLoading(false)
+        return
+      }
+    }
+
+    // Validate family members (required — at least one with a name)
+    const hasAnyFamilyName = familyRows.some((idx) => String(data[`family_${idx}_name`] || "").trim())
+    if (!hasAnyFamilyName) {
+      setError("At least one family member detail is required. Please fill in the Name field.")
+      setLoading(false)
       return
     }
-    const values = form.getValues()
-    setSubmitting(true)
 
-    // Map RHF values → legacy API request shape.
-    // The API parses bankAccounts JSON + the flat legacy fields.
-    const bankAccounts = [
-      {
-        bankName: values.bankName,
-        accountNumber: values.accountNumber,
-        accountTitle: values.accountTitle,
-        branchLocation: values.branchLocation,
-        iban: values.iban || undefined,
-        accountType: values.accountType,
-        walletType: "BANK",
-        isActive: true,
-      },
-    ]
+    // Validate nearest relatives (required — at least one with a name)
+    const hasAnyNearestName = nearestRows.some((idx) => String(data[`nearest_${idx}_name`] || "").trim())
+    if (!hasAnyNearestName) {
+      setError("At least one nearest relative detail is required. Please fill in the Name field.")
+      setLoading(false)
+      return
+    }
 
-    const ageYears = calculateAgeYears(values.dateOfBirth)
+    // Validate nearest relative contact numbers format
+    for (const idx of nearestRows) {
+      const contact = String(data[`nearest_${idx}_contact`] || "").trim()
+      if (contact && !/^\+92-\d{3}-\d{7}$/.test(contact)) {
+        setError("Nearest Relative Contact # format must be +92-300-1234567")
+        setLoading(false)
+        return
+      }
+    }
 
-    const payload: Record<string, unknown> = {
-      // Personal
-      name: values.name,
-      fatherName: values.fatherName,
-      motherName: values.motherName,
-      cnic: values.cnic,
-      dateOfBirth: values.dateOfBirth,
-      age: ageYears != null ? String(ageYears) : "",
-      gender: values.gender,
-      maritalStatus: values.maritalStatus,
-      religion: values.religion,
-      bloodGroup: values.bloodGroup,
-      height: values.height,
-      weight: values.weight,
-      identificationMark: values.identificationMark,
-      education: values.education,
-      passingYear: values.passingYear,
-      educationInstitute: values.educationInstitute,
-      // Ex-service
-      exServiceType: values.isExService ? values.exServiceType : "CIVILIAN",
-      isExService: values.isExService ? "true" : "false",
-      // Service
-      regionalOfficeId: values.regionalOfficeId,
-      regionId: values.regionId,
-      supervisorId: values.supervisorId,
-      managerName: values.managerName,
-      designation: values.designation,
-      shift: values.shift,
-      joiningDate: values.joiningDate,
-      policeStation: values.policeStation,
-      nationality: values.nationality,
-      nextOfKin: values.nextOfKin,
-      // Address
-      addressPermanent: values.addressPermanent,
-      permanentAddressContact: values.permanentAddressContact,
-      addressCurrent: values.addressCurrent,
-      currentAddressContact: values.currentAddressContact,
-      phone: values.phone,
-      emergencyContact: values.emergencyContactPhone || values.emergencyContactName,
-      // Bank
-      bankAccounts: JSON.stringify(bankAccounts),
-      salary: values.salary,
-      reservePct: String(values.reservePct ?? 30),
-      // Documents — boolean acks; actual files uploaded out-of-band
-      cnicCopyReceived: values.cnicCopyReceived ? "true" : "false",
-      photoReceived: values.photoReceived ? "true" : "false",
-      policeCertReceived: values.policeCertReceived ? "true" : "false",
+    // Validate bank accounts
+    if (sections.bankAccount) {
+      let parsedAccounts: Array<Record<string, unknown>> = []
+      try {
+        const raw = String(data.bankAccounts || "[]")
+        parsedAccounts = JSON.parse(raw)
+      } catch { /* ignore */ }
+      if (parsedAccounts.length === 0) {
+        setError("At least one bank account is required.")
+        setLoading(false)
+        return
+      }
+      for (const acc of parsedAccounts) {
+        const kind = acc.walletType === "BANK" ? "bank" : "wallet"
+        if (!String(acc.bankName || "").trim()) {
+          setError(`Bank account: ${kind === "bank" ? "Bank Name" : "Wallet Type"} is required.`)
+          setLoading(false)
+          return
+        }
+        if (!String(acc.accountNumber || "").trim()) {
+          setError("Bank account: Account Number is required.")
+          setLoading(false)
+          return
+        }
+        if (!String(acc.accountTitle || "").trim()) {
+          setError("Bank account: Account Title is required.")
+          setLoading(false)
+          return
+        }
+        if (kind === "bank" && !String(acc.branchLocation || "").trim()) {
+          setError("Bank account: Branch Location is required.")
+          setLoading(false)
+          return
+        }
+      }
+    }
+
+    // Validate Guard Employment Type — only when the Previous Employment
+    // section is checked on the section checklist. Hidden sections must not
+    // block submit for fields the user cannot see.
+    if (sections.previousEmployment) {
+      if (!guardEmploymentType) {
+        setError("Guard Employment Type is required.")
+        setLoading(false)
+        return
+      }
+      if (guardEmploymentType !== "CIVILIAN") {
+        const matching = prevEmployments.filter((e) => e.type === guardEmploymentType)
+        if (matching.length === 0) {
+          setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
+          setLoading(false)
+          return
+        }
+        const incomplete = matching.find(
+          (e) => !e.registrationNo.trim() || !e.rank.trim() || !e.unit.trim()
+        )
+        if (incomplete) {
+          setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
+          setLoading(false)
+          return
+        }
+      }
+      for (const emp of prevEmployments) {
+        if (!emp.type) {
+          setError("Each previous employment record must have an Employment Type selected.")
+          setLoading(false)
+          return
+        }
+      }
     }
 
     try {
-      const res = await fetch("/api/guards", {
+      data.phone = contactNumbers[0]
+      data.additionalContactNumbers = contactNumbers.slice(1).join(", ")
+      // Inject previousEmploymentsJson
+      if (prevEmployments.length > 0) {
+        data.previousEmploymentsJson = JSON.stringify(prevEmployments)
+      }
+      data.exServiceType = guardEmploymentType
+      data.isExService = guardEmploymentType !== "CIVILIAN" ? "true" : "false"
+
+      const response = await fetch("/api/guards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(data),
       })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        // Per envelope contract: read `data.message`, NOT `data.error`.
-        const msg =
-          (data && typeof data === "object" && "message" in data && typeof data.message === "string"
-            ? data.message
-            : null) || "Failed to create guard."
-        const lower = msg.toLowerCase()
-        const isBlacklisted = lower.includes("blacklist")
-        const isDuplicateCnic = lower.includes("cnic already exists") || lower.includes("already exists")
-        const isCnicProblem = isBlacklisted || isDuplicateCnic
-        let title = "Enrollment failed"
-        if (isBlacklisted) title = "CNIC is blacklisted"
-        else if (isDuplicateCnic) title = "CNIC already enrolled"
-        if (isCnicProblem) {
-          // Clear the offending CNIC and bounce the user back to step 1 so they
-          // can correct it without hunting for the field.
-          form.setValue("cnic", "", { shouldDirty: true, shouldValidate: false })
-          form.setFocus("cnic")
-          setStep(0)
-        }
-        toast.error(title, { description: msg })
-        setErrorInfo({ title, message: msg, cleared: isCnicProblem })
-        setSubmitting(false)
-        return
+
+      if (!response.ok) {
+        const responseError = await response.json().catch(() => ({}))
+        throw new Error(responseError.message || "Failed to create guard")
       }
-      const newId =
-        (data && typeof data === "object" && "id" in data && typeof data.id === "string"
-          ? data.id
-          : null) ?? null
-      const parwestId =
-        (data && typeof data === "object" && "parwestId" in data && typeof data.parwestId === "string"
-          ? data.parwestId
-          : null) ?? "—"
-      toast.success("Guard enrolled successfully", {
-        description: `Parwest ID: ${parwestId}`,
-      })
-      // Reset dirty so the cancel-with-dirty guard doesn't fire on redirect.
-      form.reset(values, { keepValues: true })
-      setSuccessInfo({ id: newId, parwestId })
-      setSubmitting(false)
+
+      setSuccess("Guard created successfully.")
+      router.push("/guards")
+      router.refresh()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unexpected error."
-      toast.error("Enrollment failed", { description: msg })
-      setErrorInfo({ title: "Enrollment failed", message: msg, cleared: false })
-      setSubmitting(false)
+            setError(err instanceof Error ? err.message : "Unexpected error")
+      setLoading(false)
     }
   }
 
-  // ── OCR autofill bridge ────────────────────────────────────────────────────
-  // Legacy ParwestAIAutofill signature: `onApply: (fields: Record<string,string>) => void`.
-  // We intentionally keep the legacy field names that the OCR pipeline emits
-  // (e.g. `name`, `cnic`, `dateOfBirth`, `fatherName`, etc.) — they already
-  // line up with our zod schema keys.
-  const handleOcrApply = (fields: Record<string, string>) => {
-    let appliedCount = 0
-    Object.entries(fields).forEach(([key, value]) => {
-      if (!value) return
-      // Only apply keys we actually own in this schema; ignore unknowns.
-      if (key in form.getValues()) {
-        form.setValue(key as Path<GuardCreateForm>, value as never, {
-          shouldDirty: true,
-          shouldValidate: true,
-        })
-        appliedCount++
-      }
-    })
-    if (appliedCount > 0) {
-      toast.success(`Autofilled ${appliedCount} field${appliedCount === 1 ? "" : "s"} from CNIC`)
-    } else {
-      toast.warning("No matching fields to apply.")
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────────────────
   return (
-    <Form {...form}>
-      {/* shadcn Form already injects a FormProvider; FormProvider explicit not required. */}
-      <FormProvider {...form}>
-        <form
-          className="space-y-6"
-          onSubmit={(e) => {
-            e.preventDefault()
-            // Submission is driven by goNext on the last step
-          }}
-        >
-          {/* Stepper */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-card p-4">
-            <Stepper
-              variant="horizontal"
-              steps={STEPS}
-              currentStep={step}
-              onStepClick={goToStep}
-            />
-          </div>
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
 
-          {/* OCR autofill — visible on the personal step only */}
-          {step === 0 && (
-            <div>
-              <ParwestAIAutofill onApply={handleOcrApply} />
-            </div>
-          )}
+      {success ? (
+        <div className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          {success}
+        </div>
+      ) : null}
 
-          {/* Body */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-card p-6">
-            {step === 0 && <PersonalStep />}
-            {step === 1 && (
-              <ServiceStep
-                regionalOffices={regionalOffices}
-                lockedRegionalOfficeId={lockedRegionalOfficeId}
-                currentUserName={currentUserName}
+      <div className="ui-card p-6">
+        <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">Pre-Requisites Checklist</h2>
+        <label className="mb-3 inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+          <input
+            type="checkbox"
+            name="select_all_prerequisites"
+            checked={allPrerequisitesSelected}
+            onChange={(e) => toggleAllPrerequisites(e.target.checked)}
+          />
+          <span className="text-sm font-medium">Select All</span>
+        </label>
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {dbPrereqItems.map((item) => {
+            const key = item.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+            return (
+            <label key={item} className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+              <input
+                type="checkbox"
+                name={`pre_${key}`}
+                value="true"
+                checked={prerequisites[key] || false}
+                onChange={() => togglePrerequisite(key)}
               />
-            )}
-            {step === 2 && <AddressStep />}
-            {step === 3 && <BankStep />}
-            {step === 4 && <DocumentsStep />}
-            {step === 5 && <ReviewStep regionalOffices={regionalOffices} />}
-          </div>
+              <span className="text-sm">{item}</span>
+            </label>
+          )})}
+        </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleCancelClick}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => setAll(!allSelected)} className="ui-btn ui-btn-secondary">
+            {allSelected ? "Uncheck All" : "Select All"}
+          </button>
+          <input className="ui-input max-w-xs" name="importCnic" placeholder="Cnic #" />
+          <button type="button" className="ui-btn ui-btn-primary">IMPORT</button>
+        </div>
+      </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--text-muted)] tabular-nums">
-                Step {step + 1} / {STEPS.length}
-              </span>
-              {step > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={goPrev}
-                  disabled={submitting}
+      <div className="ui-card p-6">
+        <OcrUploadPanel target="guard" onApply={applyOcrFields} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-2">
+        {SECTION_CONFIG.map((section) => (
+          <label key={section.id} className={`inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 ${section.required ? "cursor-default" : ""}`}>
+            <input
+              type="checkbox"
+              checked={sections[section.id]}
+              onChange={() => toggleChecklistSection(section.id)}
+              className="h-4 w-4 accent-[var(--brand)]"
+              disabled={section.required}
+            />
+            <span className={sections[section.id] ? "text-sm text-[var(--text)] line-through" : "text-sm text-[var(--text)]"}>
+              {section.label}
+            </span>
+            {section.required ? <span className="ml-1 text-xs font-medium text-red-500">(required)</span> : null}
+          </label>
+        ))}
+      </div>
+
+      {sections.general ? (
+        <CollapsibleSection
+          title="GENERAL INFORMATION"
+          collapsed={collapsed.general}
+          onToggle={() => toggleSectionCollapse("general")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {lockedRegionalOfficeId ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Regional Office <span className="text-red-500">*</span>
+                </label>
+                <input type="hidden" name="regionalOfficeId" value={lockedRegionalOfficeId} />
+                <input
+                  type="text"
+                  readOnly
+                  value={(() => {
+                    const office = regionalOffices.find((o) => o.id === lockedRegionalOfficeId)
+                    return office ? `${office.name} (${office.region.name})` : "Locked to your regional office"
+                  })()}
+                  className="ui-input bg-slate-50 text-slate-600"
+                />
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Locked to your assigned regional office.</p>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Regional Office <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="regionalOfficeId"
+                  required
+                  className="ui-input"
+                  value={selectedRegionalOfficeId}
+                  onChange={(e) => setSelectedRegionalOfficeId(e.target.value)}
                 >
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Back
-                </Button>
-              )}
-              {step < STEPS.length - 1 && (
-                <Button type="button" onClick={goNext} disabled={submitting}>
-                  {step === STEPS.length - 2 ? "Review" : "Continue"}
-                  <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              )}
-              {step === STEPS.length - 1 && (
-                <Button type="button" onClick={onSubmit} disabled={submitting}>
-                  {submitting ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Check className="mr-1 h-4 w-4" />
-                  )}
-                  Create Guard
-                </Button>
+                  <option value="">Select regional office</option>
+                  {regionalOffices.map((office) => (
+                    <option key={`regionalOffice-${office.id}`} value={office.id}>
+                      {office.name} ({office.region.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Parwest ID</label>
+              <input
+                type="text"
+                value="Auto-generated on submit"
+                readOnly
+                className="ui-input bg-slate-50 text-slate-500"
+              />
+            </div>
+            <Field label="FULL NAME *" name="name" required placeholder="Full Name" />
+            <Field label="FATHER'S NAME *" name="fatherName" required placeholder="FATHER'S NAME" />
+            <Field label="MOTHER'S NAME *" name="motherName" required placeholder="MOTHER'S NAME" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                DATE OF BIRTH <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="dateOfBirth"
+                required
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="ui-input"
+                aria-invalid={Boolean(dateOfBirth && !isValidGuardAge(dateOfBirth))}
+              />
+              {dateOfBirth && !isValidGuardAge(dateOfBirth) && (
+                <p className="mt-1 text-[11px] text-red-500">
+                  Guard must be between 18 and 65 years old.
+                </p>
               )}
             </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">AGE</label>
+              <input type="number" name="age" readOnly value={ageValue} className="ui-input bg-slate-50" placeholder="AGE" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CNIC # (FORMAT: XXXXX-XXXXXXX-X) <span className="text-red-500">*</span>
+              </label>
+              <CnicInput
+                name="cnic"
+                required
+                placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)"
+                uniqueCheckUrl="/api/guards/check-cnic"
+              />
+            </div>
+            <Field label="CNIC ISSUE DATE *" name="cnicIssueDate" type="date" required />
+            <Field label="CNIC EXPIRY DATE *" name="cnicExpiryDate" type="date" required />
+            <Field label="NEXT OF KIN *" name="nextOfKin" required />
+            <Field label="NATIONALITY *" name="nationality" required placeholder="e.g. Pakistani" />
+            <div className="space-y-3 lg:col-span-3">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CONTACT # (FORMAT: +92-300-1234567) <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <PhoneInput name="phone" required />
+                {contactRows.map((idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <PhoneInput name={`phone_secondary_${idx}`} />
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] text-red-600 hover:bg-red-50"
+                      onClick={() => setContactRows((prev) => prev.filter((id) => id !== idx))}
+                      aria-label="Remove contact number"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+                onClick={() => {
+                  const nextId = contactCounterRef.current++
+                  setContactRows((prev) => [...prev, nextId])
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Add Contact Number
+              </button>
+            </div>
+            <SelectField label="RELIGION" name="religion" options={["Islam", "Christianity", "Hinduism", "Other"]} defaultValue="Islam" required />
+            <Field label="SECT *" name="sect" required placeholder="SECT" />
+            <Field label="CAST *" name="cast" required placeholder="CAST" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Joining Date</label>
+              <input
+                type="text"
+                name="joiningDate"
+                value={joiningDate}
+                readOnly
+                className="ui-input bg-slate-50"
+              />
+              <p className="mt-1 text-xs text-gray-500">Auto-set to today (date of enrollment).</p>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Joining Age</label>
+              <input type="number" name="joiningAge" readOnly value={joiningAgeValue} className="ui-input bg-slate-50" placeholder="Joining Age" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Enrolled By User</label>
+              <input type="text" name="enrolledBy" readOnly value={currentUserName} className="ui-input bg-slate-50" />
+            </div>
+            <Field label="POLICE STATION *" name="policeStation" required />
+            <SelectField label="BLOOD GROUP" name="bloodGroup" options={BLOOD_GROUPS} placeholder="--Select Blood Group--" required />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                MARITAL STATUS <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="maritalStatus"
+                required
+                value={maritalStatus}
+                onChange={(e) => setMaritalStatus(e.target.value)}
+                className="ui-input"
+              >
+                <option value="">--Select Marital Status--</option>
+                {MARITAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <SupervisorSelector regionalOfficeId={selectedRegionalOfficeId} required />
+            <Field label="PROFILE INTRODUCER *" name="profileIntroducer" required placeholder="Profile Introducer" />
           </div>
-        </form>
-      </FormProvider>
+        </CollapsibleSection>
+      ) : null}
 
-      {/* Discard confirmation */}
-      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard guard creation?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Unsaved changes will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction onClick={() => router.push("/guards")}>
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {sections.bankAccount ? (
+        <CollapsibleSection
+          title="GUARD BANK ACCOUNT DETAILS"
+          collapsed={collapsed.bankAccount}
+          onToggle={() => toggleSectionCollapse("bankAccount")}
+        >
+          <GuardAccountsEditor control={accountsForm.control} name="bankAccounts" />
+          {/* Mirror RHF state into a hidden FormData field so the legacy submit handler keeps working */}
+          <input type="hidden" name="bankAccounts" value={serializedAccounts} readOnly />
+        </CollapsibleSection>
+      ) : null}
 
-      {/* Enrollment success popup */}
-      <AlertDialog open={!!successInfo} onOpenChange={(open) => { if (!open) setSuccessInfo(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Check className="h-5 w-5 text-emerald-600" />
-              Guard enrolled successfully
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The new guard has been added to the system.
-              <span className="mt-3 block rounded-md border bg-muted px-3 py-2 font-mono text-sm text-foreground">
-                Parwest ID: <strong>{successInfo?.parwestId}</strong>
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setSuccessInfo(null); router.push("/guards"); router.refresh() }}>
-              Back to guards list
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const id = successInfo?.id ?? null
-                setSuccessInfo(null)
-                if (id) {
-                  router.push(`/guards/${id}`)
-                } else {
-                  router.push("/guards")
-                }
-                router.refresh()
+      {sections.previousEmployment ? (
+        <CollapsibleSection
+          title="PREVIOUS EMPLOYMENT DETAILS"
+          collapsed={collapsed.previousEmployment}
+          onToggle={() => toggleSectionCollapse("previousEmployment")}
+        >
+          <div className="space-y-4">
+            {/* Top-level guard employment type — drives PBA SA-10 vs SA-11 */}
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Guard Employment Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="guardEmploymentType"
+                    checked={guardEmploymentType === "CIVILIAN"}
+                    onChange={() => handleGuardEmploymentTypeChange("CIVILIAN")}
+                    className="h-4 w-4 accent-[var(--brand)]"
+                  />
+                  Civilian
+                </label>
+                {exServiceTypeOptions.map((t) => (
+                  <label key={t} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="guardEmploymentType"
+                      checked={guardEmploymentType === t}
+                      onChange={() => handleGuardEmploymentTypeChange(t)}
+                      className="h-4 w-4 accent-[var(--brand)]"
+                    />
+                    {t}
+                  </label>
+                ))}
+                {exServiceTypeOptions.length === 0 && (
+                  <span className="text-xs text-[var(--text-muted)]">Loading types…</span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                {guardEmploymentType === "CIVILIAN"
+                  ? "Civilian — adding previous employment records is optional."
+                  : guardEmploymentType
+                  ? `${guardEmploymentType} — at least one ${guardEmploymentType} record with Registration No, Rank, and Unit is required.`
+                  : "Required. Determines applicable PBA documents (SA-10 for ex-service, SA-11 for civilian)."}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--text-muted)]">
+                Add all previous employment records — both <strong>Civilian</strong> and <strong>Ex-Service</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = empCounterRef.current++
+                  setPrevEmployments((prev) => [...prev, { ...emptyEmp() }])
+                  void id
+                }}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-muted)]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Employment
+              </button>
+            </div>
+
+            {prevEmployments.length === 0 && (
+              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-6 py-5 text-center text-sm text-[var(--text-muted)]">
+                No previous employment records added
+              </div>
+            )}
+
+            {prevEmployments.map((emp, idx) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[var(--text)]">Employment {idx + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => setPrevEmployments((prev) => prev.filter((_, i) => i !== idx))}
+                    className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </button>
+                </div>
+
+                {/* Type selection — Civilian + all ex-service types */}
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Employment Type <span className="text-red-500">*</span></label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="radio"
+                        checked={emp.type === "CIVILIAN"}
+                        onChange={() => setPrevEmployments((prev) => prev.map((e, i) => i === idx ? { ...e, type: "CIVILIAN", isExService: false } : e))}
+                        className="h-4 w-4 accent-[var(--brand)]"
+                      />
+                      Civilian
+                    </label>
+                    {exServiceTypeOptions.map((t) => (
+                      <label key={t} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          checked={emp.type === t}
+                          onChange={() => setPrevEmployments((prev) => prev.map((e, i) => i === idx ? { ...e, type: t, isExService: true } : e))}
+                          className="h-4 w-4 accent-[var(--brand)]"
+                        />
+                        {t}
+                      </label>
+                    ))}
+                    {exServiceTypeOptions.length === 0 && (
+                      <span className="text-xs text-[var(--text-muted)]">Loading ex-service types…</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Civilian fields */}
+                {emp.type === "CIVILIAN" && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">COMPANY NAME <span className="text-red-500">*</span></label>
+                      <input type="text" className="ui-input" placeholder="Name of Company" value={emp.nameOfCompany} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, nameOfCompany: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DESIGNATION / POSITION</label>
+                      <input type="text" className="ui-input" placeholder="Designation" value={emp.designation} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, designation: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF JOINING</label>
+                      <input type="date" className="ui-input" value={emp.dateOfEnrollment} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfEnrollment: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF LEAVING</label>
+                      <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
+                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
+                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REASON FOR LEAVING</label>
+                      <input type="text" className="ui-input" placeholder="Reason for leaving" value={emp.reasonForLeaving} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, reasonForLeaving: e.target.value } : p))} />
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REMARKS</label>
+                      <input type="text" className="ui-input" placeholder="Remarks" value={emp.remarks} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, remarks: e.target.value } : p))} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Ex-service fields */}
+                {emp.type && emp.type !== "CIVILIAN" && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REGISTRATION NO</label>
+                      <input type="text" className="ui-input" placeholder="Registration No" value={emp.registrationNo} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, registrationNo: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">RANK</label>
+                      <input type="text" className="ui-input" placeholder="Rank" value={emp.rank} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, rank: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">UNIT</label>
+                      <input type="text" className="ui-input" placeholder="Unit" value={emp.unit} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, unit: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF ENROLLMENT</label>
+                      <input type="date" className="ui-input" value={emp.dateOfEnrollment} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfEnrollment: e.target.value } : p))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF DISCHARGE</label>
+                      <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
+                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
+                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
+                      </div>
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REMARKS</label>
+                      <input type="text" className="ui-input" placeholder="Remarks" value={emp.remarks} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, remarks: e.target.value } : p))} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.address ? (
+        <CollapsibleSection
+          title="ADDRESS DETAIL"
+          collapsed={collapsed.address}
+          onToggle={() => toggleSectionCollapse("address")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="CURRENT RESIDENTIAL ADDRESS *" name="addressCurrent" required placeholder="Current Residential Address" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                CURRENT ADDRESS CONTACT NO <span className="text-red-500">*</span>
+              </label>
+              <PhoneInput name="currentAddressContact" required />
+            </div>
+            <Field label="PERMANENT RESIDENTIAL ADDRESS *" name="addressPermanent" required placeholder="Permanent Residential Address" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                PERMANENT ADDRESS CONTACT NO <span className="text-red-500">*</span>
+              </label>
+              <PhoneInput name="permanentAddressContact" required />
+            </div>
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.education ? (
+        <CollapsibleSection
+          title="EDUCATION"
+          collapsed={collapsed.education}
+          onToggle={() => toggleSectionCollapse("education")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <SelectField label="EDUCATION" name="education" options={EDUCATION_LEVELS} placeholder="Choose Education Level" />
+            <Field label="YEAR" name="passingYear" placeholder="Year" />
+            <Field label="NAME OF INSTITUTE" name="educationInstitute" placeholder="Name Of Institute" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.introducer ? (
+        <CollapsibleSection
+          title="INTRODUCER"
+          collapsed={collapsed.introducer}
+          onToggle={() => toggleSectionCollapse("introducer")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="FULL NAME *" name="introducerName" required placeholder="Full Name" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Introducer&apos;s CNIC</label>
+              <CnicInput name="introducerCnic" placeholder="Introducer's CNIC" />
+            </div>
+            <Field label="Introducer's Address" name="introducerAddress" placeholder="Introducer's Address" />
+            <Field label="Introducer's Contact" name="introducerContact" placeholder="Introducer's Contact #" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.physical ? (
+        <CollapsibleSection
+          title="PHYSICAL DETAILS"
+          collapsed={collapsed.physical}
+          onToggle={() => toggleSectionCollapse("physical")}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="HEIGHT *" name="height" required placeholder="Height" />
+            <Field label="WEIGHT *" name="weight" required placeholder="Weight" />
+            <Field label="EYE COLOR *" name="eyeColor" required placeholder="Eye Color" />
+            <Field label="HAIR COLOR *" name="hairColor" required placeholder="Hair Color" />
+            <Field label="ANY DISABILITY *" name="disability" required placeholder="Any Disability" />
+            <Field label="MARK OF IDENTIFICATION*" name="identificationMark" required placeholder="Mark of Identification" />
+          </div>
+        </CollapsibleSection>
+      ) : null}
+
+      {sections.family ? (
+        <CollapsibleSection
+          title="ADD FAMILY MEMBER DETAIL"
+          collapsed={collapsed.family}
+          onToggle={() => toggleSectionCollapse("family")}
+          action={(
+            <button
+              type="button"
+              className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                const nextId = familyCounterRef.current++
+                setFamilyRows((prev) => [...prev, nextId])
               }}
             >
-              View profile
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Enrollment error popup — surfaces blacklist / duplicate CNIC clearly */}
-      <AlertDialog open={!!errorInfo} onOpenChange={(open) => { if (!open) setErrorInfo(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">{errorInfo?.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {errorInfo?.message}
-              {errorInfo?.cleared ? (
-                <span className="mt-3 block text-sm text-muted-foreground">
-                  The CNIC field has been cleared. Please verify and re-enter the correct CNIC.
-                </span>
-              ) : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorInfo(null)}>OK</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Form>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Step 1: Personal Information
-// ────────────────────────────────────────────────────────────────────────────
-
-function PersonalStep() {
-  const form = useFormContext<GuardCreateForm>()
-  const dob = form.watch("dateOfBirth")
-  const ageYears = useMemo(() => (dob ? calculateAgeYears(dob) : null), [dob])
-  const isExService = form.watch("isExService")
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 1 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">
-          Personal Information
-        </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Core identity details. The CNIC is the primary unique identifier — double-check it.
-        </p>
-      </header>
-
-      <section className="space-y-4">
-        <SectionHeader icon={<IdCard className="h-4 w-4" />} title="Core Identity" />
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField name="name" label="Full Name" required placeholder="e.g. Muhammad Usman Khan" />
-          <TextField name="fatherName" label="Father's Name" required placeholder="e.g. Khalid Mehmood Khan" />
-          <TextField name="motherName" label="Mother's Name" required />
-          <TextField
-            name="cnic"
-            label="CNIC"
-            required
-            placeholder="42201-1234567-9"
-            description="Format: XXXXX-XXXXXXX-X"
-          />
-          <TextField
-            name="dateOfBirth"
-            label="Date of Birth"
-            required
-            type="date"
-            description={ageYears != null ? `Age: ${ageYears} years` : undefined}
-          />
-          <SelectField
-            name="gender"
-            label="Gender"
-            options={[
-              { value: "MALE", label: "Male" },
-              { value: "FEMALE", label: "Female" },
-              { value: "OTHER", label: "Other" },
-            ]}
-          />
-          <SelectField
-            name="maritalStatus"
-            label="Marital Status"
-            required
-            placeholder="Select…"
-            options={MARITAL_STATUSES.map((s) => ({ value: s, label: s }))}
-          />
-          <SelectField
-            name="religion"
-            label="Religion"
-            options={RELIGIONS.map((r) => ({ value: r, label: r }))}
-          />
-          <SelectField
-            name="bloodGroup"
-            label="Blood Group"
-            required
-            placeholder="Select…"
-            options={BLOOD_GROUPS.map((b) => ({ value: b, label: b }))}
-          />
-          <TextField name="height" label="Height" placeholder={`e.g. 5'9"`} />
-          <TextField name="weight" label="Weight" placeholder="e.g. 74 kg" />
-          <TextField name="identificationMark" label="Identification Mark" placeholder="e.g. Mole on right cheek" />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <SectionHeader icon={<FileText className="h-4 w-4" />} title="Education" />
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SelectField
-            name="education"
-            label="Highest Qualification"
-            placeholder="Select…"
-            options={EDUCATION_LEVELS.map((e) => ({ value: e, label: e }))}
-          />
-          <TextField name="passingYear" label="Passing Year" placeholder="e.g. 2008" />
-          <TextField name="educationInstitute" label="Board / Institute" placeholder="e.g. BISE Lahore" />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <SectionHeader icon={<ShieldCheck className="h-4 w-4" />} title="Ex-Service Details" hint="Optional" />
-
-        <FormField
-          control={form.control}
-          name="isExService"
-          render={({ field }) => (
-            <FormItem className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-              <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
-              <div className="space-y-1">
-                <FormLabel className="text-sm font-semibold">
-                  This guard is an ex-serviceman
-                </FormLabel>
-                <FormDescription>
-                  Army, Navy, Air Force, Police, or Paramilitary
-                </FormDescription>
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          )}
+        >
+          <div className="space-y-6">
+            {familyRows.map((idx, rowIndex) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-[var(--text)]">Family Member #{rowIndex + 1}</p>
+                  {familyRows.length > 1 ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                      onClick={() => setFamilyRows((prev) => prev.filter((id) => id !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Field label="NAME *" name={`family_${idx}_name`} required placeholder="NAME" />
+                  <Field label="RELATION *" name={`family_${idx}_relation`} required placeholder="RELATION" />
+                  <Field label="AGE *" name={`family_${idx}_age`} required placeholder="AGE" />
+                  <Field label="PROFESSION *" name={`family_${idx}_profession`} required placeholder="PROFESSION" />
+                  <Field label="ADDRESS *" name={`family_${idx}_address`} required placeholder="ADDRESS" />
+                  {maritalStatus === "married" ? (
+                    <>
+                      <Field label="B-FORM / CNIC (CHILD) *" name={`family_${idx}_childCnic`} required placeholder="B-Form / CNIC No" />
+                      <Field label="CHILD AGE *" name={`family_${idx}_childAge`} required placeholder="Age" />
+                      <Field label="CHILD DATE OF BIRTH *" name={`family_${idx}_childDob`} required type="date" />
+                    </>
+                  ) : null}
+                </div>
               </div>
-            </FormItem>
-          )}
-        />
-
-        {isExService && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SelectField
-              name="exServiceType"
-              label="Service Type"
-              options={["ARMY", "NAVY", "AIR FORCE", "POLICE", "RANGERS", "FC"].map((t) => ({
-                value: t,
-                label: t,
-              }))}
-            />
-            <TextField name="rank" label="Rank" placeholder="e.g. Lance Naik" />
-            <TextField name="unit" label="Unit" placeholder="e.g. 22 Punjab" />
+            ))}
           </div>
-        )}
-      </section>
-    </div>
-  )
-}
+        </CollapsibleSection>
+      ) : null}
 
-// ────────────────────────────────────────────────────────────────────────────
-// Step 2: Service Details
-// ────────────────────────────────────────────────────────────────────────────
-
-function ServiceStep({
-  regionalOffices,
-  lockedRegionalOfficeId,
-  currentUserName,
-}: {
-  regionalOffices: RegionalOffice[]
-  lockedRegionalOfficeId: string | null
-  currentUserName: string
-}) {
-  const form = useFormContext<GuardCreateForm>()
-  const officeId = form.watch("regionalOfficeId")
-
-  // Supervisor list (loaded for the chosen office)
-  const [supervisors, setSupervisors] = useState<
-    Array<{ id: string; name: string; email: string }>
-  >([])
-  const [loadingSupers, setLoadingSupers] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    if (!officeId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent async-loaded list when RO changes
-      setSupervisors([])
-      return () => {
-        cancelled = true
-      }
-    }
-    setLoadingSupers(true)
-    fetch(`/api/users?status=ACTIVE&regionalOfficeId=${officeId}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ id: string; name: string; email: string }>) => {
-        if (!cancelled) setSupervisors(Array.isArray(data) ? data : [])
-      })
-      .catch(() => {
-        if (!cancelled) setSupervisors([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingSupers(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [officeId])
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 2 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">Service Details</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Designation, shift, and the regional office this guard is assigned to.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {lockedRegionalOfficeId ? (
-          <div>
-            <Label>
-              Regional Office <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              readOnly
-              value={(() => {
-                const o = regionalOffices.find((x) => x.id === lockedRegionalOfficeId)
-                return o ? `${o.name} (${o.region.name})` : "Locked office"
-              })()}
-              className="bg-[var(--surface-muted)]"
-            />
-            <p className="text-sm text-muted-foreground">Locked to your assigned regional office.</p>
-          </div>
-        ) : (
-          <SelectField
-            name="regionalOfficeId"
-            label="Regional Office"
-            required
-            placeholder="Select regional office"
-            options={regionalOffices.map((o) => ({
-              value: o.id,
-              label: `${o.name} (${o.region.name})`,
-            }))}
-          />
-        )}
-
-        <FormField
-          control={form.control}
-          name="supervisorId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Supervisor <span className="text-destructive">*</span>
-              </FormLabel>
-              <Select
-                value={field.value}
-                onValueChange={(v) => {
-                  field.onChange(v)
-                  const found = supervisors.find((s) => s.id === v)
-                  if (found) form.setValue("managerName", found.name)
-                }}
-                disabled={!officeId || loadingSupers}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        !officeId
-                          ? "Select a regional office first"
-                          : loadingSupers
-                            ? "Loading supervisors…"
-                            : "Select supervisor"
-                      }
-                    />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {supervisors.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} — {s.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
+      {sections.nearestRelative ? (
+        <CollapsibleSection
+          title="ADD NEAREST RELATIVE DETAIL"
+          collapsed={collapsed.nearestRelative}
+          onToggle={() => toggleSectionCollapse("nearestRelative")}
+          action={(
+            <button
+              type="button"
+              className="ui-btn ui-btn-secondary inline-flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                const nextId = nearestCounterRef.current++
+                setNearestRows((prev) => [...prev, nextId])
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
           )}
-        />
+        >
+          <div className="space-y-6">
+            {nearestRows.map((idx, rowIndex) => (
+              <div key={idx} className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-[var(--text)]">Nearest Relative #{rowIndex + 1}</p>
+                  {nearestRows.length > 1 ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:underline"
+                      onClick={() => setNearestRows((prev) => prev.filter((id) => id !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Field label="NAME *" name={`nearest_${idx}_name`} required placeholder="NAME" />
+                  <Field label="FATHER NAME *" name={`nearest_${idx}_fatherName`} required placeholder="FATHER NAME" />
+                  <Field label="RELATION *" name={`nearest_${idx}_relation`} required placeholder="RELATION" />
+                  <Field label="PROFESSION *" name={`nearest_${idx}_profession`} required placeholder="PROFESSION" />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      CNIC # (FORMAT: XXXXX-XXXXXXX-X) <span className="text-red-500">*</span>
+                    </label>
+                    <CnicInput name={`nearest_${idx}_cnic`} required placeholder="CNIC # (FORMAT: xxxxx-xxxxxxx-x)" />
+                  </div>
+                  <Field label="CNIC ISSUE DATE *" name={`nearest_${idx}_cnicIssueDate`} required type="date" />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      CONTACT # <span className="text-red-500">*</span>
+                    </label>
+                    <PhoneInput name={`nearest_${idx}_contact`} required />
+                  </div>
+                  <Field label="ADDRESS *" name={`nearest_${idx}_address`} required placeholder="ADDRESS" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      ) : null}
 
-        <TextField name="designation" label="Designation" placeholder="Security Guard" />
-        <SelectField
-          name="shift"
-          label="Shift"
-          options={SHIFTS.map((s) => ({ value: s.value, label: s.label }))}
-        />
-        <TextField name="joiningDate" label="Joining Date" type="date" required />
-        <TextField name="policeStation" label="Police Station" required />
-        <TextField name="nationality" label="Nationality" required placeholder="e.g. Pakistani" />
-        <TextField name="nextOfKin" label="Next of Kin" required />
-
-        <div className="md:col-span-2">
-          <Label>Enrolled By</Label>
-          <Input readOnly value={currentUserName} className="bg-[var(--surface-muted)]" />
+      <div className="flex items-center gap-4 pb-4">
+        <div className="hidden" aria-hidden="true">
+          <select name="legacy_guard_type_options">
+            <option>Guard</option>
+            <option>location supervisor</option>
+            <option>cpo</option>
+            <option>SO</option>
+            <option>ASO</option>
+            <option>LSO</option>
+            <option>Receptionist</option>
+            <option>CCTV Operator</option>
+            <option>Complaint Receiver</option>
+          </select>
+          <select name="legacy_blood_group_options">
+            <option>--Select Blood Group--</option>
+            <option>O+ve</option>
+            <option>A+ve</option>
+            <option>B+ve</option>
+            <option>AB+ve</option>
+            <option>O-ve</option>
+            <option>A-ve</option>
+            <option>B-ve</option>
+            <option>AB-ve</option>
+          </select>
+          <select name="legacy_marital_status_options">
+            <option>--Select Marital Status--</option>
+            <option>single</option>
+            <option>married</option>
+            <option>divorced</option>
+            <option>widowed</option>
+            <option>separated</option>
+            <option>engaged</option>
+          </select>
+          <select name="legacy_education_level_options">
+            <option>Choose Education Level</option>
+            <option>Primary</option>
+            <option>Middle</option>
+            <option>Matric</option>
+            <option>Intermediate</option>
+            <option>Graduate</option>
+            <option>B.A</option>
+            <option>BSc</option>
+            <option>M.A</option>
+            <option>Msc</option>
+          </select>
         </div>
+        <input type="hidden" name="3" value="" />
+        <input type="hidden" name="68" value="" />
+        <input type="hidden" name="71" value="" />
+        <input type="hidden" name="88" value="" />
+        <input type="hidden" name="107" value="" />
+        <input type="hidden" name="108" value="" />
+        <input type="hidden" name="110" value="" />
+        <input type="hidden" name="111" value="" />
+        <input type="hidden" name="FATHER'S NAME *" value="" />
+        <input type="hidden" name="MOTHER'S NAME *" value="" />
+        <input type="hidden" name="ex" value="ARMY" />
+        <input type="hidden" name="Introducer's CNIC" value="" />
+        <input type="hidden" name="Introducer's Address" value="" />
+        <input type="hidden" name="Introducer's Contact" value="" />
+        <input type="hidden" name="FATHER’S NAME *" value="" />
+        <input type="hidden" name="MOTHER’S NAME *" value="" />
+        <input type="hidden" name="Introducer’s CNIC" value="" />
+        <input type="hidden" name="Introducer’s Address" value="" />
+        <input type="hidden" name="Introducer’s Contact" value="" />
+        <input type="hidden" name="INTRODUCER'S CNIC" value="" />
+        <input type="hidden" name="INTRODUCER'S ADDRESS" value="" />
+        <input type="hidden" name="INTRODUCER'S CONTACT" value="" />
+        <input type="hidden" name="DD-MM-YYYY" value="" />
+        <input type="hidden" name="other" value="OTHER" />
+        <Link href="/guards" className="ui-btn ui-btn-secondary flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Cancel
+        </Link>
+        <button type="submit" disabled={loading} className="ui-btn ui-btn-primary flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <Save className="h-4 w-4" />
+          {loading ? "Saving..." : "SUBMIT"}
+        </button>
       </div>
-    </div>
+    </form>
   )
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Step 3: Address & Contact
-// ────────────────────────────────────────────────────────────────────────────
-
-function AddressStep() {
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 3 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">Address & Contact</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Permanent and current residential addresses, contact numbers, and an emergency contact.
-        </p>
-      </header>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Permanent Address</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField
-            name="addressPermanent"
-            label="Permanent Residential Address"
-            required
-            placeholder="House, street, city"
-          />
-          <TextField
-            name="permanentAddressContact"
-            label="Permanent Address Contact"
-            required
-            placeholder="+92-300-1234567"
-            description="Format: +92-XXX-XXXXXXX"
-          />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Current Address</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField
-            name="addressCurrent"
-            label="Current Residential Address"
-            required
-            placeholder="House, street, city"
-          />
-          <TextField
-            name="currentAddressContact"
-            label="Current Address Contact"
-            required
-            placeholder="+92-300-1234567"
-          />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Primary Contact</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField
-            name="phone"
-            label="Mobile Number"
-            required
-            placeholder="+92-300-1234567"
-            description="At least one contact number is required."
-          />
-          <TextField name="locationPin" label="Location Pin (lat,lng)" placeholder="optional" />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Emergency Contact</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <TextField name="emergencyContactName" label="Name" />
-          <TextField name="emergencyContactRelation" label="Relation" />
-          <TextField
-            name="emergencyContactPhone"
-            label="Phone"
-            placeholder="+92-300-1234567"
-          />
-        </div>
-      </section>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Step 4: Bank & Finance
-// ────────────────────────────────────────────────────────────────────────────
-
-function BankStep() {
-  const form = useFormContext<GuardCreateForm>()
-  const salary = form.watch("salary")
-  const reserve = form.watch("reservePct") ?? 0
-  const reserveAmount = useMemo(() => {
-    const s = Number(salary)
-    if (!Number.isFinite(s)) return 0
-    return Math.round((s * Number(reserve || 0)) / 100)
-  }, [salary, reserve])
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 4 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">Bank & Finance</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Primary bank account for salary disbursement and the reserve % held back each cycle.
-        </p>
-      </header>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Primary Bank Account</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField name="bankName" label="Bank Name" required />
-          <TextField name="accountTitle" label="Account Title" required />
-          <TextField name="accountNumber" label="Account Number" required />
-          <TextField name="iban" label="IBAN" placeholder="optional" />
-          <TextField name="branchLocation" label="Branch Location" required />
-          <SelectField
-            name="accountType"
-            label="Account Type"
-            options={[
-              { value: "CURRENT", label: "Current" },
-              { value: "SAVINGS", label: "Savings" },
-              { value: "OTHER", label: "Other" },
-            ]}
-          />
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Salary</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <TextField
-            name="salary"
-            label="Basic Salary"
-            required
-            type="number"
-            placeholder="40000"
-          />
-          <TextField
-            name="reservePct"
-            label="Reserve %"
-            type="number"
-            description="Held back per pay cycle."
-          />
-          <div>
-            <Label>Reserve Amount</Label>
-            <div className="flex h-10 items-center rounded-md border border-input bg-[var(--surface-muted)] px-3 text-sm">
-              <ParwestCurrency value={reserveAmount} />
-            </div>
-            <p className="text-sm text-muted-foreground">Auto-calculated from salary × reserve %.</p>
-          </div>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Step 5: Documents
-// ────────────────────────────────────────────────────────────────────────────
-
-function DocumentsStep() {
-  const form = useFormContext<GuardCreateForm>()
-  const photoDataUrl = form.watch("photoDataUrl")
-  const name = form.watch("name")
-
-  const initials = useMemo(() => {
-    const parts = (name || "").trim().split(/\s+/).filter(Boolean)
-    if (parts.length === 0) return "?"
-    if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
-    return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase()
-  }, [name])
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      form.setValue("photoDataUrl", dataUrl, { shouldDirty: true })
-      form.setValue("photoReceived", true, { shouldDirty: true })
-    }
-    reader.readAsDataURL(file)
-  }
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 5 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">Documents</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Confirm which documents have been collected. Files are uploaded after the guard profile is created.
-        </p>
-      </header>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Guard Photo</h3>
-        <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20">
-            {photoDataUrl ? (
-              <AvatarImage src={photoDataUrl} alt="Guard photo preview" />
-            ) : null}
-            <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
-          </Avatar>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent">
-            <Camera className="h-4 w-4" />
-            {photoDataUrl ? "Replace photo" : "Upload photo"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePhotoChange}
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Document Checklist</h3>
-        <CheckboxField
-          name="cnicCopyReceived"
-          label="CNIC Copy"
-          description="Front + back required."
-        />
-        <CheckboxField
-          name="photoReceived"
-          label="Passport-size Photo"
-          description="Auto-checked when you upload above."
-        />
-        <CheckboxField
-          name="policeCertReceived"
-          label="Police Verification Certificate"
-        />
-      </section>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Step 6: Review & Submit
-// ────────────────────────────────────────────────────────────────────────────
-
-function ReviewStep({ regionalOffices }: { regionalOffices: RegionalOffice[] }) {
-  const form = useFormContext<GuardCreateForm>()
-  const v = form.getValues()
-  const office = regionalOffices.find((o) => o.id === v.regionalOfficeId)
-  const ageYears = v.dateOfBirth ? calculateAgeYears(v.dateOfBirth) : null
-
-  return (
-    <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-          Step 6 of 6
-        </p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--text)]">Review & Submit</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Double-check the details below. Submitting will create the guard profile.
-        </p>
-      </header>
-
-      <ReviewSection title="Personal">
-        <ReviewField label="Full Name" value={v.name} />
-        <ReviewField label="Father's Name" value={v.fatherName} />
-        <ReviewField label="Mother's Name" value={v.motherName} />
-        <ReviewField label="CNIC" value={v.cnic} mono />
-        <ReviewField
-          label="Date of Birth"
-          value={v.dateOfBirth ? `${v.dateOfBirth}${ageYears != null ? ` (age ${ageYears})` : ""}` : ""}
-        />
-        <ReviewField label="Gender" value={v.gender} />
-        <ReviewField label="Marital Status" value={v.maritalStatus} />
-        <ReviewField label="Religion" value={v.religion} />
-        <ReviewField label="Blood Group" value={v.bloodGroup} />
-        <ReviewField label="Ex-Service" value={v.isExService ? v.exServiceType : "Civilian"} />
-      </ReviewSection>
-
-      <ReviewSection title="Service">
-        <ReviewField
-          label="Regional Office"
-          value={office ? `${office.name} (${office.region.name})` : v.regionalOfficeId}
-        />
-        <ReviewField label="Designation" value={v.designation} />
-        <ReviewField label="Shift" value={v.shift} />
-        <ReviewField label="Joining Date" value={v.joiningDate} />
-        <ReviewField label="Police Station" value={v.policeStation} />
-        <ReviewField label="Nationality" value={v.nationality} />
-        <ReviewField label="Next of Kin" value={v.nextOfKin} />
-      </ReviewSection>
-
-      <ReviewSection title="Address & Contact">
-        <ReviewField label="Permanent Address" value={v.addressPermanent} />
-        <ReviewField label="Permanent Contact" value={v.permanentAddressContact} mono />
-        <ReviewField label="Current Address" value={v.addressCurrent} />
-        <ReviewField label="Current Contact" value={v.currentAddressContact} mono />
-        <ReviewField label="Mobile" value={v.phone} mono />
-        <ReviewField
-          label="Emergency Contact"
-          value={
-            v.emergencyContactName
-              ? `${v.emergencyContactName} (${v.emergencyContactRelation || "—"}) ${v.emergencyContactPhone}`
-              : v.emergencyContactPhone || "—"
-          }
-        />
-      </ReviewSection>
-
-      <ReviewSection title="Bank & Finance">
-        <ReviewField label="Bank Name" value={v.bankName} />
-        <ReviewField label="Account Title" value={v.accountTitle} />
-        <ReviewField label="Account Number" value={v.accountNumber} mono />
-        <ReviewField label="IBAN" value={v.iban || "—"} mono />
-        <ReviewField label="Branch" value={v.branchLocation} />
-        <ReviewField label="Account Type" value={v.accountType} />
-        <ReviewField
-          label="Salary"
-          value={v.salary ? <ParwestCurrency value={Number(v.salary)} /> : "—"}
-        />
-        <ReviewField label="Reserve %" value={`${v.reservePct ?? 0}%`} />
-      </ReviewSection>
-
-      <ReviewSection title="Documents">
-        <ReviewField label="CNIC Copy" value={v.cnicCopyReceived ? "Received" : "Pending"} />
-        <ReviewField label="Photo" value={v.photoReceived ? "Received" : "Pending"} />
-        <ReviewField
-          label="Police Certificate"
-          value={v.policeCertReceived ? "Received" : "Pending"}
-        />
-      </ReviewSection>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────────────────────────
-
-function SectionHeader({
-  icon,
+function CollapsibleSection({
   title,
-  hint,
+  collapsed,
+  onToggle,
+  children,
+  action,
 }: {
-  icon: React.ReactNode
   title: string
-  hint?: string
+  collapsed: boolean
+  onToggle: () => void
+  children: ReactNode
+  action?: ReactNode
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
-      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-        {icon}
+    <div className="ui-card">
+      <div className={`flex w-full items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 rounded-t-[var(--radius-lg)] ${collapsed ? "rounded-b-[var(--radius-lg)] border-b-0" : ""}`}>
+        <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
+        <div className="inline-flex items-center gap-2">
+          {action}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-muted)] hover:bg-[var(--surface)]"
+            aria-label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+          >
+            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
-      <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
-      {hint && (
-        <span className="ml-auto text-xs text-[var(--text-muted)]">{hint}</span>
-      )}
+      {!collapsed ? <div className="p-6">{children}</div> : null}
     </div>
   )
 }
 
-function TextField({
-  name,
+function Field({
   label,
-  required,
+  name,
   type = "text",
   placeholder,
-  description,
+  required,
 }: {
-  name: Path<GuardCreateForm>
   label: string
-  required?: boolean
+  name: string
   type?: string
   placeholder?: string
-  description?: string
+  required?: boolean
 }) {
-  const form = useFormContext<GuardCreateForm>()
   return (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>
-            {label} {required ? <span className="text-destructive">*</span> : null}
-          </FormLabel>
-          <FormControl>
-            <Input
-              type={type}
-              placeholder={placeholder}
-              {...field}
-              value={(field.value as string | number | undefined) ?? ""}
-            />
-          </FormControl>
-          {description ? <FormDescription>{description}</FormDescription> : null}
-          <FormMessage />
-        </FormItem>
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {label} {required && !label.includes("*") ? <span className="text-red-500">*</span> : null}
+      </label>
+      <input type={type} name={name} required={required} className="ui-input" placeholder={placeholder} />
+    </div>
+  )
+}
+
+function SupervisorSelector({ regionalOfficeId, required }: { regionalOfficeId: string; required?: boolean }) {
+  const [query, setQuery] = useState("")
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([])
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null)
+  const [open, setOpen] = useState(false)
+  const [fetching, setFetching] = useState(false)
+
+  // Reset and refetch when regional office changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset dependent async-loaded fields when RO changes
+    setSelected(null)
+    setQuery("")
+    setUsers([])
+    if (!regionalOfficeId) return
+    setFetching(true)
+    fetch(`/api/users?status=ACTIVE&regionalOfficeId=${regionalOfficeId}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Array<{ id: string; name: string; email: string }>) => setUsers(data))
+      .catch(() => setUsers([]))
+      .finally(() => setFetching(false))
+  }, [regionalOfficeId])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return q
+      ? users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      : users.slice(0, 15)
+  }, [query, users])
+
+  return (
+    <div className="relative">
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        Supervisor {required ? <span className="text-red-500">*</span> : null}
+      </label>
+      <input type="hidden" name="supervisorId" value={selected?.id || ""} />
+      <input type="hidden" name="managerName" value={selected?.name || ""} />
+      {!regionalOfficeId ? (
+        <div className="ui-input bg-gray-50 text-gray-400 text-sm cursor-not-allowed">
+          Select a regional office first
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            type="text"
+            className="ui-input pr-8"
+            placeholder={fetching ? "Loading supervisors..." : "Search supervisor by name..."}
+            value={selected ? selected.name : query}
+            onChange={(e) => { setSelected(null); setQuery(e.target.value) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            autoComplete="off"
+            disabled={fetching}
+          />
+          {selected && (
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-600"
+              onClick={() => { setSelected(null); setQuery("") }}
+              tabIndex={-1}
+            >✕</button>
+          )}
+        </div>
       )}
-    />
+      {open && !selected && regionalOfficeId && (
+        <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-60 overflow-y-auto">
+          {fetching && <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Loading...</p>}
+          {!fetching && filtered.length === 0 && (
+            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">
+              {query ? "No matching supervisors" : "No supervisors in this office"}
+            </p>
+          )}
+          {filtered.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)] flex items-center justify-between gap-2"
+              onMouseDown={() => { setSelected({ id: u.id, name: u.name }); setQuery(""); setOpen(false) }}
+            >
+              <span className="font-medium text-[var(--text)]">{u.name}</span>
+              <span className="text-xs text-[var(--text-muted)] shrink-0">{u.email}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
 function SelectField({
-  name,
   label,
+  name,
   options,
-  required,
+  defaultValue = "",
   placeholder,
+  required,
 }: {
-  name: Path<GuardCreateForm>
   label: string
-  options: Array<{ value: string; label: string }>
-  required?: boolean
+  name: string
+  options: Array<string | { label: string; value: string }>
+  defaultValue?: string
   placeholder?: string
-}) {
-  const form = useFormContext<GuardCreateForm>()
-  return (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>
-            {label} {required ? <span className="text-destructive">*</span> : null}
-          </FormLabel>
-          <Select
-            value={(field.value as string | undefined) ?? ""}
-            onValueChange={field.onChange}
-          >
-            <FormControl>
-              <SelectTrigger>
-                <SelectValue placeholder={placeholder ?? `Select ${label.toLowerCase()}`} />
-              </SelectTrigger>
-            </FormControl>
-            <SelectContent>
-              {options.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  )
-}
-
-function CheckboxField({
-  name,
-  label,
-  description,
-}: {
-  name: Path<GuardCreateForm>
-  label: string
-  description?: string
-}) {
-  const form = useFormContext<GuardCreateForm>()
-  return (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-card p-3">
-          <FormControl>
-            <Checkbox
-              checked={Boolean(field.value)}
-              onCheckedChange={(v) => field.onChange(Boolean(v))}
-            />
-          </FormControl>
-          <div className="flex-1 space-y-0.5">
-            <FormLabel className="cursor-pointer text-sm font-medium">{label}</FormLabel>
-            {description ? <FormDescription>{description}</FormDescription> : null}
-          </div>
-        </FormItem>
-      )}
-    />
-  )
-}
-
-function ReviewSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
+  required?: boolean
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--border)]">
-      <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2">
-        <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
-      </div>
-      <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 md:grid-cols-3">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function ReviewField({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: React.ReactNode
-  mono?: boolean
-}) {
-  return (
-    <div className="border-b border-r border-[var(--border)] px-4 py-2 last:border-r-0">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-        {label}
-      </p>
-      <p
-        className={`mt-1 text-sm font-medium text-[var(--text)] ${mono ? "font-mono" : ""}`}
-      >
-        {value || "—"}
-      </p>
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {label} {required ? <span className="text-red-500">*</span> : null}
+      </label>
+      <select name={name} defaultValue={defaultValue} required={required} className="ui-input">
+        <option value="">{placeholder || `Select ${label.toLowerCase()}`}</option>
+        {options.map((option) => {
+          const value = typeof option === "string" ? option : option.value
+          const labelText = typeof option === "string" ? option : option.label
+          return (
+            <option key={`${name}-${value}`} value={value}>
+              {labelText}
+            </option>
+          )
+        })}
+      </select>
     </div>
   )
 }

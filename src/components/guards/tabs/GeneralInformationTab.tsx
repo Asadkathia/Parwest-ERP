@@ -47,6 +47,7 @@ import {
     FormMessage,
 } from "@/components/shadcn/form"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import {
     Select,
     SelectContent,
@@ -199,9 +200,9 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                     </div>
 
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        {/* Parwest ID — read-only */}
+                        {/* Parwest ID — read-only, not bound to a form field */}
                         <div className="space-y-2">
-                            <FormLabel>Parwest ID</FormLabel>
+                            <Label>Parwest ID</Label>
                             <Input value={guard.parwestId || ""} disabled />
                         </div>
 
