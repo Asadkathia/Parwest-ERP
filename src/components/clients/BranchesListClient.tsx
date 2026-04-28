@@ -109,6 +109,18 @@ export default function BranchesListClient({ branches }: Props) {
     const columns = React.useMemo<ColumnDef<BranchListRow>[]>(
         () => [
             {
+                accessorKey: "clientName",
+                header: "Client",
+                cell: ({ row }) => (
+                    <Link
+                        href={`/clients/${row.original.clientId}`}
+                        className="font-medium text-primary hover:underline"
+                    >
+                        {row.original.clientName}
+                    </Link>
+                ),
+            },
+            {
                 accessorKey: "id",
                 header: "Branch ID",
                 cell: ({ row }) => (
@@ -119,7 +131,7 @@ export default function BranchesListClient({ branches }: Props) {
             },
             {
                 accessorKey: "name",
-                header: "Name",
+                header: "Branch",
                 cell: ({ row }) => (
                     <div className="flex items-center gap-2">
                         <span className="font-medium">{row.original.name}</span>
