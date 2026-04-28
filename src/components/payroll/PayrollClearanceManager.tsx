@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
 import GuardContextFields from "@/components/payroll/shared/GuardContextFields"
@@ -160,9 +160,9 @@ export default function PayrollClearanceManager({
 
         {canCreate && (
           <div className="flex justify-end">
-            <ActionButton onClick={initiate} disabled={!canSubmit || busy}>
+            <Button onClick={initiate} disabled={!canSubmit || busy}>
               {busy ? "Processing…" : "Initiate Clearance"}
-            </ActionButton>
+            </Button>
           </div>
         )}
 

@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
 import { useEffect, useState, use as reactUse } from "react"
 import { useSearchParams } from "next/navigation"
-import ActionButton from "@/components/ui/action-button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 
 type GuardRow = {
@@ -149,7 +149,7 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
               <div className="font-semibold">{detail.supervisor?.name ?? "—"}</div>
             </div>
             <div className="ui-card p-4">
-              <ActionButton onClick={exportExcel}>Export Excel</ActionButton>
+              <Button onClick={exportExcel}>Export Excel</Button>
             </div>
           </div>
 

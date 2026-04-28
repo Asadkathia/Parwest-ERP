@@ -1,14 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import Link from "next/link"
 import type { ScreenConfig } from "@/lib/parity/screenConfigs"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Card, CardBody } from "@/components/ui/card"
-
 type Props = {
   config: ScreenConfig
   links?: Array<{ label: string; href: string }>
@@ -97,7 +95,7 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <SectionTitle title={config.title} subtitle={config.description} />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(config.title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(config.description)}</p></div></div>
         {links.length > 0 ? (
           <div className="flex flex-wrap gap-2 justify-end">
             {links.map((link) => (
@@ -110,7 +108,8 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
       </div>
 
       {config.tabs && config.tabs.length > 0 ? (
-        <FilterBar>
+        <Card>
+        <CardContent className="p-5">
           <div className="flex flex-wrap gap-2">
             {config.tabs.map((tab) => (
               <button
@@ -123,16 +122,17 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
               </button>
             ))}
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
 
       {notice ? (
-        <InlineAlert type={notice.type} message={notice.text} />
+        ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.text)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.text)}</AlertDescription></Alert>)
       ) : null}
 
       {config.sections?.map((section) => (
         <Card key={section.title}>
-          <CardBody>
+          <CardContent className="p-5">
           <h2 className="text-lg font-semibold text-[var(--text)]">{section.title}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             {section.fields.map((field) => {
@@ -205,20 +205,16 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
               )
             })}
           </div>
-          </CardBody>
+          </CardContent>
         </Card>
       ))}
 
       {config.actions && config.actions.length > 0 ? (
         <div className="flex flex-wrap gap-2 justify-end">
           {config.actions.map((action) => (
-            <ActionButton
-              key={action}
-              type="button"
-              onClick={() => onRunAction(action)}
-            >
+            <Button key={action} type="button" onClick={() => onRunAction(action)}>
               {action}
-            </ActionButton>
+            </Button>
           ))}
         </div>
       ) : null}

@@ -72,7 +72,7 @@ function toInputDate(d: string | null | undefined) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="w-full max-w-lg rounded-xl bg-card shadow-2xl">
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text)]">{title}</h3>
                     <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] text-xl leading-none">×</button>
@@ -92,7 +92,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     )
 }
 
-const inputCls = "w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+const inputCls = "w-full rounded-lg border border-[var(--border)] bg-card px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
 
 // ── Add / Edit Contract Modal ──────────────────────────────────────────────────
 function ContractFormModal({
@@ -250,9 +250,9 @@ function AddRateModal({
                     <button
                         type="button"
                         onClick={() => set("isCurrentRate", !form.isCurrentRate)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.isCurrentRate ? "bg-green-500" : "bg-gray-300"}`}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.isCurrentRate ? "bg-green-500" : "bg-muted-foreground/30 dark:bg-muted-foreground/40"}`}
                     >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.isCurrentRate ? "translate-x-6" : "translate-x-1"}`} />
+                        <span className={`inline-block h-4 w-4 rounded-full bg-card shadow transition-transform ${form.isCurrentRate ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                 </div>
 
@@ -341,26 +341,26 @@ function ContractCard({
     }
 
     return (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+        <div className="rounded-xl border border-[var(--border)] bg-card overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between gap-4 px-5 py-4 bg-slate-50">
+            <div className="flex items-center justify-between gap-4 px-5 py-4 bg-muted">
                 <button
                     onClick={() => setExpanded((v) => !v)}
-                    className="flex flex-1 items-center gap-3 text-left"
+                    className="flex flex-1 items-center gap-3 text-start"
                 >
-                    <ChevronRight className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
+                    <ChevronRight className={`h-4 w-4 text-[var(--text-muted)] transition-transform rtl:rotate-180 ${expanded ? "rotate-90 rtl:rotate-90" : ""}`} />
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
                             <FileText className="h-4 w-4 text-blue-500" />
                             <span className="text-sm font-semibold text-[var(--text)]">{contract.name}</span>
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{contract.type}</span>
+                            <span className="rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">{contract.type}</span>
                             {contract.branch ? (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{contract.branch.name}</span>
+                                <span className="rounded-full bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">{contract.branch.name}</span>
                             ) : (
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">Client-Level</span>
+                                <span className="rounded-full bg-slate-200 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">Client-Level</span>
                             )}
                             {!contract.isActive && (
-                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">Inactive</span>
+                                <span className="rounded-full bg-red-100 dark:bg-red-950/40 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">Inactive</span>
                             )}
                         </div>
                         <p className="mt-0.5 text-xs text-[var(--text-muted)]">
@@ -395,9 +395,9 @@ function ContractCard({
                     ) : (
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-[var(--border)] bg-slate-50">
+                                <tr className="border-b border-[var(--border)] bg-muted">
                                     {["Province","City","Guard Type","Ex-Service","Rate (PKR)","Extra/Hr (PKR)","Rate Period","Current","Action"].map((h) => (
-                                        <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
+                                        <th key={h} className="px-4 py-2.5 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -405,12 +405,12 @@ function ContractCard({
                                 {contract.rates.map((rate) => (
                                     <tr
                                         key={rate.id}
-                                        className={`border-b border-[var(--border)] transition-colors ${rate.isCurrentRate ? "bg-green-50" : "hover:bg-slate-50"}`}
+                                        className={`border-b border-[var(--border)] transition-colors ${rate.isCurrentRate ? "bg-green-50 dark:bg-green-950/30" : "hover:bg-muted"}`}
                                     >
                                         <td className="px-4 py-2.5 text-[var(--text)]">{rate.province || "—"}</td>
                                         <td className="px-4 py-2.5 text-[var(--text)]">{rate.city || "—"}</td>
                                         <td className="px-4 py-2.5">
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
                                                 <Tag className="h-3 w-3" />{rate.guardType}
                                             </span>
                                         </td>
@@ -424,7 +424,7 @@ function ContractCard({
                                         </td>
                                         <td className="px-4 py-2.5">
                                             {rate.isCurrentRate ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-950/40 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-300">
                                                     <CheckCircle2 className="h-3 w-3" /> Current
                                                 </span>
                                             ) : (
@@ -437,7 +437,7 @@ function ContractCard({
                                                     onClick={() => markAsCurrent(rate.id)}
                                                     disabled={markingCurrentId === rate.id}
                                                     title="Set as current rate"
-                                                    className="rounded-lg border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+                                                    className="rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/40 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-950/60 disabled:opacity-50"
                                                 >
                                                     {markingCurrentId === rate.id ? "…" : "Set Current"}
                                                 </button>
@@ -544,7 +544,7 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                         <select
                             value={filterBranchId}
                             onChange={(e) => setFilterBranchId(e.target.value)}
-                            className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)] focus:outline-none"
+                            className="rounded-lg border border-[var(--border)] bg-card px-3 py-2 text-sm text-[var(--text)] focus:outline-none"
                         >
                             <option value="all">All Contracts</option>
                             <option value="client">Client-Level</option>
@@ -568,11 +568,11 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
 
             {/* Contracts list */}
             {loading ? (
-                <div className="rounded-xl border border-[var(--border)] bg-white px-5 py-10 text-center text-sm text-[var(--text-muted)]">
+                <div className="rounded-xl border border-[var(--border)] bg-card px-5 py-10 text-center text-sm text-[var(--text-muted)]">
                     Loading contracts…
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[var(--border)] bg-white px-5 py-12 text-center">
+                <div className="rounded-xl border border-dashed border-[var(--border)] bg-card px-5 py-12 text-center">
                     <FileText className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
                     <p className="text-sm font-medium text-[var(--text)]">No contracts yet</p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">

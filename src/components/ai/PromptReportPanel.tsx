@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-
+import { Button } from "@/components/shadcn/button"
 type PromptReportResponse = {
   narrative: string
   kpis: { label: string; value: string }[]
@@ -154,8 +153,8 @@ export default function PromptReportPanel() {
           />
         </div>
         <div className="flex gap-2">
-          <ActionButton onClick={() => setSubmittedPrompt(prompt)}>Generate</ActionButton>
-          <ActionButton variant="secondary" onClick={() => setPrompt("Show attendance gaps for this week")}>Preset</ActionButton>
+          <Button onClick={() => setSubmittedPrompt(prompt)}>Generate</Button>
+          <Button variant="secondary" onClick={() => setPrompt("Show attendance gaps for this week")}>Preset</Button>
         </div>
       </div>
 

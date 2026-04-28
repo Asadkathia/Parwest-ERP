@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db"
 import { ShieldAlert } from "lucide-react"
 import { isSuperAdmin } from "@/lib/api/permissions"
 import { deriveRegionalScope } from "@/lib/access/scope"
-import SectionTitle from "@/components/ui/section-title"
 import GuardsApprovalClient from "./GuardsApprovalClient"
 
 export default async function GuardsApprovalPage({
@@ -34,10 +33,7 @@ export default async function GuardsApprovalPage({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Guards Approval"
-        subtitle="Manage guard age limits and review age approval requests."
-      />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Guards Approval"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage guard age limits and review age approval requests."}</p></div></div>
 
       {needsRegionGate ? (
         <>

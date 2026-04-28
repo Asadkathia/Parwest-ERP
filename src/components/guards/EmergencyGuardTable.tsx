@@ -1,15 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
 import { useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import StatusChip from "@/components/ui/status-chip"
 import type { EmergencyGuardRow, EmergencyReason } from "@/lib/guards/emergency"
 
-function urgencyVariant(urgency: EmergencyGuardRow["urgency"]) {
-  if (urgency === "HIGH") return "danger"
-  if (urgency === "MEDIUM") return "warning"
-  return "neutral"
+function urgencyVariantClass(urgency: EmergencyGuardRow["urgency"]) {
+  if (urgency === "HIGH") return "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-transparent"
+  if (urgency === "MEDIUM") return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-transparent"
+  return "bg-secondary text-secondary-foreground border-transparent"
 }
 
 export default function EmergencyGuardTable({ rows }: { rows: EmergencyGuardRow[] }) {
@@ -100,7 +100,7 @@ export default function EmergencyGuardTable({ rows }: { rows: EmergencyGuardRow[
           ))}
         </div>
         <div>
-          <ActionButton onClick={addEmergencyGuard}>Add as Emergency Guard</ActionButton>
+          <Button onClick={addEmergencyGuard}>Add as Emergency Guard</Button>
         </div>
       </div>
 
@@ -139,12 +139,12 @@ export default function EmergencyGuardTable({ rows }: { rows: EmergencyGuardRow[
                 <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{row.cnic || "—"}</td>
                 <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{row.phone || "—"}</td>
                 <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{row.status}</td>
-                <td className="px-4 py-2 text-sm"><StatusChip label={row.urgency} variant={urgencyVariant(row.urgency)} /></td>
+                <td className="px-4 py-2 text-sm"><Badge className={`font-bold ${urgencyVariantClass(row.urgency)}`}>{row.urgency}</Badge></td>
                 <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{row.reasons.join(", ")}</td>
                 <td className="px-4 py-2">
                   <div className="flex flex-wrap gap-2">
-                    <ActionButton className="px-2.5 py-1.5 text-xs">Assign Temporarily</ActionButton>
-                    <ActionButton className="px-2.5 py-1.5 text-xs" variant="secondary" onClick={() => markEscalated(row.id)}>Mark Escalated</ActionButton>
+                    <Button className="px-2.5 py-1.5 text-xs">Assign Temporarily</Button>
+                    <Button className="px-2.5 py-1.5 text-xs" variant="secondary" onClick={() => markEscalated(row.id)}>Mark Escalated</Button>
                     {row.source === "manual" ? (
                       <Link href="/guards/new" className="ui-btn ui-btn-secondary px-2.5 py-1.5 text-xs">Complete Profile</Link>
                     ) : (

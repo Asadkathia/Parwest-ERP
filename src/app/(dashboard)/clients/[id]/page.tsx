@@ -22,8 +22,6 @@ import {
 } from "@/components/shadcn/table"
 import { TabStatusBadge } from "@/components/guards/tabs/status-badge"
 import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
-import SectionTitle from "@/components/ui/section-title"
-
 type TabKey =
   | "general-information"
   | "assigned-guards"
@@ -276,11 +274,7 @@ export default async function ClientDetailPage({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title={`${client.name} - PROFILE V2`}
-        subtitle="Legacy-aligned client profile view"
-        action={
-          <div className="flex items-center gap-2">
+      <div className="mb-4 flex items-start justify-between gap-4 flex items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{(`${client.name} - PROFILE V2`)}</h2><p className="mt-1 text-sm text-muted-foreground">{"Legacy-aligned client profile view"}</p></div><div className="flex shrink-0 items-center gap-2">{(<div className="flex items-center gap-2">
             <Button asChild variant="outline">
               <Link href="/clients">
                 <ArrowLeft className="h-4 w-4" />
@@ -304,9 +298,7 @@ export default async function ClientDetailPage({
                 </Link>
               </Button>
             ) : null}
-          </div>
-        }
-      />
+          </div>)}</div></div>
 
       <div className="flex flex-wrap gap-2 rounded-md border bg-card p-2">
         {TABS.map((tab) => {

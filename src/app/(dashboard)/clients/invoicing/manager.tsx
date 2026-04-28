@@ -18,7 +18,6 @@ import { useCallback, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
-import SectionTitle from "@/components/ui/section-title"
 import { Button } from "@/components/shadcn/button"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import InvoiceComposer from "./InvoiceComposer"
@@ -196,17 +195,11 @@ export default function ClientInvoicingManager(_props: {
 
   return (
     <div className="space-y-4">
-      <SectionTitle
-        title="Client Invoicing"
-        subtitle="Compose, auto-fill and track invoices. Advances are auto-applied on creation."
-        action={
-          <PermissionGate module="CLIENTS" action="CREATE" mode="hide">
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Client Invoicing"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Compose, auto-fill and track invoices. Advances are auto-applied on creation."}</p></div><div className="flex shrink-0 items-center gap-2">{(<PermissionGate module="CLIENTS" action="CREATE" mode="hide">
             <Button onClick={runBulkGenerate} disabled={bulkBusy || !period}>
               {bulkBusy ? "Generating…" : "Bulk generate (period)"}
             </Button>
-          </PermissionGate>
-        }
-      />
+          </PermissionGate>)}</div></div>
 
       <InvoiceSummaryTiles rows={invoices} />
 

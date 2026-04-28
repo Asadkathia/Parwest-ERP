@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 import { cn } from "@/lib/utils"
 import { BellOff, Bell, Save, RotateCcw } from "lucide-react"
 
@@ -52,10 +51,7 @@ export default function InsightsConfigManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Insights Configuration"
-        subtitle="Tune thresholds and muting for every dashboard insight."
-      />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Insights Configuration"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Tune thresholds and muting for every dashboard insight."}</p></div></div>
       {error ? <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
       {loading ? (
         <p className="text-sm text-[var(--text-muted)]">Loading…</p>
@@ -81,13 +77,13 @@ function Section({
   return (
     <Card>
       <CardHeader>
-        <SectionTitle title={title} subtitle={`${rows.length} insights`} />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(`${rows.length} insights`)}</p></div></div>
       </CardHeader>
-      <CardBody className="space-y-3">
+      <CardContent className="space-y-3">
         {rows.map((r) => (
           <InsightConfigRow key={r.key} row={r} onSaved={onSaved} />
         ))}
-      </CardBody>
+      </CardContent>
     </Card>
   )
 }
@@ -263,26 +259,24 @@ function InsightConfigRow({ row, onSaved }: { row: InsightConfig; onSaved: () =>
           {err ? <p className="rounded bg-red-50 p-2 text-xs text-red-700">{err}</p> : null}
 
           <div className="flex gap-2">
-            <ActionButton onClick={save} disabled={saving}>
+            <Button onClick={save} disabled={saving}>
               <Save className="mr-1 inline h-4 w-4" />
               {saving ? "Saving…" : "Save"}
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={reset} disabled={saving}>
+            </Button>
+            <Button variant="secondary" onClick={reset} disabled={saving}>
               <RotateCcw className="mr-1 inline h-4 w-4" />
               Reset to defaults
-            </ActionButton>
+            </Button>
             {row.muted ? (
-              <ActionButton
-                variant="secondary"
-                onClick={() => {
+              <Button 
+                variant="secondary" onClick={() => {
                   setMuted(false)
                   setTimeout(save, 0)
                 }}
-                disabled={saving}
-              >
+                disabled={saving}>
                 <Bell className="mr-1 inline h-4 w-4" />
                 Unmute now
-              </ActionButton>
+              </Button>
             ) : null}
           </div>
         </div>

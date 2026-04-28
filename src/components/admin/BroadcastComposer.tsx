@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import type { AudienceScope, BroadcastMessage } from "@/lib/admin/types"
 
 type Props = {
@@ -43,7 +43,7 @@ export default function BroadcastComposer({ onCreate }: Props) {
         </select>
         <input className="ui-input" value={audienceValue} onChange={(e) => setAudienceValue(e.target.value)} placeholder="Role or office (optional)" />
       </div>
-      <ActionButton onClick={submit}>Send Broadcast</ActionButton>
+      <Button onClick={submit}>Send Broadcast</Button>
     </section>
   )
 }

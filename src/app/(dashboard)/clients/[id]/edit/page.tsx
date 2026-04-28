@@ -4,8 +4,6 @@ import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { deriveManagerScope } from "@/lib/access/scope"
 import ClientEditForm from "./form"
-import SectionTitle from "@/components/ui/section-title"
-
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
@@ -34,7 +32,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Edit Client" subtitle={`Update client information for ${client.name}`} />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Edit Client"}</h2><p className="mt-1 text-sm text-muted-foreground">{(`Update client information for ${client.name}`)}</p></div></div>
 
             <ClientEditForm
                 client={client}

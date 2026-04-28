@@ -1,12 +1,11 @@
 "use client"
 
 import { Suspense, useState, useEffect, useCallback } from "react"
-import { ShieldAlert, Check, X as XIcon, Clock, AlertTriangle } from "lucide-react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
+import { ShieldAlert, Check, X as XIcon, Clock, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Card, CardBody } from "@/components/ui/card"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -139,13 +138,10 @@ export default function GuardsApprovalClient({
     <div className="space-y-6">
       {/* ── Age Limit Configuration ── */}
       <Card>
-        <CardBody className="space-y-4">
-          <SectionTitle
-            title="Guard Age Limit Configuration"
-            subtitle="Set the minimum and maximum permitted age for guard enrollment. Guards outside these limits will require admin approval."
-          />
-          {ageConfigError && <InlineAlert type="error" message={ageConfigError} />}
-          {ageConfigSuccess && <InlineAlert type="success" message={ageConfigSuccess} />}
+        <CardContent className="space-y-4">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Guard Age Limit Configuration"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Set the minimum and maximum permitted age for guard enrollment. Guards outside these limits will require admin approval."}</p></div></div>
+          {ageConfigError && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{ageConfigError}</AlertDescription></Alert>}
+          {ageConfigSuccess && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{ageConfigSuccess}</AlertDescription></Alert>}
           {ageConfigLoading ? (
             <p className="text-sm text-[var(--text-muted)]">Loading...</p>
           ) : (
@@ -180,26 +176,23 @@ export default function GuardsApprovalClient({
                 />
                 <p className="mt-1 text-xs text-gray-400">Overage threshold</p>
               </div>
-              <ActionButton onClick={saveAgeConfig} disabled={ageConfigSaving}>
+              <Button onClick={saveAgeConfig} disabled={ageConfigSaving}>
                 {ageConfigSaving ? "Saving..." : "Save Limits"}
-              </ActionButton>
+              </Button>
             </div>
           )}
           <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
             <strong>How it works:</strong> When a guard&apos;s age is below the minimum or above the maximum, the system will still
             enroll the guard but flag it as <em>Pending Age Approval</em>. An approval request will appear in the section below for admin review.
           </p>
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Age Approval Requests ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <SectionTitle
-              title="Age Approval Requests"
-              subtitle="Guards whose age is outside configured limits require your approval to be enrolled."
-            />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Age Approval Requests"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Guards whose age is outside configured limits require your approval to be enrolled."}</p></div></div>
             <div className="flex items-end gap-2 flex-wrap">
               <div className="min-w-[200px]">
                 <Suspense>
@@ -225,7 +218,7 @@ export default function GuardsApprovalClient({
             </div>
           </div>
 
-          {approvalsError && <InlineAlert type="error" message={approvalsError} />}
+          {approvalsError && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{approvalsError}</AlertDescription></Alert>}
 
           {approvalsLoading ? (
             <p className="text-sm text-[var(--text-muted)]">Loading...</p>
@@ -304,7 +297,7 @@ export default function GuardsApprovalClient({
               </table>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Review Modal */}

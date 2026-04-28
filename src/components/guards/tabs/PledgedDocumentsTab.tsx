@@ -368,7 +368,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
                   {["#", "Document", "Received By", "Received At", "Return Type", "Returned By", "Returned At", "Expected Return", "Status", "Actions"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
+                    <th key={h} className="px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -380,7 +380,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                   return (
                     <tr
                       key={rec.id}
-                      className={`border-b border-[var(--border)] last:border-0 transition-colors ${overdue ? "bg-red-50 hover:bg-red-100" : "hover:bg-[var(--surface-muted)]"}`}
+                      className={`border-b border-[var(--border)] last:border-0 transition-colors ${overdue ? "bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50" : "hover:bg-[var(--surface-muted)]"}`}
                     >
                       <td className="px-4 py-3 text-[var(--text-muted)]">{idx + 1}</td>
                       <td className="px-4 py-3">
@@ -389,16 +389,16 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                           <span className="font-medium text-[var(--text)]">{rec.documentTypeName}</span>
                           {overdue && <span title="Expected return date passed"><AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" /></span>}
                         </div>
-                        {rec.notes && <p className="mt-0.5 text-xs text-[var(--text-muted)] pl-6">{rec.notes}</p>}
-                        {rec.returnReason && <p className="mt-0.5 text-xs text-orange-700 pl-6">Reason: {rec.returnReason}</p>}
-                        {rec.returnCondition && <p className="mt-0.5 text-xs text-orange-700 pl-6">Condition: {rec.returnCondition.name}</p>}
+                        {rec.notes && <p className="mt-0.5 text-xs text-[var(--text-muted)] ps-6">{rec.notes}</p>}
+                        {rec.returnReason && <p className="mt-0.5 text-xs text-orange-700 dark:text-orange-300 ps-6">Reason: {rec.returnReason}</p>}
+                        {rec.returnCondition && <p className="mt-0.5 text-xs text-orange-700 dark:text-orange-300 ps-6">Condition: {rec.returnCondition.name}</p>}
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{rec.receivedBy || "—"}</td>
                       <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{fmt(rec.receivedAt)}</td>
                       <td className="px-4 py-3">
                         {rec.returnType ? (
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            rec.returnType === "TEMPORARY" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"
+                            rec.returnType === "TEMPORARY" ? "bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300" : "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
                           }`}>
                             {rec.returnType === "TEMPORARY" ? "Temporary" : "Clearance"}
                           </span>
@@ -417,8 +417,8 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           isHeld
-                            ? overdue ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
+                            ? overdue ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300" : "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300"
+                            : "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300"
                         }`}>
                           {isHeld && overdue ? "OVERDUE" : rec.status}
                         </span>
@@ -499,7 +499,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── Add Modal ── */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-md rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <h3 className="text-base font-semibold text-[var(--text)]">Add Pledged Document</h3>
               <button onClick={() => setShowAdd(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -580,7 +580,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── Return Modal ── */}
       {returnRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-md rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <h3 className="text-base font-semibold text-[var(--text)]">Return Document</h3>
               <button onClick={() => setReturnRec(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -698,7 +698,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── History Modal ── */}
       {historyRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-xl rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <div>
                 <h3 className="text-base font-semibold text-[var(--text)]">Document History</h3>
@@ -715,12 +715,12 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                 let details: Record<string, unknown> = {}
                 try { if (h.details) details = JSON.parse(h.details) } catch { /* ignore */ }
                 const actionColors: Record<string, string> = {
-                  CREATED:          "bg-blue-100 text-blue-800",
-                  RETURNED:         "bg-green-100 text-green-800",
-                  REHOLD:           "bg-indigo-100 text-indigo-800",
-                  VERSION_UPLOADED: "bg-teal-100 text-teal-800",
-                  UPDATED:          "bg-yellow-100 text-yellow-800",
-                  DELETED:          "bg-red-100 text-red-800",
+                  CREATED:          "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+                  RETURNED:         "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300",
+                  REHOLD:           "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
+                  VERSION_UPLOADED: "bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
+                  UPDATED:          "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300",
+                  DELETED:          "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300",
                 }
                 const actionLabels: Record<string, string> = {
                   CREATED:          "Created",
@@ -733,24 +733,24 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                 return (
                   <div key={h.id} className="rounded-lg border border-[var(--border)] p-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${actionColors[h.action] ?? "bg-gray-100 text-gray-800"}`}>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${actionColors[h.action] ?? "bg-muted text-foreground"}`}>
                         {actionLabels[h.action] ?? h.action}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{fmtDateTime(h.performedAt)}</span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">By: <span className="font-medium text-[var(--text)]">{h.performedBy || "System"}</span></p>
                     {h.action === "RETURNED" && (
-                      <div className="text-xs text-[var(--text-muted)] space-y-0.5 pl-1 border-l-2 border-green-200">
+                      <div className="text-xs text-[var(--text-muted)] space-y-0.5 ps-1 border-s-2 border-green-200 dark:border-green-800">
                         {details.returnType != null && <p>Return Type: <span className="font-medium">{String(details.returnType)}</span></p>}
                         {details.returnReason != null && <p>Reason: <span className="font-medium">{String(details.returnReason)}</span></p>}
                         {details.expectedReturnDate != null && <p>Expected Return: <span className="font-medium">{fmt(String(details.expectedReturnDate))}</span></p>}
                       </div>
                     )}
                     {h.action === "CREATED" && details.notes != null && (
-                      <p className="text-xs text-[var(--text-muted)] pl-1 border-l-2 border-blue-200">Notes: <span className="font-medium">{String(details.notes)}</span></p>
+                      <p className="text-xs text-[var(--text-muted)] ps-1 border-s-2 border-blue-200 dark:border-blue-800">Notes: <span className="font-medium">{String(details.notes)}</span></p>
                     )}
                     {h.action === "VERSION_UPLOADED" && (
-                      <div className="text-xs text-[var(--text-muted)] space-y-1 pl-1 border-l-2 border-teal-200">
+                      <div className="text-xs text-[var(--text-muted)] space-y-1 ps-1 border-s-2 border-teal-200 dark:border-teal-800">
                         {details.previousAttachmentName != null && (
                           <p>Previous file: <span className="font-medium">{String(details.previousAttachmentName)}</span></p>
                         )}
@@ -769,7 +769,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
                       </div>
                     )}
                     {h.action === "REHOLD" && (
-                      <p className="text-xs text-indigo-700 pl-1 border-l-2 border-indigo-200">Document re-taken into custody</p>
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300 ps-1 border-s-2 border-indigo-200 dark:border-indigo-800">Document re-taken into custody</p>
                     )}
                   </div>
                 )
@@ -790,7 +790,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── Rehold Confirm Modal ── */}
       {reholdRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-sm rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <h3 className="text-base font-semibold text-indigo-700">Re-hold Document</h3>
               <button onClick={() => setReholdRec(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -828,7 +828,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── New Version Modal ── */}
       {versionRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-md rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <div>
                 <h3 className="text-base font-semibold text-teal-700">Upload New Version</h3>
@@ -884,7 +884,7 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
       {/* ── Delete Confirm Modal ── */}
       {deleteRec && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-[var(--border)]">
+          <div className="w-full max-w-sm rounded-xl bg-card shadow-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <h3 className="text-base font-semibold text-red-700">Delete Record</h3>
               <button onClick={() => setDeleteRec(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">

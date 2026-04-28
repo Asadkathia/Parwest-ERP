@@ -2,8 +2,6 @@ import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import BranchEditForm from "./form"
-import SectionTitle from "@/components/ui/section-title"
-
 export default async function EditBranchPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
@@ -21,7 +19,7 @@ export default async function EditBranchPage({ params }: { params: Promise<{ id:
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Edit Branch" subtitle={`Update branch information for ${branch.name}`} />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Edit Branch"}</h2><p className="mt-1 text-sm text-muted-foreground">{(`Update branch information for ${branch.name}`)}</p></div></div>
 
             <BranchEditForm branch={branch} />
         </div>

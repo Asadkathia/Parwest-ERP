@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import {
   STATUS_OPTIONS,
   newItemId,
@@ -174,16 +174,12 @@ export default function InvoiceComposer({
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold">Line items</h3>
           <div className="flex gap-2">
-            <ActionButton type="button" variant="secondary" onClick={openAutoFill} disabled={!clientId || !period}>
+            <Button type="button" variant="secondary" onClick={openAutoFill} disabled={!clientId || !period}>
               Auto-fill
-            </ActionButton>
-            <ActionButton
-              type="button"
-              variant="secondary"
-              onClick={() => setItems((p) => [...p, { id: newItemId(), kind: "MANUAL", refId: null, description: "", quantity: 1, unitPrice: 0 }])}
-            >
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setItems((p) => [...p, { id: newItemId(), kind: "MANUAL", refId: null, description: "", quantity: 1, unitPrice: 0 }])}>
               Add line item
-            </ActionButton>
+            </Button>
           </div>
         </div>
 
@@ -261,8 +257,8 @@ export default function InvoiceComposer({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <ActionButton onClick={submit} disabled={busy || !clientId}>Save Invoice</ActionButton>
-        <ActionButton variant="secondary" onClick={reset}>Reset</ActionButton>
+        <Button onClick={submit} disabled={busy || !clientId}>Save Invoice</Button>
+        <Button variant="secondary" onClick={reset}>Reset</Button>
       </div>
 
       {autoFillOpen ? (
@@ -313,8 +309,8 @@ export default function InvoiceComposer({
                 </table>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <ActionButton variant="secondary" onClick={() => setAutoFillOpen(false)}>Cancel</ActionButton>
-                <ActionButton onClick={applyAutoFill} disabled={autoFillItems.length === 0}>Apply selected</ActionButton>
+                <Button variant="secondary" onClick={() => setAutoFillOpen(false)}>Cancel</Button>
+                <Button onClick={applyAutoFill} disabled={autoFillItems.length === 0}>Apply selected</Button>
               </div>
             </>
           )}

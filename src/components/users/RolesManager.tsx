@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "@/components/shadcn/button"
 import { AlertCircle, CheckCircle2, Plus, Trash2, Shield } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
-import ActionButton from "@/components/ui/action-button"
 import RolePermissionsManager from "@/components/users/RolePermissionsManager"
 import UserPermissionsManager from "@/components/users/UserPermissionsManager"
 
@@ -124,10 +124,10 @@ export default function RolesManager({ initialRoles, initialTab = "roles" }: Pro
                                     <option value="GLOBAL">Global (sees all regions)</option>
                                 </select>
                             </div>
-                            <ActionButton onClick={handleCreate} disabled={saving} className="inline-flex items-center gap-2">
+                            <Button onClick={handleCreate} disabled={saving} className="inline-flex items-center gap-2">
                                 <Plus className="h-4 w-4" />
                                 {saving ? "Creating..." : "Add Role"}
-                            </ActionButton>
+                            </Button>
                         </div>
                         <p className="mt-3 text-xs text-[var(--text-muted)]">
                             Global roles see all data across regions. Regional roles only see data for the region and office assigned to the user.

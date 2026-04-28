@@ -1,12 +1,12 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useRouter } from "next/navigation"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { useScopeQuery } from "@/components/store-inventory-v2/use-scope-query"
@@ -414,22 +414,18 @@ export default function PurchasesManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title={createMode ? (productScope === "WEAPON" ? "Add Weapon Purchase" : "Add Purchase") : (productScope === "WEAPON" ? "Weapon Purchase" : "Regular Purchase")}
-        subtitle={
-          createMode
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(createMode ? (productScope === "WEAPON" ? "Add Weapon Purchase" : "Add Purchase") : (productScope === "WEAPON" ? "Weapon Purchase" : "Regular Purchase"))}</h2><p className="mt-1 text-sm text-muted-foreground">{(createMode
             ? productScope === "WEAPON"
               ? "Weapon-only purchase workflow for stock-in."
               : "Staging-aligned purchase workflow for store/warehouse inventory intake."
             : productScope === "WEAPON"
               ? "Weapon purchase list with status and invoice totals."
-              : "Purchase list with status and invoice totals."
-        }
-      />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+              : "Purchase list with status and invoice totals.")}</p></div></div>
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
       {createMode ? (
-        <FilterBar className="space-y-6">
+        <Card>
+        <CardContent className="space-y-6 p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FieldSelect
               label="Select Store/Warehouse *"
@@ -517,7 +513,7 @@ export default function PurchasesManager({
                 </div>
               )
             })}
-            <ActionButton variant="secondary" onClick={addLine}>+ Add Product</ActionButton>
+            <Button variant="secondary" onClick={addLine}>+ Add Product</Button>
 
             <div className="grid grid-cols-1 gap-2 text-sm text-[var(--text-muted)] md:grid-cols-2">
               <div className="rounded border border-[var(--border)] p-2 font-medium">Total Qty: {lineTotals.qty}</div>
@@ -553,13 +549,15 @@ export default function PurchasesManager({
           </div>
 
           <div className="flex gap-2">
-            <ActionButton onClick={() => void submit()} disabled={saving}>{saving ? "Saving..." : "Add Purchase"}</ActionButton>
-            <ActionButton variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</ActionButton>
+            <Button onClick={() => void submit()} disabled={saving}>{saving ? "Saving..." : "Add Purchase"}</Button>
+            <Button variant="secondary" onClick={() => setForm(INITIAL_FORM)}>Reset</Button>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : (
         <>
-          <FilterBar>
+          <Card>
+        <CardContent className="p-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Suspense>
                 <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
@@ -569,7 +567,8 @@ export default function PurchasesManager({
                 <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by store/vendor/user/date/invoice" />
               </div>
             </div>
-          </FilterBar>
+          </CardContent>
+      </Card>
 
           <DataTable
             rows={visible}
@@ -772,12 +771,12 @@ export default function PurchasesManager({
               </div>
 
               <div className="flex justify-end gap-2">
-                <ActionButton variant="secondary" onClick={() => { setReceivingRow(null); setReceivingDraft(null) }}>
+                <Button variant="secondary" onClick={() => { setReceivingRow(null); setReceivingDraft(null) }}>
                   Cancel
-                </ActionButton>
-                <ActionButton onClick={() => void submitReceiving()} disabled={saving}>
+                </Button>
+                <Button onClick={() => void submitReceiving()} disabled={saving}>
                   {saving ? "Saving..." : "Received"}
-                </ActionButton>
+                </Button>
               </div>
             </div>
           </div>

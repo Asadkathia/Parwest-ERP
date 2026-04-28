@@ -1,12 +1,11 @@
 import { auth } from "@/lib/auth"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
+import { Badge } from "@/components/shadcn/badge"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
 import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import StatusChip from "@/components/ui/status-chip"
 import { deriveBranchModel } from "@/lib/branches/model"
 import BranchDeleteButton from "@/components/clients/BranchDeleteButton"
 
@@ -51,11 +50,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title={branch.name}
-        subtitle={branch.client.name}
-        action={
-          <div className="flex items-center gap-2">
+      <div className="mb-4 flex items-start justify-between gap-4 flex items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{(branch.name)}</h2><p className="mt-1 text-sm text-muted-foreground">{(branch.client.name)}</p></div><div className="flex shrink-0 items-center gap-2">{(<div className="flex items-center gap-2">
             <Link href={`/clients/${branch.clientId}`} className="ui-btn ui-btn-secondary inline-flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -70,12 +65,10 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               branchName={branch.name}
               activeDeploymentCount={activeDeployments.length}
             />
-          </div>
-        }
-      />
+          </div>)}</div></div>
 
       <Card>
-        <CardBody className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Code</p>
             <p className="mt-2 text-base font-semibold text-[var(--text)]">{branch.code || "—"}</p>
@@ -95,10 +88,10 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Model</p>
             <div className="mt-2">
-              <StatusChip label={branchModel} variant={branchModel === "ISLAMIC" ? "warning" : "neutral"} />
+              <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{branchModel}</Badge>
             </div>
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -110,7 +103,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 Location Information
               </h3>
             </CardHeader>
-            <CardBody className="space-y-4">
+            <CardContent className="space-y-4">
               {branch.address ? (
                 <div>
                   <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Address</p>
@@ -127,7 +120,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                   <p className="text-sm font-medium text-[var(--text)]">{branch.province || "—"}</p>
                 </div>
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           <Card>
@@ -137,7 +130,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 Contact Information
               </h3>
             </CardHeader>
-            <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Contact Person</p>
                 <p className="text-sm font-medium text-[var(--text)]">{branch.contactPerson || "—"}</p>
@@ -160,7 +153,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                   <p className="text-sm font-medium text-[var(--text)]">—</p>
                 )}
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           <Card>
@@ -170,7 +163,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 + Add Deployment
               </Link>
             </CardHeader>
-            <CardBody>
+            <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px]">
                   <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
@@ -207,7 +200,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                           <td className="px-6 py-4 text-sm">{guard?.parwestId || "—"}</td>
                           <td className="px-6 py-4 text-sm">{deployment.designation || "—"}</td>
                           <td className="px-6 py-4 text-sm">
-                            <StatusChip label={deployment.status} variant={deployment.status === "ACTIVE" ? "success" : "warning"} />
+                            <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{deployment.status}</Badge>
                           </td>
                           <td className="px-6 py-4 text-sm">{formatDate(deployment.deploymentDate)}</td>
                           <td className="px-6 py-4 text-sm">
@@ -221,7 +214,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                   </tbody>
                 </table>
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
 
@@ -233,7 +226,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 Client
               </h3>
             </CardHeader>
-            <CardBody className="space-y-4">
+            <CardContent className="space-y-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Name</p>
                 {branch.client?.id ? (
@@ -250,17 +243,17 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Status</p>
-                <StatusChip label={branch.client?.status || "UNKNOWN"} variant={branch.client?.status === "ACTIVE" ? "success" : "warning"} />
+                <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{branch.client?.status || "UNKNOWN"}</Badge>
               </div>
-              {branch.isHeadOffice ? <StatusChip label="Head Office" variant="success" /> : null}
-            </CardBody>
+              {branch.isHeadOffice ? <Badge className={"font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent"}>{"Head Office"}</Badge> : null}
+            </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <h3 className="text-base font-semibold text-[var(--text)]">Quick Stats</h3>
             </CardHeader>
-            <CardBody className="space-y-3">
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Total Deployments</span>
                 <span className="font-semibold text-[var(--text)]">{deployments.length}</span>
@@ -273,7 +266,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 <span className="text-[var(--text-muted)]">Inactive</span>
                 <span className="font-semibold text-[var(--text)]">{deployments.length - activeDeployments.length}</span>
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
 
           <Card>
@@ -283,7 +276,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 Information
               </h3>
             </CardHeader>
-            <CardBody className="space-y-3 text-sm">
+            <CardContent className="space-y-3 text-sm">
               <div>
                 <p className="text-[var(--text-muted)]">Created</p>
                 <p className="font-medium text-[var(--text)]">{formatDate(branch.createdAt)}</p>
@@ -292,7 +285,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 <p className="text-[var(--text-muted)]">Last Updated</p>
                 <p className="font-medium text-[var(--text)]">{formatDate(branch.updatedAt)}</p>
               </div>
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
       </div>

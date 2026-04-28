@@ -1,13 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ColumnDef } from "@tanstack/react-table"
 
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 import { DataTable as ShadcnDataTable } from "@/components/shadcn/data-table"
 import { Card, CardContent } from "@/components/shadcn/card"
@@ -234,10 +232,11 @@ export default function ProductsManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle title={createMode ? "Create Product" : "Products"} subtitle={createMode ? "Create store-inventory v2 products backed by Prisma models." : "Manage and search v2 products."} />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(createMode ? "Create Product" : "Products")}</h2><p className="mt-1 text-sm text-muted-foreground">{(createMode ? "Create store-inventory v2 products backed by Prisma models." : "Manage and search v2 products.")}</p></div></div>
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Name *</label>
@@ -247,9 +246,9 @@ export default function ProductsManager({
             <label className="mb-1 block text-sm text-[var(--text-muted)]">SKU *</label>
             <div className="flex gap-2">
               <input className="ui-input" value={form.sku} onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))} />
-              <ActionButton type="button" onClick={generateCode}>
+              <Button type="button" onClick={generateCode}>
                 Gen-Code
-              </ActionButton>
+              </Button>
             </div>
           </div>
           <Select
@@ -324,12 +323,13 @@ export default function ProductsManager({
         </label>
 
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={() => void saveProduct()} disabled={saving}>
+          <Button onClick={() => void saveProduct()} disabled={saving}>
             {saving ? "Saving..." : editingId ? "Update Product" : "Create Product"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={resetForm}>{editingId ? "Cancel Edit" : "Reset"}</ActionButton>
+          </Button>
+          <Button variant="secondary" onClick={resetForm}>{editingId ? "Cancel Edit" : "Reset"}</Button>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       {!createMode ? (
         <>

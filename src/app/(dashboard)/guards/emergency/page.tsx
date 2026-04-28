@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import EmergencyGuardTable from "@/components/guards/EmergencyGuardTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { deriveEmergencyRowFromGuard } from "@/lib/guards/emergency"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
@@ -85,7 +86,7 @@ export default async function EmergencyGuardsPage({
           <p className="mt-1 text-sm text-muted-foreground">Guards that can be temporarily assigned despite incomplete documentation</p>
         </div>
       </div>
-      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+      {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
       <section className="ui-card p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

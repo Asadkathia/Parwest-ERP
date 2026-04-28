@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Sparkles, Users, MessageSquareMore, ShieldCheck, Wallet } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
 import KpiCard from "@/components/dashboard/KpiCard"
 import AttentionStrip from "@/components/dashboard/AttentionStrip"
 import OpsFeed from "@/components/dashboard/OpsFeed"
@@ -44,13 +43,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <SectionTitle
-        title={`Good ${greeting()}, ${session.user?.name?.split(" ")[0] || "there"}`}
-        subtitle={`${ROLE_LABELS[role]}${
+      <div className="mb-4 flex items-start justify-between gap-4 flex items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{(`Good ${greeting()}, ${session.user?.name?.split(" ")[0] || "there"}`)}</h2><p className="mt-1 text-sm text-muted-foreground">{(`${ROLE_LABELS[role]}${
           scope?.regionId ? " · Region-scoped view" : role === "SUPER_ADMIN" ? " · All regions" : ""
-        }`}
-        action={
-          <div className="flex items-center gap-2">
+        }`)}</p></div><div className="flex shrink-0 items-center gap-2">{(<div className="flex items-center gap-2">
             <QuickActions role={role} />
             <Link
               href="/dashboard/ai-chat"
@@ -59,9 +54,7 @@ export default async function DashboardPage() {
               <Sparkles className="h-4 w-4" />
               AI Chat
             </Link>
-          </div>
-        }
-      />
+          </div>)}</div></div>
 
       {vis.attentionStrip && data.attention.length > 0 ? <AttentionStrip items={data.attention} /> : null}
 

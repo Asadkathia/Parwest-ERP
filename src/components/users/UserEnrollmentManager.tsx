@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import { checkPasswordStrength } from "@/lib/validation/formats"
 
 type RoleOption = { id: string; name: string; scopeType?: "GLOBAL" | "REGIONAL" }
@@ -186,12 +186,13 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="User Enrolment Form" subtitle="Create users with role, region, and office mapping." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"User Enrolment Form"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Create users with role, region, and office mapping."}</p></div></div>
 
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="User's Name" required value={form.name} onChange={(v) => setField("name", v)} />
           <Field label="Email (must end with @parwestgroup.com)" required type="email" value={form.email} onChange={(v) => setField("email", v)} />
@@ -291,14 +292,15 @@ export default function UserEnrollmentManager({ isSuperAdmin = false }: { isSupe
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={onSubmit} disabled={submitting}>
+          <Button onClick={onSubmit} disabled={submitting}>
             {submitting ? "Submitting..." : "Submit"}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={onReset}>
+          </Button>
+          <Button variant="secondary" onClick={onReset}>
             Reset
-          </ActionButton>
+          </Button>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
     </div>
   )
 }

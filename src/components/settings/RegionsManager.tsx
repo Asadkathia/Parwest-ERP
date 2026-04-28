@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
@@ -92,7 +91,7 @@ export default function RegionsManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Settings: Regions" subtitle="Manage broad geographical regions." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Settings: Regions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage broad geographical regions."}</p></div></div>
       {notice ? (
         <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
           <CheckCircle2 className="h-4 w-4" />
@@ -106,26 +105,28 @@ export default function RegionsManager() {
         </Alert>
       ) : null}
 
-      <FilterBar className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Region Name</label>
-            <input className="ui-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Region name" />
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Region Name</label>
+              <input className="ui-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Region name" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
+              <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search region" />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-[var(--text-muted)]">Search</label>
-            <input className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search region" />
+          <div className="flex gap-2">
+            <Button onClick={create} disabled={saving}>
+              {saving ? "Saving..." : "Create"}
+            </Button>
+            <Button variant="secondary" onClick={() => void load()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={create} disabled={saving}>
-            {saving ? "Saving..." : "Create"}
-          </Button>
-          <Button variant="secondary" onClick={() => void load()} disabled={loading}>
-            Refresh
-          </Button>
-        </div>
-      </FilterBar>
+        </CardContent>
+      </Card>
 
       <DataTable
         rows={visibleRows}

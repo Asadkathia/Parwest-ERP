@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
 import GuardEnrollmentForm from "./form"
-import SectionTitle from "@/components/ui/section-title"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { AlertCircle } from "lucide-react"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
@@ -38,7 +37,7 @@ export default async function NewGuardPage() {
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Add New Guard" subtitle="Enroll a new security guard into the system" />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Add New Guard"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Enroll a new security guard into the system"}</p></div></div>
             {dbWarning ? (
                 <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
                     <AlertCircle className="h-4 w-4" />

@@ -5,8 +5,6 @@ import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, buildManagerScopeWhere, managerScopeDenied } from "@/lib/access/scope"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import DeploymentEditForm from "./form"
-import SectionTitle from "@/components/ui/section-title"
-
 export default async function EditDeploymentPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/login")
@@ -71,7 +69,7 @@ export default async function EditDeploymentPage({ params }: { params: Promise<{
 
     return (
         <div className="space-y-6">
-            <SectionTitle title="Change Deployment" subtitle={`Update deployment for ${deployment.guard.name}`} />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Change Deployment"}</h2><p className="mt-1 text-sm text-muted-foreground">{(`Update deployment for ${deployment.guard.name}`)}</p></div></div>
 
             <DeploymentEditForm
                 deployment={deployment}

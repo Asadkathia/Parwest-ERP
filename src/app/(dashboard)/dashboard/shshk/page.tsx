@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import SuggestionCard from "@/components/ai/SuggestionCard"
-import InlineAlert from "@/components/ui/inline-alert"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import type { ShshkSuggestion } from "@/lib/shshk/types"
 
@@ -72,7 +73,7 @@ export default async function ShshkPage() {
           <p className="mt-1 text-sm text-muted-foreground">AI-based admin recommendations for compliance, staffing, billing, and operations</p>
         </div>
       </div>
-      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+      {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
       {suggestions.length === 0 ? (
         <section className="ui-card p-4">

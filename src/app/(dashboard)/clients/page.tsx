@@ -1,12 +1,11 @@
 import { auth } from "@/lib/auth"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import Link from "next/link"
-import { Plus, Building2, Building, Users, Ban } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
+import { Plus, Building2, Building, Users, Ban, AlertCircle } from "lucide-react"
 import StatCard from "@/components/shadcn/parwest-stat-card"
-import InlineAlert from "@/components/ui/inline-alert"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import ClientsListClient, {
@@ -159,11 +158,7 @@ export default async function ClientsPage({
     <div className="space-y-6">
       {/* TODO(phase-5): replace SectionTitle with shadcn header primitive
           when section-title is migrated module-wide. */}
-      <SectionTitle
-        title="Clients"
-        subtitle="Manage clients and their branch locations"
-        action={
-          canCreateClient ? (
+      <div className="mb-4 flex items-start justify-between gap-4 flex flex-wrap items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{"Clients"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage clients and their branch locations"}</p></div><div className="flex shrink-0 items-center gap-2">{(canCreateClient ? (
             <PermissionGate module="CLIENTS" action="CREATE" mode="hide">
               <div className="flex flex-wrap items-center gap-2">
                 <Link href="/clients/new?mode=branch" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
@@ -176,12 +171,10 @@ export default async function ClientsPage({
                 </Link>
               </div>
             </PermissionGate>
-          ) : null
-        }
-      />
+          ) : null)}</div></div>
       {/* TODO(phase-5): replace InlineAlert with shadcn `Alert` when this
           legacy banner is migrated module-wide. */}
-      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+      {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
       {needsRegionGate ? (
         <Card>

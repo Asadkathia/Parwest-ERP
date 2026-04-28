@@ -8,11 +8,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import PayrollStateBadge from "@/components/payroll/PayrollStateBadge"
 import PayrollStateActions from "@/components/payroll/PayrollStateActions"
-import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type Region = { id: string; name: string }
@@ -280,12 +281,12 @@ export default function PayrollStateClient({
               ))}
             </select>
           </div>
-          <ActionButton variant="secondary" onClick={() => { loadPayrolls(); loadHistory(); }}>
+          <Button variant="secondary" onClick={() => { loadPayrolls(); loadHistory(); }}>
             Refresh
-          </ActionButton>
+          </Button>
         </div>
-        {rowsError && <InlineAlert type="error" message={rowsError} />}
-        {resultMessage && <InlineAlert type="success" message={resultMessage} />}
+        {rowsError && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(rowsError)}</AlertDescription></Alert>}
+        {resultMessage && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(resultMessage)}</AlertDescription></Alert>}
       </section>
 
       {/* Section 1: Per-Region Status */}
@@ -395,15 +396,9 @@ export default function PayrollStateClient({
         <h3 className="text-base font-semibold">Global Finalization</h3>
         <div className="text-sm">
           {globalStateSummary.globalFinalized > 0 ? (
-            <InlineAlert
-              type="success"
-              message={`${globalStateSummary.globalFinalized} payrolls are already GLOBAL_FINALIZED for ${month}.`}
-            />
+            <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(`${globalStateSummary.globalFinalized} payrolls are already GLOBAL_FINALIZED for ${month}.`)}</AlertDescription></Alert>
           ) : readyToFinalizeGlobally ? (
-            <InlineAlert
-              type="success"
-              message={`All locked regions ready — ${globalStateSummary.regionalLocked} REGIONAL_LOCKED payrolls can be globally finalized.`}
-            />
+            <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(`All locked regions ready — ${globalStateSummary.regionalLocked} REGIONAL_LOCKED payrolls can be globally finalized.`)}</AlertDescription></Alert>
           ) : (
             <div className="text-[var(--text-muted)]">
               Locked: {globalStateSummary.regionalLocked} • Still CALCULATED:{" "}

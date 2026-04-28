@@ -1,12 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
-import StatusChip from "@/components/ui/status-chip"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { AlertCircle } from "lucide-react"
 
@@ -101,7 +100,7 @@ export default function UserSearchManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Search Users" subtitle="Search and filter users from backend data." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Search Users"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Search and filter users from backend data."}</p></div></div>
       {error ? (
         <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
           <AlertCircle className="h-4 w-4" />
@@ -109,7 +108,8 @@ export default function UserSearchManager() {
         </Alert>
       ) : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="Search" value={search} onChange={setSearch} placeholder="Name or email" />
           <SelectField
@@ -131,23 +131,20 @@ export default function UserSearchManager() {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={load} disabled={loading}>
+          <Button onClick={load} disabled={loading}>
             {loading ? "Searching..." : "Search"}
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            onClick={() => {
+          </Button>
+          <Button 
+            variant="secondary" onClick={() => {
               setSearch("")
               setRoleId("")
               setStatus("")
               void load()
-            }}
-          >
+            }}>
             Clear
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            onClick={() => {
+          </Button>
+          <Button 
+            variant="secondary" onClick={() => {
               const blob = new Blob([JSON.stringify(rowsForExport, null, 2)], { type: "application/json" })
               const url = URL.createObjectURL(blob)
               const link = document.createElement("a")
@@ -155,12 +152,12 @@ export default function UserSearchManager() {
               link.download = `users-export-${Date.now()}.json`
               link.click()
               URL.revokeObjectURL(url)
-            }}
-          >
+            }}>
             Export
-          </ActionButton>
+          </Button>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       <DataTable
         rows={rows}
@@ -174,10 +171,7 @@ export default function UserSearchManager() {
             header: "Status",
             sortable: true,
             render: (row) => (
-              <StatusChip
-                label={row.status}
-                variant={String(row.status).toUpperCase() === "ACTIVE" ? "success" : "warning"}
-              />
+              <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{row.status}</Badge>
             ),
           },
           {

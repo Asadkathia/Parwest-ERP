@@ -1,12 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useSession } from "next-auth/react"
-import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
-import SectionTitle from "@/components/ui/section-title"
-import InlineAlert from "@/components/ui/inline-alert"
-import { ChevronDown, Info, Trash2, X } from "lucide-react"
+import { ChevronDown, Info, Trash2, X, CheckCircle2, AlertCircle } from "lucide-react"
 import { ACTIONS, MODULES } from "@/lib/constants/permissions"
 
 type ActionName = (typeof ACTIONS)[number]
@@ -62,7 +61,7 @@ function UserSearchSelect({ users, value, onChange }: { users: UserRow[]; value:
     return (
         <div ref={containerRef} className="relative">
             <button type="button" onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-                className="ui-select flex items-center justify-between gap-2 text-left w-full">
+                className="ui-select flex items-center justify-between gap-2 text-start w-full">
                 <span className={selected ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
                     {selected ? `${selected.name} (${selected.email})` : "Select user..."}
                 </span>
@@ -81,9 +80,9 @@ function UserSearchSelect({ users, value, onChange }: { users: UserRow[]; value:
                             : filtered.map((u) => (
                                 <li key={u.id}>
                                     <button type="button" onClick={() => { onChange(u.id); setOpen(false); setSearch("") }}
-                                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--surface-muted)] transition-colors ${u.id === value ? "bg-[var(--surface-muted)] font-medium text-[var(--brand)]" : "text-[var(--text)]"}`}>
+                                        className={`w-full px-4 py-2.5 text-start text-sm hover:bg-[var(--surface-muted)] transition-colors ${u.id === value ? "bg-[var(--surface-muted)] font-medium text-[var(--brand)]" : "text-[var(--text)]"}`}>
                                         <span className="font-medium">{u.name}</span>
-                                        <span className="ml-1.5 text-[var(--text-muted)]">({u.email})</span>
+                                        <span className="ms-1.5 text-[var(--text-muted)]">({u.email})</span>
                                     </button>
                                 </li>
                             ))}
@@ -250,15 +249,13 @@ export default function UserPermissionsManager() {
 
     return (
         <div className="space-y-6">
-            <SectionTitle
-                title="Permissions Management"
-                subtitle="Configure role-based and additional user permissions."
-            />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Permissions Management"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure role-based and additional user permissions."}</p></div></div>
 
-            {notice && <InlineAlert type="success" message={notice} />}
-            {error && <InlineAlert type="error" message={error} />}
+            {notice && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert>}
+            {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
-            <FilterBar className="space-y-4">
+            <Card>
+        <CardContent className="space-y-4 p-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm text-[var(--text-muted)] mb-1">Select User</label>
@@ -270,29 +267,26 @@ export default function UserPermissionsManager() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                    <ActionButton onClick={save} disabled={saving || loading || !selectedUser}>
+                    <Button onClick={save} disabled={saving || loading || !selectedUser}>
                         {saving ? "Saving..." : "Save Additional Permissions"}
-                    </ActionButton>
-                    <ActionButton
-                        variant="danger"
-                        onClick={clearAll}
-                        disabled={saving || loading || !selectedUser}
-                    >
+                    </Button>
+                    <Button variant="destructive" onClick={clearAll} disabled={saving || loading || !selectedUser}>
                         Clear All Additional
-                    </ActionButton>
-                    <ActionButton variant="secondary" onClick={() => setQuery("")}>Reset Filter</ActionButton>
+                    </Button>
+                    <Button variant="secondary" onClick={() => setQuery("")}>Reset Filter</Button>
                     <span className="text-sm font-medium text-[var(--text)]">{selectedUserName}</span>
                 </div>
-            </FilterBar>
+            </CardContent>
+      </Card>
 
             {/* Legend */}
             <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-3.5 w-3.5 rounded border-2 border-blue-400 bg-blue-100" />
+                    <span className="inline-block h-3.5 w-3.5 rounded border-2 border-blue-400 bg-blue-100 dark:bg-blue-950/40 dark:border-blue-500" />
                     Inherited from Role (read-only)
                 </span>
                 <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-3.5 w-3.5 rounded border-2 border-green-500 bg-green-100" />
+                    <span className="inline-block h-3.5 w-3.5 rounded border-2 border-green-500 bg-green-100 dark:bg-green-950/40 dark:border-green-500" />
                     Additional User Permission
                 </span>
                 <span className="flex items-center gap-1.5">
@@ -306,7 +300,7 @@ export default function UserPermissionsManager() {
                 <table className="w-full text-sm min-w-[700px]">
                     <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase w-32">Module</th>
+                            <th className="px-4 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase w-32">Module</th>
                             {ACTIONS.map((a) => (
                                 <th key={a} className="px-4 py-3 text-center text-xs font-semibold text-[var(--text-muted)] uppercase">{a}</th>
                             ))}
@@ -317,10 +311,10 @@ export default function UserPermissionsManager() {
                         {loading ? (
                             [...Array(6)].map((_, i) => (
                                 <tr key={i} className="animate-pulse">
-                                    <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-100 rounded" /></td>
+                                    <td className="px-4 py-3"><div className="h-4 w-20 bg-muted rounded" /></td>
                                     {ACTIONS.map((a) => (
                                         <td key={a} className="px-4 py-3 text-center">
-                                            <div className="h-4 w-4 bg-gray-100 rounded mx-auto" />
+                                            <div className="h-4 w-4 bg-muted rounded mx-auto" />
                                         </td>
                                     ))}
                                     <td className="px-4 py-3" />
@@ -373,7 +367,7 @@ export default function UserPermissionsManager() {
                                                     title={hasOverride ? `Remove all additional permissions for ${module}` : "No additional permissions to remove"}
                                                     className={`inline-flex items-center justify-center rounded p-1.5 transition-colors ${
                                                         hasOverride
-                                                            ? "text-red-600 hover:bg-red-50 cursor-pointer"
+                                                            ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
                                                             : "text-[var(--text-muted)] opacity-30 cursor-not-allowed"
                                                     }`}
                                                 >

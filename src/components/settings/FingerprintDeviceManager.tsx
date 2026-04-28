@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Badge } from "@/components/shadcn/badge"
 import { Button } from "@/components/shadcn/button"
-import InlineAlert from "@/components/ui/inline-alert"
-import SectionTitle from "@/components/ui/section-title"
-import StatusChip from "@/components/ui/status-chip"
-
 type FingerprintStatus = "ONLINE" | "OFFLINE" | "WARNING"
 
 type FingerprintDeviceRow = {
@@ -211,8 +210,8 @@ export default function FingerprintDeviceManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Fingerprint Device" subtitle="Manage office binding, sync status, and enrollment queue with live APIs." />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Fingerprint Device"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage office binding, sync status, and enrollment queue with live APIs."}</p></div></div>
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
       <section className="ui-card p-4 space-y-4">
         <h3 className="text-sm font-semibold text-[var(--text-main)]">Bind New Device</h3>
@@ -284,12 +283,12 @@ export default function FingerprintDeviceManager() {
         <table className="w-full min-w-[1000px]">
           <thead className="bg-[var(--surface-muted)]">
             <tr>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Device</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Office</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Last Sync</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Pending Enrollments</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Status</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Actions</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Device</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Office</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Last Sync</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Pending Enrollments</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Status</th>
+              <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -300,10 +299,7 @@ export default function FingerprintDeviceManager() {
                 <td className="px-4 py-2 text-sm">{new Date(device.lastSyncAt).toLocaleString()}</td>
                 <td className="px-4 py-2 text-sm">{device.pendingEnrollments}</td>
                 <td className="px-4 py-2 text-sm">
-                  <StatusChip
-                    label={device.status}
-                    variant={device.status === "ONLINE" ? "success" : device.status === "WARNING" ? "warning" : "danger"}
-                  />
+                  <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{device.status}</Badge>
                 </td>
                 <td className="px-4 py-2 text-sm">
                   <div className="flex gap-2">

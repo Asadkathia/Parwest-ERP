@@ -157,7 +157,7 @@ export default function AiReportingScreen() {
             <button
               type="button"
               onClick={createThread}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-slate-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-card px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-muted"
             >
               <Plus className="h-4 w-4" />
               New chat
@@ -180,10 +180,10 @@ export default function AiReportingScreen() {
                     setError("")
                   }}
                   className={cn(
-                    "w-full rounded-xl border px-3 py-2 text-left transition",
+                    "w-full rounded-xl border px-3 py-2 text-start transition",
                     isActive
-                      ? "border-[var(--brand)] bg-white shadow-[var(--shadow-xs)]"
-                      : "border-transparent bg-transparent hover:border-[var(--border)] hover:bg-white"
+                      ? "border-[var(--brand)] bg-card shadow-[var(--shadow-xs)]"
+                      : "border-transparent bg-transparent hover:border-[var(--border)] hover:bg-card"
                   )}
                 >
                   <p className="truncate text-sm font-medium text-[var(--text)]">{thread.title}</p>
@@ -197,7 +197,7 @@ export default function AiReportingScreen() {
         </aside>
 
         <section className="flex h-full min-h-0 flex-col bg-[var(--surface)]">
-          <header className="border-b border-[var(--border)] bg-white px-4 py-3">
+          <header className="border-b border-[var(--border)] bg-card px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--brand)] text-white">
@@ -245,7 +245,7 @@ export default function AiReportingScreen() {
                     className={cn(
                       "max-w-[92%] rounded-2xl border px-4 py-3 text-sm leading-6 shadow-[var(--shadow-xs)] whitespace-pre-wrap md:max-w-[85%]",
                       msg.role === "assistant"
-                        ? "border-[var(--border)] bg-white text-[var(--text)]"
+                        ? "border-[var(--border)] bg-card text-[var(--text)]"
                         : "border-[var(--brand)] bg-[var(--brand)] text-white"
                     )}
                   >
@@ -260,7 +260,7 @@ export default function AiReportingScreen() {
 
               {loading ? (
                 <div className="flex justify-start">
-                  <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-muted)]">
+                  <div className="rounded-2xl border border-[var(--border)] bg-card px-4 py-3 text-sm text-[var(--text-muted)]">
                     Thinking...
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export default function AiReportingScreen() {
             </div>
           </div>
 
-          <footer className="border-t border-[var(--border)] bg-white px-4 py-3 md:px-8 md:py-4">
+          <footer className="border-t border-[var(--border)] bg-card px-4 py-3 md:px-8 md:py-4">
             <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl">
               <div className="rounded-2xl border border-[var(--border)] bg-[#f8fafc] p-2 shadow-[var(--shadow-xs)]">
                 <textarea

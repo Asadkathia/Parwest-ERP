@@ -261,7 +261,7 @@ export default function TicketDetail({
           onClick={() => router.back()}
           className="mt-1 shrink-0"
         >
-          <ArrowLeft className="me-1.5 h-4 w-4" /> Back
+          <ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" /> Back
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -327,7 +327,7 @@ export default function TicketDetail({
             <CardHeader className="bg-muted/50 py-3">
               <CardTitle className="text-sm font-semibold">
                 Comments{" "}
-                <span className="text-muted-foreground font-normal ml-1">
+                <span className="text-muted-foreground font-normal ms-1">
                   ({comments.length})
                 </span>
               </CardTitle>
@@ -362,7 +362,7 @@ export default function TicketDetail({
                                 Internal Note
                               </Badge>
                             )}
-                            <span className="text-xs text-muted-foreground ml-auto">
+                            <span className="text-xs text-muted-foreground ms-auto">
                               {new Date(c.createdAt).toLocaleDateString("en-GB", {
                                 day: "2-digit",
                                 month: "short",
@@ -549,13 +549,13 @@ export default function TicketDetail({
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Sender</span>
-                <span className="font-medium text-right">
+                <span className="font-medium text-end">
                   {ticket.sender?.name ?? "—"}
                 </span>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Created</span>
-                <span className="text-right">
+                <span className="text-end">
                   {new Date(ticket.createdAt).toLocaleDateString("en-GB", {
                     day: "2-digit",
                     month: "short",
@@ -565,7 +565,7 @@ export default function TicketDetail({
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Updated</span>
-                <span className="text-right">
+                <span className="text-end">
                   {new Date(ticket.updatedAt).toLocaleDateString("en-GB", {
                     day: "2-digit",
                     month: "short",

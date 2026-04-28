@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Trash2, Edit3, Check, X, Settings } from "lucide-react"
-import InlineAlert from "@/components/ui/inline-alert"
-
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Plus, Trash2, Edit3, Check, X, Settings, CheckCircle2, AlertCircle } from "lucide-react"
 type Item = { id: string; name: string; description?: string | null; color?: string | null }
 type Tab = "Categories" | "Priorities" | "Statuses"
 
@@ -111,8 +110,8 @@ export default function TicketPrerequisitesManager() {
         </div>
       </div>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-[var(--border)]">

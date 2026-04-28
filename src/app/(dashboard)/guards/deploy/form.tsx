@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useRouter } from "next/navigation"
-import { FileText, MapPin, Users, Shield, Calendar, Clock } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { FileText, MapPin, Users, Shield, Calendar, Clock, CheckCircle2, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { isNotFutureDate } from "@/lib/validation/formats"
 
@@ -595,10 +594,10 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <SectionTitle title="Deploy Guards" subtitle="Guard deployment form" />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Deploy Guards"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Guard deployment form"}</p></div></div>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -950,8 +949,8 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
         </section>
 
         <div className="flex flex-wrap gap-3">
-          <ActionButton type="submit" disabled={loading}>{loading ? "Deploying..." : "Save"}</ActionButton>
-          <ActionButton type="button" variant="secondary" onClick={() => router.back()}>Cancel</ActionButton>
+          <Button type="submit" disabled={loading}>{loading ? "Deploying..." : "Save"}</Button>
+          <Button type="button" variant="secondary" onClick={() => router.back()}>Cancel</Button>
         </div>
       </form>
 

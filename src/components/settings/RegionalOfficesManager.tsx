@@ -1,12 +1,11 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { Badge } from "@/components/shadcn/badge"
 import { useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
-import StatusChip from "@/components/ui/status-chip"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { AlertCircle, CheckCircle2, Pencil, Check, X, MapPin, Map } from "lucide-react"
 
@@ -219,7 +218,7 @@ export default function RegionalOfficesManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Settings: Regional Offices" subtitle="Manage specific offices within regions." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Settings: Regional Offices"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage specific offices within regions."}</p></div></div>
       {notice ? (
         <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300">
           <CheckCircle2 className="h-4 w-4" />
@@ -370,7 +369,7 @@ export default function RegionalOfficesManager() {
           {
             key: "region",
             header: "Region",
-            render: (row) => <StatusChip label={row.region?.name || "—"} variant="neutral" />,
+            render: (row) => <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{row.region?.name || "—"}</Badge>,
             sortable: true,
           },
           { key: "officeHead", header: "Office Head", render: (row) => row.officeHead || "—", sortable: true },

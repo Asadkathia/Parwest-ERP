@@ -1,8 +1,6 @@
 import Link from "next/link"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 export type UiField = {
   label: string
   type?: "text" | "email" | "number" | "date" | "month" | "textarea" | "select" | "checkbox"
@@ -44,7 +42,7 @@ export default function UiDocScreen({
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <SectionTitle title={title} subtitle={description} />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(description)}</p></div></div>
         {links.length > 0 ? (
           <div className="flex flex-wrap gap-2 justify-end">
             {links.map((link) => (
@@ -58,7 +56,7 @@ export default function UiDocScreen({
 
       {tabs.length > 0 ? (
         <Card>
-          <CardBody>
+          <CardContent>
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)] mb-2">Tabs</p>
             <div className="flex flex-wrap gap-2">
               {tabs.map((tab, index) => (
@@ -71,13 +69,13 @@ export default function UiDocScreen({
                 </button>
               ))}
             </div>
-          </CardBody>
+          </CardContent>
         </Card>
       ) : null}
 
       {sections.map((section) => (
         <Card key={section.title}>
-          <CardBody>
+          <CardContent>
             <h2 className="text-lg font-semibold text-[var(--text)]">{section.title}</h2>
             {section.description ? <p className="text-sm text-[var(--text-muted)] mt-1">{section.description}</p> : null}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
@@ -132,16 +130,16 @@ export default function UiDocScreen({
                 )
               })}
             </div>
-          </CardBody>
+          </CardContent>
         </Card>
       ))}
 
       {actions.length > 0 ? (
         <div className="flex flex-wrap gap-2 justify-end">
           {actions.map((action) => (
-            <ActionButton key={action} type="button">
+            <Button key={action} type="button">
               {action}
-            </ActionButton>
+            </Button>
           ))}
         </div>
       ) : null}

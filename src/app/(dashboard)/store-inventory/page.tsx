@@ -1,9 +1,8 @@
 import Link from 'next/link'
+import { Card, CardContent } from "@/components/shadcn/card"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { hasAction } from "@/lib/api/permissions"
-import SectionTitle from '@/components/ui/section-title'
-import { Card, CardBody } from '@/components/ui/card'
 import RegionFilterCard from '@/components/access/RegionFilterCard'
 
 type InventoryAction = "VIEW" | "CREATE" | "REQUISITIONS"
@@ -39,12 +38,12 @@ export default async function StoreInventoryDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Store Inventory" subtitle="Inventory V2 namespace (add-first migration foundation)." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Store Inventory"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Inventory V2 namespace (add-first migration foundation)."}</p></div></div>
 
       <RegionFilterCard session={session} />
 
       <Card>
-        <CardBody>
+        <CardContent>
           <p className="mb-3 text-sm font-semibold text-[var(--text)]">Store Inventory Navigation</p>
           <div className="flex flex-wrap gap-2">
             {visibleLinks.map((link) => (
@@ -53,7 +52,7 @@ export default async function StoreInventoryDashboardPage() {
               </Link>
             ))}
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   )

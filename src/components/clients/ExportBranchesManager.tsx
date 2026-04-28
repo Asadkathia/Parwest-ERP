@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useSearchParams } from "next/navigation"
-import { Filter } from "lucide-react"
-import ActionButton from "@/components/ui/action-button"
+import { Filter, CheckCircle2, AlertCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/shadcn/card"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -193,7 +193,7 @@ export default function ExportBranchesManager({
             </div>
           </div>
           <div className="flex gap-2">
-            <ActionButton type="submit" className="inline-flex items-center gap-2"><Filter className="h-4 w-4" />Submit</ActionButton>
+            <Button type="submit" className="inline-flex items-center gap-2"><Filter className="h-4 w-4" />Submit</Button>
           </div>
           </CardContent>
         </Card>
@@ -313,8 +313,8 @@ export default function ExportBranchesManager({
         </div>
       </form>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       <DataTable
         rows={filtered}

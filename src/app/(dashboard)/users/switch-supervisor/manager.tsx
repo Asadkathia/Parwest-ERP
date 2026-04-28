@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Badge } from "@/components/shadcn/badge"
 import { useSession } from "next-auth/react"
-import ActionButton from "@/components/ui/action-button"
-import StatusChip from "@/components/ui/status-chip"
-import InlineAlert from "@/components/ui/inline-alert"
-
 type Region = { id: string; name: string }
 type Office = { id: string; regionId: string; name: string }
 type User = { id: string; name: string; roleId?: string | null; regionalOfficeId?: string | null; role?: { id: string; name: string } | null }
@@ -167,8 +167,8 @@ export default function SwitchSupervisorManager() {
           <p className="mt-1 text-sm text-muted-foreground">region -&gt; reigional office -&gt; From Supervisor -&gt; To supervisor</p>
         </div>
       </div>
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
       <section className="ui-card p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {!lockedRegionId && (
@@ -209,9 +209,9 @@ export default function SwitchSupervisorManager() {
         </div>
 
         <div className="md:col-span-2 lg:col-span-3 flex items-center gap-2">
-          <ActionButton disabled={!canPreview || loading} onClick={() => void preview()}>{loading ? "Previewing..." : "Preview"}</ActionButton>
-          <ActionButton variant="secondary" disabled={result !== "previewed" || submitting} onClick={() => void submit()}>{submitting ? "Submitting..." : "Submit"}</ActionButton>
-          <ActionButton variant="secondary" onClick={resetForm}>Reset</ActionButton>
+          <Button disabled={!canPreview || loading} onClick={() => void preview()}>{loading ? "Previewing..." : "Preview"}</Button>
+          <Button variant="secondary" disabled={result !== "previewed" || submitting} onClick={() => void submit()}>{submitting ? "Submitting..." : "Submit"}</Button>
+          <Button variant="secondary" onClick={resetForm}>Reset</Button>
         </div>
       </section>
 
@@ -235,7 +235,7 @@ export default function SwitchSupervisorManager() {
                 <td className="px-4 py-2 text-sm">{row.guardName}</td>
                 <td className="px-4 py-2 text-sm">{supervisorOptions.find((u) => u.id === row.fromSupervisorId)?.name || row.fromSupervisorId}</td>
                 <td className="px-4 py-2 text-sm">{supervisorOptions.find((u) => u.id === row.toSupervisorId)?.name || row.toSupervisorId}</td>
-                <td className="px-4 py-2 text-sm"><StatusChip label={result === "switched" ? "SWITCHED" : row.status} variant={result === "switched" ? "success" : "warning"} /></td>
+                <td className="px-4 py-2 text-sm"><Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{result === "switched" ? "SWITCHED" : row.status}</Badge></td>
               </tr>
             ))}
           </tbody>

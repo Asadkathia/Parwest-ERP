@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 import Link from "next/link"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import SectionTitle from "@/components/ui/section-title"
 import { cn } from "@/lib/utils"
 import type { ExpiringItem } from "@/lib/dashboard/queries"
 
@@ -20,7 +19,7 @@ export default function ExpiringRenewals({ docs, contracts }: { docs: ExpiringIt
   return (
     <Card>
       <CardHeader>
-        <SectionTitle title="Expiring & Renewals" subtitle="Next 30 days" />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Expiring & Renewals"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Next 30 days"}</p></div></div>
         <div className="mt-3 flex gap-1 rounded-[var(--radius-md)] bg-[var(--surface-muted)] p-1">
           <TabButton active={tab === "docs"} onClick={() => setTab("docs")}>
             Guard Docs ({docs.length})
@@ -30,7 +29,7 @@ export default function ExpiringRenewals({ docs, contracts }: { docs: ExpiringIt
           </TabButton>
         </div>
       </CardHeader>
-      <CardBody>
+      <CardContent>
         {items.length === 0 ? (
           <p className="py-8 text-center text-sm text-[var(--text-muted)]">Nothing expiring in the next 30 days.</p>
         ) : (
@@ -64,7 +63,7 @@ export default function ExpiringRenewals({ docs, contracts }: { docs: ExpiringIt
             })}
           </ul>
         )}
-      </CardBody>
+      </CardContent>
     </Card>
   )
 }

@@ -1,12 +1,11 @@
 import { auth } from "@/lib/auth"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import Link from "next/link"
-import { Plus, Shield, ShieldCheck, Clock3, ShieldX } from "lucide-react"
+import { Plus, Shield, ShieldCheck, Clock3, ShieldX, AlertCircle } from "lucide-react"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
-import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/shadcn/parwest-stat-card"
-import InlineAlert from "@/components/ui/inline-alert"
 import GuardsListClient, {
   type GuardListRow,
 } from "@/components/guards/GuardsListClient"
@@ -230,20 +229,14 @@ export default async function GuardsPage({
     <div className="space-y-6">
       {/* TODO(phase-5): replace SectionTitle with shadcn header primitive
           when section-title is migrated module-wide. */}
-      <SectionTitle
-        title="Guards"
-        subtitle="Manage security guards and their information"
-        action={
-          canCreateGuard ? (
+      <div className="mb-4 flex items-start justify-between gap-4 ui-btn ui-btn-primary inline-flex items-center gap-2"><div><h2 className="text-xl font-bold tracking-tight">{"Guards"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage security guards and their information"}</p></div><div className="flex shrink-0 items-center gap-2">{(canCreateGuard ? (
             <Link href="/guards/new" className="ui-btn ui-btn-primary inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Guard
             </Link>
-          ) : null
-        }
-      />
+          ) : null)}</div></div>
 
-      {dbWarning ? <InlineAlert type="error" message={dbWarning} /> : null}
+      {dbWarning ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{dbWarning}</AlertDescription></Alert> : null}
 
       {needsRegionGate ? (
         <Card>

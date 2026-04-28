@@ -1,8 +1,6 @@
 "use client"
 
 import { ReactNode } from "react"
-import SectionTitle from "@/components/ui/section-title"
-
 type Tab = {
   id: string
   label: string
@@ -29,7 +27,7 @@ export default function PayrollPageShell({
 }: Props) {
   return (
     <div className="space-y-6">
-      <SectionTitle title={title} subtitle={subtitle} action={actions} />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(subtitle)}</p></div><div className="flex shrink-0 items-center gap-2">{(actions)}</div></div>
 
       {tabs && tabs.length > 0 && (
         <div className="flex flex-wrap gap-2 border-b border-[var(--border)]">

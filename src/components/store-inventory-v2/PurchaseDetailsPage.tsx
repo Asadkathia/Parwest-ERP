@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useSearchParams } from "next/navigation"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet } from "@/components/store-inventory-v2/api"
 
 type Purchase = {
@@ -137,12 +137,19 @@ export default function PurchaseDetailsPage({ purchaseId }: { purchaseId: string
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Purchase Details" subtitle="Lifecycle details, transport details, and status history." />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
-      {!row && loading ? <InlineAlert type="success" message="Loading purchase details..." /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Purchase Details"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Lifecycle details, transport details, and status history."}</p></div></div>
+      {notice ? (
+        notice.type === "success" ? (
+          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice.message}</AlertDescription></Alert>
+        ) : (
+          <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{notice.message}</AlertDescription></Alert>
+        )
+      ) : null}
+      {!row && loading ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{"Loading purchase details..."}</AlertDescription></Alert> : null}
       {row ? (
         <>
-          <FilterBar className="space-y-4">
+          <Card>
+        <CardContent className="space-y-4 p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm text-[var(--text-muted)]">
                 Purchase Status:{" "}
@@ -150,7 +157,7 @@ export default function PurchaseDetailsPage({ purchaseId }: { purchaseId: string
                   {toStatusLabel(row.status)}
                 </span>
               </div>
-              <ActionButton onClick={() => window.print()}>Print PO</ActionButton>
+              <Button onClick={() => window.print()}>Print PO</Button>
             </div>
 
             <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
@@ -199,9 +206,11 @@ export default function PurchaseDetailsPage({ purchaseId }: { purchaseId: string
                 </tbody>
               </table>
             </div>
-          </FilterBar>
+          </CardContent>
+      </Card>
 
-          <FilterBar>
+          <Card>
+        <CardContent className="p-5">
             <div className="mb-2 font-medium text-[var(--text-muted)]">Transportation Details</div>
             {row.workflow?.transport ? (
               <div className="overflow-x-auto">
@@ -235,9 +244,11 @@ export default function PurchaseDetailsPage({ purchaseId }: { purchaseId: string
             ) : (
               <div className="text-sm text-[var(--text-muted)]">No transport details.</div>
             )}
-          </FilterBar>
+          </CardContent>
+      </Card>
 
-          <FilterBar>
+          <Card>
+        <CardContent className="p-5">
             <div className="mb-2 font-medium text-[var(--text-muted)]">Status History</div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -293,7 +304,8 @@ export default function PurchaseDetailsPage({ purchaseId }: { purchaseId: string
                 </tbody>
               </table>
             </div>
-          </FilterBar>
+          </CardContent>
+      </Card>
         </>
       ) : null}
     </div>

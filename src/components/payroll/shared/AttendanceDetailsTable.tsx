@@ -72,13 +72,13 @@ export default function AttendanceDetailsTable({
       <table className="w-full min-w-[800px] text-sm">
         <thead className="bg-green-100 dark:bg-green-950/40 text-green-900 dark:text-green-200">
           <tr>
-            <th className="px-3 py-2 text-left">Branch Name</th>
-            <th className="px-3 py-2 text-right">Salary Rate</th>
-            <th className="px-3 py-2 text-right">Regular Days</th>
-            <th className="px-3 py-2 text-right">Regular Total Salary</th>
-            <th className="px-3 py-2 text-right">Overtime Salary Rate</th>
-            <th className="px-3 py-2 text-right">Overtime Days</th>
-            <th className="px-3 py-2 text-right">Overtime Total Salary</th>
+            <th className="px-3 py-2 text-start">Branch Name</th>
+            <th className="px-3 py-2 text-end">Salary Rate</th>
+            <th className="px-3 py-2 text-end">Regular Days</th>
+            <th className="px-3 py-2 text-end">Regular Total Salary</th>
+            <th className="px-3 py-2 text-end">Overtime Salary Rate</th>
+            <th className="px-3 py-2 text-end">Overtime Days</th>
+            <th className="px-3 py-2 text-end">Overtime Total Salary</th>
           </tr>
         </thead>
         <tbody>
@@ -99,23 +99,23 @@ export default function AttendanceDetailsTable({
           {rows.map((r, i) => (
             <tr key={i} className="border-t border-[var(--border)]">
               <td className="px-3 py-2">{r.branchName}</td>
-              <td className="px-3 py-2 text-right">{r.salaryRate.toFixed(0)}</td>
-              <td className="px-3 py-2 text-right">{r.regularDays}</td>
-              <td className="px-3 py-2 text-right">{r.regularTotal.toFixed(0)}</td>
-              <td className="px-3 py-2 text-right">{r.overtimeRate.toFixed(0)}</td>
-              <td className="px-3 py-2 text-right">{r.overtimeDays}</td>
-              <td className="px-3 py-2 text-right">{r.overtimeTotal.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{r.salaryRate.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{r.regularDays}</td>
+              <td className="px-3 py-2 text-end">{r.regularTotal.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{r.overtimeRate.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{r.overtimeDays}</td>
+              <td className="px-3 py-2 text-end">{r.overtimeTotal.toFixed(0)}</td>
             </tr>
           ))}
           {rows.length > 0 && (
             <tr className="border-t-2 border-[var(--border)] font-semibold bg-[var(--surface-muted)]">
               <td className="px-3 py-2">TOTAL:</td>
               <td className="px-3 py-2"></td>
-              <td className="px-3 py-2 text-right">{totals.regularDays}</td>
-              <td className="px-3 py-2 text-right">{totals.regularTotal.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{totals.regularDays}</td>
+              <td className="px-3 py-2 text-end">{totals.regularTotal.toFixed(0)}</td>
               <td className="px-3 py-2"></td>
-              <td className="px-3 py-2 text-right">{totals.overtimeDays}</td>
-              <td className="px-3 py-2 text-right">{totals.overtimeTotal.toFixed(0)}</td>
+              <td className="px-3 py-2 text-end">{totals.overtimeDays}</td>
+              <td className="px-3 py-2 text-end">{totals.overtimeTotal.toFixed(0)}</td>
             </tr>
           )}
         </tbody>

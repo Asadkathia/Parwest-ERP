@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import StatusChip from "@/components/ui/status-chip"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
 import type { GeneratedReport, ReportTemplate } from "@/lib/reports/system-report-types"
 
 type Props = {
@@ -71,8 +71,8 @@ export default function SystemReportList({ templates, generated }: Props) {
             <p className="mt-1 text-xs text-[var(--text-muted)]">{template.frequency} • Owner: {template.owner}</p>
             <p className="mt-1 text-xs text-[var(--text-muted)]">Last generated: {new Date(template.lastGeneratedAt).toLocaleString("en-US")}</p>
             <div className="mt-3 flex items-center justify-between">
-              <StatusChip label={template.status} variant={template.status === "FAILED" ? "danger" : template.status === "RUNNING" ? "warning" : "success"} />
-              <ActionButton className="px-2.5 py-1.5 text-xs" onClick={() => runNow(template.id)}>Run now</ActionButton>
+              <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{template.status}</Badge>
+              <Button className="px-2.5 py-1.5 text-xs" onClick={() => runNow(template.id)}>Run now</Button>
             </div>
           </article>
         ))}
@@ -100,7 +100,7 @@ export default function SystemReportList({ templates, generated }: Props) {
                   <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{new Date(item.generatedAt).toLocaleString("en-US")}</td>
                   <td className="px-4 py-2 text-sm text-[var(--text-muted)]">{item.rowCount}</td>
                   <td className="px-4 py-2 text-sm">
-                    <StatusChip label={item.status} variant={item.status === "FAILED" ? "danger" : item.status === "RUNNING" ? "warning" : "success"} />
+                    <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{item.status}</Badge>
                   </td>
                 </tr>
               ))}

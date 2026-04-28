@@ -1,6 +1,5 @@
 import Link from "next/link"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import SectionTitle from "@/components/ui/section-title"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 import { cn } from "@/lib/utils"
 import { formatShortMoney, formatPayrollState, type FinanceSnapshot } from "@/lib/dashboard/queries"
 
@@ -14,17 +13,11 @@ export default function FinancePulse({ data, nowMs }: { data: FinanceSnapshot; n
   return (
     <Card>
       <CardHeader>
-        <SectionTitle
-          title="Finance Pulse"
-          subtitle="Month-to-date snapshot"
-          action={
-            <Link href="/clients/invoicing" className="text-sm font-semibold text-[var(--brand)] hover:underline">
+        <div className="mb-4 flex items-start justify-between gap-4 text-sm font-semibold text-[var(--brand)] hover:underline"><div><h2 className="text-xl font-bold tracking-tight">{"Finance Pulse"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Month-to-date snapshot"}</p></div><div className="flex shrink-0 items-center gap-2">{(<Link href="/clients/invoicing" className="text-sm font-semibold text-[var(--brand)] hover:underline">
               Open invoicing
-            </Link>
-          }
-        />
+            </Link>)}</div></div>
       </CardHeader>
-      <CardBody className="space-y-5">
+      <CardContent className="space-y-5">
         <div className="grid gap-4 md:grid-cols-3">
           <Metric
             label="A/R Outstanding"
@@ -102,7 +95,7 @@ export default function FinancePulse({ data, nowMs }: { data: FinanceSnapshot; n
             </ul>
           </div>
         ) : null}
-      </CardBody>
+      </CardContent>
     </Card>
   )
 }

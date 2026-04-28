@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type AttendanceRecord = {
@@ -250,7 +251,7 @@ export default function GuardAttendanceManager({
                 <div><label className="block text-sm text-gray-600 mb-1">Secure Ops ID*</label><input name="Secure Ops ID*" value={parwestId} onChange={(e) => setParwestId(e.target.value)} className="w-full border rounded-md px-3 py-2" placeholder="Secure Ops ID" /></div>
                 <div><label className="block text-sm text-gray-600 mb-1">Strat Date*</label><input name="Strat Date*" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                 <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input name="End Date*" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                <div className="flex items-end"><ActionButton onClick={loadAttendance} className="w-full">Submit</ActionButton></div>
+                <div className="flex items-end"><Button onClick={loadAttendance} className="w-full">Submit</Button></div>
             </div>
 
             <form onSubmit={markAttendance} className="bg-white rounded-lg border p-4 grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -282,7 +283,7 @@ export default function GuardAttendanceManager({
                     </select>
                 </div>
                 <div className="flex items-end">
-                    <ActionButton type="submit" className="w-full">Mark</ActionButton>
+                    <Button type="submit" className="w-full">Mark</Button>
                 </div>
                 <div className="md:col-span-6">
                     <label className="block text-sm text-gray-600 mb-1">Notes</label>
@@ -314,9 +315,9 @@ export default function GuardAttendanceManager({
                         </select>
                     </div>
                     <div className="flex items-end">
-                        <ActionButton type="submit" className="w-full" disabled={bulkLoading}>
+                        <Button type="submit" className="w-full" disabled={bulkLoading}>
                             {bulkLoading ? "Processing..." : "Mark Selected"}
-                        </ActionButton>
+                        </Button>
                     </div>
                 </div>
                 <div>
@@ -362,14 +363,14 @@ export default function GuardAttendanceManager({
                     <p className="mt-1 text-xs text-gray-500">Format: guardId,date,status,shift,notes</p>
                 </div>
                 <div className="flex items-end">
-                    <ActionButton type="submit" className="w-full" disabled={bulkLoading}>
+                    <Button type="submit" className="w-full" disabled={bulkLoading}>
                         {bulkLoading ? "Uploading..." : "Upload CSV"}
-                    </ActionButton>
+                    </Button>
                 </div>
             </form>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
-            {notice ? <InlineAlert type="success" message={notice} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+            {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <table className="w-full">

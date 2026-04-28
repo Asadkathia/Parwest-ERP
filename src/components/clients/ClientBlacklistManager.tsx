@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Button } from "@/components/shadcn/button"
 import { Card, CardContent } from "@/components/shadcn/card"
-import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -142,7 +142,7 @@ export default function ClientBlacklistManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Black Listed Clients" subtitle="Manage blacklisted clients by email." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Black Listed Clients"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage blacklisted clients by email."}</p></div></div>
 
       <Card>
         <CardContent className="space-y-4 p-5">
@@ -172,8 +172,8 @@ export default function ClientBlacklistManager({
         </CardContent>
       </Card>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
         <div>

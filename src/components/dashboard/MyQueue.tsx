@@ -1,5 +1,4 @@
 import Link from "next/link"
-import SectionTitle from "@/components/ui/section-title"
 import { Inbox, ShieldCheck, Ticket } from "lucide-react"
 import type { MyQueueCounts } from "@/lib/dashboard/queries"
 
@@ -22,7 +21,7 @@ export default function MyQueue({ counts, userName }: { counts: MyQueueCounts; u
   ]
   return (
     <aside className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-xs)]">
-      <SectionTitle title="My Queue" subtitle={userName} />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"My Queue"}</h2><p className="mt-1 text-sm text-muted-foreground">{(userName)}</p></div></div>
       <ul className="mt-3 space-y-2">
         {rows.map((r) => {
           const Icon = r.icon

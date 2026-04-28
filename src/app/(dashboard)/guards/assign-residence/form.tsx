@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
 
 type Guard = {
@@ -222,8 +223,8 @@ export default function AssignResidenceForm({ lockedRegionId = null }: AssignRes
                 <p className="text-gray-600 mt-1">Assign a guard to a residence under a supervisor</p>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
-            {success ? <InlineAlert type="success" message={success} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+            {success ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{success}</AlertDescription></Alert> : null}
 
             <form onSubmit={onSubmit} className="bg-white rounded-lg border p-6 space-y-5">
                 <h2 className="font-semibold text-gray-700">New Assignment</h2>
@@ -292,9 +293,9 @@ export default function AssignResidenceForm({ lockedRegionId = null }: AssignRes
                 </div>
 
                 <div>
-                    <ActionButton type="submit" disabled={loading}>
+                    <Button type="submit" disabled={loading}>
                         {loading ? "Saving..." : "Save Assignment"}
-                    </ActionButton>
+                    </Button>
                 </div>
             </form>
 

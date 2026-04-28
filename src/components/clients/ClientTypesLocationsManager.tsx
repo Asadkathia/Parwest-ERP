@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Button } from "@/components/shadcn/button"
-import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
-
 type ClientTypeRow = { id: string; serial: number; name: string; label: string; addedBy: string }
 type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string; status: "ACTIVE" | "INACTIVE" }
 type LocationRow = { id: string; locationName: string; createdBy: string; createdOn: string }
@@ -163,7 +162,7 @@ export default function ClientTypesLocationsManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Types & Locations" subtitle="All client types, client's document types, and client locations." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Types & Locations"}</h2><p className="mt-1 text-sm text-muted-foreground">{"All client types, client's document types, and client locations."}</p></div></div>
 
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
         <div>
@@ -192,8 +191,8 @@ export default function ClientTypesLocationsManager() {
         </div>
       </div>
 
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       <MasterSection title="All Client Types" onAdd={() => setAddMode("clientType")}>
         <DataTable

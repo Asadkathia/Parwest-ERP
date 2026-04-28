@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Card, CardBody } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { cn } from "@/lib/utils"
 import { TrendingDown, TrendingUp, Minus } from "lucide-react"
 
@@ -16,7 +16,7 @@ type Props = {
 export default function KpiCard({ label, value, deltaToday, sparkline, tone = "brand", href, footer }: Props) {
   const content = (
     <Card className="transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-      <CardBody className="space-y-3">
+      <CardContent className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
           {typeof deltaToday === "number" && deltaToday !== 0 ? <DeltaChip value={deltaToday} /> : null}
@@ -34,7 +34,7 @@ export default function KpiCard({ label, value, deltaToday, sparkline, tone = "b
         </p>
         {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} tone={tone} /> : null}
         {footer ? <div className="text-xs text-[var(--text-muted)]">{footer}</div> : null}
-      </CardBody>
+      </CardContent>
     </Card>
   )
   return href ? (

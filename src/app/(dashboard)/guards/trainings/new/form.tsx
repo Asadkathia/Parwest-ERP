@@ -1,13 +1,12 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
 import { Card, CardContent } from "@/components/shadcn/card"
-import InlineAlert from "@/components/ui/inline-alert"
-
 type GuardOption = { id: string; parwestId: string; name: string; cnic: string }
 type RegionalOffice = { id: string; name: string }
 type Client = { id: string; name: string }
@@ -173,11 +172,11 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
     return (
         <div className="space-y-6 max-w-4xl">
             <div className="flex items-center justify-between">
-                <SectionTitle title="Add OnJob Training" subtitle="Create a new OJT training record" />
+                <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Add OnJob Training"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Create a new OJT training record"}</p></div></div>
                 <Link href="/guards/trainings" className="ui-btn ui-btn-secondary">Return to List</Link>
             </div>
 
-            {error && <InlineAlert type="error" message={error} />}
+            {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
             <form onSubmit={onSubmit}>
                 <Card>
@@ -349,8 +348,8 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
                     </div>
 
                     <div className="flex justify-end gap-3">
-                        <ActionButton type="button" variant="secondary" onClick={() => setForm(EMPTY)}>Reset</ActionButton>
-                        <ActionButton type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</ActionButton>
+                        <Button type="button" variant="secondary" onClick={() => setForm(EMPTY)}>Reset</Button>
+                        <Button type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</Button>
                     </div>
                     </CardContent>
                 </Card>

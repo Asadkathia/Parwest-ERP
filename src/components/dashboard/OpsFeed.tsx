@@ -1,6 +1,5 @@
 import Link from "next/link"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import SectionTitle from "@/components/ui/section-title"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 import { Activity } from "lucide-react"
 import type { ActivityEntry } from "@/lib/dashboard/queries"
 
@@ -19,17 +18,11 @@ export default function OpsFeed({ entries }: { entries: ActivityEntry[] }) {
   return (
     <Card>
       <CardHeader>
-        <SectionTitle
-          title="Activity"
-          subtitle="Recent system events"
-          action={
-            <Link href="/audit" className="text-sm font-semibold text-[var(--brand)] hover:underline">
+        <div className="mb-4 flex items-start justify-between gap-4 text-sm font-semibold text-[var(--brand)] hover:underline"><div><h2 className="text-xl font-bold tracking-tight">{"Activity"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Recent system events"}</p></div><div className="flex shrink-0 items-center gap-2">{(<Link href="/audit" className="text-sm font-semibold text-[var(--brand)] hover:underline">
               View audit log
-            </Link>
-          }
-        />
+            </Link>)}</div></div>
       </CardHeader>
-      <CardBody>
+      <CardContent>
         {entries.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-[var(--text-muted)]">
             <Activity className="h-4 w-4" />
@@ -56,7 +49,7 @@ export default function OpsFeed({ entries }: { entries: ActivityEntry[] }) {
             ))}
           </ol>
         )}
-      </CardBody>
+      </CardContent>
     </Card>
   )
 }

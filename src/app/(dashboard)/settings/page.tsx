@@ -11,7 +11,6 @@ import {
   Users,
 } from "lucide-react"
 
-import SectionTitle from "@/components/ui/section-title"
 import {
   Card,
   CardContent,
@@ -80,7 +79,7 @@ const links = [
 export default function SettingsOverviewPage() {
   return (
     <div className="space-y-6">
-      <SectionTitle title="Settings" subtitle="Master settings routes and setup workflows." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Settings"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Master settings routes and setup workflows."}</p></div></div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {links.map((item) => {
           const Icon = item.icon

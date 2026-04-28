@@ -1,15 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { AlertCircle, Search, RotateCcw } from "lucide-react"
-import ActionButton from "@/components/ui/action-button"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import DataTable from "@/components/shared/DataTable"
-import StatusChip from "@/components/ui/status-chip"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -212,13 +212,12 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={loadRows} className="inline-flex items-center gap-2">
+          <Button onClick={loadRows} className="inline-flex items-center gap-2">
             <Search className="h-4 w-4" />
             Search
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            className="inline-flex items-center gap-2"
+          </Button>
+          <Button 
+            variant="secondary" className="inline-flex items-center gap-2"
             onClick={() => {
               setName("")
               setClientType("")
@@ -226,12 +225,11 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
               setRowsPerPage("10")
               setTableSearch("")
               setSelectDate("")
-            }}
-          >
+            }}>
             <RotateCcw className="h-4 w-4" />
             {variant === "v2" ? "Clear" : "Reset"}
-          </ActionButton>
-          {variant === "legacy" ? <ActionButton variant="secondary">Export In Excel</ActionButton> : null}
+          </Button>
+          {variant === "legacy" ? <Button variant="secondary">Export In Excel</Button> : null}
         </div>
         <div className="hidden" aria-hidden="true">
           <select name="legacy_client_type_options">
@@ -288,10 +286,7 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             key: "status",
             header: "Status",
             render: (row) => (
-              <StatusChip
-                label={row.status}
-                variant={row.status.toLowerCase() === "active" ? "success" : row.status.toLowerCase() === "inactive" ? "warning" : "neutral"}
-              />
+              <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{row.status}</Badge>
             ),
           },
           {

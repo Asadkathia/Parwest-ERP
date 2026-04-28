@@ -1,12 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
-
 type ClientTypeRow = {
     id: string
     name: string
@@ -88,12 +87,9 @@ export default function ClientTypesManager() {
 
     return (
         <div className="space-y-6">
-            <SectionTitle
-                title="Client Types"
-                subtitle="Manage the client types available when adding a new client. Changes reflect immediately in the Add Client form."
-            />
-            {notice && <InlineAlert type="success" message={notice} />}
-            {error && <InlineAlert type="error" message={error} />}
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Client Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage the client types available when adding a new client. Changes reflect immediately in the Add Client form."}</p></div></div>
+            {notice && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert>}
+            {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
             <Card>
                 <CardContent className="space-y-4 p-5">

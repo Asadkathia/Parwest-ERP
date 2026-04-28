@@ -1,13 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import Link from "next/link"
 import type { ScreenConfig } from "@/lib/parity/screenConfigs"
 import type { ApiEnvelope } from "@/lib/api/response"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-
 import { REPORT_BINDINGS } from "@/lib/reports/bindings"
 import ClientSummaryChart from "@/components/reports/ClientSummaryChart"
 import GuardDeploymentChart from "@/components/reports/GuardDeploymentChart"
@@ -121,7 +120,7 @@ export default function OperationalReportScreen({ screen, config, links }: Props
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <SectionTitle title={config.title} subtitle={config.description || "Live operational reporting endpoint."} />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(config.title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(config.description || "Live operational reporting endpoint.")}</p></div></div>
         {links.length > 0 ? (
           <div className="flex flex-wrap gap-2 justify-end">
             {links.map((link) => (
@@ -133,7 +132,7 @@ export default function OperationalReportScreen({ screen, config, links }: Props
         ) : null}
       </div>
 
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
       <section className="ui-card p-4">
         <h3 className="text-sm font-semibold text-[var(--text)]">Filters</h3>
@@ -167,17 +166,17 @@ export default function OperationalReportScreen({ screen, config, links }: Props
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 justify-end">
-          <ActionButton type="button" variant="secondary" onClick={resetFilters} disabled={loading}>
+          <Button type="button" variant="secondary" onClick={resetFilters} disabled={loading}>
             Reset
-          </ActionButton>
+          </Button>
           <PermissionGate module="REPORTS" action="VIEW" mode="disable">
-            <ActionButton type="button" variant="secondary" onClick={exportCsv} disabled={loading}>
+            <Button type="button" variant="secondary" onClick={exportCsv} disabled={loading}>
               Export CSV
-            </ActionButton>
+            </Button>
           </PermissionGate>
-          <ActionButton type="button" onClick={loadReport} disabled={loading}>
+          <Button type="button" onClick={loadReport} disabled={loading}>
             {loading ? "Loading..." : "Generate Report"}
-          </ActionButton>
+          </Button>
         </div>
       </section>
 

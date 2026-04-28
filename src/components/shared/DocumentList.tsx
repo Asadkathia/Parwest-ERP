@@ -1,9 +1,7 @@
 "use client"
 
 import { Download, Eye, FileText, Upload } from "lucide-react"
-import ActionButton from "@/components/ui/action-button"
-import SectionTitle from "@/components/ui/section-title"
-
+import { Button } from "@/components/shadcn/button"
 type DocumentItem = {
     id: string
     name: string
@@ -22,11 +20,11 @@ export default function DocumentList({ documents, title = "Documents", onUpload 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <SectionTitle title={title} />
-                <ActionButton onClick={onUpload} className="flex items-center gap-2">
+                <div className="mb-4 flex items-start justify-between gap-4"><h2 className="text-xl font-bold tracking-tight">{(title)}</h2></div>
+                <Button onClick={onUpload} className="flex items-center gap-2">
                     <Upload className="h-4 w-4" />
                     Upload Document
-                </ActionButton>
+                </Button>
             </div>
 
             {documents.length === 0 ? (

@@ -1,10 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import FilterBar from "@/components/ui/filter-bar"
-
+import { Button } from "@/components/shadcn/button"
+import { Card, CardContent } from "@/components/shadcn/card"
 type Row = {
   id: string
   name: string
@@ -81,10 +79,11 @@ export default function MasterDataManager({
   return (
     <div className="space-y-6">
       <div>
-        <SectionTitle title={title} subtitle={subtitle} />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(title)}</h2><p className="mt-1 text-sm text-muted-foreground">{(subtitle)}</p></div></div>
       </div>
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className={`grid grid-cols-1 ${includeDescription ? "md:grid-cols-3" : "md:grid-cols-2"} gap-4`}>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">{label}</label>
@@ -114,14 +113,15 @@ export default function MasterDataManager({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={onCreate}>Create</ActionButton>
-          <ActionButton variant="secondary" onClick={onReset}>Reset</ActionButton>
-          <ActionButton variant="secondary">Submit</ActionButton>
-          <ActionButton variant="secondary">Update</ActionButton>
-          <ActionButton variant="secondary">Delete</ActionButton>
-          <ActionButton variant="secondary">Export In Excel File</ActionButton>
+          <Button onClick={onCreate}>Create</Button>
+          <Button variant="secondary" onClick={onReset}>Reset</Button>
+          <Button variant="secondary">Submit</Button>
+          <Button variant="secondary">Update</Button>
+          <Button variant="secondary">Delete</Button>
+          <Button variant="secondary">Export In Excel File</Button>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       <div className="ui-card overflow-x-auto">
         <table className="w-full min-w-[720px]">

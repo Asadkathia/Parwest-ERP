@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useSearchParams } from "next/navigation"
-import ActionButton from "@/components/ui/action-button"
 import { Card, CardContent } from "@/components/shadcn/card"
-import FilterBar from "@/components/ui/filter-bar"
-import SectionTitle from "@/components/ui/section-title"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionOption = { id: string; name: string }
@@ -231,23 +230,26 @@ export default function InvoicePrerequisitesManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Contract Default Rates" subtitle="Client Invoice Pre-requisites" />
-      {error ? <InlineAlert type="error" message={error} /> : null}
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Contract Default Rates"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Client Invoice Pre-requisites"}</p></div></div>
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
-      <FilterBar className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((tab) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={tabClass(tab)}>
-              {tab}
-            </button>
-          ))}
-        </div>
-      </FilterBar>
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-wrap gap-2">
+            {TABS.map((tab) => (
+              <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={tabClass(tab)}>
+                {tab}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {activeTab === "Default Rates" ? (
         <>
-          <FilterBar className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 p-5">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <RegionUrlPicker
                 regions={regionOptions}
@@ -308,10 +310,11 @@ export default function InvoicePrerequisitesManager({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <ActionButton onClick={onSave}>Submit</ActionButton>
-              <ActionButton variant="secondary" onClick={resetDefaults}>Reset</ActionButton>
+              <Button onClick={onSave}>Submit</Button>
+              <Button variant="secondary" onClick={resetDefaults}>Reset</Button>
             </div>
-          </FilterBar>
+            </CardContent>
+          </Card>
 
           <DataTable
             rows={filteredRows.slice(0, Number.parseInt(entries, 10) || 10)}
@@ -372,23 +375,25 @@ export default function InvoicePrerequisitesManager({
           emptyText="No guard types found."
         />
       ) : (
-        <FilterBar className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
-              <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
+        <Card>
+          <CardContent className="space-y-4 p-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
+                <input value={invoiceHeaderName} onChange={(e) => setInvoiceHeaderName(e.target.value)} className="ui-input" placeholder="Name" />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={() => setNotice("Invoice header saved.")}>Submit</Button>
+              </div>
             </div>
-            <div className="flex items-end">
-              <ActionButton onClick={() => setNotice("Invoice header saved.")}>Submit</ActionButton>
-            </div>
-          </div>
-          <Card>
-            <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-              <p className="text-base font-semibold">Invoice Header</p>
-              <p className="text-sm text-muted-foreground">Header presets can be managed here in frontend mode.</p>
-            </CardContent>
-          </Card>
-        </FilterBar>
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                <p className="text-base font-semibold">Invoice Header</p>
+                <p className="text-sm text-muted-foreground">Header presets can be managed here in frontend mode.</p>
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
       )}
 
       {editingRate ? (
@@ -400,8 +405,8 @@ export default function InvoicePrerequisitesManager({
             <label className="block text-sm text-[var(--text-muted)]">Effective Rate</label>
             <input type="number" className="ui-input" value={editRateValue} onChange={(e) => setEditRateValue(e.target.value)} placeholder="Effective Rate" />
             <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setEditingRate(null)}>Cancel</ActionButton>
-              <ActionButton onClick={onApplyEditRate}>Save</ActionButton>
+              <Button variant="secondary" onClick={() => setEditingRate(null)}>Cancel</Button>
+              <Button onClick={onApplyEditRate}>Save</Button>
             </div>
           </div>
         </FormDialog>

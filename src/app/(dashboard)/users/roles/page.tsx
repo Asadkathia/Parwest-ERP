@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
-import SectionTitle from "@/components/ui/section-title"
 import RolesManager from "@/components/users/RolesManager"
 
 type TabKey = "roles" | "permissions" | "overrides"
@@ -27,10 +26,7 @@ export default async function RolesPage({
 
     return (
         <div className="space-y-6">
-            <SectionTitle
-                title="Roles & Permissions"
-                subtitle="Define roles, configure role-level permissions, and assign per-user overrides."
-            />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Roles & Permissions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Define roles, configure role-level permissions, and assign per-user overrides."}</p></div></div>
             <RolesManager
                 initialRoles={roles.map((r) => ({ id: r.id, name: r.name, description: r.description ?? null, scopeType: r.scopeType }))}
                 initialTab={initialTab}

@@ -9,9 +9,9 @@
  */
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-
+import { Button } from "@/components/shadcn/button"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 type LedgerEntry = {
   id: string
   type: "ACCRUED" | "RELEASED" | string
@@ -104,16 +104,13 @@ export default function ReserveLedgerPanel({ guardId }: Props) {
               </div>
             )}
           </div>
-          <ActionButton
-            onClick={() => setOpen(true)}
-            disabled={!data || data.balance <= 0}
-          >
+          <Button onClick={() => setOpen(true)} disabled={!data || data.balance <= 0}>
             Release Reserve
-          </ActionButton>
+          </Button>
         </div>
         {loadError && (
           <div className="mt-3">
-            <InlineAlert type="error" message={loadError} />
+            <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{loadError}</AlertDescription></Alert>
           </div>
         )}
       </section>
@@ -124,12 +121,12 @@ export default function ReserveLedgerPanel({ guardId }: Props) {
           <table className="w-full min-w-[800px] text-sm">
             <thead className="bg-[var(--surface-muted)]">
               <tr>
-                <th className="px-3 py-2 text-left">Date</th>
-                <th className="px-3 py-2 text-left">Type</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-                <th className="px-3 py-2 text-left">Reason</th>
-                <th className="px-3 py-2 text-left">By</th>
-                <th className="px-3 py-2 text-left">Slip / Method</th>
+                <th className="px-3 py-2 text-start">Date</th>
+                <th className="px-3 py-2 text-start">Type</th>
+                <th className="px-3 py-2 text-end">Amount</th>
+                <th className="px-3 py-2 text-start">Reason</th>
+                <th className="px-3 py-2 text-start">By</th>
+                <th className="px-3 py-2 text-start">Slip / Method</th>
               </tr>
             </thead>
             <tbody>
@@ -168,7 +165,7 @@ export default function ReserveLedgerPanel({ guardId }: Props) {
                           {e.type}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-end">
                         {amount.toLocaleString()}
                       </td>
                       <td className="px-3 py-2">{e.reason ?? ""}</td>
@@ -271,7 +268,7 @@ function ReleaseModal({
             ×
           </button>
         </div>
-        {error && <InlineAlert type="error" message={error} />}
+        {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
         <div className="text-xs text-[var(--text-muted)]">
           Available balance:{" "}
           <span className="font-semibold text-[var(--text)]">
@@ -346,12 +343,12 @@ function ReleaseModal({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
-          </ActionButton>
-          <ActionButton onClick={submit} disabled={!canSubmit || busy}>
+          </Button>
+          <Button onClick={submit} disabled={!canSubmit || busy}>
             {busy ? "Releasing…" : "Confirm Release"}
-          </ActionButton>
+          </Button>
         </div>
       </div>
     </div>

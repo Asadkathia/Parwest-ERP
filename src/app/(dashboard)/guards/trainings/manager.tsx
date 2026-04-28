@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/shadcn/card"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type TrainingRow = {
@@ -340,22 +341,22 @@ export default function TrainingsManager({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <ActionButton>Filter</ActionButton>
-                    <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
-                    <ActionButton onClick={() => exportCsv(rows, "ojt-all.csv")}>Export All OJT Report</ActionButton>
-                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-filtered.csv")}>Export Filtered OJT Report</ActionButton>
-                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-branch-report.csv")}>Branch Training Report</ActionButton>
-                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-branch-export.csv")}>Export Branch Report</ActionButton>
-                    <ActionButton onClick={() => exportCsv(filteredRows, "ojt-summary.csv")}>Export Summary</ActionButton>
-                    <ActionButton variant="danger" onClick={() => {
+                    <Button>Filter</Button>
+                    <Button variant="secondary" onClick={clearFilters}>Clear</Button>
+                    <Button onClick={() => exportCsv(rows, "ojt-all.csv")}>Export All OJT Report</Button>
+                    <Button onClick={() => exportCsv(filteredRows, "ojt-filtered.csv")}>Export Filtered OJT Report</Button>
+                    <Button onClick={() => exportCsv(filteredRows, "ojt-branch-report.csv")}>Branch Training Report</Button>
+                    <Button onClick={() => exportCsv(filteredRows, "ojt-branch-export.csv")}>Export Branch Report</Button>
+                    <Button onClick={() => exportCsv(filteredRows, "ojt-summary.csv")}>Export Summary</Button>
+                    <Button variant="destructive" onClick={() => {
                         const missing = rows.filter(r => !r.trainingType || !r.completedAt)
                         exportCsv(missing, "ojt-missing.csv")
-                    }}>Missing Training Report</ActionButton>
+                    }}>Missing Training Report</Button>
                 </div>
                 </CardContent>
             </Card>
 
-            {error && <InlineAlert type="error" message={error} />}
+            {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(error)}</AlertDescription></Alert>}
 
             <div className="ui-card overflow-x-auto">
                 <table className="w-full min-w-[1500px]">

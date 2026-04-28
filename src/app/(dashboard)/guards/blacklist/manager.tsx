@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Trash2, X } from "lucide-react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Trash2, X, CheckCircle2, AlertCircle } from "lucide-react"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type BlacklistedGuard = {
@@ -427,13 +427,13 @@ export default function BlacklistManager({
                 </div>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
             {abscondedPromptVisible ? (
                 <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
                     Tick the Absconded box to forfeit kit and continue.
                 </p>
             ) : null}
-            {notice ? <InlineAlert type="success" message={notice} /> : null}
+            {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
             {/* Blacklisted records table */}
             <div className="bg-white rounded-lg border overflow-x-auto">
@@ -642,13 +642,13 @@ function ConfirmDialog({
                 )}
 
                 <div className="mt-5 flex justify-end gap-2">
-                    <ActionButton variant="secondary" onClick={onNo} disabled={processing}>
+                    <Button variant="secondary" onClick={onNo} disabled={processing}>
                         <X className="h-4 w-4 mr-1 inline" />
                         Cancel
-                    </ActionButton>
-                    <ActionButton onClick={onYes} disabled={processing}>
+                    </Button>
+                    <Button onClick={onYes} disabled={processing}>
                         {processing ? "Processing..." : "Yes, Blacklist"}
-                    </ActionButton>
+                    </Button>
                 </div>
             </div>
         </div>

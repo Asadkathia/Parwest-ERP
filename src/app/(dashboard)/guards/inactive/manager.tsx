@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type InactiveGuard = {
@@ -133,8 +134,8 @@ export default function InactiveGuardsManager({
                 <p className="text-gray-600 mt-1">List of deactivated guards with reactivation controls</p>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
-            {notice ? <InlineAlert type="success" message={notice} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+            {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 {/* Filter bar */}
@@ -268,9 +269,9 @@ export default function InactiveGuardsManager({
                                     <td className="px-6 py-4 text-sm">{new Date(guard.updatedAt).toLocaleString("en-US")}</td>
                                     <td className="px-6 py-4 text-sm">{guard.status}</td>
                                     <td className="px-6 py-4 text-sm">
-                                        <ActionButton variant="secondary" onClick={() => setConfirmReactivateId(guard.id)}>
+                                        <Button variant="secondary" onClick={() => setConfirmReactivateId(guard.id)}>
                                             Activate
-                                        </ActionButton>
+                                        </Button>
                                     </td>
                                 </tr>
                             ))
@@ -329,8 +330,8 @@ function ConfirmDialog({
                     />
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
-                    <ActionButton variant="secondary" onClick={onNo}>No</ActionButton>
-                    <ActionButton onClick={onYes}>Yes</ActionButton>
+                    <Button variant="secondary" onClick={onNo}>No</Button>
+                    <Button onClick={onYes}>Yes</Button>
                 </div>
             </div>
         </div>

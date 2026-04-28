@@ -1,13 +1,11 @@
 "use client"
 
 import { type ReactNode, useState, useEffect, useCallback } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useRouter } from "next/navigation"
-import { Plus, Pencil, Trash2, X as XIcon, Check } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Card, CardBody } from "@/components/ui/card"
-
+import { Plus, Pencil, Trash2, X as XIcon, Check, CheckCircle2, AlertCircle } from "lucide-react"
 type Region = {
   id: string
   name: string
@@ -700,18 +698,15 @@ export default function PrerequisitesManager({ regions }: Props) {
 
   return (
     <div className="space-y-8">
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
       {/* ── Deployment Inventory Prerequisite ── */}
       <Card>
-        <CardBody className="space-y-4">
-          <SectionTitle
-            title="Deployment Inventory Prerequisite"
-            subtitle="Control guard deployment blocking by minimum assigned inventory and optional category restrictions."
-          />
+        <CardContent className="space-y-4">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Deployment Inventory Prerequisite"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Control guard deployment blocking by minimum assigned inventory and optional category restrictions."}</p></div></div>
 
-          {inventoryRuleError ? <InlineAlert type="error" message={inventoryRuleError} /> : null}
-          {inventoryRuleNotice ? <InlineAlert type="success" message={inventoryRuleNotice} /> : null}
+          {inventoryRuleError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{inventoryRuleError}</AlertDescription></Alert> : null}
+          {inventoryRuleNotice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{inventoryRuleNotice}</AlertDescription></Alert> : null}
 
           {inventoryRuleLoading || !inventoryRule ? (
             <p className="text-sm text-[var(--text-muted)]">Loading rule settings...</p>
@@ -784,36 +779,32 @@ export default function PrerequisitesManager({ regions }: Props) {
               </div>
 
               <div className="flex items-center gap-2">
-                <ActionButton onClick={handleSaveDeploymentInventoryRule} disabled={inventoryRuleSaving}>
+                <Button onClick={handleSaveDeploymentInventoryRule} disabled={inventoryRuleSaving}>
                   {inventoryRuleSaving ? "Saving..." : "Save Rule"}
-                </ActionButton>
-                <ActionButton
-                  variant="secondary"
-                  onClick={loadDeploymentInventoryRule}
-                  disabled={inventoryRuleSaving}
-                >
+                </Button>
+                <Button variant="secondary" onClick={loadDeploymentInventoryRule} disabled={inventoryRuleSaving}>
                   Reset
-                </ActionButton>
+                </Button>
               </div>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Prerequisite Document Types (DB-backed) ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <SectionTitle title="Prerequisite Document Types" subtitle="Configure required documents for guard enrollment. Attachment category → appears in Attachments tab. Verification category → appears in Verifications tab." />
+              <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Prerequisite Document Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure required documents for guard enrollment. Attachment category → appears in Attachments tab. Verification category → appears in Verifications tab."}</p></div></div>
             </div>
-            <ActionButton onClick={() => setShowAddDocType((p) => !p)} className="inline-flex items-center gap-2">
+            <Button onClick={() => setShowAddDocType((p) => !p)} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Type
-            </ActionButton>
+            </Button>
           </div>
 
-          {docTypesError ? <InlineAlert type="error" message={docTypesError} /> : null}
+          {docTypesError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{docTypesError}</AlertDescription></Alert> : null}
 
           {showAddDocType && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
@@ -839,10 +830,10 @@ export default function PrerequisitesManager({ regions }: Props) {
                   <option value="ATTACHMENT">Attachment Document</option>
                 </select>
               </div>
-              <ActionButton onClick={handleAddDocType} disabled={savingDocType || !newDocTypeName.trim()}>
+              <Button onClick={handleAddDocType} disabled={savingDocType || !newDocTypeName.trim()}>
                 {savingDocType ? "Saving..." : "Save"}
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => { setShowAddDocType(false); setNewDocTypeName(""); setNewDocTypeCategory("ATTACHMENT") }}>Cancel</ActionButton>
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowAddDocType(false); setNewDocTypeName(""); setNewDocTypeCategory("ATTACHMENT") }}>Cancel</Button>
             </div>
           )}
 
@@ -953,14 +944,14 @@ export default function PrerequisitesManager({ regions }: Props) {
               </div>
             )
           })()}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Guard Statuses ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div>
-            <SectionTitle title="Guard Statuses" subtitle="Legacy merged options and deduction prerequisites." />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Guard Statuses"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Legacy merged options and deduction prerequisites."}</p></div></div>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
             <div>
@@ -974,7 +965,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               />
             </div>
             <div className="self-end">
-              <ActionButton onClick={addCwfeDeduction}>Add</ActionButton>
+              <Button onClick={addCwfeDeduction}>Add</Button>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -984,53 +975,53 @@ export default function PrerequisitesManager({ regions }: Props) {
               </span>
             ))}
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
 
       <Card>
-        <CardBody className="space-y-4">
-          <SectionTitle title="Salary Categories" subtitle="Reference values — configurable via system settings." />
+        <CardContent className="space-y-4">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Salary Categories"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Reference values — configurable via system settings."}</p></div></div>
           <SimpleTable
             headers={["ID#", "NAME", "LIMIT"]}
             rows={salaryCategories.map((row) => [row.id, row.name, row.limit])}
           />
-        </CardBody>
+        </CardContent>
       </Card>
 
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <HeaderWithAdd title="All Guard&apos;s Document Types" />
           <SimpleTable
             headers={["NAME", "DOCUMENT #", "ACTION", "STATUS"]}
             rows={documentTypes.map((row) => [row.name, row.number, "✎", row.status])}
           />
-        </CardBody>
+        </CardContent>
       </Card>
 
       <Card>
-        <CardBody className="space-y-4">
-          <SectionTitle title="Allowances &amp; Deductions" subtitle="Reference values — configurable via system settings." />
+        <CardContent className="space-y-4">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Allowances &amp; Deductions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Reference values — configurable via system settings."}</p></div></div>
           <SimpleTable
             headers={["FACTOR NAME", "AMOUNT"]}
             rows={allowancesAndDeductions.map((row) => [row.factorName, row.amount])}
           />
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Guard Designation Types ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <SectionTitle title="Guard Designation Types" subtitle="Configure the list of designations shown in the Branch Contract section when adding/editing clients and branches." />
+              <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Guard Designation Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure the list of designations shown in the Branch Contract section when adding/editing clients and branches."}</p></div></div>
             </div>
-            <ActionButton onClick={() => { setShowAddDesignationType((p) => !p); setNewDesignationTypeName("") }} className="inline-flex items-center gap-2">
+            <Button onClick={() => { setShowAddDesignationType((p) => !p); setNewDesignationTypeName("") }} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Type
-            </ActionButton>
+            </Button>
           </div>
 
-          {designationTypesError ? <InlineAlert type="error" message={designationTypesError} /> : null}
+          {designationTypesError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{designationTypesError}</AlertDescription></Alert> : null}
 
           {showAddDesignationType && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
@@ -1045,10 +1036,10 @@ export default function PrerequisitesManager({ regions }: Props) {
                   className="ui-input"
                 />
               </div>
-              <ActionButton onClick={handleAddDesignationType} disabled={savingDesignationType || !newDesignationTypeName.trim()}>
+              <Button onClick={handleAddDesignationType} disabled={savingDesignationType || !newDesignationTypeName.trim()}>
                 {savingDesignationType ? "Saving..." : "Save"}
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => { setShowAddDesignationType(false); setNewDesignationTypeName("") }}>Cancel</ActionButton>
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowAddDesignationType(false); setNewDesignationTypeName("") }}>Cancel</Button>
             </div>
           )}
 
@@ -1104,7 +1095,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               </table>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Edit designation type modal */}
@@ -1127,10 +1118,10 @@ export default function PrerequisitesManager({ regions }: Props) {
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <ActionButton variant="secondary" onClick={() => setEditingDesignationType(null)}>Cancel</ActionButton>
-              <ActionButton onClick={handleEditDesignationType} disabled={savingDesignationType || !editDesignationTypeName.trim()}>
+              <Button variant="secondary" onClick={() => setEditingDesignationType(null)}>Cancel</Button>
+              <Button onClick={handleEditDesignationType} disabled={savingDesignationType || !editDesignationTypeName.trim()}>
                 {savingDesignationType ? "Saving..." : "Save"}
-              </ActionButton>
+              </Button>
             </div>
           </div>
         </div>
@@ -1148,7 +1139,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               Are you sure you want to delete <strong>{confirmDeleteDesignationType.name}</strong>? This cannot be undone.
             </div>
             <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <ActionButton variant="secondary" onClick={() => setConfirmDeleteDesignationType(null)}>Cancel</ActionButton>
+              <Button variant="secondary" onClick={() => setConfirmDeleteDesignationType(null)}>Cancel</Button>
               <button
                 onClick={() => handleDeleteDesignationType(confirmDeleteDesignationType)}
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
@@ -1162,18 +1153,18 @@ export default function PrerequisitesManager({ regions }: Props) {
 
       {/* ── Ex-Service Types ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <SectionTitle title="Ex-Servicemen Types" subtitle="Configure the list of ex-service branches shown during guard enrollment. Guards not matching any type are treated as Civilian." />
+              <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Ex-Servicemen Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure the list of ex-service branches shown during guard enrollment. Guards not matching any type are treated as Civilian."}</p></div></div>
             </div>
-            <ActionButton onClick={() => { setShowAddExServiceType((p) => !p); setNewExServiceTypeName("") }} className="inline-flex items-center gap-2">
+            <Button onClick={() => { setShowAddExServiceType((p) => !p); setNewExServiceTypeName("") }} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Type
-            </ActionButton>
+            </Button>
           </div>
 
-          {exServiceTypesError ? <InlineAlert type="error" message={exServiceTypesError} /> : null}
+          {exServiceTypesError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{exServiceTypesError}</AlertDescription></Alert> : null}
 
           {showAddExServiceType && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
@@ -1188,10 +1179,10 @@ export default function PrerequisitesManager({ regions }: Props) {
                   className="ui-input"
                 />
               </div>
-              <ActionButton onClick={handleAddExServiceType} disabled={savingExServiceType || !newExServiceTypeName.trim()}>
+              <Button onClick={handleAddExServiceType} disabled={savingExServiceType || !newExServiceTypeName.trim()}>
                 {savingExServiceType ? "Saving..." : "Save"}
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => { setShowAddExServiceType(false); setNewExServiceTypeName("") }}>Cancel</ActionButton>
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowAddExServiceType(false); setNewExServiceTypeName("") }}>Cancel</Button>
             </div>
           )}
 
@@ -1247,7 +1238,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               </table>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Edit ex-service type modal */}
@@ -1270,10 +1261,10 @@ export default function PrerequisitesManager({ regions }: Props) {
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <ActionButton variant="secondary" onClick={() => setEditingExServiceType(null)}>Cancel</ActionButton>
-              <ActionButton onClick={handleEditExServiceType} disabled={savingExServiceType || !editExServiceTypeName.trim()}>
+              <Button variant="secondary" onClick={() => setEditingExServiceType(null)}>Cancel</Button>
+              <Button onClick={handleEditExServiceType} disabled={savingExServiceType || !editExServiceTypeName.trim()}>
                 {savingExServiceType ? "Saving..." : "Save"}
-              </ActionButton>
+              </Button>
             </div>
           </div>
         </div>
@@ -1291,7 +1282,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               Are you sure you want to delete <strong>{confirmDeleteExServiceType.name}</strong>? This cannot be undone.
             </div>
             <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <ActionButton variant="secondary" onClick={() => setConfirmDeleteExServiceType(null)}>Cancel</ActionButton>
+              <Button variant="secondary" onClick={() => setConfirmDeleteExServiceType(null)}>Cancel</Button>
               <button
                 onClick={() => handleDeleteExServiceType(confirmDeleteExServiceType)}
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
@@ -1305,18 +1296,18 @@ export default function PrerequisitesManager({ regions }: Props) {
 
       {/* ── Pledged Document Types ── */}
       <Card>
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <SectionTitle title="Pledged Document Types" subtitle="Configure the types of documents that guards can pledge (hand over to the company for safekeeping)." />
+              <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Pledged Document Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure the types of documents that guards can pledge (hand over to the company for safekeeping)."}</p></div></div>
             </div>
-            <ActionButton onClick={() => { setShowAddPledgeType((p) => !p); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }} className="inline-flex items-center gap-2">
+            <Button onClick={() => { setShowAddPledgeType((p) => !p); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Type
-            </ActionButton>
+            </Button>
           </div>
 
-          {pledgeTypesError ? <InlineAlert type="error" message={pledgeTypesError} /> : null}
+          {pledgeTypesError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{pledgeTypesError}</AlertDescription></Alert> : null}
 
           {showAddPledgeType && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
@@ -1341,10 +1332,10 @@ export default function PrerequisitesManager({ regions }: Props) {
                   className="ui-input"
                 />
               </div>
-              <ActionButton onClick={handleAddPledgeType} disabled={savingPledgeType || !newPledgeTypeName.trim()}>
+              <Button onClick={handleAddPledgeType} disabled={savingPledgeType || !newPledgeTypeName.trim()}>
                 {savingPledgeType ? "Saving..." : "Save"}
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={() => { setShowAddPledgeType(false); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }}>Cancel</ActionButton>
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowAddPledgeType(false); setNewPledgeTypeName(""); setNewPledgeTypeDesc("") }}>Cancel</Button>
             </div>
           )}
 
@@ -1390,14 +1381,14 @@ export default function PrerequisitesManager({ regions }: Props) {
               </table>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Pledge Return Conditions ── */}
       <Card>
-        <CardBody className="space-y-5">
+        <CardContent className="space-y-5">
           <div className="flex items-center justify-between">
-            <SectionTitle title="Pledge Return Conditions" subtitle="Configure conditions that can be selected when a pledged document is temporarily issued back to a guard." />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Pledge Return Conditions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Configure conditions that can be selected when a pledged document is temporarily issued back to a guard."}</p></div></div>
             <button
               onClick={() => { setShowAddReturnCond(true); setNewReturnCondName(""); setNewReturnCondDesc("") }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
@@ -1406,7 +1397,7 @@ export default function PrerequisitesManager({ regions }: Props) {
             </button>
           </div>
 
-          {returnCondError ? <InlineAlert type="error" message={returnCondError} /> : null}
+          {returnCondError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{returnCondError}</AlertDescription></Alert> : null}
 
           {showAddReturnCond && (
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
@@ -1526,7 +1517,7 @@ export default function PrerequisitesManager({ regions }: Props) {
               </table>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* ── Delete Return Condition Confirm ── */}
@@ -1549,13 +1540,13 @@ export default function PrerequisitesManager({ regions }: Props) {
       )}
 
       <Card>
-        <CardBody className="space-y-5">
+        <CardContent className="space-y-5">
           <div className="flex items-center justify-between">
-            <SectionTitle title="Regions" subtitle="Manage region master list for guard workflows." />
-            <ActionButton onClick={() => setShowRegionForm((p) => !p)} className="inline-flex items-center gap-2">
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Regions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage region master list for guard workflows."}</p></div></div>
+            <Button onClick={() => setShowRegionForm((p) => !p)} className="inline-flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Region
-            </ActionButton>
+            </Button>
           </div>
 
           {showRegionForm ? (
@@ -1565,8 +1556,8 @@ export default function PrerequisitesManager({ regions }: Props) {
               </label>
               <input type="text" name="name" required placeholder="e.g., Punjab, Sindh, KPK" className="ui-input" />
               <div className="flex gap-2 mt-4">
-                <ActionButton type="submit" disabled={loading}>{loading ? "Saving..." : "Save Region"}</ActionButton>
-                <ActionButton type="button" variant="secondary" onClick={() => setShowRegionForm(false)}>Cancel</ActionButton>
+                <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Region"}</Button>
+                <Button type="button" variant="secondary" onClick={() => setShowRegionForm(false)}>Cancel</Button>
               </div>
             </form>
           ) : null}
@@ -1582,11 +1573,11 @@ export default function PrerequisitesManager({ regions }: Props) {
               ))
             )}
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
 
       <Card>
-        <CardBody className="space-y-5">
+        <CardContent className="space-y-5">
           <div className="space-y-4">
             <HeaderWithAdd title="Guard Statuses" />
             <SimpleTable
@@ -1595,7 +1586,7 @@ export default function PrerequisitesManager({ regions }: Props) {
             />
           </div>
 
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Edit Doc Type Modal */}
@@ -1700,10 +1691,10 @@ function HeaderWithAdd({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between">
       <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-      <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+      <Button variant="secondary" className="inline-flex items-center gap-2">
         <Plus className="h-4 w-4" />
         Add
-      </ActionButton>
+      </Button>
     </div>
   )
 }
@@ -1767,8 +1758,8 @@ function ConfirmDialog({
         {message ? <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p> : null}
         {customContent ? <div className="mt-3">{customContent}</div> : null}
         <div className="mt-5 flex justify-end gap-2">
-          <ActionButton variant="secondary" onClick={onNo}>{noText}</ActionButton>
-          <ActionButton onClick={onYes}>{yesText}</ActionButton>
+          <Button variant="secondary" onClick={onNo}>{noText}</Button>
+          <Button onClick={onYes}>{yesText}</Button>
         </div>
       </div>
     </div>

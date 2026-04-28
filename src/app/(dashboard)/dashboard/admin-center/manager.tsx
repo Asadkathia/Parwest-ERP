@@ -1,9 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Badge } from "@/components/shadcn/badge"
 import BroadcastComposer from "@/components/admin/BroadcastComposer"
 import SystemLogTimeline from "@/components/admin/SystemLogTimeline"
-import StatusChip from "@/components/ui/status-chip"
 import type { AdminLogEntry, BroadcastMessage } from "@/lib/admin/types"
 
 export default function AdminCenterManager() {
@@ -45,7 +45,7 @@ export default function AdminCenterManager() {
                 <article key={broadcast.id} className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium text-[var(--text)]">{broadcast.title}</p>
-                    <StatusChip label={broadcast.audience} variant="neutral" />
+                    <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{broadcast.audience}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-[var(--text-muted)]">{broadcast.message}</p>
                   <p className="mt-2 text-xs text-[var(--text-muted)]">

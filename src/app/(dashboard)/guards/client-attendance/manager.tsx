@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
 type RegionalOffice = { id: string; name: string }
@@ -178,11 +179,11 @@ export default function ClientAttendanceManager({
                     </div>
                     <div><label className="block text-sm text-gray-600 mb-1">Start Date*</label><input name="Start Date*" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
                     <div><label className="block text-sm text-gray-600 mb-1">End Date*</label><input name="End Date*" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded-md px-3 py-2" /></div>
-                    <div className="flex items-end"><ActionButton onClick={loadClientAttendance} className="w-full">Submit</ActionButton></div>
+                    <div className="flex items-end"><Button onClick={loadClientAttendance} className="w-full">Submit</Button></div>
                 </div>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 px-4 py-3">

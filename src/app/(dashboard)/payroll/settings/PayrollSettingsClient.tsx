@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import DeductionsManager from "./deductions-manager"
 
@@ -184,12 +184,9 @@ function GuardAgeLimitTab({ canUpdate = false }: { canUpdate?: boolean }) {
           <div className="flex items-center justify-end gap-2">
             {result && <span className="text-sm mr-2">{result}</span>}
             {canUpdate && (
-              <ActionButton
-                onClick={save}
-                disabled={saving || !minAge || !maxAge || Number(minAge) >= Number(maxAge)}
-              >
+              <Button onClick={save} disabled={saving || !minAge || !maxAge || Number(minAge) >= Number(maxAge)}>
                 {saving ? "Saving…" : "Save"}
-              </ActionButton>
+              </Button>
             )}
           </div>
         </>
@@ -317,7 +314,7 @@ function PayrollDefaultsTab({
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold">Payroll Defaults</h3>
         {canCreate && (
-          <ActionButton onClick={openCreate}>+ Add Defaults</ActionButton>
+          <Button onClick={openCreate}>+ Add Defaults</Button>
         )}
       </div>
 
@@ -500,13 +497,13 @@ function PayrollDefaultsTab({
 
             <div className="flex items-center justify-end gap-2 pt-2">
               {result && <span className="text-sm mr-2">{result}</span>}
-              <ActionButton variant="secondary" onClick={reset}>
+              <Button variant="secondary" onClick={reset}>
                 Reset
-              </ActionButton>
+              </Button>
               {(editingId ? canUpdate : canCreate) && (
-                <ActionButton onClick={submit} disabled={saving}>
+                <Button onClick={submit} disabled={saving}>
                   {saving ? "Saving…" : "Save"}
-                </ActionButton>
+                </Button>
               )}
             </div>
           </div>

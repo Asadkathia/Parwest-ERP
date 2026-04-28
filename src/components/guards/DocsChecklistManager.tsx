@@ -216,7 +216,7 @@ export default function DocsChecklistManager() {
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand)] text-xs font-bold text-white">1</span>
               <h2 className="text-base font-semibold text-[var(--text)]">Select Documents to Print</h2>
             </div>
-            <p className="mt-0.5 ml-8 text-sm text-[var(--text-muted)]">
+            <p className="mt-0.5 ms-8 text-sm text-[var(--text-muted)]">
               Choose which documents should be printed for every selected guard.
             </p>
           </div>
@@ -265,7 +265,7 @@ export default function DocsChecklistManager() {
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand)] text-xs font-bold text-white">2</span>
             <h2 className="text-base font-semibold text-[var(--text)]">Select Guards</h2>
           </div>
-          <p className="ml-8 text-sm text-[var(--text-muted)]">
+          <p className="ms-8 text-sm text-[var(--text-muted)]">
             Select which guards to include in the bulk print.
           </p>
         </div>
@@ -273,16 +273,16 @@ export default function DocsChecklistManager() {
         {/* Search + page-size bar */}
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] px-4 py-3 bg-[var(--surface-muted)]">
           <div className="relative flex-1 min-w-[200px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, Parwest ID or CNIC…"
-              className="ui-input pl-8 py-1.5 text-sm w-full"
+              className="ui-input ps-8 py-1.5 text-sm w-full"
             />
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-xs text-[var(--text-muted)] mr-1">Show:</span>
+            <span className="text-xs text-[var(--text-muted)] me-1">Show:</span>
             {PAGE_SIZES.map((size) => (
               <button
                 key={String(size)}
@@ -313,11 +313,11 @@ export default function DocsChecklistManager() {
             <thead className="bg-[var(--surface-muted)]">
               <tr>
                 <th className="w-10 px-4 py-2"></th>
-                <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Parwest ID</th>
-                <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Guard Name</th>
-                <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">CNIC</th>
-                <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Docs</th>
-                <th className="px-4 py-2 text-left text-xs uppercase text-[var(--text-muted)]">Customise</th>
+                <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Parwest ID</th>
+                <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Guard Name</th>
+                <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">CNIC</th>
+                <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Docs</th>
+                <th className="px-4 py-2 text-start text-xs uppercase text-[var(--text-muted)]">Customise</th>
               </tr>
             </thead>
             <tbody>
@@ -374,7 +374,7 @@ export default function DocsChecklistManager() {
                               isExpanded
                                 ? "border-[var(--brand)] text-[var(--brand)] bg-[var(--brand)]/8"
                                 : hasOverride
-                                ? "border-amber-400 text-amber-700 bg-amber-50"
+                                ? "border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300"
                                 : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
                             }`}
                           >

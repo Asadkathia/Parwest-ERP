@@ -1,8 +1,8 @@
 "use client"
 
 import { Suspense, useState } from "react"
+import { Badge } from "@/components/shadcn/badge"
 import Link from "next/link"
-import StatusChip from "@/components/ui/status-chip"
 import { Trash2 } from "lucide-react"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
@@ -68,18 +68,18 @@ export default function UsersTable({
         </div>
       </div>
       {error && (
-        <div className="px-6 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">{error}</div>
+        <div className="px-6 py-3 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900/40 text-sm text-red-700 dark:text-red-300">{error}</div>
       )}
       <div className="overflow-x-auto">
       <table className="w-full min-w-[960px]">
         <thead className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Email</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Role</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Last Login</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Name</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Email</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Role</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Status</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Last Login</th>
+            <th className="px-6 py-3 text-start text-xs font-semibold text-[var(--text-muted)] uppercase">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border)]">
@@ -96,7 +96,7 @@ export default function UsersTable({
                 <td className="px-6 py-4 text-sm text-[var(--text)]">{user.email}</td>
                 <td className="px-6 py-4 text-sm text-[var(--text)]">{user.role?.name || "—"}</td>
                 <td className="px-6 py-4 text-sm">
-                  <StatusChip label={user.status} variant={user.status === "ACTIVE" ? "success" : "warning"} />
+                  <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{user.status}</Badge>
                 </td>
                 <td className="px-6 py-4 text-sm text-[var(--text-muted)]">
                   {user.lastLoginAt

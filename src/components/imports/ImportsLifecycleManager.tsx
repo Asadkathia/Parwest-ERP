@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import DataTable from "@/components/shared/DataTable"
 import { importLinks } from "@/lib/parity/screenConfigs"
 
@@ -185,7 +185,7 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <SectionTitle title="Imports" subtitle="Validate, process, and monitor import jobs with downloadable error reports." />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Imports"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Validate, process, and monitor import jobs with downloadable error reports."}</p></div></div>
         <div className="flex flex-wrap gap-2 justify-end">
           {importLinks.map((link) => (
             <Link key={link.href} href={link.href} className="ui-btn ui-btn-secondary">
@@ -195,9 +195,10 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
         </div>
       </div>
 
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Import Module</label>
@@ -229,12 +230,12 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
             />
           </div>
           <div className="flex items-end gap-2">
-            <ActionButton onClick={onValidate} disabled={loadingValidate}>
+            <Button onClick={onValidate} disabled={loadingValidate}>
               {loadingValidate ? "Validating..." : "Validate"}
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={onProcess} disabled={loadingProcess}>
+            </Button>
+            <Button variant="secondary" onClick={onProcess} disabled={loadingProcess}>
               {loadingProcess ? "Processing..." : "Import"}
-            </ActionButton>
+            </Button>
           </div>
         </div>
         <div>
@@ -247,7 +248,8 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
             placeholder="Paste CSV content"
           />
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       <section className="ui-card overflow-x-auto">
         <h3 className="text-base font-semibold text-[var(--text)] mb-3">Preview Rows</h3>
@@ -293,12 +295,12 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-base font-semibold text-[var(--text)]">Import Job</h3>
             <div className="flex gap-2">
-              <ActionButton variant="secondary" onClick={refreshStatus} disabled={loadingStatus}>
+              <Button variant="secondary" onClick={refreshStatus} disabled={loadingStatus}>
                 {loadingStatus ? "Refreshing..." : "Refresh Status"}
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={downloadErrorsCsv} disabled={!job.jobId}>
+              </Button>
+              <Button variant="secondary" onClick={downloadErrorsCsv} disabled={!job.jobId}>
                 Download Errors CSV
-              </ActionButton>
+              </Button>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

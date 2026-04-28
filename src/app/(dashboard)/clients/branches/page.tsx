@@ -14,7 +14,6 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { Building, MapPin, Building2, BriefcaseBusiness } from "lucide-react"
-import SectionTitle from "@/components/ui/section-title"
 import StatCard from "@/components/shadcn/parwest-stat-card"
 import { deriveBranchModel } from "@/lib/branches/model"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
@@ -85,10 +84,7 @@ export default async function BranchesPage({
 
     return (
         <div className="space-y-6">
-            <SectionTitle
-                title="All Branches"
-                subtitle="Manage all client branches across the system"
-            />
+            <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"All Branches"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage all client branches across the system"}</p></div></div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <StatCard label="Total Branches" value={stats.total} icon={<Building className="h-5 w-5" />} tone="brand" />

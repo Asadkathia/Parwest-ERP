@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { AlertTriangle, ExternalLink, Loader2, RefreshCw, RotateCcw } from "lucide-react"
 
-import SectionTitle from "@/components/ui/section-title"
 import {
   Card,
   CardContent,
@@ -265,10 +264,7 @@ export default function WorkflowRulesManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Workflow Rules"
-        subtitle="Toggle workflow strictness without changing route code. Changes are persisted and applied immediately."
-      />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Workflow Rules"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Toggle workflow strictness without changing route code. Changes are persisted and applied immediately."}</p></div></div>
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -281,7 +277,7 @@ export default function WorkflowRulesManager() {
           <PermissionGate module="SETTINGS" action="UPDATE" mode="hide">
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => void loadRules()} disabled={loading}>
-                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                <RefreshCw className="me-2 h-3.5 w-3.5" />
                 Refresh
               </Button>
               <Button
@@ -290,7 +286,7 @@ export default function WorkflowRulesManager() {
                 onClick={() => void resetToDefaults()}
                 disabled={loading || !rules.length}
               >
-                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                <RotateCcw className="me-2 h-3.5 w-3.5" />
                 Reset Defaults
               </Button>
             </div>
@@ -323,7 +319,7 @@ export default function WorkflowRulesManager() {
               >
                 {applyingPreset ? (
                   <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="me-2 h-3.5 w-3.5 animate-spin" />
                     Applying...
                   </>
                 ) : (
@@ -347,7 +343,7 @@ export default function WorkflowRulesManager() {
             {groupedRules.map((group) => (
               <TabsTrigger key={group.key} value={group.key}>
                 {group.label}
-                <span className="ml-2 text-xs text-muted-foreground">{group.items.length}</span>
+                <span className="ms-2 text-xs text-muted-foreground">{group.items.length}</span>
               </TabsTrigger>
             ))}
           </TabsList>

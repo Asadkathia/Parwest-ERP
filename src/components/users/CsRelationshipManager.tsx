@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
-
 type Role = { id: string; name: string }
 type User = { id: string; name: string; roleId?: string | null; role?: { id: string; name: string } | null }
 type Client = { id: string; name: string }
@@ -142,11 +141,12 @@ export default function CsRelationshipManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="C/S Relationship" subtitle="Assign client branches to supervisors." />
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"C/S Relationship"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Assign client branches to supervisors."}</p></div></div>
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
-      <FilterBar className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Select label="Client" value={clientId} onChange={(value) => { setClientId(value); setBranchId("") }} options={clients.map((c) => ({ value: c.id, label: c.name }))} placeholder="-- Select Client --" />
           <Select label="Branch" value={branchId} onChange={setBranchId} options={visibleBranches.map((b) => ({ value: b.id, label: b.name }))} placeholder="-- Select Branch --" />
@@ -157,10 +157,11 @@ export default function CsRelationshipManager() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={assign} disabled={saving}>{saving ? "Assigning..." : "Assign"}</ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</ActionButton>
+          <Button onClick={assign} disabled={saving}>{saving ? "Assigning..." : "Assign"}</Button>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</Button>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       <DataTable
         rows={rows}

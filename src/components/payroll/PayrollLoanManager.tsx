@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 
@@ -168,7 +167,7 @@ export default function PayrollLoanManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Loan" subtitle="Backend-connected loan operations." />
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Loan"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Backend-connected loan operations."}</p></div></div>
 
       {notice ? (
         notice.type === "success" ? (
@@ -267,9 +266,9 @@ export default function PayrollLoanManager() {
           </label>
         </div>
         <div className="flex justify-end">
-          <ActionButton onClick={onCreate} disabled={saving}>
+          <Button onClick={onCreate} disabled={saving}>
             {saving ? "Saving..." : "Submit"}
-          </ActionButton>
+          </Button>
         </div>
       </section>
 
@@ -331,13 +330,13 @@ export default function PayrollLoanManager() {
         <table className="w-full min-w-[960px]">
           <thead className="bg-[var(--surface-muted)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Guard</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Month</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Amount</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Status</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Supervisor</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Manager</th>
-              <th className="px-4 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Actions</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Guard</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Month</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Amount</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Status</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Supervisor</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Manager</th>
+              <th className="px-4 py-3 text-start text-xs uppercase text-[var(--text-muted)]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -368,9 +367,9 @@ export default function PayrollLoanManager() {
                   <td className="px-4 py-3 text-sm">{row.manager || "—"}</td>
                   <td className="px-4 py-3 text-sm">
                     {row.status !== "FINALIZED" ? (
-                      <ActionButton variant="secondary" onClick={() => onFinalize(row)}>
+                      <Button variant="secondary" onClick={() => onFinalize(row)}>
                         Finalize
-                      </ActionButton>
+                      </Button>
                     ) : (
                       <span className="text-xs text-[var(--text-muted)]">Finalized</span>
                     )}

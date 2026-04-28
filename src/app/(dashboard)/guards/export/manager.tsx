@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Download, X } from "lucide-react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Download, X, CheckCircle2 } from "lucide-react"
 import { Card, CardContent } from "@/components/shadcn/card"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
-
 // Legacy shadow status (Guard.status) — dual-written, kept for non-web CSV consumers.
 // BLACKLISTED + ABSENT are retired enum values and no longer emitted, so omitted here.
 const STATUS_OPTIONS = ["ACTIVE", "PENDING", "INACTIVE", "TERMINATED", "PRESENT", "DEFAULT"]
@@ -204,22 +203,22 @@ export default function ExportGuardsManager() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <ActionButton variant="secondary" onClick={clearFilter} className="inline-flex items-center gap-2">
+          <Button variant="secondary" onClick={clearFilter} className="inline-flex items-center gap-2">
             <X className="h-4 w-4" />
             Clear Filter
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
+          </Button>
+          <Button variant="secondary" onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
             Submit
-          </ActionButton>
-          <ActionButton onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
+          </Button>
+          <Button onClick={handleExport} disabled={exporting} className="inline-flex items-center gap-2">
             <Download className="h-4 w-4" />
             {exporting ? "Exporting..." : "Export to CSV"}
-          </ActionButton>
+          </Button>
         </div>
         </CardContent>
       </Card>
 
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
     </div>
   )
 }

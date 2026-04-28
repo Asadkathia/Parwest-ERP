@@ -4,16 +4,15 @@
  * Action buttons + modals for the Payroll state machine.
  *
  * Modal pattern reused from `src/components/payroll/PayrollOtherDeductionsManager.tsx`
- * (`fixed inset-0 z-50 ... ui-card max-w-* p-6`). Buttons are `ActionButton`
- * from `src/components/ui/action-button.tsx`. Errors come from the API
+ * (`fixed inset-0 z-50 ... ui-card max-w-* p-6`). Buttons are shadcn `Button`
+ * from `src/components/shadcn/button.tsx`. Errors come from the API
  * envelope's `data.message`.
  */
 
 import { useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Loader2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
 import { Button } from "@/components/shadcn/button"
 import {
   AlertDialog,
@@ -124,7 +123,7 @@ export default function PayrollStateActions({
         >
           <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
             <AlertDialogTrigger asChild>
-              <ActionButton>Lock Region</ActionButton>
+              <Button>Lock Region</Button>
             </AlertDialogTrigger>
           </PermissionGate>
           {open === "lock-region" && (
@@ -140,9 +139,9 @@ export default function PayrollStateActions({
         </AlertDialog>
       )}
       {canUnlockRegion && (
-        <ActionButton variant="secondary" onClick={() => setOpen("unlock-region")}>
+        <Button variant="secondary" onClick={() => setOpen("unlock-region")}>
           Unlock Region
-        </ActionButton>
+        </Button>
       )}
       {canGlobalFinalize && scope && (
         <AlertDialog
@@ -151,7 +150,7 @@ export default function PayrollStateActions({
         >
           <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
             <AlertDialogTrigger asChild>
-              <ActionButton>Globally Finalize</ActionButton>
+              <Button>Globally Finalize</Button>
             </AlertDialogTrigger>
           </PermissionGate>
           {open === "global-finalize" && (
@@ -167,22 +166,22 @@ export default function PayrollStateActions({
         </AlertDialog>
       )}
       {canGlobalUnfinalize && (
-        <ActionButton variant="secondary" onClick={() => setOpen("global-unfinalize")}>
+        <Button variant="secondary" onClick={() => setOpen("global-unfinalize")}>
           Unfreeze Global
-        </ActionButton>
+        </Button>
       )}
       {canMarkPaid && (
-        <ActionButton onClick={() => setOpen("mark-paid")}>Mark Paid</ActionButton>
+        <Button onClick={() => setOpen("mark-paid")}>Mark Paid</Button>
       )}
       {canHold && (
-        <ActionButton variant="secondary" onClick={() => setOpen("hold")}>
+        <Button variant="secondary" onClick={() => setOpen("hold")}>
           Place Hold
-        </ActionButton>
+        </Button>
       )}
       {canReleaseHold && (
-        <ActionButton onClick={() => setOpen("release-hold")}>
+        <Button onClick={() => setOpen("release-hold")}>
           Release Hold
-        </ActionButton>
+        </Button>
       )}
       {canEmergencyRelease && payrollId && (
         <AlertDialog
@@ -191,7 +190,7 @@ export default function PayrollStateActions({
         >
           <PermissionGate module="PAYROLL" action="UPDATE" mode="disable">
             <AlertDialogTrigger asChild>
-              <ActionButton variant="danger">Emergency Release</ActionButton>
+              <Button variant="destructive">Emergency Release</Button>
             </AlertDialogTrigger>
           </PermissionGate>
           {open === "emergency" && (
@@ -326,7 +325,7 @@ function HoldModal({
 
   return (
     <ModalShell title="Place Hold" onClose={onClose}>
-      {error && <InlineAlert type="error" message={error} />}
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
       <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
         Reason (required, min 5 chars)
       </label>
@@ -337,12 +336,12 @@ function HoldModal({
         placeholder="Why is this payroll being held?"
       />
       <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
-        </ActionButton>
-        <ActionButton onClick={submit} disabled={busy}>
+        </Button>
+        <Button onClick={submit} disabled={busy}>
           {busy ? "Placing…" : "Place Hold"}
-        </ActionButton>
+        </Button>
       </div>
     </ModalShell>
   )
@@ -378,7 +377,7 @@ function ReleaseHoldModal({
 
   return (
     <ModalShell title="Release Hold" onClose={onClose}>
-      {error && <InlineAlert type="error" message={error} />}
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
       <p className="text-sm text-[var(--text-muted)]">
         Returns the payroll to its previous resting state.
       </p>
@@ -391,12 +390,12 @@ function ReleaseHoldModal({
         onChange={(e) => setReason(e.target.value)}
       />
       <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
-        </ActionButton>
-        <ActionButton onClick={submit} disabled={busy}>
+        </Button>
+        <Button onClick={submit} disabled={busy}>
           {busy ? "Releasing…" : "Release"}
-        </ActionButton>
+        </Button>
       </div>
     </ModalShell>
   )
@@ -505,7 +504,7 @@ function MarkPaidModal({
 
   return (
     <ModalShell title="Mark Paid" onClose={onClose}>
-      {error && <InlineAlert type="error" message={error} />}
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
       <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
         Payment Method *
       </label>
@@ -530,12 +529,12 @@ function MarkPaidModal({
         onChange={(e) => setPaymentRemarks(e.target.value)}
       />
       <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
-        </ActionButton>
-        <ActionButton onClick={submit} disabled={busy}>
+        </Button>
+        <Button onClick={submit} disabled={busy}>
           {busy ? "Saving…" : "Confirm"}
-        </ActionButton>
+        </Button>
       </div>
     </ModalShell>
   )
@@ -652,11 +651,8 @@ function UnlockRegionModal({
 
   return (
     <ModalShell title="Unlock Region" onClose={onClose}>
-      <InlineAlert
-        type="error"
-        message="ACCRUED reserve ledger entries created during the lock will be reversed (deleted)."
-      />
-      {error && <InlineAlert type="error" message={error} />}
+      <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{"ACCRUED reserve ledger entries created during the lock will be reversed (deleted)."}</AlertDescription></Alert>
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
       <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
         Reason (optional, recommended)
       </label>
@@ -666,12 +662,12 @@ function UnlockRegionModal({
         onChange={(e) => setReason(e.target.value)}
       />
       <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
-        </ActionButton>
-        <ActionButton variant="danger" onClick={submit} disabled={busy}>
+        </Button>
+        <Button variant="destructive" onClick={submit} disabled={busy}>
           {busy ? "Unlocking…" : "Confirm Unlock"}
-        </ActionButton>
+        </Button>
       </div>
     </ModalShell>
   )
@@ -769,11 +765,8 @@ function GlobalUnfinalizeModal({
 
   return (
     <ModalShell title="Unfreeze Global Finalization" onClose={onClose}>
-      <InlineAlert
-        type="error"
-        message="This reverts GLOBAL_FINALIZED payrolls back to REGIONAL_LOCKED."
-      />
-      {error && <InlineAlert type="error" message={error} />}
+      <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{"This reverts GLOBAL_FINALIZED payrolls back to REGIONAL_LOCKED."}</AlertDescription></Alert>
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
       <label className="block text-xs uppercase tracking-wide text-[var(--text-muted)] mb-1">
         Reason (required)
       </label>
@@ -783,12 +776,12 @@ function GlobalUnfinalizeModal({
         onChange={(e) => setReason(e.target.value)}
       />
       <div className="flex justify-end gap-2 pt-2">
-        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
-        </ActionButton>
-        <ActionButton variant="danger" onClick={submit} disabled={busy}>
+        </Button>
+        <Button variant="destructive" onClick={submit} disabled={busy}>
           {busy ? "Reverting…" : "Confirm Unfreeze"}
-        </ActionButton>
+        </Button>
       </div>
     </ModalShell>
   )

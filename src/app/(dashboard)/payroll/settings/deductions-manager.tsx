@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-
+import { Button } from "@/components/shadcn/button"
 type DeductionType = {
   id: string
   code: string
@@ -182,7 +181,7 @@ export default function DeductionsManager({
           </p>
         </div>
         {canCreate && (
-          <ActionButton onClick={openCreate}>+ Add Deduction</ActionButton>
+          <Button onClick={openCreate}>+ Add Deduction</Button>
         )}
       </div>
 
@@ -376,16 +375,13 @@ export default function DeductionsManager({
 
             <div className="flex items-center justify-end gap-2 pt-2">
               {result && <span className="text-sm mr-2">{result}</span>}
-              <ActionButton variant="secondary" onClick={() => setFormOpen(false)}>
+              <Button variant="secondary" onClick={() => setFormOpen(false)}>
                 Cancel
-              </ActionButton>
+              </Button>
               {(editingId ? canUpdate : canCreate) && (
-                <ActionButton
-                  onClick={submit}
-                  disabled={saving || !form.name.trim() || (!editingId && !form.code.trim())}
-                >
+                <Button onClick={submit} disabled={saving || !form.name.trim() || (!editingId && !form.code.trim())}>
                   {saving ? "Saving…" : "Save"}
-                </ActionButton>
+                </Button>
               )}
             </div>
           </div>

@@ -1,11 +1,11 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import SectionTitle from "@/components/ui/section-title"
-import FilterBar from "@/components/ui/filter-bar"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import { Card, CardContent } from "@/components/shadcn/card"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
 import { apiGet, apiSend } from "@/components/store-inventory-v2/api"
 import { parseDemandResponseMeta, totalReceivedForMeta, type DemandResponseMeta } from "@/lib/inventory/demand-response-meta"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
@@ -133,12 +133,12 @@ function workflowStatus(row: Demand): string {
 
 function badgeClass(status: string): string {
   const normalized = status.toUpperCase()
-  if (normalized === "COMPLETED") return "bg-emerald-100 text-emerald-700"
-  if (normalized === "IN TRANSIT" || normalized === "IN_TRANSIT") return "bg-sky-100 text-sky-700"
-  if (normalized === "CHECKED OUT" || normalized === "CHECKED_OUT") return "bg-blue-100 text-blue-700"
-  if (normalized === "PENDING") return "bg-amber-100 text-amber-700"
-  if (normalized === "REJECTED") return "bg-rose-100 text-rose-700"
-  return "bg-slate-100 text-slate-700"
+  if (normalized === "COMPLETED") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+  if (normalized === "IN TRANSIT" || normalized === "IN_TRANSIT") return "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+  if (normalized === "CHECKED OUT" || normalized === "CHECKED_OUT") return "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+  if (normalized === "PENDING") return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+  if (normalized === "REJECTED") return "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
 }
 
 export default function DemandsManager({
@@ -543,18 +543,14 @@ export default function DemandsManager({
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title={responseMode ? "Demands Response" : "Demands Send"}
-        subtitle={
-          responseMode
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{(responseMode ? "Demands Response" : "Demands Send")}</h2><p className="mt-1 text-sm text-muted-foreground">{(responseMode
             ? "Respond to store requests, allocate stock, add transport, and confirm receive."
-            : "Create store demand requests toward warehouse and track lifecycle."
-        }
-      />
-      {notice ? <InlineAlert type={notice.type} message={notice.message} /> : null}
+            : "Create store demand requests toward warehouse and track lifecycle.")}</p></div></div>
+      {notice ? ((notice.type) === "success" ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert> : <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{(notice.message)}</AlertDescription></Alert>) : null}
 
       {!responseMode ? (
-        <FilterBar className="space-y-6">
+        <Card>
+        <CardContent className="space-y-6 p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Select
               label="From Store *"
@@ -589,14 +585,14 @@ export default function DemandsManager({
               </select>
             </div>
             <div className="md:col-span-2">
-              <ActionButton variant="secondary" onClick={addLine}>+ Add Product</ActionButton>
+              <Button variant="secondary" onClick={addLine}>+ Add Product</Button>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                <tr className="border-b border-[var(--border)] text-start text-[var(--text-muted)]">
                   <th className="p-2">Product Name</th>
                   <th className="p-2">Product Code</th>
                   <th className="p-2">Variant</th>
@@ -654,23 +650,23 @@ export default function DemandsManager({
           </div>
 
           <div className="flex gap-2">
-            <ActionButton onClick={() => void submitDemand()} disabled={saving}>{saving ? "Saving..." : "Create Demand"}</ActionButton>
-            <ActionButton
-              variant="secondary"
-              onClick={() => {
+            <Button onClick={() => void submitDemand()} disabled={saving}>{saving ? "Saving..." : "Create Demand"}</Button>
+            <Button 
+              variant="secondary" onClick={() => {
                 setForm(INITIAL_FORM)
                 setNewLineProductId("")
-              }}
-            >
+              }}>
               Reset
-            </ActionButton>
+            </Button>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
 
       {responseMode && allocateDraft ? (
-        <FilterBar className="space-y-4">
-          <SectionTitle title="Allocate Demand" subtitle="Allocate new/reusable quantities from warehouse inventory." />
+        <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Allocate Demand"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Allocate new/reusable quantities from warehouse inventory."}</p></div></div>
           <div>
             <label className="mb-1 block text-sm text-[var(--text-muted)]">Response Remarks</label>
             <input
@@ -683,7 +679,7 @@ export default function DemandsManager({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                <tr className="border-b border-[var(--border)] text-start text-[var(--text-muted)]">
                   <th className="p-2">Product</th>
                   <th className="p-2">Requested</th>
                   <th className="p-2">To Avail Qty</th>
@@ -753,15 +749,17 @@ export default function DemandsManager({
           </div>
 
           <div className="flex gap-2">
-            <ActionButton onClick={() => void submitAllocate()} disabled={saving}>{saving ? "Saving..." : "Add Response"}</ActionButton>
-            <ActionButton variant="secondary" onClick={() => setAllocateDraft(null)}>Close</ActionButton>
+            <Button onClick={() => void submitAllocate()} disabled={saving}>{saving ? "Saving..." : "Add Response"}</Button>
+            <Button variant="secondary" onClick={() => setAllocateDraft(null)}>Close</Button>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
 
       {responseMode && transportDraft ? (
-        <FilterBar className="space-y-4">
-          <SectionTitle title="Transportation" subtitle="Add transport details after checkout/allocation." />
+        <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Transportation"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Add transport details after checkout/allocation."}</p></div></div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-[var(--text-muted)]">Transportation Type</label>
@@ -792,19 +790,21 @@ export default function DemandsManager({
           </div>
 
           <div className="flex gap-2">
-            <ActionButton onClick={() => void submitTransport()} disabled={saving}>{saving ? "Saving..." : "Submit"}</ActionButton>
-            <ActionButton variant="secondary" onClick={() => setTransportDraft(null)}>Close</ActionButton>
+            <Button onClick={() => void submitTransport()} disabled={saving}>{saving ? "Saving..." : "Submit"}</Button>
+            <Button variant="secondary" onClick={() => setTransportDraft(null)}>Close</Button>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
 
       {receiveDraft ? (
-        <FilterBar className="space-y-4">
-          <SectionTitle title="Receive Demand" subtitle="Confirm received new/reusable quantities at requesting store." />
+        <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Receive Demand"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Confirm received new/reusable quantities at requesting store."}</p></div></div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                <tr className="border-b border-[var(--border)] text-start text-[var(--text-muted)]">
                   <th className="p-2">Product</th>
                   <th className="p-2">Requested Qty</th>
                   <th className="p-2">Fulfilled New Qty</th>
@@ -883,13 +883,15 @@ export default function DemandsManager({
           </div>
 
           <div className="flex gap-2">
-            <ActionButton onClick={() => void submitReceive()} disabled={saving}>{saving ? "Saving..." : "Confirm Receive"}</ActionButton>
-            <ActionButton variant="secondary" onClick={() => setReceiveDraft(null)}>Close</ActionButton>
+            <Button onClick={() => void submitReceive()} disabled={saving}>{saving ? "Saving..." : "Confirm Receive"}</Button>
+            <Button variant="secondary" onClick={() => setReceiveDraft(null)}>Close</Button>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
 
-      <FilterBar>
+      <Card>
+        <CardContent className="p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Suspense>
             <RegionUrlPicker regions={regions} locked={locked} includeGlobalOption={false} />
@@ -899,7 +901,8 @@ export default function DemandsManager({
             <input className="ui-input" placeholder="Search by status/store/request" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-      </FilterBar>
+      </CardContent>
+      </Card>
 
       <DataTable
         rows={visible}
@@ -1028,8 +1031,9 @@ export default function DemandsManager({
       />
 
       {detailsDemand ? (
-        <FilterBar className="space-y-4">
-          <SectionTitle title="Demand Details" subtitle={`Request ${detailsDemand.requestNo || detailsDemand.id.slice(0, 8)}`} />
+        <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Demand Details"}</h2><p className="mt-1 text-sm text-muted-foreground">{(`Request ${detailsDemand.requestNo || detailsDemand.id.slice(0, 8)}`)}</p></div></div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 text-sm">
             <ReadOnly label="From Store" value={detailsDemand.fromStore?.name || "—"} />
             <ReadOnly label="To Warehouse" value={detailsDemand.toStore?.name || "—"} />
@@ -1044,7 +1048,7 @@ export default function DemandsManager({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                <tr className="border-b border-[var(--border)] text-start text-[var(--text-muted)]">
                   <th className="p-2">Product</th>
                   <th className="p-2">Required Qty</th>
                   <th className="p-2">Allocated Qty</th>
@@ -1061,7 +1065,8 @@ export default function DemandsManager({
               </tbody>
             </table>
           </div>
-        </FilterBar>
+        </CardContent>
+      </Card>
       ) : null}
     </div>
   )

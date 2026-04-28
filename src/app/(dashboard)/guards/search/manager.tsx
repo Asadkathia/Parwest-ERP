@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Badge } from "@/components/shadcn/badge"
 import Link from "next/link"
 import { AlertCircle, Download, Loader2, Search, X } from "lucide-react"
 import DataTable from "@/components/shared/DataTable"
-import ActionButton from "@/components/ui/action-button"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
-import StatusChip from "@/components/ui/status-chip"
 import GuardAvatar from "@/components/guards/GuardAvatar"
 import SearchSelect from "@/components/ui/SearchSelect"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
@@ -97,14 +97,14 @@ const defaultFilters: Filters = {
 
 const lc = (v?: string | null) => String(v ?? "").toLowerCase()
 
-const STATUS_COLORS: Record<string, "success" | "warning" | "neutral" | "danger"> = {
-    ACTIVE:     "success",
-    PRESENT:    "success",
-    PENDING:    "warning",
-    DEFAULT:    "neutral",
-    ABSENT:     "warning",
-    INACTIVE:   "neutral",
-    TERMINATED: "danger",
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+    ACTIVE:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent",
+    PRESENT:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent",
+    PENDING:    "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-transparent",
+    DEFAULT:    "bg-secondary text-secondary-foreground border-transparent",
+    ABSENT:     "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-transparent",
+    INACTIVE:   "bg-secondary text-secondary-foreground border-transparent",
+    TERMINATED: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-transparent",
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -322,26 +322,26 @@ export default function SearchGuardsManager({
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                    <ActionButton onClick={loadGuards} disabled={loading} className="inline-flex items-center gap-2">
+                    <Button onClick={loadGuards} disabled={loading} className="inline-flex items-center gap-2">
                         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                         {loading ? "Searching..." : "SEARCH!"}
-                    </ActionButton>
-                    <ActionButton variant="secondary" onClick={resetFilters} className="inline-flex items-center gap-2">
+                    </Button>
+                    <Button variant="secondary" onClick={resetFilters} className="inline-flex items-center gap-2">
                         <X className="h-4 w-4" />
                         Clear Filter
-                    </ActionButton>
-                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                    </Button>
+                    <Button variant="secondary" className="inline-flex items-center gap-2">
                         <Download className="h-4 w-4" />
                         Export Short Role In Excel
-                    </ActionButton>
-                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                    </Button>
+                    <Button variant="secondary" className="inline-flex items-center gap-2">
                         <Download className="h-4 w-4" />
                         Export In Bank Details
-                    </ActionButton>
-                    <ActionButton variant="secondary" className="inline-flex items-center gap-2">
+                    </Button>
+                    <Button variant="secondary" className="inline-flex items-center gap-2">
                         <Download className="h-4 w-4" />
                         Export In Excel
-                    </ActionButton>
+                    </Button>
                 </div>
             </div>
 
@@ -403,10 +403,7 @@ export default function SearchGuardsManager({
                             header: "Status",
                             className: "w-24",
                             render: (g) => (
-                                <StatusChip
-                                    label={g.status}
-                                    variant={STATUS_COLORS[g.status] ?? "neutral"}
-                                />
+                                <Badge className={`font-bold ${STATUS_BADGE_CLASSES[g.status] || STATUS_BADGE_CLASSES.DEFAULT}`}>{g.status}</Badge>
                             ),
                         },
                         {

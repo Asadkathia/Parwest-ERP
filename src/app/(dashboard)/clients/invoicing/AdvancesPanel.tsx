@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
+import { Button } from "@/components/shadcn/button"
 import type { AdvanceRow } from "./types"
 
 type Props = {
@@ -66,9 +66,9 @@ export default function AdvancesPanel({ clientId, branches, setError, setNotice 
     <section className="ui-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">Client advance payments</h3>
-        <ActionButton variant="secondary" onClick={() => setOpen((o) => !o)}>
+        <Button variant="secondary" onClick={() => setOpen((o) => !o)}>
           {open ? "Cancel" : "Record advance"}
-        </ActionButton>
+        </Button>
       </div>
 
       {open ? (
@@ -99,7 +99,7 @@ export default function AdvancesPanel({ clientId, branches, setError, setNotice 
             </Field>
           </div>
           <div className="flex justify-end">
-            <ActionButton onClick={submit}>Save advance</ActionButton>
+            <Button onClick={submit}>Save advance</Button>
           </div>
         </div>
       ) : null}

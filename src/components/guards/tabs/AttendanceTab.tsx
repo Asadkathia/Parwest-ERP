@@ -10,12 +10,12 @@ import type { AttendanceRecord, AttendanceSummary, DeploymentAuditRecord } from 
 
 // ── attendance type config ────────────────────────────────────────────────────
 const ATTENDANCE_TYPES: Record<string, { label: string; color: string; dot: string; bg: string; text: string }> = {
-  PRESENT:           { label: "Present",            color: "var(--chart-2)", dot: "bg-green-500",   bg: "bg-green-100",  text: "text-green-800" },
-  DOUBLE_DUTY_DAY:   { label: "Double Duty (Day)",   color: "var(--chart-1)", dot: "bg-blue-500",    bg: "bg-blue-100",   text: "text-blue-800" },
-  DOUBLE_DUTY_NIGHT: { label: "Double Duty (Night)", color: "var(--chart-5)", dot: "bg-indigo-500",  bg: "bg-indigo-100", text: "text-indigo-800" },
-  EXTRA_DUTY:        { label: "Extra Duty",          color: "var(--chart-3)", dot: "bg-amber-500",   bg: "bg-amber-100",  text: "text-amber-800" },
-  ABSENT:            { label: "Absent",              color: "var(--chart-4)", dot: "bg-red-500",     bg: "bg-red-100",    text: "text-red-800" },
-  LEAVE:             { label: "Leave",               color: "var(--viz-7)",   dot: "bg-purple-500",  bg: "bg-purple-100", text: "text-purple-800" },
+  PRESENT:           { label: "Present",            color: "var(--chart-2)", dot: "bg-green-500",   bg: "bg-green-100 dark:bg-green-950/40",   text: "text-green-800 dark:text-green-300" },
+  DOUBLE_DUTY_DAY:   { label: "Double Duty (Day)",   color: "var(--chart-1)", dot: "bg-blue-500",    bg: "bg-blue-100 dark:bg-blue-950/40",    text: "text-blue-800 dark:text-blue-300" },
+  DOUBLE_DUTY_NIGHT: { label: "Double Duty (Night)", color: "var(--chart-5)", dot: "bg-indigo-500",  bg: "bg-indigo-100 dark:bg-indigo-950/40", text: "text-indigo-800 dark:text-indigo-300" },
+  EXTRA_DUTY:        { label: "Extra Duty",          color: "var(--chart-3)", dot: "bg-amber-500",   bg: "bg-amber-100 dark:bg-amber-950/40",  text: "text-amber-800 dark:text-amber-300" },
+  ABSENT:            { label: "Absent",              color: "var(--chart-4)", dot: "bg-red-500",     bg: "bg-red-100 dark:bg-red-950/40",    text: "text-red-800 dark:text-red-300" },
+  LEAVE:             { label: "Leave",               color: "var(--viz-7)",   dot: "bg-purple-500",  bg: "bg-purple-100 dark:bg-purple-950/40", text: "text-purple-800 dark:text-purple-300" },
 }
 
 function getTypeConfig(record: AttendanceRecord) {
@@ -68,11 +68,11 @@ function AttendanceCalendar({ attendance }: { attendance: AttendanceRecord[] }) 
     <div className="ui-card p-5 select-none">
       <div className="flex items-center justify-between mb-4">
         <button onClick={prev} className="p-1.5 rounded-lg hover:bg-[var(--surface-muted)] transition-colors">
-          <ChevronLeft className="h-4 w-4 text-[var(--text-muted)]" />
+          <ChevronLeft className="h-4 w-4 text-[var(--text-muted)] rtl:rotate-180" />
         </button>
         <h3 className="text-sm font-semibold text-[var(--text)]">{MONTHS[month]} {year}</h3>
         <button onClick={next} className="p-1.5 rounded-lg hover:bg-[var(--surface-muted)] transition-colors">
-          <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
+          <ChevronRight className="h-4 w-4 text-[var(--text-muted)] rtl:rotate-180" />
         </button>
       </div>
 
@@ -102,7 +102,7 @@ function AttendanceCalendar({ attendance }: { attendance: AttendanceRecord[] }) 
                 ? <span className={`w-2 h-2 rounded-full ${cfg.dot}`} title={cfg.label} />
                 : <span className="w-2 h-2 rounded-full bg-transparent" />}
               {isToday && (
-                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--brand)]" />
+                <span className="absolute bottom-0.5 start-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--brand)]" />
               )}
             </div>
           )
@@ -115,9 +115,9 @@ function AttendanceCalendar({ attendance }: { attendance: AttendanceRecord[] }) 
           <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${cfg.bg} ${cfg.text} border border-current/10`}>
             <span className="font-semibold">{new Date(hovered.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
             {" · "}<span>{cfg.label}</span>
-            {hovered.clientName && <span className="ml-1 opacity-70">@ {hovered.clientName}</span>}
-            {hovered.shift && <span className="ml-1 opacity-70">({hovered.shift})</span>}
-            {hovered.hours && <span className="ml-1 opacity-70">· {hovered.hours}h</span>}
+            {hovered.clientName && <span className="ms-1 opacity-70">@ {hovered.clientName}</span>}
+            {hovered.shift && <span className="ms-1 opacity-70">({hovered.shift})</span>}
+            {hovered.hours && <span className="ms-1 opacity-70">· {hovered.hours}h</span>}
           </div>
         )
       })()}
@@ -154,21 +154,21 @@ function ActiveDeploymentBanner({ dep }: { dep: DeploymentAuditRecord }) {
   const today = new Date()
   const duration = daysBetween(dep.deploymentDate, today)
   return (
-    <div className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 p-4">
+    <div className="rounded-[var(--radius-md)] border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 p-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center">
-            <Shield className="h-4 w-4 text-emerald-600" />
+          <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+            <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Currently Deployed</p>
-            <p className="text-sm font-bold text-emerald-900">{dep.client.name}</p>
+            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">Currently Deployed</p>
+            <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">{dep.client.name}</p>
           </div>
         </div>
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
           dep.shiftType === "DAY"
-            ? "bg-amber-50 text-amber-700 border-amber-200"
-            : "bg-indigo-50 text-indigo-700 border-indigo-200"
+            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50"
+            : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/50"
         }`}>
           <Clock className="h-3 w-3" />
           {dep.shiftType}
@@ -180,8 +180,8 @@ function ActiveDeploymentBanner({ dep }: { dep: DeploymentAuditRecord }) {
           <div className="flex items-start gap-1.5">
             <MapPin className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
             <div>
-              <p className="text-[10px] text-emerald-600">Branch</p>
-              <p className="font-medium text-emerald-900 text-xs">
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Branch</p>
+              <p className="font-medium text-emerald-900 dark:text-emerald-100 text-xs">
                 {dep.branch.name}{dep.branch.city ? `, ${dep.branch.city}` : ""}
               </p>
             </div>
@@ -190,25 +190,25 @@ function ActiveDeploymentBanner({ dep }: { dep: DeploymentAuditRecord }) {
         <div className="flex items-start gap-1.5">
           <User className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
           <div>
-            <p className="text-[10px] text-emerald-600">Designation</p>
-            <p className="font-medium text-emerald-900 text-xs">{dep.designation}</p>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Designation</p>
+            <p className="font-medium text-emerald-900 dark:text-emerald-100 text-xs">{dep.designation}</p>
           </div>
         </div>
         <div className="flex items-start gap-1.5">
           <Calendar className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
           <div>
-            <p className="text-[10px] text-emerald-600">Since</p>
-            <p className="font-medium text-emerald-900 text-xs">{fmtDate(dep.deploymentDate)}</p>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Since</p>
+            <p className="font-medium text-emerald-900 dark:text-emerald-100 text-xs">{fmtDate(dep.deploymentDate)}</p>
           </div>
         </div>
         <div>
-          <p className="text-[10px] text-emerald-600">Duration</p>
-          <p className="font-medium text-emerald-900 text-xs">{duration} day{duration !== 1 ? "s" : ""}</p>
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Duration</p>
+          <p className="font-medium text-emerald-900 dark:text-emerald-100 text-xs">{duration} day{duration !== 1 ? "s" : ""}</p>
         </div>
       </div>
 
       {dep.deployedByName && (
-        <p className="mt-2 text-[11px] text-emerald-600">
+        <p className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
           Deployed by <strong>{dep.deployedByName}</strong> · {fmtDate(dep.deploymentDate)}
         </p>
       )}
@@ -229,7 +229,7 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
   return (
     <div className="relative">
       {/* Timeline line */}
-      <div className="absolute left-4 top-0 bottom-0 w-px bg-[var(--border)]" />
+      <div className="absolute start-4 top-0 bottom-0 w-px bg-[var(--border)]" />
 
       <div className="space-y-0">
         {sorted.map((dep, idx) => {
@@ -245,15 +245,15 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
             : null
 
           return (
-            <div key={dep.id} className="relative pl-10 pb-6">
+            <div key={dep.id} className="relative ps-10 pb-6">
               {/* Timeline dot */}
-              <div className={`absolute left-2.5 top-1.5 h-3 w-3 rounded-full border-2 border-white ${
-                isActive ? "bg-emerald-500" : wasChanged ? "bg-blue-400" : "bg-gray-400"
+              <div className={`absolute start-2.5 top-1.5 h-3 w-3 rounded-full border-2 border-card ${
+                isActive ? "bg-emerald-500" : wasChanged ? "bg-blue-400" : "bg-muted-foreground"
               }`} />
 
               <div className={`rounded-[var(--radius-md)] border p-4 ${
                 isActive
-                  ? "border-emerald-200 bg-emerald-50/40"
+                  ? "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20"
                   : "border-[var(--border)] bg-[var(--surface-muted)]/50"
               }`}>
                 {/* Header row */}
@@ -261,15 +261,15 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       isActive
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "bg-muted text-muted-foreground"
                     }`}>
                       {isActive ? "● ACTIVE" : wasChanged ? "↔ CHANGED" : "◉ ENDED"}
                     </span>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
                       dep.shiftType === "DAY"
-                        ? "bg-amber-50 text-amber-700 border-amber-200"
-                        : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                        ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50"
+                        : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/50"
                     }`}>
                       <Clock className="h-3 w-3" />
                       {dep.shiftType}
@@ -294,7 +294,7 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
                     <p className="font-semibold text-sm text-[var(--text)]">{dep.client.name}</p>
                     {dep.branch && (
                       <p className="text-xs text-[var(--text-muted)]">
-                        <MapPin className="h-3 w-3 inline mr-0.5" />
+                        <MapPin className="h-3 w-3 inline me-0.5" />
                         {dep.branch.name}{dep.branch.city ? `, ${dep.branch.city}` : ""}
                       </p>
                     )}
@@ -324,7 +324,7 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
                   {dep.deployedByName && (
                     <span className="flex items-center gap-1">
                       <Shield className="h-3 w-3 text-emerald-500" />
-                      Deployed by <strong className="text-[var(--text)] ml-0.5">{dep.deployedByName}</strong>
+                      Deployed by <strong className="text-[var(--text)] ms-0.5">{dep.deployedByName}</strong>
                     </span>
                   )}
                   {!isActive && dep.revokedByName && (
@@ -332,7 +332,7 @@ function DeploymentAuditLog({ deployments }: { deployments: DeploymentAuditRecor
                       {wasChanged
                         ? <RefreshCw className="h-3 w-3 text-blue-400" />
                         : <ArrowRight className="h-3 w-3 text-red-400" />}
-                      {wasChanged ? "Changed" : "Revoked"} by <strong className="text-[var(--text)] ml-0.5">{dep.revokedByName}</strong>
+                      {wasChanged ? "Changed" : "Revoked"} by <strong className="text-[var(--text)] ms-0.5">{dep.revokedByName}</strong>
                     </span>
                   )}
                   {!isActive && endReasonDisplay && (
@@ -404,7 +404,7 @@ export default function AttendanceTab({ attendance, attendanceSummary, deploymen
               Attendance
             </button>
             <button onClick={() => setSection("audit")}
-              className={`px-3 py-1.5 font-medium border-l border-[var(--border)] transition-colors ${section === "audit" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}>
+              className={`px-3 py-1.5 font-medium border-s border-[var(--border)] transition-colors ${section === "audit" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}>
               Deployment Log
             </button>
           </div>
@@ -415,7 +415,7 @@ export default function AttendanceTab({ attendance, attendanceSummary, deploymen
                 Calendar
               </button>
               <button onClick={() => setView("table")}
-                className={`px-3 py-1.5 font-medium border-l border-[var(--border)] transition-colors ${view === "table" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}>
+                className={`px-3 py-1.5 font-medium border-s border-[var(--border)] transition-colors ${view === "table" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"}`}>
                 Table
               </button>
             </div>
@@ -431,7 +431,7 @@ export default function AttendanceTab({ attendance, attendanceSummary, deploymen
         </div>
       )}
       {generated !== null && generated > 0 && (
-        <div className="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 flex items-center gap-2">
+        <div className="rounded-[var(--radius-md)] border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
           <CheckCircle className="h-3.5 w-3.5" />
           {generated} attendance record{generated !== 1 ? "s" : ""} auto-generated from active deployment.
           Refresh to see updated records.
@@ -480,7 +480,7 @@ export default function AttendanceTab({ attendance, attendanceSummary, deploymen
                     <thead className="bg-[var(--surface-muted)]">
                       <tr>
                         {["Date","Status","Client","Shift","Hours","Overtime","Remarks"].map(h => (
-                          <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
+                          <th key={h} className="px-4 py-2.5 text-start text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
                     </thead>

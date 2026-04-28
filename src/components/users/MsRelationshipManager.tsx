@@ -1,12 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/shadcn/button"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
-import ActionButton from "@/components/ui/action-button"
 import DataTable from "@/components/shared/DataTable"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Pencil, X, Check } from "lucide-react"
+import { Pencil, X, Check, CheckCircle2, AlertCircle } from "lucide-react"
 
 type Role = { id: string; name: string }
 type User = { id: string; name: string; roleId?: string | null; role?: { id: string; name: string } | null }
@@ -56,7 +55,7 @@ function SearchableSelect({
       <label className="mb-1 block text-sm text-[var(--text-muted)]">{label}</label>
       <div className="relative">
         <input
-          className="ui-input pr-8"
+          className="ui-input pe-8"
           placeholder={placeholder}
           value={open ? query : (selected?.label ?? "")}
           onFocus={() => { setQuery(""); setOpen(true) }}
@@ -66,7 +65,7 @@ function SearchableSelect({
         {value && !open && (
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-500"
+            className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-500"
             onClick={() => { onChange(""); setQuery("") }}
             tabIndex={-1}
           >
@@ -74,7 +73,7 @@ function SearchableSelect({
           </button>
         )}
         {open && (
-          <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-56 overflow-y-auto">
+          <div className="absolute z-50 mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-card shadow-lg max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-sm text-[var(--text-muted)]">No results</p>
             ) : (
@@ -82,7 +81,7 @@ function SearchableSelect({
                 <button
                   key={opt.value}
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)]"
+                  className="w-full px-3 py-2 text-start text-sm hover:bg-[var(--surface-muted)]"
                   onMouseDown={() => { onChange(opt.value); setOpen(false); setQuery("") }}
                 >
                   {opt.label}
@@ -271,9 +270,9 @@ export default function MsRelationshipManager() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="M/S Relationship" subtitle="Assign managers to supervisors." />
-      {notice ? <InlineAlert type="success" message={notice} /> : null}
-      {error ? <InlineAlert type="error" message={error} /> : null}
+      <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"M/S Relationship"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Assign managers to supervisors."}</p></div></div>
+      {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
 
       {/* Assign form */}
       <div className="ui-card p-5 space-y-4">
@@ -287,8 +286,8 @@ export default function MsRelationshipManager() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton onClick={assign} disabled={saving}>{saving ? "Assigning..." : "Assign"}</ActionButton>
-          <ActionButton variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</ActionButton>
+          <Button onClick={assign} disabled={saving}>{saving ? "Assigning..." : "Assign"}</Button>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</Button>
         </div>
       </div>
 

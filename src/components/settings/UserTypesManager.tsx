@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState, useCallback } from "react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useSession } from "next-auth/react"
-import SectionTitle from "@/components/ui/section-title"
 import { Button } from "@/components/shadcn/button"
-import InlineAlert from "@/components/ui/inline-alert"
-import { Plus, Users, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
+import { Plus, Users, ChevronDown, ChevronUp, Trash2, CheckCircle2, AlertCircle } from "lucide-react"
 
 type RoleRow = { id: string; name: string; description?: string | null }
 type RegionOption = { id: string; name: string }
@@ -158,10 +157,7 @@ export default function UserTypesManager() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <SectionTitle
-          title="Settings: User Types"
-          subtitle="Create and manage supervisor and manager accounts with region and office assignment."
-        />
+        <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Settings: User Types"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Create and manage supervisor and manager accounts with region and office assignment."}</p></div></div>
         {isAdmin && (
           <Button onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />
@@ -170,8 +166,8 @@ export default function UserTypesManager() {
         )}
       </div>
 
-      {notice && <InlineAlert type="success" message={notice} />}
-      {error && <InlineAlert type="error" message={error} />}
+      {notice && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert>}
+      {error && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
       {/* ── Create User Form (Admin only) ── */}
       {showForm && isAdmin && (
@@ -288,7 +284,7 @@ export default function UserTypesManager() {
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
                 {["#", "Name", "Email", "Role", "Region", "Regional Office", "Status"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
+                  <th key={h} className="px-4 py-2.5 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -305,7 +301,7 @@ export default function UserTypesManager() {
                   <td className="px-4 py-3">
                     {u.role ? (
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        isSupervisorRole(u.role.name) ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-700"
+                        isSupervisorRole(u.role.name) ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300" : "bg-muted text-foreground"
                       }`}>{u.role.name}</span>
                     ) : "—"}
                   </td>
@@ -313,7 +309,7 @@ export default function UserTypesManager() {
                   <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{u.regionalOffice?.name || "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      u.status === "ACTIVE" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+                      u.status === "ACTIVE" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300" : "bg-muted text-muted-foreground"
                     }`}>{u.status}</span>
                   </td>
                 </tr>
@@ -335,8 +331,8 @@ export default function UserTypesManager() {
           </button>
           {showRolesSection && (
             <div className="p-5 space-y-4">
-              {roleError && <InlineAlert type="error" message={roleError} />}
-              {roleNotice && <InlineAlert type="success" message={roleNotice} />}
+              {roleError && <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{roleError}</AlertDescription></Alert>}
+              {roleNotice && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{roleNotice}</AlertDescription></Alert>}
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex-1 min-w-[180px]">
                   <label className="ui-label">Role Name <span className="text-red-500">*</span></label>
@@ -354,11 +350,11 @@ export default function UserTypesManager() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-[var(--surface-muted)] border-b border-[var(--border)]">
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">#</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Role</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Description</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Created</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">Actions</th>
+                      <th className="px-4 py-2 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">#</th>
+                      <th className="px-4 py-2 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">Role</th>
+                      <th className="px-4 py-2 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">Description</th>
+                      <th className="px-4 py-2 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">Created</th>
+                      <th className="px-4 py-2 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -375,7 +371,7 @@ export default function UserTypesManager() {
                             onClick={() => handleDeleteRole(r)}
                             disabled={deletingRoleId === r.id}
                             title="Delete role"
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             {deletingRoleId === r.id ? "Deleting..." : "Delete"}

@@ -205,9 +205,9 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                     {overall}%
                 </span>
             </div>
-            <div className="leading-tight ml-3 shrink-0">
-                <div className="text-xs font-semibold text-gray-700">Profile</div>
-                <div className="text-[11px] text-gray-400">Completeness</div>
+            <div className="leading-tight ms-3 shrink-0">
+                <div className="text-xs font-semibold text-foreground">Profile</div>
+                <div className="text-[11px] text-muted-foreground">Completeness</div>
             </div>
 
             {/* ── Inline expandable panel ── */}
@@ -226,7 +226,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
             >
                 {/* Vertical divider */}
                 <div
-                    className="mx-4 w-px bg-gray-200 self-stretch shrink-0"
+                    className="mx-4 w-px bg-muted-foreground/20 self-stretch shrink-0"
                     style={{
                         opacity: phase >= 1 ? 1 : 0,
                         transition: "opacity 0.2s ease 0.15s",
@@ -237,7 +237,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                 <div className="flex flex-col justify-center gap-2 py-0.5" style={{ minWidth: "460px" }}>
                     {/* Label */}
                     <div
-                        className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
+                        className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest"
                         style={{
                             opacity: phase >= 2 ? 1 : 0,
                             transform: phase >= 2 ? "translateX(0)" : "translateX(-6px)",
@@ -275,7 +275,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                                         {s.value}%
                                     </span>
                                 </div>
-                                <span className="text-[9px] text-gray-500 text-center leading-tight whitespace-nowrap">
+                                <span className="text-[9px] text-muted-foreground text-center leading-tight whitespace-nowrap">
                                     {s.label}
                                 </span>
                             </div>
@@ -283,7 +283,7 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
 
                         {/* Overall bar — inline after rings */}
                         <div
-                            className="flex-1 ml-2"
+                            className="flex-1 ms-2"
                             style={{
                                 opacity: phase >= 2 ? 1 : 0,
                                 transition: "opacity 0.3s ease 0.3s",
@@ -291,10 +291,10 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
                             }}
                         >
                             <div className="flex items-center justify-between text-[10px] mb-1">
-                                <span className="text-gray-500 font-medium">Overall</span>
+                                <span className="text-muted-foreground font-medium">Overall</span>
                                 <span className="font-bold" style={{ color: overallColor }}>{overall}%</span>
                             </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                 <div
                                     className="h-full rounded-full"
                                     style={{

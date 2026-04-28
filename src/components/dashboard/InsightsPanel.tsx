@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader } from "@/components/shadcn/card"
 import Link from "next/link"
-import { Card, CardBody, CardHeader } from "@/components/ui/card"
-import SectionTitle from "@/components/ui/section-title"
 import { cn } from "@/lib/utils"
 import { AlertTriangle, Sparkles, ChevronDown, ChevronRight, Clock, BellOff, Settings2 } from "lucide-react"
 
@@ -85,15 +84,9 @@ export default function InsightsPanel({ canManage }: { canManage: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <SectionTitle
-          title="Operational Insights"
-          subtitle={
-            loading
+        <div className="mb-4 flex items-start justify-between gap-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand)] hover:underline"><div><h2 className="text-xl font-bold tracking-tight">{"Operational Insights"}</h2><p className="mt-1 text-sm text-muted-foreground">{(loading
               ? "Computing…"
-              : `${withIssues.length} flag${withIssues.length === 1 ? "" : "s"} · ${healthy} clean`
-          }
-          action={
-            canManage ? (
+              : `${withIssues.length} flag${withIssues.length === 1 ? "" : "s"} · ${healthy} clean`)}</p></div><div className="flex shrink-0 items-center gap-2">{(canManage ? (
               <Link
                 href="/settings/insights"
                 className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand)] hover:underline"
@@ -101,9 +94,7 @@ export default function InsightsPanel({ canManage }: { canManage: boolean }) {
                 <Settings2 className="h-4 w-4" />
                 Configure
               </Link>
-            ) : null
-          }
-        />
+            ) : null)}</div></div>
         <div className="mt-3 flex gap-1 rounded-[var(--radius-md)] bg-[var(--surface-muted)] p-1">
           <TabButton active={tab === "EFFICIENCY"} onClick={() => setTab("EFFICIENCY")}>
             <Sparkles className="h-3.5 w-3.5" />
@@ -115,7 +106,7 @@ export default function InsightsPanel({ canManage }: { canManage: boolean }) {
           </TabButton>
         </div>
       </CardHeader>
-      <CardBody className="space-y-2">
+      <CardContent className="space-y-2">
         {error ? (
           <p className="rounded-[var(--radius-md)] bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>
         ) : results.length === 0 && !loading ? (
@@ -123,7 +114,7 @@ export default function InsightsPanel({ canManage }: { canManage: boolean }) {
         ) : (
           results.map((r) => <InsightRow key={r.key} r={r} />)
         )}
-      </CardBody>
+      </CardContent>
     </Card>
   )
 }

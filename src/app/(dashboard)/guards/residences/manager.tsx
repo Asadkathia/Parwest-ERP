@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import ActionButton from "@/components/ui/action-button"
-import InlineAlert from "@/components/ui/inline-alert"
+import { Button } from "@/components/shadcn/button"
+import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
@@ -282,11 +283,11 @@ export default function ResidencesManager({
                 </div>
 
                 <div className="flex gap-2">
-                    <ActionButton type="submit">{form.id ? "Update" : "Create"}</ActionButton>
+                    <Button type="submit">{form.id ? "Update" : "Create"}</Button>
                     {form.id && (
-                        <ActionButton type="button" variant="secondary" onClick={() => { setForm(defaultForm); if (fileRef.current) fileRef.current.value = "" }}>
+                        <Button type="button" variant="secondary" onClick={() => { setForm(defaultForm); if (fileRef.current) fileRef.current.value = "" }}>
                             Cancel
-                        </ActionButton>
+                        </Button>
                     )}
                 </div>
             </form>
@@ -322,8 +323,8 @@ export default function ResidencesManager({
                 </div>
             </div>
 
-            {error ? <InlineAlert type="error" message={error} /> : null}
-            {success ? <InlineAlert type="success" message={success} /> : null}
+            {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
+            {success ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{success}</AlertDescription></Alert> : null}
 
             <div className="bg-white rounded-lg border overflow-x-auto">
                 <table className="w-full">
@@ -376,7 +377,7 @@ export default function ResidencesManager({
                                         ) : "—"}
                                     </td>
                                     <td className="px-4 py-3 text-sm">
-                                        <ActionButton variant="secondary" onClick={() => editResidence(row)}>Edit</ActionButton>
+                                        <Button variant="secondary" onClick={() => editResidence(row)}>Edit</Button>
                                     </td>
                                 </tr>
                             ))
