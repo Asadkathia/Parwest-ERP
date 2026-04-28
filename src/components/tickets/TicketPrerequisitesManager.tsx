@@ -11,6 +11,7 @@ const TABS: Tab[] = ["Categories", "Priorities", "Statuses"]
 const endpoint = (t: Tab) => t === "Categories" ? "/api/tickets/categories" : t === "Priorities" ? "/api/tickets/priorities" : "/api/tickets/statuses"
 const singular = (t: Tab) => t.slice(0, -1)
 
+// eslint-disable-next-line no-restricted-syntax -- color palette presented to admin in <input type="color"> swatch picker; persisted as DB data, not UI styling
 const DEFAULT_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#6366f1","#8b5cf6","#ec4899","#94a3b8"]
 
 export default function TicketPrerequisitesManager() {
@@ -23,6 +24,7 @@ export default function TicketPrerequisitesManager() {
   // Add form
   const [newName, setNewName] = useState("")
   const [newDesc, setNewDesc] = useState("")
+  // eslint-disable-next-line no-restricted-syntax -- default seed color persisted to DB, not UI styling
   const [newColor, setNewColor] = useState("#3b82f6")
   const [adding, setAdding] = useState(false)
 
@@ -55,6 +57,7 @@ export default function TicketPrerequisitesManager() {
       const data = await res.json().catch(()=>({}))
       if (!res.ok) throw new Error(data?.message || "Failed to add.")
       setNotice(`${singular(activeTab)} added.`)
+      // eslint-disable-next-line no-restricted-syntax -- reset to default seed color value (DB data)
       setNewName(""); setNewDesc(""); setNewColor("#3b82f6")
       await load(activeTab)
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to add.") }
@@ -65,6 +68,7 @@ export default function TicketPrerequisitesManager() {
     setEditId(item.id)
     setEditName(item.name)
     setEditDesc(item.description ?? "")
+    // eslint-disable-next-line no-restricted-syntax -- fallback to default seed color (DB data)
     setEditColor(item.color ?? "#3b82f6")
   }
 
@@ -164,6 +168,7 @@ export default function TicketPrerequisitesManager() {
             {items.map(item => (
               <div key={item.id} className="px-5 py-4 flex items-center gap-4 hover:bg-[var(--surface-muted)] transition-colors">
                 {/* Color swatch */}
+                {/* eslint-disable-next-line no-restricted-syntax -- swatch fallback for unset DB color */}
                 <span className="h-8 w-8 rounded-full border-2 border-white shadow shrink-0" style={{background: item.color||"#94a3b8"}} />
 
                 {editId === item.id ? (

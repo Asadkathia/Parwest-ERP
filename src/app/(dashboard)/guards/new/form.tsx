@@ -54,6 +54,7 @@ import {
   FormMessage,
 } from "@/components/shadcn/form"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import { Button } from "@/components/shadcn/button"
 import { Switch } from "@/components/shadcn/switch"
 import { Checkbox } from "@/components/shadcn/checkbox"
@@ -710,22 +711,20 @@ function ServiceStep({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {lockedRegionalOfficeId ? (
-          <FormItem>
-            <FormLabel>
+          <div>
+            <Label>
               Regional Office <span className="text-destructive">*</span>
-            </FormLabel>
-            <FormControl>
-              <Input
-                readOnly
-                value={(() => {
-                  const o = regionalOffices.find((x) => x.id === lockedRegionalOfficeId)
-                  return o ? `${o.name} (${o.region.name})` : "Locked office"
-                })()}
-                className="bg-[var(--surface-muted)]"
-              />
-            </FormControl>
-            <FormDescription>Locked to your assigned regional office.</FormDescription>
-          </FormItem>
+            </Label>
+            <Input
+              readOnly
+              value={(() => {
+                const o = regionalOffices.find((x) => x.id === lockedRegionalOfficeId)
+                return o ? `${o.name} (${o.region.name})` : "Locked office"
+              })()}
+              className="bg-[var(--surface-muted)]"
+            />
+            <p className="text-sm text-muted-foreground">Locked to your assigned regional office.</p>
+          </div>
         ) : (
           <SelectField
             name="regionalOfficeId"
@@ -793,12 +792,10 @@ function ServiceStep({
         <TextField name="nationality" label="Nationality" required placeholder="e.g. Pakistani" />
         <TextField name="nextOfKin" label="Next of Kin" required />
 
-        <FormItem className="md:col-span-2">
-          <FormLabel>Enrolled By</FormLabel>
-          <FormControl>
-            <Input readOnly value={currentUserName} className="bg-[var(--surface-muted)]" />
-          </FormControl>
-        </FormItem>
+        <div className="md:col-span-2">
+          <Label>Enrolled By</Label>
+          <Input readOnly value={currentUserName} className="bg-[var(--surface-muted)]" />
+        </div>
       </div>
     </div>
   )
@@ -950,15 +947,13 @@ function BankStep() {
             type="number"
             description="Held back per pay cycle."
           />
-          <FormItem>
-            <FormLabel>Reserve Amount</FormLabel>
-            <FormControl>
-              <div className="flex h-10 items-center rounded-md border border-input bg-[var(--surface-muted)] px-3 text-sm">
-                <ParwestCurrency value={reserveAmount} />
-              </div>
-            </FormControl>
-            <FormDescription>Auto-calculated from salary × reserve %.</FormDescription>
-          </FormItem>
+          <div>
+            <Label>Reserve Amount</Label>
+            <div className="flex h-10 items-center rounded-md border border-input bg-[var(--surface-muted)] px-3 text-sm">
+              <ParwestCurrency value={reserveAmount} />
+            </div>
+            <p className="text-sm text-muted-foreground">Auto-calculated from salary × reserve %.</p>
+          </div>
         </div>
       </section>
     </div>

@@ -36,6 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn/alert"
 import { Badge } from "@/components/shadcn/badge"
 import { Button } from "@/components/shadcn/button"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import { Checkbox } from "@/components/shadcn/checkbox"
 import {
   Select,
@@ -869,21 +870,19 @@ export default function MasterManager({
 
                   {supportsStoreFields ? (
                     <>
-                      <FormItem>
-                        <FormLabel>Code (Auto-generated)</FormLabel>
-                        <FormControl>
-                          <Input
-                            readOnly
-                            value={editingId ? editingCode || "" : ""}
-                            placeholder={
-                              editingId
-                                ? ""
-                                : "Generated on create from region + type"
-                            }
-                            className="tabular-nums"
-                          />
-                        </FormControl>
-                      </FormItem>
+                      <div>
+                        <Label>Code (Auto-generated)</Label>
+                        <Input
+                          readOnly
+                          value={editingId ? editingCode || "" : ""}
+                          placeholder={
+                            editingId
+                              ? ""
+                              : "Generated on create from region + type"
+                          }
+                          className="tabular-nums"
+                        />
+                      </div>
 
                       <FormField
                         control={form.control}
@@ -1034,25 +1033,31 @@ export default function MasterManager({
                         )}
                       />
 
-                      <FormItem className="flex flex-row items-center gap-2 pt-6">
-                        <FormControl>
-                          <Checkbox
-                            id="isHeadOffice"
-                            checked={watchedIsHeadOffice}
-                            onCheckedChange={(value) =>
-                              form.setValue("isHeadOffice", value === true, {
-                                shouldDirty: true,
-                              })
-                            }
-                          />
-                        </FormControl>
-                        <FormLabel
-                          htmlFor="isHeadOffice"
-                          className="text-sm font-normal text-muted-foreground"
-                        >
-                          Is Head Office
-                        </FormLabel>
-                      </FormItem>
+                      <FormField
+                        control={form.control}
+                        name="isHeadOffice"
+                        render={() => (
+                          <FormItem className="flex flex-row items-center gap-2 pt-6">
+                            <FormControl>
+                              <Checkbox
+                                id="isHeadOffice"
+                                checked={watchedIsHeadOffice}
+                                onCheckedChange={(value) =>
+                                  form.setValue("isHeadOffice", value === true, {
+                                    shouldDirty: true,
+                                  })
+                                }
+                              />
+                            </FormControl>
+                            <FormLabel
+                              htmlFor="isHeadOffice"
+                              className="text-sm font-normal text-muted-foreground"
+                            >
+                              Is Head Office
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
 
                       <FormField
                         control={form.control}
@@ -1142,8 +1147,8 @@ export default function MasterManager({
                   ) : null}
 
                   {supportsCategoryFields ? (
-                    <FormItem>
-                      <FormLabel>Assignees</FormLabel>
+                    <div>
+                      <Label>Assignees</Label>
                       <div className="flex flex-wrap gap-4 rounded-md border p-3">
                         {ASSIGNEE_OPTIONS.map((option) => {
                           const checked = watchedAssignees.includes(
@@ -1178,7 +1183,7 @@ export default function MasterManager({
                           )
                         })}
                       </div>
-                    </FormItem>
+                    </div>
                   ) : null}
 
                   {supportsStatusCategory ? (

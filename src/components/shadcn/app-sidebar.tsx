@@ -312,7 +312,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }): React.ReactElemen
             <div
                 aria-hidden
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-                style={{ background: "var(--brand-600, #2f5bff)", color: "#fff" }}
+                style={{ background: "var(--brand-600)", color: "var(--text-inverse)" }}
             >
                 <Shield className="h-4 w-4" strokeWidth={1.75} />
             </div>

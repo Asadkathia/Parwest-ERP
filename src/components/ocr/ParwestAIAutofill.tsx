@@ -45,11 +45,11 @@ function ProgressBar({ value }: { value: number }) {
 // ── Confidence pill ───────────────────────────────────────────────────────────
 function ConfidencePill({ value }: { value: number }) {
     const pct = Math.round(value * 100)
-    const color = pct >= 85 ? "#16a34a" : pct >= 65 ? "#d97706" : "#dc2626"
+    const color = pct >= 85 ? "var(--success-600)" : pct >= 65 ? "var(--warning-600)" : "var(--danger-600)"
     return (
         <span
             className="ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-            style={{ color, background: `${color}18` }}
+            style={{ color, background: `color-mix(in srgb, ${color} 9%, transparent)` }}
         >
             {pct}%
         </span>

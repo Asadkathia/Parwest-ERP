@@ -72,7 +72,7 @@ function Sparkline({ values, tone }: { values: number[]; tone: Props["tone"] }) 
   const step = values.length > 1 ? w / (values.length - 1) : 0
   const points = values.map((v, i) => `${(i * step).toFixed(2)},${(h - (v / max) * h).toFixed(2)}`).join(" ")
   const stroke =
-    tone === "danger" ? "#dc2626" : tone === "warning" ? "#d97706" : tone === "success" ? "#059669" : "#2563eb"
+    tone === "danger" ? "var(--danger-600)" : tone === "warning" ? "var(--warning-600)" : tone === "success" ? "var(--success-600)" : "var(--brand-600)"
   const fill =
     tone === "danger"
       ? "rgba(220,38,38,0.08)"

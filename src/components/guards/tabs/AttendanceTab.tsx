@@ -10,12 +10,12 @@ import type { AttendanceRecord, AttendanceSummary, DeploymentAuditRecord } from 
 
 // ── attendance type config ────────────────────────────────────────────────────
 const ATTENDANCE_TYPES: Record<string, { label: string; color: string; dot: string; bg: string; text: string }> = {
-  PRESENT:           { label: "Present",            color: "#10b981", dot: "bg-green-500",   bg: "bg-green-100",  text: "text-green-800" },
-  DOUBLE_DUTY_DAY:   { label: "Double Duty (Day)",   color: "#3b82f6", dot: "bg-blue-500",    bg: "bg-blue-100",   text: "text-blue-800" },
-  DOUBLE_DUTY_NIGHT: { label: "Double Duty (Night)", color: "#6366f1", dot: "bg-indigo-500",  bg: "bg-indigo-100", text: "text-indigo-800" },
-  EXTRA_DUTY:        { label: "Extra Duty",          color: "#f59e0b", dot: "bg-amber-500",   bg: "bg-amber-100",  text: "text-amber-800" },
-  ABSENT:            { label: "Absent",              color: "#ef4444", dot: "bg-red-500",     bg: "bg-red-100",    text: "text-red-800" },
-  LEAVE:             { label: "Leave",               color: "#8b5cf6", dot: "bg-purple-500",  bg: "bg-purple-100", text: "text-purple-800" },
+  PRESENT:           { label: "Present",            color: "var(--chart-2)", dot: "bg-green-500",   bg: "bg-green-100",  text: "text-green-800" },
+  DOUBLE_DUTY_DAY:   { label: "Double Duty (Day)",   color: "var(--chart-1)", dot: "bg-blue-500",    bg: "bg-blue-100",   text: "text-blue-800" },
+  DOUBLE_DUTY_NIGHT: { label: "Double Duty (Night)", color: "var(--chart-5)", dot: "bg-indigo-500",  bg: "bg-indigo-100", text: "text-indigo-800" },
+  EXTRA_DUTY:        { label: "Extra Duty",          color: "var(--chart-3)", dot: "bg-amber-500",   bg: "bg-amber-100",  text: "text-amber-800" },
+  ABSENT:            { label: "Absent",              color: "var(--chart-4)", dot: "bg-red-500",     bg: "bg-red-100",    text: "text-red-800" },
+  LEAVE:             { label: "Leave",               color: "var(--viz-7)",   dot: "bg-purple-500",  bg: "bg-purple-100", text: "text-purple-800" },
 }
 
 function getTypeConfig(record: AttendanceRecord) {

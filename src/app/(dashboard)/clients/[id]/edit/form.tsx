@@ -32,6 +32,7 @@ import { clientEditSchema, type ClientEditForm } from "@/lib/schemas/client"
 
 import { Button } from "@/components/shadcn/button"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import { Textarea } from "@/components/shadcn/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
@@ -609,8 +610,8 @@ export default function ClientEditForm({
                                 )}
                             />
 
-                            <FormItem>
-                                <FormLabel>Contact Number</FormLabel>
+                            <div>
+                                <Label>Contact Number</Label>
                                 <div className="space-y-2">
                                     {contactNumbers.map((num, idx) => {
                                         const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
@@ -658,7 +659,7 @@ export default function ClientEditForm({
                                         <Plus size={13} /> Add another number
                                     </button>
                                 </div>
-                            </FormItem>
+                            </div>
 
                             <FormField
                                 control={form.control}

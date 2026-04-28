@@ -6,8 +6,11 @@ import { badRequest, conflict, forbidden, internalServerError, unauthorized } fr
 import { hasAction } from "@/lib/api/permissions"
 
 const MOCK_ROWS = [
+  // eslint-disable-next-line no-restricted-syntax -- mock DB seed data, persisted color value not UI styling
   { id: "mock-status-1", name: "New", color: "#3B82F6" },
+  // eslint-disable-next-line no-restricted-syntax -- mock DB seed data, persisted color value not UI styling
   { id: "mock-status-2", name: "In-Progress", color: "#F59E0B" },
+  // eslint-disable-next-line no-restricted-syntax -- mock DB seed data, persisted color value not UI styling
   { id: "mock-status-3", name: "Closed", color: "#10B981" },
 ]
 

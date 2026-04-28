@@ -27,8 +27,8 @@ function makeCircleIcon(color: string) {
   })
 }
 
-const CLIENT_ICON = makeCircleIcon("#10b981")       // emerald
-const OFFICE_ICON  = makeCircleIcon("#6366f1")      // indigo
+const CLIENT_ICON = makeCircleIcon("var(--chart-2)")  // emerald
+const OFFICE_ICON  = makeCircleIcon("var(--chart-5)") // indigo
 
 type MapClient = {
   id: string

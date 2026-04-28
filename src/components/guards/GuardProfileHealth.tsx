@@ -44,7 +44,7 @@ function Ring({
             viewBox={`0 0 ${size} ${size}`}
             style={{ transform: "rotate(-90deg)" }}
         >
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-default)" strokeWidth={stroke} />
             <circle
                 cx={size / 2}
                 cy={size / 2}
@@ -179,15 +179,15 @@ export default function GuardProfileHealth({ guard }: GuardProfileHealthProps) {
     )
 
     const sections: Section[] = [
-        { label: "Personal Info",     color: "#3b82f6", value: calcPct(personalFields.filter(has).length, personalFields.length) },
-        { label: "Contact Info",      color: "#8b5cf6", value: calcPct(contactFields.filter(has).length, contactFields.length) },
-        { label: "Employment",        color: "#f59e0b", value: calcPct(employmentFields.filter(has).length, employmentFields.length) },
-        { label: "Nearest Relatives", color: "#10b981", value: relPct },
-        { label: "Documents",         color: "#ef4444", value: docLoading ? 0 : (docPct ?? 0) },
+        { label: "Personal Info",     color: "var(--chart-1)", value: calcPct(personalFields.filter(has).length, personalFields.length) },
+        { label: "Contact Info",      color: "var(--viz-7)",   value: calcPct(contactFields.filter(has).length, contactFields.length) },
+        { label: "Employment",        color: "var(--chart-3)", value: calcPct(employmentFields.filter(has).length, employmentFields.length) },
+        { label: "Nearest Relatives", color: "var(--chart-2)", value: relPct },
+        { label: "Documents",         color: "var(--chart-4)", value: docLoading ? 0 : (docPct ?? 0) },
     ]
 
     const overall = Math.round(sections.reduce((s, x) => s + x.value, 0) / sections.length)
-    const overallColor = overall >= 80 ? "#10b981" : overall >= 50 ? "#f59e0b" : "#ef4444"
+    const overallColor = overall >= 80 ? "var(--success-500)" : overall >= 50 ? "var(--warning-500)" : "var(--danger-500)"
 
     return (
         <div

@@ -562,6 +562,7 @@ function generateSA10(guard: GuardTabModel & { id?: string }): string {
 }
 
 // ── document card config ──────────────────────────────────────────────────────
+/* eslint-disable no-restricted-syntax -- per-document-type accent palettes used as inline styles for PDF/print rendering; kept as discrete color tuples */
 const PBA_DOCS = [
     {
         id: "SA05",
@@ -594,6 +595,7 @@ const PBA_DOCS = [
         visibility: "civilian" as const,    // only for civilians
     },
 ]
+/* eslint-enable no-restricted-syntax */
 
 // Determine if a guard is ex-service from any source
 function isExServiceGuard(guard: GuardTabModel & { id?: string }): boolean {

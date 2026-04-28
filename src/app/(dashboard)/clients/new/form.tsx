@@ -46,6 +46,7 @@ import { clientCreateSchema, type ClientCreateForm } from "@/lib/schemas/client"
 
 import { Button } from "@/components/shadcn/button"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import { Textarea } from "@/components/shadcn/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
@@ -736,10 +737,10 @@ export default function ClientEnrollmentForm({
                                 )}
                             />
 
-                            <FormItem>
-                                <FormLabel>
+                            <div>
+                                <Label>
                                     Contact Number <span className="text-destructive">*</span>
-                                </FormLabel>
+                                </Label>
                                 <div className="space-y-2">
                                     {contactNumbers.map((num, idx) => {
                                         const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
@@ -791,7 +792,7 @@ export default function ClientEnrollmentForm({
                                         <Plus size={13} /> Add another number
                                     </button>
                                 </div>
-                            </FormItem>
+                            </div>
 
                             <FormField
                                 control={form.control}
@@ -1823,77 +1824,67 @@ function ContractFields({
                 )}
             />
 
-            <FormItem>
-                <FormLabel>Regional Office</FormLabel>
-                <FormControl>
-                    <div>
-                        <SearchSelect
-                            name="contractRegionalOffice"
-                            options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                            placeholder="— Select Regional Office —"
-                        />
-                    </div>
-                </FormControl>
-            </FormItem>
+            <div>
+                <Label>Regional Office</Label>
+                <div>
+                    <SearchSelect
+                        name="contractRegionalOffice"
+                        options={regions.map((r) => ({ value: r.id, label: r.name }))}
+                        placeholder="— Select Regional Office —"
+                    />
+                </div>
+            </div>
             <div />
 
             <div className="md:col-span-2">
                 <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormItem>
-                        <FormLabel>Guard Designation</FormLabel>
-                        <FormControl>
-                            <div>
-                                <MultiSearchSelect
-                                    name="contractDayGuardDesignation"
-                                    options={designationOptions}
-                                    placeholder="Select designations"
-                                />
-                            </div>
-                        </FormControl>
-                    </FormItem>
-                    <FormItem>
-                        <FormLabel>Guard Ex Service</FormLabel>
-                        <FormControl>
-                            <div>
-                                <MultiSearchSelect
-                                    name="contractDayGuardExService"
-                                    options={exServiceOptions}
-                                    placeholder="Select"
-                                />
-                            </div>
-                        </FormControl>
-                    </FormItem>
+                    <div>
+                        <Label>Guard Designation</Label>
+                        <div>
+                            <MultiSearchSelect
+                                name="contractDayGuardDesignation"
+                                options={designationOptions}
+                                placeholder="Select designations"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Guard Ex Service</Label>
+                        <div>
+                            <MultiSearchSelect
+                                name="contractDayGuardExService"
+                                options={exServiceOptions}
+                                placeholder="Select"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div className="md:col-span-2">
                 <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormItem>
-                        <FormLabel>Guard Designation</FormLabel>
-                        <FormControl>
-                            <div>
-                                <MultiSearchSelect
-                                    name="contractNightGuardDesignation"
-                                    options={designationOptions}
-                                    placeholder="Select designations"
-                                />
-                            </div>
-                        </FormControl>
-                    </FormItem>
-                    <FormItem>
-                        <FormLabel>Guard Ex Service</FormLabel>
-                        <FormControl>
-                            <div>
-                                <MultiSearchSelect
-                                    name="contractNightGuardExService"
-                                    options={exServiceOptions}
-                                    placeholder="Select"
-                                />
-                            </div>
-                        </FormControl>
-                    </FormItem>
+                    <div>
+                        <Label>Guard Designation</Label>
+                        <div>
+                            <MultiSearchSelect
+                                name="contractNightGuardDesignation"
+                                options={designationOptions}
+                                placeholder="Select designations"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Guard Ex Service</Label>
+                        <div>
+                            <MultiSearchSelect
+                                name="contractNightGuardExService"
+                                options={exServiceOptions}
+                                placeholder="Select"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
