@@ -80,12 +80,30 @@ body {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   padding: 0.6rem 0.85rem;
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ui-input::placeholder,
+.ui-textarea::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
+}
+
+/* Native <select> in some browsers reports `:invalid` while the placeholder
+   option is selected; force placeholder colour for that state too. */
+.ui-select:invalid,
+.ui-select option[value=""] {
+  color: var(--text-placeholder);
+}
+
+.ui-select option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .ui-input:focus,
@@ -114,7 +132,7 @@ body {
 }
 
 .ui-btn-secondary {
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   border-color: var(--border);
 }
@@ -124,9 +142,9 @@ body {
 }
 
 .ui-btn-danger {
-  background: #fff0f0;
+  background: color-mix(in oklab, var(--danger) 12%, var(--surface));
   color: var(--danger);
-  border-color: #fecaca;
+  border-color: color-mix(in oklab, var(--danger) 35%, var(--border));
 }
 
 .ui-chip {

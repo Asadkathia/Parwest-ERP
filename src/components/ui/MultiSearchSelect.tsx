@@ -127,7 +127,7 @@ export default function MultiSearchSelect({
 
             {/* Dropdown */}
             {open && (
-                <div className="absolute z-[2000] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-56 overflow-y-auto">
+                <div className="absolute z-[2000] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-lg max-h-56 overflow-y-auto">
                     {filtered.length === 0 ? (
                         <p className="px-3 py-2 text-sm text-[var(--text-muted)]">No results</p>
                     ) : (

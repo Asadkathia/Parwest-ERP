@@ -44,7 +44,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/shadcn/alert-dialog"
 import { Button } from "@/components/shadcn/button"
 import { Card, CardContent } from "@/components/shadcn/card"
@@ -184,6 +183,15 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
   })
 
   const handleConfirmedRevoke = async () => {
+    // Defense-in-depth: re-validate before posting so the destructive request
+    // can't fire with empty/undefined fields if the dialog is reached via an
+    // unexpected path.
+    const valid = await form.trigger()
+    if (!valid) {
+      setConfirmOpen(false)
+      toast.error("Please complete the required fields.")
+      return
+    }
     const data = form.getValues()
     setSubmitting(true)
     try {
@@ -455,20 +463,18 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
             />
 
             <div className="flex gap-3 pt-2 border-t border-border">
-              <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-                <PermissionGate
-                  module="GUARDS"
-                  action="CREATE"
-                  mode="disable"
-                >
-                  <AlertDialogTrigger asChild>
-                    <Button type="submit" variant="destructive">
-                      <ShieldOff className="h-4 w-4 mr-2" />
-                      End Deployment
-                    </Button>
-                  </AlertDialogTrigger>
-                </PermissionGate>
+              <PermissionGate
+                module="GUARDS"
+                action="CREATE"
+                mode="disable"
+              >
+                <Button type="submit" variant="destructive">
+                  <ShieldOff className="h-4 w-4 mr-2" />
+                  End Deployment
+                </Button>
+              </PermissionGate>
 
+              <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>End deployment?</AlertDialogTitle>
