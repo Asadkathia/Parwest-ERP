@@ -5,6 +5,16 @@
 @import "../styles/tokens-v1.1.css";
 @import "../styles/parwest-theme.css";
 
+/* ─── Tailwind v4 dark variant ─────────────────────────────────────────────
+   The Parwest theme toggle (AppTopbar -> applyTheme) sets
+   `data-theme="dark"` on the <html> element. By default Tailwind v4 binds
+   `dark:` to the `(prefers-color-scheme: dark)` media query, which ignores
+   the user toggle. This @custom-variant rebinds `dark:` so it activates
+   whenever the document (or any ancestor — e.g. the always-dark sidebar)
+   carries `data-theme="dark"`. Required for the user-controlled theme
+   toggle to actually drive `dark:`-prefixed Tailwind utilities. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* Legacy aliases — kept so existing components that read these
    custom-property names (--surface, --text, --brand, --border, --danger)
    continue to render identically while we migrate to v1.0/v1.1 tokens.

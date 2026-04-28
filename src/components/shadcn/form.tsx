@@ -90,12 +90,19 @@ const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => {
-  const { error, formItemId } = useFormField()
+  // a11y: bind the visual label to the field's id, but keep the label text
+  // itself in --foreground regardless of error state. The red-on-error
+  // signal is carried by FormMessage (the helper text below the field) and
+  // by the input border (`aria-invalid`), not by recoloring the label.
+  // Recoloring the label causes required-asterisk pages to render the
+  // entire label string in destructive red, which kills contrast on dark
+  // surfaces and violates the rule that "color is never the sole signal."
+  const { formItemId } = useFormField()
 
   return (
     <Label
       ref={ref}
-      className={cn(error && "text-destructive", className)}
+      className={cn(className)}
       htmlFor={formItemId}
       {...props}
     />

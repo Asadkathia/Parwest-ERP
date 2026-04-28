@@ -116,7 +116,7 @@
   --color-border-focus:   var(--border-focus);
   --color-border-danger:  var(--border-danger);
   --color-border-success: var(--border-success);
-  --color-input:          var(--border-default);
+  --color-input:          var(--input);
   --color-ring:           var(--brand-600);
 
   /* ─── Color: Sidebar ─────────────────────────────────── */
@@ -135,7 +135,15 @@
      palette via the names shadcn's sidebar/menu primitives expect, so
      Tailwind utilities like bg-sidebar, text-sidebar-foreground,
      bg-sidebar-accent etc. resolve correctly inside the sidebar
-     (command palette, tooltips, menu items). */
+     (command palette, tooltips, menu items).
+
+     Tailwind v4 derives utility classes from --color-* tokens by stripping
+     the "color-" prefix: `bg-sidebar` reads `--color-sidebar`,
+     `text-sidebar-foreground` reads `--color-sidebar-foreground`. The
+     `--color-sidebar-bg` / `--color-sidebar-text` aliases above only power
+     legacy `bg-sidebar-bg` / `text-sidebar-text` utilities, so we also
+     register the shadcn-canonical names below. */
+  --color-sidebar:                    var(--sidebar-bg);
   --color-sidebar-background:         var(--sidebar-bg);
   --color-sidebar-foreground:         var(--sidebar-text);
   --color-sidebar-accent:             var(--sidebar-active-bg);

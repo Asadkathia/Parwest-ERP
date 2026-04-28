@@ -334,7 +334,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
     const errorCount = jobs.filter((j) => j.status === "error").length
 
     return (
-        <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 overflow-hidden shadow-sm">
+        <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 dark:border-violet-900/40 dark:from-violet-950/40 dark:to-indigo-950/40 overflow-hidden shadow-sm">
             {/* ── Header ── */}
             <button
                 type="button"
@@ -346,12 +346,12 @@ export default function ParwestAIAutofill({ onApply }: Props) {
                 </div>
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-violet-900">Parwest AI Autofill</span>
+                        <span className="text-sm font-bold text-violet-900 dark:text-violet-200">Parwest AI Autofill</span>
                         <span className="rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-semibold text-violet-600 uppercase tracking-wide">
                             AI Powered
                         </span>
                     </div>
-                    <p className="text-xs text-violet-500 mt-0.5">
+                    <p className="text-xs text-violet-500 dark:text-violet-300/80 mt-0.5">
                         Upload any document — CNIC, passport, certificates, letters
                     </p>
                 </div>

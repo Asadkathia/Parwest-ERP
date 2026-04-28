@@ -88,7 +88,7 @@
   --destructive:        var(--danger-500);
   --destructive-foreground: #ffffff;
   --border:             var(--border-default);
-  --input:              var(--border-default);
+  --input:              var(--border-strong);
   --ring:               var(--brand-400);
 }
 

@@ -413,7 +413,7 @@ export default function GuardEnrollmentForm({
           }}
         >
           {/* Stepper */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-4">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-card p-4">
             <Stepper
               variant="horizontal"
               steps={STEPS}
@@ -430,7 +430,7 @@ export default function GuardEnrollmentForm({
           )}
 
           {/* Body */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-6">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-card p-6">
             {step === 0 && <PersonalStep />}
             {step === 1 && (
               <ServiceStep
@@ -1265,7 +1265,7 @@ function CheckboxField({
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-white p-3">
+        <FormItem className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-card p-3">
           <FormControl>
             <Checkbox
               checked={Boolean(field.value)}

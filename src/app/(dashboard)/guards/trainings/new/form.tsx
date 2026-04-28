@@ -165,9 +165,9 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
         }
     }
 
-    const sel = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-    const inp = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-    const lbl = "block text-sm font-medium text-gray-700 mb-1"
+    const sel = "w-full border border-input rounded-lg px-3 py-2 text-sm bg-[var(--bg-input)] text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:text-muted-foreground"
+    const inp = "w-full border border-input rounded-lg px-3 py-2 text-sm bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+    const lbl = "block text-sm font-medium text-foreground mb-1"
 
     return (
         <div className="space-y-6 max-w-4xl">
@@ -276,7 +276,7 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
 
                         {/* Select Guard */}
                         <div>
-                            <label className={lbl}>Select Guard <span className="text-red-500">*</span></label>
+                            <label className={lbl}>Select Guard <span className="text-destructive">*</span></label>
                             <select className={sel} value={form.guardId} onChange={e => setForm(f => ({ ...f, guardId: e.target.value }))} required>
                                 <option value="">— Select Guard —</option>
                                 {guards.map(g => (
@@ -287,7 +287,7 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
 
                         {/* Date */}
                         <div>
-                            <label className={lbl}>Date <span className="text-red-500">*</span></label>
+                            <label className={lbl}>Date <span className="text-destructive">*</span></label>
                             <input
                                 type="date"
                                 className={inp}

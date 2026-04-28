@@ -198,17 +198,22 @@
   --bg-page:          #0d1117;
   --bg-card:          #161b27;
   --bg-card-hover:    #1e2535;
-  --bg-input:         #1e2535;
-  --bg-input-focus:   #252d42;
+  /* Inputs need to stand out from the card surface. Previously matched
+     --bg-card-hover (#1e2535) which sat too close to --bg-card (#161b27)
+     and produced near-invisible field outlines on dark forms. The deeper
+     ink-blue here gives ~3:1 surface contrast against bg-card while still
+     reading as "filled". */
+  --bg-input:         #0b1020;
+  --bg-input-focus:   #11182b;
   --bg-subtle:        #1e2535;
 
   --text-primary:   #e2e8f0;
   --text-secondary: #94a3b8;
-  --text-muted:     #64748b;
-  --text-placeholder: #475569;
+  --text-muted:     #94a3b8;
+  --text-placeholder: #64748b;
 
-  --border-default: rgba(255,255,255,0.08);
-  --border-strong:  rgba(255,255,255,0.14);
+  --border-default: rgba(255,255,255,0.12);
+  --border-strong:  rgba(255,255,255,0.20);
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3);

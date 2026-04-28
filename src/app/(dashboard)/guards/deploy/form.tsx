@@ -746,7 +746,7 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
                 </p>
                 <div className="space-y-1.5">
                   {activeDeployments.map((d) => (
-                    <div key={d.id} className="flex flex-wrap items-center gap-2 text-sm text-amber-900 bg-white rounded border border-amber-200 px-3 py-2">
+                    <div key={d.id} className="flex flex-wrap items-center gap-2 text-sm text-amber-900 dark:text-amber-200 bg-card rounded border border-amber-200 dark:border-amber-900/40 px-3 py-2">
                       <ShiftBadge shift={d.shiftType} />
                       <span className="font-medium">{d.client.name}</span>
                       {d.branch && <span className="text-amber-600">· {d.branch.name}{d.branch.city ? `, ${d.branch.city}` : ""}</span>}

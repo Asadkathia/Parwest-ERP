@@ -116,7 +116,7 @@ export default function ConfiguredInteractiveScreen({ config, links = [] }: Prop
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${activeTab === tab ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-white text-[var(--text)] border-[var(--border)]"}`}
+                className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${activeTab === tab ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[var(--surface)] text-[var(--text)] border-[var(--border)] hover:bg-[var(--surface-muted)]"}`}
               >
                 {tab}
               </button>
