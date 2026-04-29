@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import sharp from "sharp"
 import { auth } from "@/lib/auth"
 import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
 
@@ -77,15 +78,35 @@ Transliteration & translation:
 - Output: single comma-separated line (e.g. "House #123, Street #4, Mohalla Sheikhupura, District Lahore").
 - Uncertain transliteration → confidence ≤ 0.6.
 
+═══ UNREADABLE FIELDS ═══
+- If a field is genuinely unreadable (smudge, glare, missing), do NOT guess. OMIT the field from the array entirely, OR include it with value "" and confidence 0.
+- Never fabricate values to fill the schema. A missing field is far better than a wrong one.
+
 ═══ OUTPUT SCHEMA ═══
-Return ONLY a JSON object with this shape (no markdown, no prose):
+Return ONLY a single valid JSON object with no markdown fences, no prose, no commentary, no leading/trailing text. Schema:
 {
   "docType": "cnic" | "passport" | "license" | "education_certificate" | "employment_letter" | "experience_letter" | "other",
   "overallConfidence": number (0.0-1.0),
   "fields": [
     { "field": "<one of: ${ALLOWED_FIELDS.join(", ")}>", "value": "string", "confidence": number }
   ]
-}`
+}
+
+═══ EXAMPLE OUTPUT (one-shot reference) ═══
+For a clear CNIC front showing holder "Muhammad Asad", father "Abdul Rauf", CNIC 35202-1234567-1, DOB 18.09.2001:
+{
+  "docType": "cnic",
+  "overallConfidence": 0.93,
+  "fields": [
+    { "field": "name", "value": "Muhammad Asad", "confidence": 0.96 },
+    { "field": "fatherName", "value": "Abdul Rauf", "confidence": 0.94 },
+    { "field": "cnic", "value": "35202-1234567-1", "confidence": 0.98 },
+    { "field": "dateOfBirth", "value": "2001-09-18", "confidence": 0.92 },
+    { "field": "gender", "value": "Male", "confidence": 0.95 },
+    { "field": "nationality", "value": "Pakistani", "confidence": 0.75 }
+  ]
+}
+Return ONLY valid JSON.`
 
 export async function POST(request: NextRequest) {
     try {
@@ -100,8 +121,23 @@ export async function POST(request: NextRequest) {
         }
 
         const match = imageBase64.match(/^data:(image\/[a-z+]+);base64,(.+)$/i)
-        const mimeType = match?.[1] || "image/png"
-        const rawBase64 = match?.[2] || imageBase64
+        let mimeType = match?.[1] || "image/png"
+        let rawBase64 = match?.[2] || imageBase64
+
+        // ── Server-side image preprocessing ─────────────────────────────────
+        // Goals: bound token cost (downscale > 2048px) + boost OCR signal
+        // (mild contrast + sharpening). On any failure, fall through to the
+        // original image — preprocessing must never break the OCR flow.
+        try {
+            const preprocessed = await preprocessImage(rawBase64, mimeType)
+            if (preprocessed) {
+                rawBase64 = preprocessed.base64
+                mimeType = preprocessed.mimeType
+                if (DEBUG_OCR) console.log(`[OCR] Preprocessed: ${preprocessed.note}`)
+            }
+        } catch (e) {
+            console.warn("[OCR] Preprocessing failed; using original:", e instanceof Error ? e.message : String(e))
+        }
 
         // Decide which provider(s) to try
         const provider = pickProvider()
@@ -164,6 +200,51 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error("[OCR] Top-level error:", error)
         return internalServerError("Failed to extract document fields.")
+    }
+}
+
+// ── Image preprocessing ─────────────────────────────────────────────────────
+// Downscales overly-large images (max 2048px on the long side), normalises
+// (linear histogram stretch) and sharpens. Output is always JPEG (q=88) since
+// JPEG is well-supported by every vision provider and shrinks token cost
+// versus PNG. On error returns null and the caller falls back to the original.
+const MAX_DIMENSION = 2048
+
+async function preprocessImage(
+    base64: string,
+    mimeType: string,
+): Promise<{ base64: string; mimeType: string; note: string } | null> {
+    const buffer = Buffer.from(base64, "base64")
+    if (buffer.length === 0) return null
+
+    const pipeline = sharp(buffer, { failOn: "none" })
+    const meta = await pipeline.metadata()
+    const longSide = Math.max(meta.width || 0, meta.height || 0)
+    if (longSide === 0) return null
+
+    let chain = sharp(buffer, { failOn: "none" }).rotate() // honour EXIF orientation
+
+    const resized = longSide > MAX_DIMENSION
+    if (resized) {
+        chain = chain.resize({
+            width: (meta.width || 0) >= (meta.height || 0) ? MAX_DIMENSION : undefined,
+            height: (meta.height || 0) > (meta.width || 0) ? MAX_DIMENSION : undefined,
+            fit: "inside",
+            withoutEnlargement: true,
+        })
+    }
+
+    // Normalise (linear histogram stretch) + mild sharpen — improves OCR on
+    // dim or low-contrast camera photos. Keep colour: CNIC fronts mix Urdu
+    // and English, and provider models do better with the original colour.
+    chain = chain.normalise().sharpen({ sigma: 0.6 })
+
+    const out = await chain.jpeg({ quality: 88, mozjpeg: true }).toBuffer()
+    const note = `${meta.width}x${meta.height} ${mimeType} ${buffer.length}B → ${MAX_DIMENSION}-cap jpeg ${out.length}B${resized ? " (resized)" : ""}`
+    return {
+        base64: out.toString("base64"),
+        mimeType: "image/jpeg",
+        note,
     }
 }
 
