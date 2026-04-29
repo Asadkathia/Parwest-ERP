@@ -364,7 +364,11 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
 
   const loadClients = async (regionalOfficeId: string) => {
     try {
-      const res = await fetch(`/api/clients?regionalOfficeId=${regionalOfficeId}`)
+      const params = new URLSearchParams()
+      if (regionalOfficeId) params.set("regionalOfficeId", String(regionalOfficeId))
+      else if (lockedRegionId) params.set("regionId", String(lockedRegionId))
+      const url = params.toString() ? `/api/clients?${params.toString()}` : "/api/clients"
+      const res = await fetch(url)
       const data = await res.json()
       setClients(Array.isArray(data) && data.length > 0 ? data : [])
     } catch {

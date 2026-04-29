@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, useWatch } from "react-hook-form"
+import type { FieldErrors } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import {
@@ -101,6 +102,28 @@ function readFileAsBase64(file: File): Promise<string> {
         reader.onerror = () => reject(new Error("Failed to read file"))
         reader.readAsDataURL(file)
     })
+}
+
+// Mirrors the formatter inside <PhoneInput>. We can't reuse that uncontrolled
+// component for the contactNumbers[] array (no onChange), so we inline the
+// same +92-XXX-XXXXXXX formatting on this controlled input.
+const PHONE_PREFIX = "+92-"
+const PHONE_MAX_DIGITS = 10
+function formatPhoneDigits(raw: string): string {
+    let afterPrefix: string
+    if (raw.startsWith(PHONE_PREFIX)) {
+        afterPrefix = raw.slice(PHONE_PREFIX.length).replace(/\D/g, "").slice(0, PHONE_MAX_DIGITS)
+    } else {
+        const allDigits = raw.replace(/\D/g, "")
+        const stripped =
+            allDigits.startsWith("92") && allDigits.length > PHONE_MAX_DIGITS
+                ? allDigits.slice(2)
+                : allDigits
+        afterPrefix = stripped.slice(0, PHONE_MAX_DIGITS)
+    }
+    if (afterPrefix.length === 0) return raw === "" ? "" : PHONE_PREFIX
+    if (afterPrefix.length <= 3) return PHONE_PREFIX + afterPrefix
+    return `${PHONE_PREFIX}${afterPrefix.slice(0, 3)}-${afterPrefix.slice(3)}`
 }
 
 export default function ClientEnrollmentForm({
@@ -506,6 +529,17 @@ export default function ClientEnrollmentForm({
         }
     }
 
+    // Surface zod validation failures so the submit button doesn't appear inert.
+    const onInvalid = (errors: FieldErrors<ClientCreateForm>) => {
+        const firstMessage = Object.values(errors).flatMap((e) => {
+            if (!e) return []
+            if (typeof e === "object" && "message" in e && typeof e.message === "string") return [e.message]
+            return []
+        })[0]
+        toast.error(firstMessage ?? "Please fix the highlighted fields and try again.")
+        console.warn("Client form validation errors", errors)
+    }
+
     // ── Success state (branch client only) ──────────────────────────────────
     if (savedClient) {
         return (
@@ -545,7 +579,7 @@ export default function ClientEnrollmentForm({
             <form
                 ref={formRef}
                 // eslint-disable-next-line react-hooks/refs -- onSubmit reads formRef.current only inside the submit callback (runtime), not during render.
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
                 className="space-y-6"
             >
                 <Card>
@@ -743,17 +777,25 @@ export default function ClientEnrollmentForm({
                                 </Label>
                                 <div className="space-y-2">
                                     {contactNumbers.map((num, idx) => {
-                                        const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
+                                        const invalid = num.trim().length > 0 && num.trim() !== "+92-" && !isValidPhone(num.trim())
                                         return (
                                             <div key={idx} className="flex items-start gap-2">
                                                 <div className="flex-1">
                                                     <Input
-                                                        type="text"
+                                                        type="tel"
                                                         value={num}
                                                         onChange={(e) => {
+                                                            const formatted = formatPhoneDigits(e.target.value)
                                                             const updated = [...contactNumbers]
-                                                            updated[idx] = e.target.value
+                                                            updated[idx] = formatted
                                                             setContactNumbers(updated)
+                                                        }}
+                                                        onFocus={(e) => {
+                                                            if (!e.target.value) {
+                                                                const updated = [...contactNumbers]
+                                                                updated[idx] = "+92-"
+                                                                setContactNumbers(updated)
+                                                            }
                                                         }}
                                                         className={invalid ? "border-destructive" : ""}
                                                         placeholder={
@@ -761,6 +803,8 @@ export default function ClientEnrollmentForm({
                                                                 ? "+92-300-1234567"
                                                                 : `Contact number ${idx + 1}`
                                                         }
+                                                        maxLength={16}
+                                                        autoComplete="tel"
                                                     />
                                                     {invalid && (
                                                         <p className="mt-1 text-[11px] text-destructive">

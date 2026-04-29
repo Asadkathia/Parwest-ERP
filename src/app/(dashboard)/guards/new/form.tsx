@@ -103,6 +103,24 @@ function calculateAge(dateOfBirth: string, referenceDate?: string) {
   return age >= 0 ? String(age) : ""
 }
 
+/** Compute total months between two ISO date strings; returns { years, months } or null. */
+function computeDurationFromDates(startIso: string, endIso: string): { years: number; months: number } | null {
+  if (!startIso || !endIso) return null
+  const start = new Date(startIso)
+  const end = new Date(endIso)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  if (end < start) return null
+  let totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+  if (end.getDate() < start.getDate()) totalMonths -= 1
+  if (totalMonths < 0) return null
+  return { years: Math.floor(totalMonths / 12), months: totalMonths % 12 }
+}
+
+function formatDuration(d: { years: number; months: number } | null): string {
+  if (!d) return ""
+  return `${d.years} year${d.years === 1 ? "" : "s"}, ${d.months} month${d.months === 1 ? "" : "s"}`
+}
+
 export default function GuardEnrollmentForm({ regionalOffices, currentUserName, lockedRegionalOfficeId = null, lockedRegionId: _lockedRegionId = null }: Props) {
   void _lockedRegionId
   const router = useRouter()
@@ -486,9 +504,19 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     try {
       data.phone = contactNumbers[0]
       data.additionalContactNumbers = contactNumbers.slice(1).join(", ")
-      // Inject previousEmploymentsJson
+      // Inject previousEmploymentsJson — derive years/months from dates so the
+      // backend (which reads fe.years / fe.months) gets a consistent value
+      // computed from the start/end pickers.
       if (prevEmployments.length > 0) {
-        data.previousEmploymentsJson = JSON.stringify(prevEmployments)
+        const enriched = prevEmployments.map((e) => {
+          const d = computeDurationFromDates(e.dateOfEnrollment, e.dateOfDischarge)
+          return {
+            ...e,
+            years: d ? String(d.years) : "",
+            months: d ? String(d.months) : "",
+          }
+        })
+        data.previousEmploymentsJson = JSON.stringify(enriched)
       }
       data.exServiceType = guardEmploymentType
       data.isExService = guardEmploymentType !== "CIVILIAN" ? "true" : "false"
@@ -908,15 +936,11 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
                       <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF LEAVING</label>
                       <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
                     </div>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
-                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
-                      </div>
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
-                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
-                      </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DURATION</label>
+                      <p className="text-sm text-muted-foreground py-2">
+                        {formatDuration(computeDurationFromDates(emp.dateOfEnrollment, emp.dateOfDischarge)) || "—"}
+                      </p>
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REASON FOR LEAVING</label>
@@ -952,15 +976,11 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
                       <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DATE OF DISCHARGE</label>
                       <input type="date" className="ui-input" value={emp.dateOfDischarge} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, dateOfDischarge: e.target.value } : p))} />
                     </div>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">YEARS</label>
-                        <input type="number" className="ui-input" placeholder="Years" value={emp.years} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, years: e.target.value } : p))} />
-                      </div>
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">MONTHS</label>
-                        <input type="number" className="ui-input" placeholder="Months" value={emp.months} onChange={(e) => setPrevEmployments((prev) => prev.map((p, i) => i === idx ? { ...p, months: e.target.value } : p))} />
-                      </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">DURATION</label>
+                      <p className="text-sm text-muted-foreground py-2">
+                        {formatDuration(computeDurationFromDates(emp.dateOfEnrollment, emp.dateOfDischarge)) || "—"}
+                      </p>
                     </div>
                     <div className="lg:col-span-3">
                       <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">REMARKS</label>
@@ -1092,7 +1112,12 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
                   <Field label="ADDRESS *" name={`family_${idx}_address`} required placeholder="ADDRESS" />
                   {maritalStatus === "married" ? (
                     <>
-                      <Field label="B-FORM / CNIC (CHILD) *" name={`family_${idx}_childCnic`} required placeholder="B-Form / CNIC No" />
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">
+                          B-FORM / CNIC (CHILD) <span className="text-red-500">*</span>
+                        </label>
+                        <CnicInput name={`family_${idx}_childCnic`} required placeholder="B-Form / CNIC No" />
+                      </div>
                       <Field label="CHILD AGE *" name={`family_${idx}_childAge`} required placeholder="Age" />
                       <Field label="CHILD DATE OF BIRTH *" name={`family_${idx}_childDob`} required type="date" />
                     </>
@@ -1321,7 +1346,7 @@ function SupervisorSelector({ regionalOfficeId, required }: { regionalOfficeId: 
     setUsers([])
     if (!regionalOfficeId) return
     setFetching(true)
-    fetch(`/api/users?status=ACTIVE&regionalOfficeId=${regionalOfficeId}`)
+    fetch(`/api/users/supervisors?regionalOfficeId=${regionalOfficeId}`)
       .then((r) => r.ok ? r.json() : [])
       .then((data: Array<{ id: string; name: string; email: string }>) => setUsers(data))
       .catch(() => setUsers([]))

@@ -187,7 +187,7 @@ export default function LocationPickerMapInner({ latName, lngName, defaultLat, d
                     center={center}
                     zoom={DEFAULT_ZOOM}
                     className="h-72 w-full"
-                    scrollWheelZoom
+                    scrollWheelZoom={false}
                 >
                     {/* OpenStreetMap Standard — shows city/town/street names at every zoom level */}
                     <TileLayer

@@ -15,7 +15,6 @@ import {
   type GuardStatus,
 } from "@/components/shadcn/guard-status-badge"
 import { Input } from "@/components/shadcn/input"
-import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
 import { RegionSelector } from "@/components/shadcn/region-selector"
 import {
   Select,
@@ -32,8 +31,6 @@ export type GuardListRow = {
   cnic: string
   phone: string | null
   status: string
-  designation: string | null
-  salary: number | null
   regionId: string | null
   regionalOfficeId: string | null
   supervisorName: string | null
@@ -211,11 +208,6 @@ export default function GuardsListClient({
         ),
       },
       {
-        accessorKey: "designation",
-        header: "Designation",
-        cell: ({ row }) => row.original.designation || "—",
-      },
-      {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => (
@@ -226,21 +218,6 @@ export default function GuardsListClient({
         accessorKey: "regionalOfficeName",
         header: "Region",
         cell: ({ row }) => row.original.regionalOfficeName || "—",
-      },
-      {
-        accessorKey: "salary",
-        header: () => <span className="block text-end">Salary</span>,
-        // Currency is always-LTR — wrap in `dir="ltr"` so the ₨ symbol
-        // and digits keep their natural order under RTL.
-        cell: ({ row }) =>
-          row.original.salary !== null &&
-          Number.isFinite(row.original.salary) ? (
-            <div dir="ltr" className="text-end">
-              <ParwestCurrency value={row.original.salary as number} />
-            </div>
-          ) : (
-            <div className="text-end text-muted-foreground">—</div>
-          ),
       },
       {
         accessorKey: "clientName",

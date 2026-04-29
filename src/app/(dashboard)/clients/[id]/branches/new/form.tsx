@@ -298,9 +298,15 @@ export default function BranchForm({
             operationsManagerId: selectedOperationsManagerId || null,
         }
 
-        // Ensure every contactPhone field is included
-        filledPhones.forEach((p, idx) => {
-            payload[idx === 0 ? "contactPhone" : `contactPhone_${idx}`] = p
+        // API contract (POST /api/branches): single flat `contactPhone` string.
+        // Indexed `contactPhone_<idx>` keys are silently ignored (and earlier
+        // were corrupting the payload via FormData spread → 500). Send only
+        // the first phone here; persist the rest once the API supports an
+        // additional-phones array.
+        payload.contactPhone = filledPhones[0]
+        // Strip any leftover indexed keys spread in from FormData.
+        Object.keys(payload).forEach((k) => {
+            if (/^contactPhone_\d+$/.test(k)) delete payload[k]
         })
 
         setSubmitting(true)

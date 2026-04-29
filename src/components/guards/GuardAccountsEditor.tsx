@@ -33,6 +33,117 @@ function getKind(walletType: BankAccountInput["walletType"]): AccountKind {
   return walletType === "BANK" ? "bank" : "wallet"
 }
 
+// --- Stable, module-scope row sub-components ---
+// These are defined OUTSIDE the parent component so React preserves their
+// identity across re-renders. Re-defining components inline (or using inline
+// ternaries that swap subtrees with mismatched structure) causes inputs to
+// remount on every keystroke, which is what was making the Account Details
+// fields lose focus after typing a single character.
+
+type SelectorProps = {
+  account: BankAccountInput
+  bankNames: string[]
+  walletTypes: { value: string; label: string }[]
+  onUpdate: (patch: Partial<BankAccountInput>) => void
+}
+
+function BankNameSelector({ account, bankNames, onUpdate }: SelectorProps) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
+        Bank Name <span className="text-red-500">*</span>
+      </label>
+      <select
+        className="ui-select"
+        value={account.bankName || ""}
+        onChange={(e) => onUpdate({ bankName: e.target.value })}
+      >
+        <option value="">-- Select Bank --</option>
+        {bankNames.map((b) => (
+          <option key={b} value={b}>{b}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function WalletTypeSelector({ account, walletTypes, onUpdate }: SelectorProps) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
+        Wallet Type <span className="text-red-500">*</span>
+      </label>
+      <select
+        className="ui-select"
+        value={account.walletType || ""}
+        onChange={(e) =>
+          onUpdate({ walletType: e.target.value as BankAccountInput["walletType"] })
+        }
+      >
+        <option value="">-- Select Wallet --</option>
+        {walletTypes.map((w) => (
+          <option key={w.value} value={w.value}>{w.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function BankOnlyFields({
+  account,
+  onUpdate,
+}: {
+  account: BankAccountInput
+  onUpdate: (patch: Partial<BankAccountInput>) => void
+}) {
+  return (
+    <>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">IBAN</label>
+        <input
+          className="ui-input"
+          placeholder="e.g. PK00XXXX0000000000000000"
+          value={account.iban || ""}
+          onChange={(e) => onUpdate({ iban: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Branch Code</label>
+        <input
+          className="ui-input"
+          placeholder="Branch code"
+          value={account.branchCode || ""}
+          onChange={(e) => onUpdate({ branchCode: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
+          Branch Location <span className="text-red-500">*</span>
+        </label>
+        <input
+          className="ui-input"
+          placeholder="e.g. Main Branch, Lahore"
+          value={account.branchLocation || ""}
+          onChange={(e) => onUpdate({ branchLocation: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Account Type</label>
+        <select
+          className="ui-select"
+          value={account.accountType || "SAVINGS"}
+          onChange={(e) =>
+            onUpdate({ accountType: e.target.value as BankAccountInput["accountType"] })
+          }
+        >
+          <option value="SAVINGS">Savings</option>
+          <option value="CURRENT">Current</option>
+        </select>
+      </div>
+    </>
+  )
+}
+
 // Loose generic over parent FieldValues — the parent form must include a
 // `bankAccounts` field of type `BankAccountInput[]`, but TS can't statically
 // enforce that constraint without breaking variance against zod's
@@ -200,39 +311,19 @@ export default function GuardAccountsEditor<TForm extends FieldValues>({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* Bank Name OR Wallet Type selector */}
                 {kind === "bank" ? (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
-                      Bank Name <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      className="ui-select"
-                      value={account.bankName || ""}
-                      onChange={(e) => updateField(index, { bankName: e.target.value })}
-                    >
-                      <option value="">-- Select Bank --</option>
-                      {bankNames.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <BankNameSelector
+                    account={account}
+                    bankNames={bankNames}
+                    walletTypes={walletTypes}
+                    onUpdate={(patch) => updateField(index, patch)}
+                  />
                 ) : (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
-                      Wallet Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      className="ui-select"
-                      value={account.walletType || ""}
-                      onChange={(e) =>
-                        updateField(index, { walletType: e.target.value as BankAccountInput["walletType"] })
-                      }
-                    >
-                      <option value="">-- Select Wallet --</option>
-                      {walletTypes.map((w) => (
-                        <option key={w.value} value={w.value}>{w.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <WalletTypeSelector
+                    account={account}
+                    bankNames={bankNames}
+                    walletTypes={walletTypes}
+                    onUpdate={(patch) => updateField(index, patch)}
+                  />
                 )}
 
                 {/* Account Title */}
@@ -261,50 +352,10 @@ export default function GuardAccountsEditor<TForm extends FieldValues>({
 
                 {/* Bank-only fields */}
                 {kind === "bank" && (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">IBAN</label>
-                      <input
-                        className="ui-input"
-                        placeholder="e.g. PK00XXXX0000000000000000"
-                        value={account.iban || ""}
-                        onChange={(e) => updateField(index, { iban: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Branch Code</label>
-                      <input
-                        className="ui-input"
-                        placeholder="Branch code"
-                        value={account.branchCode || ""}
-                        onChange={(e) => updateField(index, { branchCode: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
-                        Branch Location <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        className="ui-input"
-                        placeholder="e.g. Main Branch, Lahore"
-                        value={account.branchLocation || ""}
-                        onChange={(e) => updateField(index, { branchLocation: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--text-muted)]">Account Type</label>
-                      <select
-                        className="ui-select"
-                        value={account.accountType || "SAVINGS"}
-                        onChange={(e) =>
-                          updateField(index, { accountType: e.target.value as BankAccountInput["accountType"] })
-                        }
-                      >
-                        <option value="SAVINGS">Savings</option>
-                        <option value="CURRENT">Current</option>
-                      </select>
-                    </div>
-                  </>
+                  <BankOnlyFields
+                    account={account}
+                    onUpdate={(patch) => updateField(index, patch)}
+                  />
                 )}
 
                 {/* Account Status — always shown */}
