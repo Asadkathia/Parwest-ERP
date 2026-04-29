@@ -19,12 +19,56 @@
 import { z } from "zod"
 import { CNIC_REGEX, PHONE_REGEX } from "@/lib/validation/formats"
 
+// Capacity field keys — must match Prisma `Branch` columns and the
+// designation→capacity mapping used by `src/app/api/deployments/route.ts`.
+export const BRANCH_CAPACITY_FIELDS = [
+    "dayGuardCapacity",
+    "nightGuardCapacity",
+    "daySupervisorCapacity",
+    "nightSupervisorCapacity",
+    "cpoCapacity",
+    "dayCpoCapacity",
+    "nightCpoCapacity",
+    "daySoCapacity",
+    "nightSoCapacity",
+    "dayAsoCapacity",
+    "nightAsoCapacity",
+    "dayLsoCapacity",
+    "nightLsoCapacity",
+    "dayCctvCapacity",
+    "nightCctvCapacity",
+    "dayReceptionistCapacity",
+    "nightReceptionistCapacity",
+] as const
+export type BranchCapacityField = (typeof BRANCH_CAPACITY_FIELDS)[number]
+
+// Capacity inputs are strings on the form (HTML number inputs return ""),
+// then coerced to nullable non-negative integers before transmission.
+const capacityFieldSchema = z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .transform((v) => {
+        if (v === null || v === undefined || v === "") return null
+        const n = typeof v === "number" ? v : Number(v)
+        return Number.isFinite(n) ? n : NaN
+    })
+    .refine((n) => n === null || (Number.isInteger(n) && n >= 0), {
+        message: "Capacity must be a non-negative whole number.",
+    })
+
+const capacityShape = BRANCH_CAPACITY_FIELDS.reduce<
+    Record<BranchCapacityField, typeof capacityFieldSchema>
+>((acc, key) => {
+    acc[key] = capacityFieldSchema
+    return acc
+}, {} as Record<BranchCapacityField, typeof capacityFieldSchema>)
+
 // ─── Edit schema (lean — mirrors the edit form fields) ──────────────────────
 export const branchEditSchema = z.object({
     name: z.string().trim().min(1, "Branch name is required."),
     code: z.string().trim().optional().default(""),
     branchType: z.enum(["CONVENTIONAL", "ISLAMIC"]).optional().default("CONVENTIONAL"),
     isHeadOffice: z.boolean().optional().default(false),
+    status: z.enum(["ACTIVE", "INACTIVE"]).optional().default("ACTIVE"),
 
     address: z.string().trim().optional().default(""),
     city: z.string().trim().optional().default(""),
@@ -49,9 +93,12 @@ export const branchEditSchema = z.object({
             (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
             "Enter a valid email address.",
         ),
+
+    ...capacityShape,
 })
 
 export type BranchEditForm = z.input<typeof branchEditSchema>
+export type BranchEditFormParsed = z.output<typeof branchEditSchema>
 
 // ─── Create schema (covers the broad legacy create form — permissive) ───────
 // The legacy create form has many optional fields (capacity, contract,

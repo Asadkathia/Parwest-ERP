@@ -697,70 +697,157 @@ ${printBtn()}
 }
 
 // ─── Training Certificate ─────────────────────────────────────────────────────
+// Renders the guard's actual Training/OjtTrainingCheck rows as a checklist of
+// completed categories with completion dates. Falls back to a graceful "no
+// trainings on record" notice if none exist.
 
-function generateTrainingCertificate(g: Record<string, unknown>, _baseUrl: string): string {
+type TrainingRowForCert = {
+    id: string
+    trainingType: string
+    completedAt: Date
+    instructor: string | null
+    notes: string | null
+    ojtChecks: Array<{
+        completed: boolean
+        completedAt: Date | null
+        notes: string | null
+        category: { name: string } | null
+    }>
+}
+
+function generateTrainingCertificate(
+    g: Record<string, unknown>,
+    baseUrl: string,
+    trainings: TrainingRowForCert[] = []
+): string {
+    // Aggregate distinct completed categories across all trainings (latest date wins).
+    const completedMap = new Map<string, Date>()
+    for (const t of trainings) {
+        for (const c of t.ojtChecks) {
+            if (!c.completed || !c.category?.name) continue
+            const when = c.completedAt ?? t.completedAt
+            const prev = completedMap.get(c.category.name)
+            if (!prev || (when && when > prev)) completedMap.set(c.category.name, when)
+        }
+    }
+    const completedItems = Array.from(completedMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+
+    const sessionsRows = trainings.length > 0
+        ? trainings.map((t, i) => `
+            <tr>
+              <td style="border:1px solid #ccc;padding:6px;text-align:center;font-size:12px;width:36px;">${i + 1}</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${escHtml(t.trainingType || "—")}</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${escHtml(t.instructor || "—")}</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:13px;text-align:center;width:140px;">${fmtDate(t.completedAt, "short")}</td>
+            </tr>`).join("")
+        : `<tr><td colspan="4" style="border:1px solid #ccc;padding:14px;text-align:center;font-size:12px;color:#888;font-style:italic;">No training sessions on record.</td></tr>`
+
+    const itemsRows = completedItems.length > 0
+        ? completedItems.map(([name, when], i) => `
+            <tr>
+              <td style="border:1px solid #ccc;padding:6px;text-align:center;font-size:12px;width:36px;">${i + 1}</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${escHtml(name)}</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:14px;text-align:center;width:60px;color:#15803d;">&#10004;</td>
+              <td style="border:1px solid #ccc;padding:6px;font-size:13px;text-align:center;width:140px;">${fmtDate(when, "short")}</td>
+            </tr>`).join("")
+        : `<tr><td colspan="4" style="border:1px solid #ccc;padding:14px;text-align:center;font-size:12px;color:#888;font-style:italic;">No OJT items completed yet.</td></tr>`
+
+    const photoBox = g.photoUrl
+        ? `<img src="${escHtml(String(g.photoUrl))}" style="width:90px;height:110px;object-fit:cover;border:1px solid #ccc;" alt="photo"/>`
+        : `<div style="width:90px;height:110px;border:1px dashed #aaa;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;">No Photo</div>`
+
     return `<!doctype html><html><head><meta charset="utf-8"><title>Training Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
 body{padding:20px;max-width:900px;margin:0 auto;}
-.cert{border:3px solid #1a3a5c;padding:40px;background:#fff;position:relative;}
+.cert{border:3px solid #1a3a5c;padding:32px;background:#fff;position:relative;}
 .cert::before{content:'';position:absolute;inset:8px;border:1px solid #1a3a5c;pointer-events:none;}
-.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.04;font-size:80px;font-weight:700;color:#1a3a5c;white-space:nowrap;pointer-events:none;}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.04;font-size:64px;font-weight:700;color:#1a3a5c;white-space:nowrap;pointer-events:none;}
 table{border-collapse:collapse;width:100%;}
+@page{size:A4 portrait;margin:10mm;}
 </style></head><body>
 ${printBtn()}
 <div class="cert">
-  <div class="watermark">${COMPANY}</div>
-  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-    <img src="${_baseUrl}${LOGO}" style="width:70px;height:70px;" alt="logo"/>
-    <div>
-      <div style="font-size:20px;font-weight:700;color:#1a3a5c;">${COMPANY}</div>
-      <div style="font-size:12px;color:#555;">${ADDRESS}</div>
+  <div class="watermark">${escHtml(COMPANY)}</div>
+
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
+    <img src="${baseUrl}${LOGO}" style="width:70px;height:70px;" alt="logo"/>
+    <div style="flex:1;">
+      <div style="font-size:18px;font-weight:700;color:#1a3a5c;">${escHtml(COMPANY)}</div>
+      <div style="font-size:11px;color:#555;">${escHtml(ADDRESS)}</div>
     </div>
-    <div style="margin-left:auto;text-align:right;font-size:13px;font-weight:600;color:#1a3a5c;">
+    <div style="text-align:right;font-size:12px;font-weight:600;color:#1a3a5c;">
       Ref: ${v(g.parwestId as string)}<br/>
-      Date: ${fmtDate(g.createdAt as string, "short")}
+      Date: ${fmtDate(new Date(), "short")}
     </div>
   </div>
 
-  <div style="text-align:center;margin:20px 0;">
-    <h2 style="font-size:28px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-transform:uppercase;margin:0;">Training Certificate</h2>
+  <div style="text-align:center;margin:14px 0 18px;">
+    <h2 style="font-size:26px;font-weight:700;color:#1a3a5c;text-decoration:underline;text-transform:uppercase;margin:0;">Training Certificate</h2>
   </div>
 
-  <p style="font-size:14px;text-align:center;margin:8px 0 24px;">This is to certify that the following guard has successfully completed the required training programme.</p>
+  <p style="font-size:13px;text-align:center;margin:6px 0 20px;line-height:1.55;">
+    This is to certify that the security personnel detailed below has successfully completed the
+    On-Job Training (OJT) modules listed in this certificate, conducted under the supervision of
+    ${escHtml(COMPANY)}.
+  </p>
 
-  <table style="margin-bottom:20px;">
+  <table style="margin-bottom:14px;">
     <tr>
-      <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:13px;background:#f5f5f5;width:200px;">PPS Registration No.</td>
-      <td style="border:1px solid #ccc;padding:8px;font-size:14px;">${v(g.parwestId as string)}</td>
+      <td rowspan="5" style="border:1px solid #ccc;padding:6px;width:104px;text-align:center;vertical-align:middle;">${photoBox}</td>
+      <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f5f5f5;width:160px;">PPS Registration No.</td>
+      <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.parwestId as string)}</td>
     </tr>
     <tr>
-      <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:13px;background:#f5f5f5;">Guard Name</td>
-      <td style="border:1px solid #ccc;padding:8px;font-size:14px;">${v(g.name as string)}</td>
+      <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f5f5f5;">Guard Name</td>
+      <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.name as string)}</td>
     </tr>
     <tr>
-      <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:13px;background:#f5f5f5;">Father's Name</td>
-      <td style="border:1px solid #ccc;padding:8px;font-size:14px;">${v(g.fatherName as string)}</td>
+      <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f5f5f5;">Father&#39;s Name</td>
+      <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.fatherName as string)}</td>
     </tr>
     <tr>
-      <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:13px;background:#f5f5f5;">CNIC #</td>
-      <td style="border:1px solid #ccc;padding:8px;font-size:14px;">${v(g.cnic as string)}</td>
+      <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f5f5f5;">CNIC #</td>
+      <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.cnic as string)}</td>
     </tr>
     <tr>
-      <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:13px;background:#f5f5f5;">Date of Enrollment</td>
-      <td style="border:1px solid #ccc;padding:8px;font-size:14px;">${fmtDate(g.joiningDate as string, "short")}</td>
+      <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f5f5f5;">Designation / Enrollment</td>
+      <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.designation as string)} &nbsp;|&nbsp; ${fmtDate((g.dateOfEnrollment ?? g.joiningDate) as string, "short")}</td>
     </tr>
   </table>
 
-  <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:12px;">
+  <h3 style="background:#4a4a4a;color:#fff;padding:5px 8px;font-size:12px;margin:14px 0 0;">Training Sessions</h3>
+  <table>
+    <tr>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;width:36px;">#</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;text-align:left;">Training Type</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;text-align:left;">Instructor</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;width:140px;">Date Completed</th>
+    </tr>
+    ${sessionsRows}
+  </table>
+
+  <h3 style="background:#4a4a4a;color:#fff;padding:5px 8px;font-size:12px;margin:14px 0 0;">Completed OJT Modules</h3>
+  <table>
+    <tr>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;width:36px;">#</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;text-align:left;">Module / Category</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;width:60px;">Status</th>
+      <th style="border:1px solid #ccc;background:#f0f0f0;padding:6px;font-size:12px;width:140px;">Completed On</th>
+    </tr>
+    ${itemsRows}
+  </table>
+
+  <div style="margin-top:32px;display:flex;justify-content:space-between;font-size:11px;">
     <div style="text-align:center;">
-      <div style="border-top:1px solid #000;width:180px;padding-top:4px;">Training Officer</div>
+      <div style="border-top:1px solid #000;width:170px;padding-top:4px;">Training Officer</div>
     </div>
     <div style="text-align:center;">
-      <div style="border-top:1px solid #000;width:180px;padding-top:4px;">HR Manager</div>
+      <div style="border-top:1px solid #000;width:170px;padding-top:4px;">HR Manager</div>
     </div>
     <div style="text-align:center;">
-      <div style="border-top:1px solid #000;width:180px;padding-top:4px;">Managing Director</div>
+      <div style="border-top:1px solid #000;width:170px;padding-top:4px;">Managing Director</div>
     </div>
   </div>
 </div>
@@ -770,46 +857,121 @@ ${printBtn()}
 // ─── Character Certificate ────────────────────────────────────────────────────
 
 function generateCharacterCertificate(g: Record<string, unknown>, baseUrl: string): string {
+    const today = new Date()
+    const place = process.env.PARWEST_LETTERHEAD_PLACE || "Lahore"
+    const enrollmentDate = (g.dateOfEnrollment ?? g.joiningDate) as string | Date | null | undefined
+    const photoBox = g.photoUrl
+        ? `<img src="${escHtml(String(g.photoUrl))}" style="width:96px;height:118px;object-fit:cover;border:1px solid #999;" alt="photo"/>`
+        : `<div style="width:96px;height:118px;border:1px dashed #aaa;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;">No Photo</div>`
+
     return `<!doctype html><html><head><meta charset="utf-8"><title>Character Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
-body{padding:30px;max-width:800px;margin:0 auto;}
+body{padding:30px;max-width:820px;margin:0 auto;color:#111;}
+@page{size:A4 portrait;margin:14mm;}
+.lh-line{border-top:2px solid #1a3a5c;border-bottom:1px solid #1a3a5c;height:6px;margin:6px 0 14px;}
 </style></head><body>
 ${printBtn()}
-<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+
+<!-- Letterhead -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:0;">
   <tr>
-    <td>
-      <h1 style="margin:0;font-size:26px;font-weight:700;">${COMPANY}</h1>
-      <h2 style="margin:4px 0 0;font-size:15px;font-weight:400;">${ADDRESS}</h2>
-      <h2 style="margin:2px 0 0;font-size:15px;font-weight:400;">Tel: ${PHONE} | Fax: ${FAX}</h2>
-      <a style="font-size:15px;color:#000;">Email: ${EMAIL}</a>
+    <td style="vertical-align:middle;width:120px;padding-right:14px;">
+      <img src="${baseUrl}${LOGO}" style="width:108px;height:108px;object-fit:contain;" alt="logo"/>
     </td>
-    <td style="text-align:right;width:130px;vertical-align:top;">
-      <img src="${baseUrl}${LOGO}" style="width:110px;height:110px;object-fit:contain;" alt="logo"/>
+    <td style="vertical-align:middle;">
+      <h1 style="margin:0;font-size:26px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:0.4px;">${escHtml(COMPANY)}</h1>
+      <div style="margin:3px 0 0;font-size:12px;color:#444;">${escHtml(ADDRESS)}</div>
+      <div style="margin:2px 0 0;font-size:12px;color:#444;">Tel: ${escHtml(PHONE)} &nbsp;|&nbsp; Fax: ${escHtml(FAX)} &nbsp;|&nbsp; Email: ${escHtml(EMAIL)}</div>
     </td>
   </tr>
 </table>
+<div class="lh-line"></div>
 
-<div style="text-align:center;margin:40px 0 20px;">
-  <h2 style="font-size:26px;font-weight:700;text-decoration:underline;text-transform:uppercase;margin:0;">Character Certificate</h2>
+<!-- Reference / date row -->
+<div style="display:flex;justify-content:space-between;font-size:12px;margin:6px 0 18px;">
+  <div><strong>Ref:</strong> PPS/HR/CC/${v(g.parwestId as string)}</div>
+  <div><strong>Date:</strong> ${fmtDate(today)}</div>
 </div>
 
-<div style="font-size:18px;line-height:32px;text-align:justify;margin:40px 0;">
-  <p>It is certified that the Security Guard <strong>${v(g.parwestId as string)}</strong> is physically fit, reasonably
-  intelligent / alert and has no criminal record at the time of enrollment in
-  the verification of concerned Police Station.</p>
+<!-- Title -->
+<div style="text-align:center;margin:20px 0 10px;">
+  <h2 style="font-size:24px;font-weight:800;text-decoration:underline;text-transform:uppercase;margin:0;letter-spacing:0.6px;">Character Certificate</h2>
+  <div style="font-size:11px;color:#666;margin-top:4px;text-transform:uppercase;letter-spacing:1px;">To Whom It May Concern</div>
 </div>
 
-<div style="margin-top:120px;">
-  <h3 style="margin:0;font-size:18px;font-weight:400;">Dated: <span style="text-decoration:underline;">${fmtDate(g.createdAt as string)}</span></h3>
+<!-- Identity block with photo -->
+<table style="width:100%;border-collapse:collapse;margin:18px 0 8px;">
+  <tr>
+    <td style="vertical-align:top;padding-right:14px;">
+      <table style="border-collapse:collapse;width:100%;font-size:13px;">
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;width:42%;">Name</td>
+          <td style="padding:4px 6px;">${v(g.name as string)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;">Father&#39;s Name</td>
+          <td style="padding:4px 6px;">${v(g.fatherName as string)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;">CNIC No.</td>
+          <td style="padding:4px 6px;">${v(g.cnic as string)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;">PPS Registration No.</td>
+          <td style="padding:4px 6px;">${v(g.parwestId as string)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;">Designation</td>
+          <td style="padding:4px 6px;">${v(g.designation as string)}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;font-weight:700;">Date of Enrollment</td>
+          <td style="padding:4px 6px;">${fmtDate(enrollmentDate)}</td>
+        </tr>
+      </table>
+    </td>
+    <td style="vertical-align:top;width:110px;text-align:center;">${photoBox}</td>
+  </tr>
+</table>
+
+<!-- Attestation paragraph -->
+<div style="font-size:14px;line-height:1.85;text-align:justify;margin:22px 0 24px;">
+  <p style="margin:0 0 12px;">
+    This is to certify that <strong>${v(g.name as string)}</strong> S/o <strong>${v(g.fatherName as string)}</strong>,
+    holder of CNIC No. <strong>${v(g.cnic as string)}</strong>, has been enrolled with
+    ${escHtml(COMPANY)} bearing PPS Registration No. <strong>${v(g.parwestId as string)}</strong>
+    with effect from ${fmtDate(enrollmentDate)}.
+  </p>
+  <p style="margin:0 0 12px;">
+    During the period of his association with this company, his character and conduct have been found
+    to be <strong>satisfactory</strong>. He is physically fit, reasonably intelligent and alert, and to the best
+    of our knowledge has <strong>no criminal record</strong> as confirmed by the verification of the concerned
+    Police Station and through references provided at the time of enrollment.
+  </p>
+  <p style="margin:0;">
+    This certificate is issued on his request for record purposes and may be used for any lawful
+    employment, verification or regulatory requirement.
+  </p>
 </div>
 
-<div style="margin-top:60px;display:flex;justify-content:space-between;font-size:13px;">
-  <div>Guard Signature: ___________________________</div>
-  <div style="text-align:center;">
-    <div style="border-top:1px solid #000;width:180px;padding-top:4px;">HR Head / Authorized Signatory</div>
-  </div>
-</div>
+<!-- Place / Date / Signature -->
+<table style="width:100%;border-collapse:collapse;margin-top:46px;font-size:12px;">
+  <tr>
+    <td style="vertical-align:bottom;width:50%;">
+      <div><strong>Place:</strong> ${escHtml(place)}</div>
+      <div style="margin-top:6px;"><strong>Date:</strong> ${fmtDate(today)}</div>
+    </td>
+    <td style="vertical-align:bottom;text-align:center;width:50%;">
+      <div style="height:48px;"></div>
+      <div style="border-top:1px solid #000;width:240px;margin:0 auto;padding-top:4px;font-weight:700;">
+        Head of HR / Authorized Signatory
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">${escHtml(COMPANY)}</div>
+      <div style="font-size:10px;color:#777;margin-top:1px;">(Company Seal &amp; Stamp)</div>
+    </td>
+  </tr>
+</table>
 </body></html>`
 }
 
@@ -907,64 +1069,162 @@ ${printBtn()}
 // ─── Medical Certificate ──────────────────────────────────────────────────────
 
 function generateMedicalCertificate(g: Record<string, unknown>, baseUrl: string): string {
+    // Doctor / clinic identity is configured via env (no Setting model exists yet).
+    // Falls back to company-default values that the user can override later via env or
+    // a future settings table.
+    const doctorName = process.env.PARWEST_MEDICAL_DOCTOR_NAME || "Dr. Major (R) Navid Ahmed, MBBS"
+    const doctorTitle = process.env.PARWEST_MEDICAL_DOCTOR_TITLE || "Medical Officer"
+    const clinicName = process.env.PARWEST_MEDICAL_CLINIC_NAME || COMPANY
+    const clinicLicense = process.env.PARWEST_MEDICAL_LICENSE || ""
+    const today = new Date()
+
+    const photoBox = g.photoUrl
+        ? `<img src="${escHtml(String(g.photoUrl))}" style="width:96px;height:118px;object-fit:cover;border:1px solid #999;" alt="photo"/>`
+        : `<div style="width:96px;height:118px;border:1px dashed #aaa;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;">No Photo</div>`
+
+    const heightVal = v(g.height as string)
+    const weightStr = (g.weight as string | null | undefined)?.toString().trim()
+    const weightVal = weightStr ? `${escHtml(weightStr)} Kg` : "—"
+    const ageVal = g.age ? `${escHtml(String(g.age))} Years` : "—"
+    const bloodVal = v(g.bloodGroup as string)
+    const eyeVal = v(g.eyeColor as string)
+    const disabilityVal = v(g.disability as string, "None reported")
+    const idMarkVal = v(g.identificationMark as string)
+
     return `<!doctype html><html><head><meta charset="utf-8"><title>Medical Certificate – ${escHtml(String(g.parwestId ?? ""))}</title>
 <style>
 ${HEADER_CSS}
-body{padding:30px;max-width:800px;margin:0 auto;}
+body{padding:30px;max-width:820px;margin:0 auto;color:#111;}
+@page{size:A4 portrait;margin:14mm;}
 table{border-collapse:collapse;width:100%;}
+.lh-line{border-top:2px solid #1a3a5c;border-bottom:1px solid #1a3a5c;height:6px;margin:6px 0 14px;}
 </style></head><body>
 ${printBtn()}
-<table style="margin-bottom:8px;">
+
+<!-- Letterhead -->
+<table style="margin-bottom:0;">
   <tr>
-    <td>
-      <h1 style="margin:0;font-size:26px;font-weight:700;">${COMPANY}</h1>
-      <h2 style="margin:4px 0 0;font-size:15px;font-weight:400;">${ADDRESS}</h2>
+    <td style="vertical-align:middle;width:120px;padding-right:14px;">
+      <img src="${baseUrl}${LOGO}" style="width:108px;height:108px;object-fit:contain;" alt="logo"/>
     </td>
-    <td style="text-align:right;width:130px;vertical-align:top;">
-      <img src="${baseUrl}${LOGO}" style="width:110px;height:110px;object-fit:contain;" alt="logo"/>
+    <td style="vertical-align:middle;">
+      <h1 style="margin:0;font-size:24px;font-weight:800;color:#1a3a5c;text-transform:uppercase;">${escHtml(COMPANY)}</h1>
+      <div style="margin:3px 0 0;font-size:12px;color:#444;">${escHtml(ADDRESS)}</div>
+      <div style="margin:2px 0 0;font-size:12px;color:#444;">Tel: ${escHtml(PHONE)} &nbsp;|&nbsp; Email: ${escHtml(EMAIL)}</div>
     </td>
   </tr>
 </table>
+<div class="lh-line"></div>
 
-<div style="background:#f5f5f5;border:1px solid #ddd;padding:12px;margin-bottom:16px;border-radius:4px;">
-  <div style="font-size:16px;font-weight:700;">Dr. Major (R) Navid Ahmed, MBBS</div>
-  <div style="font-size:13px;color:#555;">Medical Officer, Parwest Pacific Security (Pvt.) Ltd.</div>
+<!-- Doctor / clinic banner -->
+<div style="background:#f5f5f5;border:1px solid #ddd;padding:10px 14px;margin-bottom:14px;border-radius:4px;">
+  <div style="font-size:15px;font-weight:700;">${escHtml(doctorName)}</div>
+  <div style="font-size:12px;color:#555;">${escHtml(doctorTitle)}, ${escHtml(clinicName)}${clinicLicense ? ` &nbsp;|&nbsp; Lic: ${escHtml(clinicLicense)}` : ""}</div>
 </div>
 
-<div style="text-align:center;margin:30px 0 20px;">
-  <h3 style="font-size:18px;font-weight:700;text-transform:uppercase;margin:0;">To Whom It May Concern</h3>
-  <h2 style="font-size:26px;font-weight:700;text-decoration:underline;text-transform:uppercase;margin:8px 0 0;">Medical Fitness Certificate</h2>
+<!-- Reference / date row -->
+<div style="display:flex;justify-content:space-between;font-size:12px;margin:6px 0 10px;">
+  <div><strong>Ref:</strong> PPS/MED/${v(g.parwestId as string)}</div>
+  <div><strong>Date of Examination:</strong> ${fmtDate(today)}</div>
 </div>
 
-<p style="font-size:15px;text-align:justify;margin:16px 0;">
-  This is to certify that I have examined the following person and found him/her medically fit for duty as a Security Guard with Parwest Pacific Security (Pvt.) Ltd.
+<!-- Title -->
+<div style="text-align:center;margin:14px 0 12px;">
+  <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;margin:0;letter-spacing:1.5px;">To Whom It May Concern</h3>
+  <h2 style="font-size:24px;font-weight:800;text-decoration:underline;text-transform:uppercase;margin:6px 0 0;letter-spacing:0.6px;">Medical Fitness Certificate</h2>
+</div>
+
+<!-- Intro paragraph -->
+<p style="font-size:13.5px;line-height:1.7;text-align:justify;margin:14px 0;">
+  This is to certify that I have personally examined the below-named individual on the date stated
+  above. Based on physical examination and review of the routine clinical findings, the individual
+  is found <strong>medically fit</strong> to perform the duties of a Security Guard with ${escHtml(COMPANY)}.
 </p>
 
-<table style="margin:20px 0;">
+<!-- Identity + photo -->
+<table style="margin:12px 0 6px;">
   <tr>
-    <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:14px;background:#f9f9f9;width:200px;">Name</td>
-    <td style="border:1px solid #ccc;padding:8px;font-size:15px;">${v(g.name as string)}</td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:14px;background:#f9f9f9;">Father's Name</td>
-    <td style="border:1px solid #ccc;padding:8px;font-size:15px;">${v(g.fatherName as string)}</td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #ccc;padding:8px;font-weight:700;font-size:14px;background:#f9f9f9;">CNIC #</td>
-    <td style="border:1px solid #ccc;padding:8px;font-size:15px;">${v(g.cnic as string)}</td>
+    <td style="vertical-align:top;padding-right:14px;">
+      <table style="border-collapse:collapse;width:100%;">
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;width:42%;">Name</td>
+          <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.name as string)}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Father&#39;s Name</td>
+          <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.fatherName as string)}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">CNIC #</td>
+          <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.cnic as string)}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">PPS Registration No.</td>
+          <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.parwestId as string)}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Designation</td>
+          <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${v(g.designation as string)}</td>
+        </tr>
+      </table>
+    </td>
+    <td style="vertical-align:top;width:110px;text-align:center;">${photoBox}</td>
   </tr>
 </table>
 
-<p style="font-size:14px;margin:16px 0;">
-  The above-named individual has been examined and found medically fit, with no significant physical or mental health issues that would prevent them from performing their duties effectively.
+<!-- Clinical findings -->
+<h3 style="background:#4a4a4a;color:#fff;padding:5px 8px;font-size:12px;margin:14px 0 0;">Clinical Findings</h3>
+<table>
+  <tr>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;width:24%;">Age</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;width:26%;">${ageVal}</td>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;width:24%;">Blood Group</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${bloodVal}</td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Height</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${heightVal}</td>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Weight</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${weightVal}</td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Eye Colour</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${eyeVal}</td>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Identification Mark</td>
+    <td style="border:1px solid #ccc;padding:6px;font-size:13px;">${idMarkVal}</td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Disability</td>
+    <td colspan="3" style="border:1px solid #ccc;padding:6px;font-size:13px;">${disabilityVal}</td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc;padding:6px;font-weight:700;font-size:12px;background:#f9f9f9;">Overall Assessment</td>
+    <td colspan="3" style="border:1px solid #ccc;padding:6px;font-size:13px;color:#15803d;font-weight:700;">FIT FOR DUTY</td>
+  </tr>
+</table>
+
+<p style="font-size:12.5px;line-height:1.7;text-align:justify;margin:14px 0;">
+  No significant physical or mental health condition was observed at the time of examination that
+  would prevent the individual from performing the duties of a Security Guard. This certificate is
+  issued for record / regulatory purposes.
 </p>
 
-<div style="margin-top:60px;display:flex;justify-content:space-between;font-size:13px;">
-  <div>Date: <strong>${fmtDate(g.createdAt as string)}</strong></div>
-  <div style="text-align:center;">
-    <div style="border-top:1px solid #000;width:200px;padding-top:4px;">Medical Officer (With Stamp)</div>
-  </div>
-</div>
+<!-- Sig block -->
+<table style="margin-top:42px;">
+  <tr>
+    <td style="vertical-align:bottom;width:50%;font-size:12px;">
+      <div><strong>Date:</strong> ${fmtDate(today)}</div>
+    </td>
+    <td style="vertical-align:bottom;text-align:center;width:50%;">
+      <div style="height:48px;"></div>
+      <div style="border-top:1px solid #000;width:240px;margin:0 auto;padding-top:4px;font-weight:700;font-size:12px;">
+        ${escHtml(doctorName)}
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">${escHtml(doctorTitle)}</div>
+      <div style="font-size:10px;color:#777;margin-top:1px;">(Doctor&#39;s Stamp &amp; Signature)</div>
+    </td>
+  </tr>
+</table>
 </body></html>`
 }
 
@@ -1074,6 +1334,255 @@ ${printBtn()}
 </body></html>`
 }
 
+// ─── PBA SA-05 / SA-10 / SA-11 ───────────────────────────────────────────────
+// Server-side equivalents of the legacy client-side templates that lived in
+// PBADocumentsTab.tsx. Centralising them here means: audit-logged, no popup
+// blockers, proper Content-Disposition for download, consistent escaping.
+
+type RelativeRef = {
+    name?: string
+    fatherName?: string
+    relation?: string
+    profession?: string
+    cnic?: string
+    contact?: string
+    address?: string
+}
+
+function generateSA05(g: Record<string, unknown>, _baseUrl: string): string {
+    return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>PBA SA-05 — ${escHtml(String(g.name ?? ""))}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff;}
+  .page{max-width:800px;margin:0 auto;padding:20px 24px;position:relative;}
+  .pba-ref{position:absolute;top:14px;right:24px;font-weight:bold;font-size:11px;border:1px solid #000;padding:2px 8px;}
+  table{width:100%;border-collapse:collapse;}
+  td,th{border:1px solid #333;padding:5px 9px;vertical-align:top;}
+  .header-cell{text-align:center;font-weight:bold;padding:7px;}
+  .lbl{width:46%;}
+  .blue{color:#1d4ed8;}
+  .red{color:#dc2626;}
+  .sec{font-weight:bold;background:#1a1a1a;color:#fff;padding:5px 9px;font-size:11px;margin-top:10px;}
+  .gap{height:10px;border:none;}
+  .guard-id{text-align:right;margin-top:6px;font-size:11px;font-weight:bold;}
+  @page{size:A4 portrait;margin:10mm;}
+  @media print{button{display:none!important;}}
+</style></head><body>
+${printBtn()}
+<div class="page">
+  <div class="pba-ref">PBA-SA-05</div>
+  <table>
+    <tr><td colspan="2" class="header-cell" style="font-size:13px;border-bottom:none;padding:10px 8px;">PARTICULARS &amp; DOCUMENTS OF GUARDS / SUPERVISORS</td></tr>
+    <tr><td colspan="2" class="header-cell" style="border-top:none;padding:5px 8px;">FOR PBA RECORDS PURPOSES</td></tr>
+    <tr><td class="lbl" style="font-weight:bold;">EMPLOYER SECURITY AGENCY</td><td class="blue" style="font-weight:bold;">${escHtml(COMPANY)}</td></tr>
+    <tr><td colspan="2" style="border:none;" class="gap"></td></tr>
+    <tr><td class="lbl">CNIC Number</td><td class="blue">${v(g.cnic as string)}</td></tr>
+    <tr><td>Name</td><td class="blue">${v(g.name as string)}</td></tr>
+    <tr><td>Father&#39;s Name</td><td class="blue">${v(g.fatherName as string)}</td></tr>
+    <tr><td>Date of Birth</td><td class="blue">${fmtDate(g.dateOfBirth as string, "short")}</td></tr>
+    <tr><td colspan="2" style="border:none;" class="gap"></td></tr>
+  </table>
+
+  <div class="sec">Training Particulars (For Guards Training)</div>
+  <table>
+    <tr><td class="lbl">Name of Training Institute</td><td class="blue">APSAA Training School</td></tr>
+    <tr><td>Training Period (Specific dates &nbsp; from - to)</td><td><span class="red">One week mandatory training</span> &nbsp;&nbsp;&nbsp;&nbsp; To</td></tr>
+    <tr><td>Name of Firing Range where last Firing Session Taken</td><td class="blue">APSAA Training School</td></tr>
+    <tr><td>Date of Firing Session:</td><td></td></tr>
+  </table>
+
+  <div class="sec">Medical Fitness Status</div>
+  <table>
+    <tr><td class="lbl">Hospital / Clinic / Doctor Name</td><td></td></tr>
+    <tr><td>Checkup Date</td><td></td></tr>
+    <tr><td>Checkup Status (Fit / Unfit)</td><td></td></tr>
+    <tr><td>Comments</td><td></td></tr>
+    <tr><td colspan="2" style="border:none;" class="gap"></td></tr>
+  </table>
+
+  <table style="margin-top:10px;">
+    <tr><td class="lbl" style="font-weight:bold;">Attachments:</td><td></td></tr>
+    <tr><td>CNIC Photocopy (both sides)</td><td class="blue">Attached</td></tr>
+    <tr><td>Photograph (Not more than 6 months old)</td><td class="blue">Attached</td></tr>
+    <tr><td colspan="2" style="height:64px;padding:8px 9px;vertical-align:bottom;">Signature &amp; Stamp of Security Agency</td></tr>
+  </table>
+
+  <div class="guard-id">${v(g.parwestId as string)}</div>
+</div>
+</body></html>`
+}
+
+function generateSA10(g: Record<string, unknown>, _baseUrl: string): string {
+    const rels = parseJson<RelativeRef>(g.nearestRelativesJson as string)
+    const ref1 = rels[0] ?? {}
+    const ref2 = rels[1] ?? {}
+
+    const refBlock = (ref: RelativeRef, num: string) => `
+    <tr><td class="lbl">Name of ${num} Reference</td><td class="blue">${v(ref.name)}</td></tr>
+    <tr><td>CNIC Number</td><td class="blue">${v(ref.cnic)}</td></tr>
+    <tr><td>Relationship</td><td class="blue">${v(ref.relation)}</td></tr>
+    <tr><td>Address</td><td class="blue" style="min-height:36px;">${v(ref.address)}</td></tr>
+    <tr><td colspan="2" style="border:none;height:4px;"></td></tr>
+    <tr><td>Phone Number</td><td class="blue">${v(ref.contact)}</td></tr>`
+
+    return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>PBA SA-10 — ${escHtml(String(g.name ?? ""))}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff;}
+  .page{max-width:800px;margin:0 auto;padding:20px 24px;position:relative;}
+  .pba-ref{position:absolute;top:14px;right:24px;font-weight:bold;font-size:11px;border:1px solid #000;padding:2px 8px;}
+  table{width:100%;border-collapse:collapse;margin-bottom:3px;}
+  td{border:1px solid #333;padding:4px 9px;vertical-align:top;}
+  .header-cell{text-align:center;font-weight:bold;padding:6px 8px;}
+  .lbl{width:42%;}
+  .blue{color:#1d4ed8;}
+  .sec-hdr{font-weight:bold;background:#1a1a1a;color:#fff;padding:5px 9px;font-size:11px;margin-top:6px;}
+  .conf-text{font-size:10.5px;padding:8px 9px;line-height:1.5;border:1px solid #333;border-top:none;}
+  .sig-row{display:flex;gap:24px;padding:18px 9px 8px;font-size:10.5px;border:1px solid #333;border-top:none;}
+  .sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:2px;}
+  .guard-id{text-align:right;margin-top:6px;font-size:11px;font-weight:bold;}
+  @page{size:A4 portrait;margin:10mm;}
+  @media print{button{display:none!important;}}
+</style></head><body>
+${printBtn()}
+<div class="page">
+  <div class="pba-ref">PBA-SA-10</div>
+  <table>
+    <tr><td colspan="2" class="header-cell" style="font-size:11.5px;padding:8px;">PARTICULARS OF EX-SERVICEMEN (ARMED / PARA MILITARY FORCES) GUARDS / SUPERVISORS</td></tr>
+    <tr><td class="lbl" style="font-weight:bold;">EMPLOYER SECURITY AGENCY</td><td style="font-weight:bold;">${escHtml(COMPANY)}</td></tr>
+    <tr><td colspan="2" style="border:none;height:6px;"></td></tr>
+    <tr><td>CNIC Number</td><td class="blue">${v(g.cnic as string)}</td></tr>
+    <tr><td>Name</td><td class="blue">${v(g.name as string)}</td></tr>
+    <tr><td>Joining Date</td><td class="blue">${fmtDate(g.joiningDate as string, "short")}</td></tr>
+    <tr><td>Permanent Address</td><td class="blue" style="min-height:40px;">${v(g.addressPermanent as string)}</td></tr>
+    <tr><td colspan="2" style="border:none;height:4px;"></td></tr>
+    <tr><td>Phone Numbers</td><td class="blue">${v(g.phone as string)}</td></tr>
+    <tr><td>Residential Address</td><td class="blue" style="min-height:40px;">${v((g.addressCurrent as string) || (g.addressPermanent as string))}</td></tr>
+    <tr><td colspan="2" style="border:none;height:4px;"></td></tr>
+    <tr><td>Phone Numbers</td><td class="blue">${v(g.phone as string)}</td></tr>
+  </table>
+
+  <table>${refBlock(ref1, "1st")}</table>
+  <table>${refBlock(ref2, "2nd")}</table>
+
+  <table>
+    <tr><td class="lbl">Name of Armed Forces Unit Served</td><td class="blue">${v(g.exServiceUnit as string)}</td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td class="blue">${v(g.exServicePeriod as string)}</td></tr>
+    <tr><td>Last Employer (other than Armed Forces)</td><td></td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td></td></tr>
+    <tr><td>2nd Last Employer (other than Armed Forces)</td><td></td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td></td></tr>
+  </table>
+
+  <div class="sec-hdr">CONFIRMATION OF VERIFICATION OF CREDENTIALS</div>
+  <div class="conf-text">
+    We hereby confirm that verification of the above particulars have been completed by us from concerned/
+    relevant departments/authorities/organizations/persons.
+  </div>
+  <div class="sig-row">
+    <div style="font-weight:bold;min-width:220px;">COMPANY AUTHORIZED SIGNATURE</div>
+    <div style="flex:1;">
+      <div>Name <span class="sig-line">&nbsp;</span></div>
+      <div style="margin-top:10px;">Date <span class="sig-line">&nbsp;</span></div>
+    </div>
+  </div>
+
+  <div class="guard-id">${v(g.parwestId as string)}</div>
+</div>
+</body></html>`
+}
+
+function generateSA11(g: Record<string, unknown>, _baseUrl: string): string {
+    const rels = parseJson<RelativeRef>(g.nearestRelativesJson as string)
+    const ref1 = rels[0] ?? {}
+    const ref2 = rels[1] ?? {}
+
+    const refRow = (ref: RelativeRef, num: string) => `
+    <tr><td class="lbl">Name of ${num} Reference</td><td class="blue">${v(ref.name)}</td></tr>
+    <tr><td>CNIC Number</td><td class="blue">${v(ref.cnic)}</td></tr>
+    <tr><td>Relationship</td><td class="blue">${v(ref.relation)}</td></tr>
+    <tr><td>Address</td><td class="blue">${v(ref.address)}</td></tr>
+    <tr><td>Phone Number</td><td class="blue">${v(ref.contact)}</td></tr>`
+
+    const verifRef = (ref: RelativeRef, num: string) => `
+    <tr><td>${num} REFERENCE</td><td>${ref.name
+        ? `<span class="blue">${v(ref.name)}</span>&emsp;<span class="blue">${v(ref.relation)}</span>&emsp;Through personal telephonic verification`
+        : "—"
+      }</td></tr>`
+
+    return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>PBA SA-11 — ${escHtml(String(g.name ?? ""))}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff;}
+  .page{max-width:800px;margin:0 auto;padding:20px 24px;position:relative;}
+  .pba-ref{position:absolute;top:14px;right:24px;font-weight:bold;font-size:11px;border:1px solid #000;padding:2px 8px;}
+  table{width:100%;border-collapse:collapse;margin-bottom:4px;}
+  td{border:1px solid #333;padding:4px 9px;vertical-align:top;}
+  .header-cell{text-align:center;font-weight:bold;padding:6px;}
+  .lbl{width:42%;}
+  .blue{color:#1d4ed8;}
+  .sec-hdr{font-weight:bold;border:1px solid #333;border-bottom:none;padding:4px 9px;background:#f0f0f0;font-size:11px;margin-top:6px;}
+  .note{font-size:9px;font-style:italic;padding:3px 9px;}
+  .guard-id{text-align:right;margin-top:6px;font-size:11px;font-weight:bold;}
+  @page{size:A4 portrait;margin:10mm;}
+  @media print{button{display:none!important;}}
+</style></head><body>
+${printBtn()}
+<div class="page">
+  <div class="pba-ref">PBA-SA-11</div>
+  <table>
+    <tr><td colspan="2" class="header-cell" style="font-size:12px;border-bottom:none;padding:9px 8px;">VERIFICATION STATUS OF PARTICULARS OF GUARDS / SUPERVISORS</td></tr>
+    <tr><td colspan="2" class="header-cell" style="border-top:none;padding:5px 8px;">FOR PBA RECORDS</td></tr>
+    <tr><td class="lbl" style="font-weight:bold;">EMPLOYER SECURITY AGENCY</td><td style="font-weight:bold;">${escHtml(COMPANY).toUpperCase()}</td></tr>
+    <tr><td>CNIC Number</td><td class="blue">${v(g.cnic as string)}</td></tr>
+    <tr><td>Name</td><td class="blue">${v(g.name as string)}</td></tr>
+    <tr><td>Joining Date</td><td class="blue">${fmtDate(g.joiningDate as string, "short")}</td></tr>
+    <tr><td>Permanent Address</td><td class="blue">${v(g.addressPermanent as string)}</td></tr>
+    <tr><td>Phone Numbers</td><td class="blue">${v(g.phone as string)}</td></tr>
+    <tr><td>Residential Address</td><td class="blue">${v((g.addressCurrent as string) || (g.addressPermanent as string))}</td></tr>
+    <tr><td>Phone Numbers</td><td class="blue">${v(g.phone as string)}</td></tr>
+  </table>
+
+  <table>${refRow(ref1, "1st")}</table>
+  <table>${refRow(ref2, "2nd")}</table>
+
+  <table>
+    <tr><td class="lbl">Name of Last Employer</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td>-</td></tr>
+    <tr><td>Employment Document Submitted</td><td>-</td></tr>
+    <tr><td>Name of 2nd Last Employer</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td>-</td></tr>
+    <tr><td>Employment Document Submitted</td><td>-</td></tr>
+    <tr><td>Name of 3rd Last Employer</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>Joining Date &amp; Departure Date</td><td>-</td></tr>
+    <tr><td>Employment Document Submitted</td><td>-</td></tr>
+    <tr><td colspan="2" class="note">(Where incumbent has had more than three employers in last 15 years, provide further information on extra sheet)</td></tr>
+  </table>
+
+  <div class="sec-hdr">VERIFICATION STATUS:</div>
+  <table>
+    <tr><td class="lbl">CNIC</td><td class="blue">Through NADRA Verisys</td></tr>
+    <tr><td>PERMANENT ADDRESS &amp; PHONE</td><td class="blue">Through Home Town Police Verification</td></tr>
+    <tr><td>RESIDENTIAL ADDRESS &amp; PHONE</td><td class="blue">Same as Above</td></tr>
+    ${verifRef(ref1, "1ST")}
+    ${verifRef(ref2, "2ND")}
+    <tr><td>LAST EMPLOYMENT</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>2ND LAST EMPLOYMENT</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>3RD LAST EMPLOYMENT</td><td class="blue">No Employed Before</td></tr>
+    <tr><td>COMPANY SIGNATURE &amp; STAMP</td><td style="height:54px;"></td></tr>
+  </table>
+
+  <div class="guard-id">${v(g.parwestId as string)}</div>
+</div>
+</body></html>`
+}
+
 // ─── Document type → slug mapping ────────────────────────────────────────────
 
 const DOC_GENERATORS: Record<string, (g: Record<string, unknown>, baseUrl: string) => string> = {
@@ -1087,6 +1596,27 @@ const DOC_GENERATORS: Record<string, (g: Record<string, unknown>, baseUrl: strin
     "medical-certificate": generateMedicalCertificate,
     "antecedents": generateAntecedents,
     "iqrar-nama": generateIqrarNama,
+    // PBA forms (formerly client-side in PBADocumentsTab.tsx)
+    "sa05": generateSA05,
+    "sa10": generateSA10,
+    "sa11": generateSA11,
+}
+
+// Filename slug used in Content-Disposition for downloads.
+const DOC_FILENAMES: Record<string, string> = {
+    "form-a": "Form-A",
+    "form-b": "Form-B",
+    "employee-card": "Employee-Card",
+    "personal-verification": "Personal-Verification",
+    "training-certificate": "Training-Certificate",
+    "character-certificate": "Character-Certificate",
+    "checklist": "Documents-Checklist",
+    "medical-certificate": "Medical-Certificate",
+    "antecedents": "Antecedents-Verification",
+    "iqrar-nama": "Iqrar-Nama",
+    "sa05": "PBA-SA-05",
+    "sa10": "PBA-SA-10",
+    "sa11": "PBA-SA-11",
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
@@ -1107,13 +1637,45 @@ export async function GET(
     if (!guard) return new NextResponse("Guard not found", { status: 404 })
 
     const origin = new URL(request.url).origin
-    const html = generator(guard as unknown as Record<string, unknown>, origin)
+
+    // Training Certificate needs Training + OjtTrainingCheck rows so the
+    // checklist reflects what's actually been completed for this guard.
+    let html: string
+    if (docType === "training-certificate") {
+        const trainings = await prisma.training.findMany({
+            where: { guardId: id },
+            orderBy: { completedAt: "desc" },
+            include: {
+                ojtChecks: {
+                    include: { category: { select: { name: true } } },
+                },
+            },
+        })
+        html = generateTrainingCertificate(
+            guard as unknown as Record<string, unknown>,
+            origin,
+            trainings as unknown as TrainingRowForCert[]
+        )
+    } else {
+        html = generator(guard as unknown as Record<string, unknown>, origin)
+    }
+
+    // ?action=download → attachment, anything else → inline (default = view).
+    const action = (new URL(request.url).searchParams.get("action") || "view").toLowerCase()
+    const isDownload = action === "download"
+    const filenameBase = DOC_FILENAMES[docType] || docType
+    const filename = `${filenameBase}-${(guard as { parwestId?: string }).parwestId || id}.html`
+    const disposition = isDownload
+        ? `attachment; filename="${filename}"`
+        : `inline; filename="${filename}"`
 
     return new NextResponse(html, {
         status: 200,
         headers: {
             "Content-Type": "text/html; charset=utf-8",
+            "Content-Disposition": disposition,
             "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
         },
     })
 }

@@ -550,8 +550,11 @@ model Deployment {
   dayShiftEnd      String?
   nightShiftStart  String?
   nightShiftEnd    String?
-  deploymentType   String? @default("REGULAR") // REGULAR, OVERTIME
+  deploymentType   String? @default("REGULAR") // REGULAR, OVERTIME, EXTRA — constrained by zod at the API layer (see deployments schemas)
   deploymentNature String? @default("PERMANENT") // PERMANENT, TEMPORARY
+  // DEPRECATED: kept during the migration grace window. Going forward,
+  // use deploymentType === "EXTRA" instead. The API will populate both
+  // fields until callers migrate, then this column will be dropped.
   isExtraGuard     Boolean @default(false)
   comment          String?
 
@@ -661,7 +664,56 @@ model Training {
   notes        String?
   createdAt    DateTime @default(now())
 
+  // OJT (On-Job Training) item-level checks linked to this training session.
+  // The Training model functions as the OJT record; each TrainingCategory
+  // can have at most one OjtTrainingCheck per Training (see unique constraint).
+  ojtChecks OjtTrainingCheck[]
+
   @@index([guardId])
+}
+
+// ============================================
+// OJT TRAINING CATEGORIES (lookup table)
+// ============================================
+//
+// Admin-managed list of training items (e.g. "Basic Drill", "Firearms Handling").
+// Decoupled from code so QA / Ops can manage the canonical list without
+// shipping a release. Use OjtTrainingCheck as the join table linking each
+// Training (OJT session) record to the categories that were completed.
+model TrainingCategory {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ojtChecks OjtTrainingCheck[]
+
+  @@index([isActive, sortOrder])
+}
+
+// Per-Training, per-Category check.
+// Composite unique (ojtId, categoryId) means each category appears at most
+// once per OJT record — UI toggles `completed` on/off.
+model OjtTrainingCheck {
+  id          String    @id @default(cuid())
+  ojtId       String
+  ojt         Training  @relation(fields: [ojtId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    TrainingCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ojtId, categoryId])
+  @@index([ojtId])
+  @@index([categoryId])
 }
 
 // ============================================
@@ -769,17 +821,25 @@ model Client {
   @@index([status])
 }
 
+// Branch lifecycle status. Branches are not blacklisted (that's a
+// client-level concept), so only ACTIVE / INACTIVE are valid.
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model Branch {
-  id                       String  @id @default(cuid())
+  id                       String       @id @default(cuid())
   clientId                 String
-  client                   Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client                   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name                     String
   code                     String?
   address                  String?
   city                     String?
   province                 String?
   type                     String? // CONVENTIONAL, ISLAMIC, etc.
-  isHeadOffice             Boolean @default(false)
+  status                   BranchStatus @default(ACTIVE)
+  isHeadOffice             Boolean      @default(false)
   contactPerson            String?
   contactPersonDesignation String?
   contactPhone             String?
@@ -862,6 +922,7 @@ model Branch {
   advancePayments       ClientAdvancePayment[]
 
   @@index([clientId])
+  @@index([status])
 }
 
 model ClientContract {

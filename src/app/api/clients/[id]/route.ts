@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
 const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
@@ -72,6 +73,25 @@ export async function PUT(
                     return badRequest("reservePct must be a decimal between 0 and 1.")
                 }
                 reservePctValue = num
+            }
+        }
+
+        // Ticket 33 — block client deactivation while any branch is still ACTIVE.
+        // Mirrored on the PUT path so save-from-edit-form is also gated.
+        const incomingStatus = body.status ? String(body.status) : null
+        if (
+            incomingStatus === "INACTIVE" &&
+            existingClient.status !== "INACTIVE" &&
+            isWorkflowRuleEnabled("branches.requireInactiveBranchesBeforeClientInactive")
+        ) {
+            const activeBranch = await prisma.branch.findFirst({
+                where: { clientId: id, status: "ACTIVE" },
+                select: { id: true },
+            })
+            if (activeBranch) {
+                return conflict(
+                    "Cannot deactivate client while branches are still active. Deactivate or remove all branches first."
+                )
             }
         }
 
@@ -185,6 +205,23 @@ export async function PATCH(
         const status = body?.status ? String(body.status) : null
         if (!status || !["ACTIVE", "INACTIVE"].includes(status)) {
             return badRequest("Status must be ACTIVE or INACTIVE.")
+        }
+
+        // Ticket 33 — block client deactivation while any branch is still ACTIVE.
+        // Workflow rule defaults ON; admins can opt out.
+        if (
+            status === "INACTIVE" &&
+            isWorkflowRuleEnabled("branches.requireInactiveBranchesBeforeClientInactive")
+        ) {
+            const activeBranch = await prisma.branch.findFirst({
+                where: { clientId: id, status: "ACTIVE" },
+                select: { id: true },
+            })
+            if (activeBranch) {
+                return conflict(
+                    "Cannot deactivate client while branches are still active. Deactivate or remove all branches first."
+                )
+            }
         }
 
         const updated = await prisma.client.update({ where: { id }, data: { status } })

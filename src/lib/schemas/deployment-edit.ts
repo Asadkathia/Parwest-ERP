@@ -96,7 +96,8 @@ export const deploymentEditSchema = z
     notes: z.string().trim().optional().default(""),
   })
   .superRefine((val, ctx) => {
-    if (val.isExtraGuard && val.deploymentNature !== "TEMPORARY") {
+    const isExtra = val.isExtraGuard || val.deploymentType === "EXTRA"
+    if (isExtra && val.deploymentNature !== "TEMPORARY") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["deploymentNature"],

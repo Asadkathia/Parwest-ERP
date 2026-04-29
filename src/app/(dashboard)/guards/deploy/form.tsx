@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { useRouter } from "next/navigation"
 import { FileText, MapPin, Users, Shield, Calendar, Clock, CheckCircle2, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { isNotFutureDate } from "@/lib/validation/formats"
 
 // Convert "HH:MM" to minutes-since-midnight. Returns NaN on invalid input.
@@ -169,6 +170,7 @@ const SHIFT_OPTIONS = [
 const DEPLOYMENT_TYPE_OPTIONS = [
   { id: "REGULAR", name: "Regular" },
   { id: "OVERTIME", name: "Overtime" },
+  { id: "EXTRA", name: "Extra" },
 ]
 
 const DEPLOYMENT_NATURE_OPTIONS = [
@@ -205,9 +207,11 @@ function StatusDot({ status }: { status: string }) {
 type DeployGuardFormProps = {
   lockedRegionId?: string | null
   lockedRegionalOfficeId?: string | null
+  /** Server-resolved value of `deployments.allowExtraType` workflow rule. */
+  allowExtraType?: boolean
 }
 
-export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalOfficeId = null }: DeployGuardFormProps = {}) {
+export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalOfficeId = null, allowExtraType = true }: DeployGuardFormProps = {}) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -238,8 +242,11 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
   const [deploymentDate, setDeploymentDate] = useState(new Date().toISOString().split("T")[0])
   const [deploymentType, setDeploymentType] = useState("REGULAR")
   const [deploymentNature, setDeploymentNature] = useState("PERMANENT")
-  const [isExtraGuard, setIsExtraGuard] = useState(false)
   const [comment, setComment] = useState("")
+  // Extra Guard is now a derived state: deploymentType === "EXTRA". The
+  // standalone `isExtraGuard` checkbox was removed in favor of a single
+  // source of truth (the deployment type select) per Ticket 34.
+  const isExtraGuard = deploymentType === "EXTRA"
   const [salaryInput, setSalaryInput] = useState("")
   const [overtimeInput, setOvertimeInput] = useState("")
 
@@ -316,10 +323,11 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
       .finally(() => setEligibilityLoading(false))
   }, [selectedGuard])
 
-  // Extra guard always means Temporary deployment
+  // Extra guard always means Temporary deployment. `isExtraGuard` is derived
+  // from `deploymentType === "EXTRA"`, so this watches deploymentType.
   useEffect(() => {
-    if (isExtraGuard) setDeploymentNature("TEMPORARY")
-  }, [isExtraGuard])
+    if (deploymentType === "EXTRA") setDeploymentNature("TEMPORARY")
+  }, [deploymentType])
 
   const loadAllDeployments = async () => {
     try {
@@ -439,14 +447,18 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
 
     // Branch is required when the client has branches
     if (branchesLoaded && branches.length > 0 && !selectedBranch) {
-      setError("Please select a branch. This client has branches and a branch must be chosen.")
+      const msg = "Please select a branch. This client has branches and a branch must be chosen."
+      setError(msg)
+      toast.error(msg)
       setLoading(false)
       return
     }
 
     // ── Future-date block (client) ──────────────────────────────────────
     if (!isNotFutureDate(deploymentDate)) {
-      setError("Deployment date cannot be in the future.")
+      const msg = "Deployment date cannot be in the future."
+      setError(msg)
+      toast.error(msg)
       setLoading(false)
       return
     }
@@ -474,7 +486,9 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
           return shiftsOverlap(newStart, newEnd, existingStart, existingEnd)
         })
         if (conflict) {
-          setError("This guard is already deployed during the selected shift on this date.")
+          const msg = "This guard is already deployed during the selected shift on this date."
+          setError(msg)
+          toast.error(msg)
           setLoading(false)
           return
         }
@@ -486,13 +500,17 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     // Daily Rate is required — payroll engine reads dep.salary ?? dep.rate ?? 0
     const parsedSalary = parseFloat(salaryInput)
     if (!salaryInput || Number.isNaN(parsedSalary) || parsedSalary <= 0) {
-      setError("Daily Rate is required.")
+      const msg = "Daily Rate is required."
+      setError(msg)
+      toast.error(msg)
       setLoading(false)
       return
     }
     const parsedOvertime = overtimeInput ? parseFloat(overtimeInput) : undefined
     if (overtimeInput && (Number.isNaN(parsedOvertime!) || parsedOvertime! < 0)) {
-      setError("Overtime Hourly Rate must be a non-negative number.")
+      const msg = "Overtime Hourly Rate must be a non-negative number."
+      setError(msg)
+      toast.error(msg)
       setLoading(false)
       return
     }
@@ -502,6 +520,7 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
       const failedChecks = Object.values(eligibility.checks).filter((c) => !c.pass)
       const details = failedChecks.map((c) => `${c.label}: ${c.message}`).join(" • ")
       setError(`Guard is not eligible for deployment — ${details}`)
+      toast.error("Guard is not eligible for deployment", { description: details })
       setLoading(false)
       return
     }
@@ -518,9 +537,11 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
           }
           const cap = payload.data
           if (cap && cap.atCapacity) {
-            setError(
-              `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${cap.used}/${cap.limit}). No more guards can be deployed to this role/shift.`
-            )
+            const msg = `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${cap.used}/${cap.limit}). No more guards can be deployed to this role/shift.`
+            setError(msg)
+            toast.error("Branch capacity reached", {
+              description: `${shiftType.toLowerCase()} ${designation}: ${cap.used}/${cap.limit}`,
+            })
             setLoading(false)
             return
           }
@@ -549,6 +570,9 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
           nightShiftEnd: shiftType === "NIGHT" ? nightShiftEnd : null,
           deploymentType,
           deploymentNature: isExtraGuard ? "TEMPORARY" : (deploymentNature || "PERMANENT"),
+          // `isExtraGuard` boolean is deprecated (kept during migration grace period)
+          // — the canonical value is `deploymentType === "EXTRA"`. We still send
+          // the boolean for backward-compat with reports/queries that read it.
           isExtraGuard,
           comment: isExtraGuard ? comment : null,
           salary: parsedSalary,
@@ -558,18 +582,37 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
       })
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || "Failed to deploy guard")
+        const data = await res.json().catch(() => ({} as { message?: string }))
+        const message = (data as { message?: string }).message ?? "Failed to create deployment"
+        setError(message)
+        toast.error(message)
+        setLoading(false)
+        return
       }
 
       const deployment = await res.json()
+
+      // Success — surface a toast describing the outcome. The form deploys
+      // a single guard per submit, but we keep the count abstraction so the
+      // copy reads naturally if this ever becomes multi-guard.
+      const guardCount = 1
+      const branchLabel =
+        selectedBranchData
+          ? (selectedBranchData.city ? `${selectedBranchData.name} - ${selectedBranchData.city}` : selectedBranchData.name)
+          : (clients.find((c) => c.id === selectedClient)?.name ?? "the selected client")
+      toast.success("Deployment created", {
+        description: `${guardCount} guard(s) deployed to ${branchLabel}`,
+      })
+
       if (deployment?.id) {
         router.push(`/deployments/${deployment.id}`)
       } else {
         setNotice("Guard deployed successfully.")
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to deploy guard")
+      const message = err instanceof Error ? err.message : "Failed to deploy guard"
+      setError(message)
+      toast.error("Network error. Please try again.", { description: message })
     } finally {
       setLoading(false)
     }
@@ -882,22 +925,24 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
             </div>
 
             {activeDeployments.length > 0 ? (
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                  Deployment Type <span className="text-xs text-[var(--text-muted)] font-normal">(metadata only — does not change pay rate)</span>
-                </label>
-                <div className="ui-input bg-amber-50 text-amber-800 text-sm flex items-center gap-2 cursor-not-allowed border-amber-200">
-                  <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 110 18A9 9 0 0112 3z" /></svg>
-                  Overtime / Double Duty
-                  <span className="ml-auto text-xs text-amber-600 font-medium">Locked — already deployed</span>
-                </div>
-              </div>
+              // Guard already deployed — only Overtime or Extra are sensible
+              // deployment-type values for an additional row. (Regular is
+              // disallowed by server-side rules when an active deployment exists.)
+              <SearchableCombobox
+                label="Deployment Type (metadata only — does not change pay rate)"
+                value={deploymentType === "REGULAR" ? "OVERTIME" : deploymentType}
+                onChange={setDeploymentType}
+                options={DEPLOYMENT_TYPE_OPTIONS.filter((o) =>
+                  o.id === "OVERTIME" || (o.id === "EXTRA" && allowExtraType)
+                )}
+                placeholder="Select deployment type..."
+              />
             ) : (
               <SearchableCombobox
                 label="Deployment (metadata only — does not change pay rate)"
                 value={deploymentType}
                 onChange={setDeploymentType}
-                options={DEPLOYMENT_TYPE_OPTIONS}
+                options={DEPLOYMENT_TYPE_OPTIONS.filter((o) => o.id !== "EXTRA" || allowExtraType)}
                 placeholder="Select deployment type..."
               />
             )}
@@ -922,19 +967,13 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
               />
             )}
 
-            <div className="flex items-end">
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-                <input
-                  name="isExtra"
-                  type="checkbox"
-                  checked={isExtraGuard}
-                  onChange={(e) => setIsExtraGuard(e.target.checked)}
-                  className="h-4 w-4 accent-[var(--brand)]"
-                />
-                Extra Guard (Comment Required)
-              </label>
-            </div>
-
+            {/* Extra Guard is selected via the Deployment Type select above
+                (value = "EXTRA"). The legacy standalone checkbox was removed
+                in Ticket 34 to make the type the single source of truth.
+                When EXTRA is selected we automatically:
+                  • lock Deployment Nature to TEMPORARY
+                  • require a comment explaining the ad-hoc deployment
+                  • send isExtraGuard=true to the API for backward-compat. */}
             {isExtraGuard ? (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">Comment <span className="text-red-500">*</span></label>

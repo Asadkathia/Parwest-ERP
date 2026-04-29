@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma, StoreInventoryAssignmentStatus } from "@prisma/client"
+import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
@@ -9,6 +10,12 @@ import { badRequest, conflict, forbidden, internalServerError, notFound, unautho
 import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
+
+// Allowed deployment-type values. Constrained at the zod layer because
+// `Deployment.deploymentType` is a free `String?` in Prisma (not an enum).
+// Keep this list in sync with `DEPLOYMENT_TYPES` in
+// `src/lib/schemas/deployment-create.ts` and the form options.
+const deploymentTypeSchema = z.enum(["REGULAR", "OVERTIME", "EXTRA"])
 
 function parseOptionalNumber(value: unknown) {
     if (value === undefined) return undefined
@@ -410,8 +417,22 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Parse deployment type early for validation
-        const deploymentType = body.deploymentType ? String(body.deploymentType).toUpperCase() : "REGULAR"
+        // Parse deployment type early for validation. Constrained to
+        // REGULAR | OVERTIME | EXTRA via zod (see deploymentTypeSchema).
+        const rawDeploymentType = body.deploymentType
+            ? String(body.deploymentType).toUpperCase()
+            : "REGULAR"
+        const parsedDeploymentType = deploymentTypeSchema.safeParse(rawDeploymentType)
+        if (!parsedDeploymentType.success) {
+            return badRequest("deploymentType must be one of REGULAR, OVERTIME, EXTRA.")
+        }
+        const deploymentType = parsedDeploymentType.data
+
+        // Workflow gate: the EXTRA deployment type can be disabled by toggling
+        // `deployments.allowExtraType` off. Default is on.
+        if (deploymentType === "EXTRA" && !isWorkflowRuleEnabled("deployments.allowExtraType")) {
+            return forbidden("Extra deployments are disabled by workflow policy.")
+        }
 
         if (deploymentType === "OVERTIME") {
             const hasRegular = await prisma.deployment.findFirst({
@@ -458,6 +479,19 @@ export async function POST(request: NextRequest) {
 
         const deployedByName = (session.user as { name?: string })?.name ?? null
 
+        // EXTRA deployments are by definition temporary and the legacy
+        // `isExtraGuard` boolean must always be true for them. We force these
+        // values server-side regardless of what the client sent so reports
+        // and downstream filters remain consistent. The boolean is deprecated
+        // — readers should prefer `deploymentType === "EXTRA"`.
+        const isExtraDeployment = deploymentType === "EXTRA"
+        const isExtraGuardFlag = isExtraDeployment
+            ? true
+            : body.isExtraGuard === "on" || body.isExtraGuard === true
+        const resolvedNature = isExtraDeployment
+            ? "TEMPORARY"
+            : (body.deploymentNature ? String(body.deploymentNature) : "PERMANENT")
+
         const data: Prisma.DeploymentUncheckedCreateInput = {
             guardId,
             clientId,
@@ -479,8 +513,8 @@ export async function POST(request: NextRequest) {
             nightShiftStart: body.nightShiftStart ? String(body.nightShiftStart) : null,
             nightShiftEnd: body.nightShiftEnd ? String(body.nightShiftEnd) : null,
             deploymentType: deploymentType,
-            deploymentNature: body.deploymentNature ? String(body.deploymentNature) : "PERMANENT",
-            isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
+            deploymentNature: resolvedNature,
+            isExtraGuard: isExtraGuardFlag,
             comment: body.comment ? String(body.comment) : null,
             deployedByName,
         }

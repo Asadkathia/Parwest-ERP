@@ -88,7 +88,9 @@ export async function GET(
           parwestId: dep.guard.parwestId,
           guardName: dep.guard.name,
           guardType: dep.guardType,
-          isExtraGuard: dep.isExtraGuard,
+          // Treat new `deploymentType === "EXTRA"` rows as extra (Ticket 34 —
+          // boolean is deprecated; type is the source of truth).
+          isExtraGuard: dep.isExtraGuard || dep.deploymentType === "EXTRA",
           basePay: 0,
           uniqueDays: new Set(),
         })

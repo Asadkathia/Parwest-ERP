@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
+import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
@@ -7,6 +8,10 @@ import { badRequest, conflict, forbidden, internalServerError, notFound, ok, una
 import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
+
+// See `src/app/api/deployments/route.ts` — `Deployment.deploymentType` is a
+// free string in Prisma; constrain it via zod here too.
+const deploymentTypeSchema = z.enum(["REGULAR", "OVERTIME", "EXTRA"])
 
 function parseOptionalNumber(value: unknown) {
     if (value === undefined) return undefined
@@ -206,8 +211,31 @@ export async function PATCH(
         if (body?.dayShiftEnd !== undefined) data.dayShiftEnd = body.dayShiftEnd ? String(body.dayShiftEnd) : null
         if (body?.nightShiftStart !== undefined) data.nightShiftStart = body.nightShiftStart ? String(body.nightShiftStart) : null
         if (body?.nightShiftEnd !== undefined) data.nightShiftEnd = body.nightShiftEnd ? String(body.nightShiftEnd) : null
-        if (body?.deploymentType !== undefined) data.deploymentType = body.deploymentType ? String(body.deploymentType) : null
-        if (body?.isExtraGuard !== undefined) data.isExtraGuard = body.isExtraGuard === "on" || body.isExtraGuard === true
+        if (body?.deploymentType !== undefined) {
+            // Validate against the allowed enum + workflow gate the EXTRA value.
+            if (body.deploymentType === null || body.deploymentType === "") {
+                data.deploymentType = null
+            } else {
+                const parsed = deploymentTypeSchema.safeParse(String(body.deploymentType).toUpperCase())
+                if (!parsed.success) {
+                    return badRequest("deploymentType must be one of REGULAR, OVERTIME, EXTRA.")
+                }
+                if (parsed.data === "EXTRA" && !isWorkflowRuleEnabled("deployments.allowExtraType")) {
+                    return forbidden("Extra deployments are disabled by workflow policy.")
+                }
+                data.deploymentType = parsed.data
+                // Defensive sync: when type becomes EXTRA, force the legacy
+                // `isExtraGuard` boolean to true and the nature to TEMPORARY.
+                // The boolean is deprecated; the type is the source of truth.
+                if (parsed.data === "EXTRA") {
+                    data.isExtraGuard = true
+                    data.deploymentNature = "TEMPORARY"
+                }
+            }
+        }
+        if (body?.isExtraGuard !== undefined && data.isExtraGuard === undefined) {
+            data.isExtraGuard = body.isExtraGuard === "on" || body.isExtraGuard === true
+        }
         if (body?.comment !== undefined) data.comment = body.comment ? String(body.comment) : null
 
         if (Object.keys(data).length === 0) {

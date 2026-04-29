@@ -124,7 +124,13 @@ type LoanRow = {
   finalizedAt: string | null
   month: string
   regionId?: string | null
-  guard: { parwestId: string; name: string; phone?: string | null; regionId?: string | null }
+  guard: {
+    parwestId: string
+    name: string
+    phone?: string | null
+    designation?: string | null
+    regionId?: string | null
+  }
 }
 
 type Region = { id: string; name: string }
@@ -932,6 +938,7 @@ function FinalizeLoansTab({
       "Payment Month",
       "Secure Ops ID",
       "Name",
+      "Designation",
       "Phone",
       "Current Supervisor",
       "Amount",
@@ -955,6 +962,7 @@ function FinalizeLoansTab({
             new Date(r.month).toISOString().slice(0, 7),
             r.guard.parwestId,
             r.guard.name,
+            r.guard.designation ?? "",
             r.guard.phone ?? "",
             r.supervisor ?? "",
             r.amount,

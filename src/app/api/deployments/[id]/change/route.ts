@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
@@ -6,6 +7,9 @@ import { badRequest, conflict, forbidden, internalServerError, notFound, unautho
 import { hasAction } from "@/lib/api/permissions"
 import { syncLegacyStatus } from "@/lib/guards/lifecycle"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+
+// Mirror of the enum in `src/app/api/deployments/route.ts`.
+const deploymentTypeSchema = z.enum(["REGULAR", "OVERTIME", "EXTRA"])
 
 /**
  * POST /api/deployments/[id]/change
@@ -143,6 +147,28 @@ export async function POST(
     const userName = (session.user as { name?: string })?.name ?? "System"
     const changeReason = String(body?.changeReason || "").trim()
 
+    // Validate the new deployment type (free string in DB, constrained here).
+    const rawNewType = body?.deploymentType
+        ? String(body.deploymentType).toUpperCase()
+        : (current.deploymentType ? String(current.deploymentType).toUpperCase() : "REGULAR")
+    const parsedNewType = deploymentTypeSchema.safeParse(rawNewType)
+    if (!parsedNewType.success) {
+        return badRequest("deploymentType must be one of REGULAR, OVERTIME, EXTRA.")
+    }
+    const newDeploymentType = parsedNewType.data
+    if (newDeploymentType === "EXTRA" && !isWorkflowRuleEnabled("deployments.allowExtraType")) {
+        return forbidden("Extra deployments are disabled by workflow policy.")
+    }
+    // EXTRA forces TEMPORARY nature + isExtraGuard=true (defensive — boolean
+    // is deprecated, but still read by some reports).
+    const isExtraDeployment = newDeploymentType === "EXTRA"
+    const newIsExtraGuard = isExtraDeployment
+        ? true
+        : (body?.isExtraGuard === true || body?.isExtraGuard === "on")
+    const newDeploymentNature = isExtraDeployment
+        ? "TEMPORARY"
+        : (body?.deploymentNature ? String(body.deploymentNature) : (current.deploymentNature ?? "PERMANENT"))
+
     // Run in a transaction: end current + create new
     const result = await prisma.$transaction(async (tx) => {
       // 1. End current deployment
@@ -168,9 +194,9 @@ export async function POST(
           shiftType: newShiftType,
           status: "ACTIVE",
           guardType: body?.guardType ? String(body.guardType) : current.guardType,
-          deploymentType: body?.deploymentType ? String(body.deploymentType) : (current.deploymentType ?? "REGULAR"),
-          deploymentNature: body?.deploymentNature ? String(body.deploymentNature) : (current.deploymentNature ?? "PERMANENT"),
-          isExtraGuard: body?.isExtraGuard === true || body?.isExtraGuard === "on",
+          deploymentType: newDeploymentType,
+          deploymentNature: newDeploymentNature,
+          isExtraGuard: newIsExtraGuard,
           dayShiftStart: body?.dayShiftStart ? String(body.dayShiftStart) : null,
           dayShiftEnd: body?.dayShiftEnd ? String(body.dayShiftEnd) : null,
           nightShiftStart: body?.nightShiftStart ? String(body.nightShiftStart) : null,

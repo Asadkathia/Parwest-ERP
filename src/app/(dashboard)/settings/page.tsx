@@ -5,6 +5,7 @@ import {
   CreditCard,
   Fingerprint,
   Gauge,
+  GraduationCap,
   MapPin,
   ScrollText,
   Settings as SettingsIcon,
@@ -49,6 +50,12 @@ const links = [
     href: "/settings/guard-bank-names",
     description: "Bank list shown when capturing guard payroll details.",
     icon: CreditCard,
+  },
+  {
+    title: "Training Categories",
+    href: "/settings/training-categories",
+    description: "OJT training items rendered as checkboxes on the OnJob Trainings tab.",
+    icon: GraduationCap,
   },
   {
     title: "Fingerprint Device",

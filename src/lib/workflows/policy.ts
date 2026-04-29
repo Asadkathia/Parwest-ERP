@@ -12,6 +12,9 @@ export type WorkflowRuleKey =
   | "deployments.requireBranchContract"
   | "deployments.requireClientHasBranches"
   | "deployments.requireVerifiedPrerequisites"
+  | "deployments.allowExtraType"
+  | "branches.requireInactiveBranchesBeforeClientInactive"
+  | "branches.blockInactiveWithActiveDeployment"
   | "inventoryDemand.requirePendingInitialStatus"
   | "inventoryDemand.enforceTransitionMap"
   | "inventoryDemand.blockCoreEditsAfterTerminal"
@@ -42,6 +45,12 @@ const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "deployments.requireBranchContract": true,
   "deployments.requireClientHasBranches": true,
   "deployments.requireVerifiedPrerequisites": true,
+  "deployments.allowExtraType": true,
+  "branches.requireInactiveBranchesBeforeClientInactive": true,
+  // Default OFF — flagged as a feature-request (QA note 32) rather than a
+  // hard rule. The toggle exists so admins can opt in once the workflow is
+  // validated end-to-end.
+  "branches.blockInactiveWithActiveDeployment": false,
   "inventoryDemand.requirePendingInitialStatus": true,
   "inventoryDemand.enforceTransitionMap": true,
   "inventoryDemand.blockCoreEditsAfterTerminal": true,
@@ -81,6 +90,9 @@ export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
       "deployments.requireBranchContract": false,
       "deployments.requireClientHasBranches": false,
       "deployments.requireVerifiedPrerequisites": false,
+      "deployments.allowExtraType": true,
+      "branches.requireInactiveBranchesBeforeClientInactive": false,
+      "branches.blockInactiveWithActiveDeployment": false,
       "inventoryDemand.requirePendingInitialStatus": false,
       "inventoryDemand.enforceTransitionMap": false,
       "inventoryDemand.blockCoreEditsAfterTerminal": false,
@@ -104,6 +116,11 @@ export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
   "deployments.requireBranchContract": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_BRANCH_CONTRACT",
   "deployments.requireClientHasBranches": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_CLIENT_HAS_BRANCHES",
   "deployments.requireVerifiedPrerequisites": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_VERIFIED_PREREQUISITES",
+  "deployments.allowExtraType": "WORKFLOW_RULE_DEPLOYMENTS_ALLOW_EXTRA_TYPE",
+  "branches.requireInactiveBranchesBeforeClientInactive":
+    "WORKFLOW_RULE_BRANCHES_REQUIRE_INACTIVE_BRANCHES_BEFORE_CLIENT_INACTIVE",
+  "branches.blockInactiveWithActiveDeployment":
+    "WORKFLOW_RULE_BRANCHES_BLOCK_INACTIVE_WITH_ACTIVE_DEPLOYMENT",
   "inventoryDemand.requirePendingInitialStatus": "WORKFLOW_RULE_INVENTORY_DEMAND_REQUIRE_PENDING_INITIAL_STATUS",
   "inventoryDemand.enforceTransitionMap": "WORKFLOW_RULE_INVENTORY_DEMAND_ENFORCE_TRANSITION_MAP",
   "inventoryDemand.blockCoreEditsAfterTerminal":

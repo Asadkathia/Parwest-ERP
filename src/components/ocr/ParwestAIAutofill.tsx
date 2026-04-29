@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
+import { toast } from "sonner"
 import {
     Sparkles, Upload, CheckCircle, XCircle, RefreshCw,
     ChevronDown, ChevronUp, Zap, FileText, Image as ImageIcon, AlertCircle, Tag,
@@ -8,6 +9,32 @@ import {
 import { classifyDocument, type ClassificationResult } from "@/lib/ocr/document-classifier"
 import { extractEntities } from "@/lib/ocr/entity-extractor"
 import { mapEntitiesToFields, type ParsedField } from "@/lib/ocr/field-mapper"
+
+// ── Confidence thresholds for auto-confirmation ───────────────────────────────
+// Field-specific thresholds. CNIC is high-stakes (must match a real ID format
+// and is uniqueness-checked server-side) so we demand near-certain reads.
+// Names/dates have moderate stakes; addresses are the most error-tolerant.
+const CONFIDENCE_THRESHOLDS: Record<string, number> = {
+    cnic: 0.9,
+    name: 0.8,
+    fatherName: 0.8,
+    motherName: 0.8,
+    husbandName: 0.8,
+    dateOfBirth: 0.8,
+    cnicIssueDate: 0.8,
+    cnicExpiryDate: 0.8,
+    passportIssueDate: 0.8,
+    passportExpiryDate: 0.8,
+    previousEmploymentFrom: 0.8,
+    previousEmploymentTo: 0.8,
+    addressCurrent: 0.7,
+    addressPermanent: 0.7,
+}
+const CONFIDENCE_FALLBACK = 0.75
+
+function autoConfirmThreshold(field: string): number {
+    return CONFIDENCE_THRESHOLDS[field] ?? CONFIDENCE_FALLBACK
+}
 
 interface Props {
     onApply: (fields: Record<string, string>) => void
@@ -215,7 +242,10 @@ export default function ParwestAIAutofill({ onApply }: Props) {
             // ── Step 2b: Tesseract OCR (fallback) ────────────────────────────
             updateJob(id, { progress: 36, progressLabel: "Falling back to local OCR…" })
             const { createWorker } = await import("tesseract.js")
-            const worker = await createWorker("eng", 1, {
+            // Load English + Urdu so CNIC backs (which carry Urdu address
+            // blocks) can also be read by the local fallback. Tesseract.js
+            // CDN-fetches both language packs lazily on first use.
+            const worker = await createWorker(["eng", "urd"], 1, {
                 logger: (m: { status: string; progress: number }) => {
                     if (m.status === "loading tesseract core")
                         updateJob(id, { progress: 38, progressLabel: "Loading OCR engine…" })
@@ -283,17 +313,47 @@ export default function ParwestAIAutofill({ onApply }: Props) {
 
     // ── Run all jobs sequentially (prevents memory overload) ─────────────────
     const runAll = useCallback(async (newJobs: FileJob[]) => {
+        const toastId = toast.loading(
+            newJobs.length === 1
+                ? "Extracting CNIC fields…"
+                : `Extracting fields from ${newJobs.length} documents…`,
+            { description: "Running AI vision on the uploaded image(s)." }
+        )
+
         const allResults: ParsedField[][] = []
+        let anyFailed = false
         for (const job of newJobs) {
             const fields = await processFile(job)
             if (fields.length > 0) allResults.push(fields)
+            else anyFailed = true
         }
         const merged = mergeFields(allResults)
         setMergedFields(merged)
-        // ── Confidence gate: only auto-check fields ≥ 75% confidence ─────────
-        // Lower-confidence fields are shown but require explicit user check
-        setSelected(Object.fromEntries(merged.map((f) => [f.field, f.confidence >= 0.75])))
+
+        // ── Confidence gate: per-field thresholds ────────────────────────────
+        // High-stakes fields (CNIC) require ≥90%, names/dates ≥80%,
+        // addresses ≥70%; everything else falls back to 75%.
+        setSelected(
+            Object.fromEntries(
+                merged.map((f) => [f.field, f.confidence >= autoConfirmThreshold(f.field)])
+            )
+        )
         setAllDone(true)
+
+        if (merged.length > 0) {
+            const avgPct = Math.round(
+                (merged.reduce((s, f) => s + f.confidence, 0) / merged.length) * 100
+            )
+            toast.success(`Fields extracted with ${avgPct}% confidence`, {
+                id: toastId,
+                description: `${merged.length} field${merged.length === 1 ? "" : "s"} ready to apply${anyFailed ? " (some files failed — see list)" : ""}.`,
+            })
+        } else {
+            toast.error("OCR failed: no fields extracted", {
+                id: toastId,
+                description: "Try a clearer scan, or fill the form manually.",
+            })
+        }
     }, [processFile])
 
     // ── Handle file selection ─────────────────────────────────────────────────
@@ -323,7 +383,13 @@ export default function ParwestAIAutofill({ onApply }: Props) {
         const toApply = mergedFields
             .filter((f) => selected[f.field])
             .reduce<Record<string, string>>((acc, f) => { acc[f.field] = f.value; return acc }, {})
+        const count = Object.keys(toApply).length
         onApply(toApply)
+        if (count > 0) {
+            toast.success(`Applied ${count} field${count === 1 ? "" : "s"} to the form`, {
+                description: "Review highlighted values before submitting.",
+            })
+        }
     }
 
     const toggleField = (field: string) =>
@@ -487,7 +553,7 @@ export default function ParwestAIAutofill({ onApply }: Props) {
 
                             <div className="grid gap-1.5 sm:grid-cols-2">
                                 {mergedFields.map((f) => {
-                                    const lowConf = f.confidence < 0.75
+                                    const lowConf = f.confidence < autoConfirmThreshold(f.field)
                                     return (
                                         <label
                                             key={f.field}

@@ -217,8 +217,7 @@ async function preprocessImage(
     const buffer = Buffer.from(base64, "base64")
     if (buffer.length === 0) return null
 
-    const pipeline = sharp(buffer, { failOn: "none" })
-    const meta = await pipeline.metadata()
+    const meta = await sharp(buffer, { failOn: "none" }).metadata()
     const longSide = Math.max(meta.width || 0, meta.height || 0)
     if (longSide === 0) return null
 

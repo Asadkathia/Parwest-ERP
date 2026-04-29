@@ -17,7 +17,10 @@
 import { z } from "zod"
 
 export const SHIFT_TYPES = ["DAY", "NIGHT", "BOTH"] as const
-export const DEPLOYMENT_TYPES = ["REGULAR", "OVERTIME"] as const
+// EXTRA is gated server-side by the `deployments.allowExtraType` workflow rule.
+// Keeping it in the schema enum so client validation passes; the server is the
+// source of truth for whether the value is currently allowed.
+export const DEPLOYMENT_TYPES = ["REGULAR", "OVERTIME", "EXTRA"] as const
 export const DEPLOYMENT_NATURES = ["PERMANENT", "TEMPORARY"] as const
 
 const HHMM_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
@@ -113,8 +116,10 @@ export const deploymentCreateSchema = z
       .nullable(),
   })
   .superRefine((val, ctx) => {
-    // Extra-guard implies temporary nature (mirrors the form's hard rule).
-    if (val.isExtraGuard && val.deploymentNature !== "TEMPORARY") {
+    // Extra-guard (legacy boolean OR new deploymentType = "EXTRA") implies
+    // temporary nature. Both paths are validated to keep the rule symmetric.
+    const isExtra = val.isExtraGuard || val.deploymentType === "EXTRA"
+    if (isExtra && val.deploymentNature !== "TEMPORARY") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["deploymentNature"],

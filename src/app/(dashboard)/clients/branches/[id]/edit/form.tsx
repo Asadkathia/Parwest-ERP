@@ -20,7 +20,12 @@ import { ArrowLeft, Save } from "lucide-react"
 
 import PhoneInput from "@/components/ui/PhoneInput"
 import { deriveBranchModel } from "@/lib/branches/model"
-import { branchEditSchema, type BranchEditForm } from "@/lib/schemas/branch"
+import {
+    BRANCH_CAPACITY_FIELDS,
+    branchEditSchema,
+    type BranchCapacityField,
+    type BranchEditForm,
+} from "@/lib/schemas/branch"
 
 import { Button } from "@/components/shadcn/button"
 import { Input } from "@/components/shadcn/input"
@@ -62,14 +67,54 @@ type Branch = {
     city: string | null
     province: string | null
     isHeadOffice: boolean
+    status?: "ACTIVE" | "INACTIVE" | string | null
     contactPerson: string | null
     contactPhone: string | null
     contactEmail: string | null
+    // Capacity fields (all optional / nullable on the model)
+    dayGuardCapacity?: number | null
+    nightGuardCapacity?: number | null
+    daySupervisorCapacity?: number | null
+    nightSupervisorCapacity?: number | null
+    cpoCapacity?: number | null
+    dayCpoCapacity?: number | null
+    nightCpoCapacity?: number | null
+    daySoCapacity?: number | null
+    nightSoCapacity?: number | null
+    dayAsoCapacity?: number | null
+    nightAsoCapacity?: number | null
+    dayLsoCapacity?: number | null
+    nightLsoCapacity?: number | null
+    dayCctvCapacity?: number | null
+    nightCctvCapacity?: number | null
+    dayReceptionistCapacity?: number | null
+    nightReceptionistCapacity?: number | null
     client: {
         id: string
         name: string
         type?: string | null
     }
+}
+
+// Human-readable labels for capacity inputs.
+const CAPACITY_LABELS: Record<BranchCapacityField, string> = {
+    dayGuardCapacity: "Day Guards",
+    nightGuardCapacity: "Night Guards",
+    daySupervisorCapacity: "Day Supervisors",
+    nightSupervisorCapacity: "Night Supervisors",
+    cpoCapacity: "CPOs (any shift)",
+    dayCpoCapacity: "Day CPOs",
+    nightCpoCapacity: "Night CPOs",
+    daySoCapacity: "Day SOs",
+    nightSoCapacity: "Night SOs",
+    dayAsoCapacity: "Day ASOs",
+    nightAsoCapacity: "Night ASOs",
+    dayLsoCapacity: "Day LSOs",
+    nightLsoCapacity: "Night LSOs",
+    dayCctvCapacity: "Day CCTV Operators",
+    nightCctvCapacity: "Night CCTV Operators",
+    dayReceptionistCapacity: "Day Receptionists",
+    nightReceptionistCapacity: "Night Receptionists",
 }
 
 type Props = {
@@ -82,6 +127,15 @@ export default function BranchEditForm({ branch }: Props) {
     const [submitting, setSubmitting] = useState(false)
     const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
 
+    const capacityDefaults = BRANCH_CAPACITY_FIELDS.reduce<Record<BranchCapacityField, string>>(
+        (acc, key) => {
+            const v = (branch as Record<string, unknown>)[key]
+            acc[key] = typeof v === "number" && Number.isFinite(v) ? String(v) : ""
+            return acc
+        },
+        {} as Record<BranchCapacityField, string>,
+    )
+
     const form = useForm<BranchEditForm>({
         resolver: zodResolver(branchEditSchema),
         mode: "onBlur",
@@ -90,24 +144,45 @@ export default function BranchEditForm({ branch }: Props) {
             code: branch.code ?? "",
             branchType: branchType === "ISLAMIC" ? "ISLAMIC" : "CONVENTIONAL",
             isHeadOffice: branch.isHeadOffice ?? false,
+            status: branch.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
             address: branch.address ?? "",
             city: branch.city ?? "",
             province: branch.province ?? "",
             contactPerson: branch.contactPerson ?? "",
             contactPhone: branch.contactPhone ?? "",
             contactEmail: branch.contactEmail ?? "",
+            ...capacityDefaults,
         },
     })
 
     const onSubmit = async (values: BranchEditForm) => {
         setSubmitting(true)
         try {
+            // Capacity fields are stringly-typed in the form (HTML number input);
+            // coerce to nullable non-negative ints for the API. Zod has already
+            // validated them — this mirror is purely for safe wire transport.
+            const capacityPayload = BRANCH_CAPACITY_FIELDS.reduce<Record<string, number | null>>(
+                (acc, key) => {
+                    const raw = (values as Record<string, unknown>)[key]
+                    if (raw === null || raw === undefined || raw === "") {
+                        acc[key] = null
+                    } else {
+                        const n = typeof raw === "number" ? raw : Number(raw)
+                        acc[key] = Number.isFinite(n) ? Math.trunc(n) : null
+                    }
+                    return acc
+                },
+                {},
+            )
+
             const response = await fetch(`/api/branches/${branch.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...values,
+                    ...capacityPayload,
                     isHeadOffice: Boolean(values.isHeadOffice),
+                    status: values.status ?? "ACTIVE",
                 }),
             })
             const data = await response.json().catch(() => ({}))
@@ -234,6 +309,78 @@ export default function BranchEditForm({ branch }: Props) {
                                     </FormItem>
                                 )}
                             />
+
+                            <FormField
+                                control={form.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Branch Status</FormLabel>
+                                        <Select
+                                            value={field.value ?? "ACTIVE"}
+                                            onValueChange={field.onChange}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger aria-label="Branch status">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="ACTIVE">Active</SelectItem>
+                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Guard / Staff Capacity */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Capacity</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Maximum active deployments allowed at this branch per role and shift.
+                            Leave blank for no limit. The API will reject lowering a value below the
+                            count of currently active deployments for that role/shift.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {BRANCH_CAPACITY_FIELDS.map((key) => (
+                                <FormField
+                                    key={key}
+                                    control={form.control}
+                                    name={key}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>{CAPACITY_LABELS[key]}</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step={1}
+                                                    inputMode="numeric"
+                                                    placeholder="—"
+                                                    value={
+                                                        field.value === null || field.value === undefined
+                                                            ? ""
+                                                            : String(field.value)
+                                                    }
+                                                    onChange={(e) => field.onChange(e.target.value)}
+                                                    onBlur={field.onBlur}
+                                                    name={field.name}
+                                                    ref={field.ref}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            ))}
                         </div>
                     </CardContent>
                 </Card>

@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo, useRef, useState, useEffect, useCallback } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react"
 import Link from "next/link"
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
@@ -299,11 +300,43 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     })
   }
 
+  // Browser-native HTML5 validation surface — fires when a `required` input
+  // fails before our async `handleSubmit` runs. Without this, the user can
+  // perceive SUBMIT as silent because the failed control may be inside a
+  // collapsed section. Capture the first invalid field per submit attempt.
+  const invalidHandledRef = useRef(false)
+  const handleInvalid = (e: React.FormEvent<HTMLFormElement>) => {
+    if (invalidHandledRef.current) return
+    const target = e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null
+    if (!target) return
+    invalidHandledRef.current = true
+    const label =
+      (target.labels && target.labels[0]?.textContent?.trim()) ||
+      target.getAttribute("aria-label") ||
+      target.getAttribute("placeholder") ||
+      target.name ||
+      "A required field"
+    const message =
+      target.validationMessage && target.validationMessage.length > 0
+        ? `${label}: ${target.validationMessage}`
+        : `${label} is required.`
+    toast.error(message)
+    // Reset latch so subsequent submit attempts surface again.
+    setTimeout(() => { invalidHandledRef.current = false }, 0)
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError("")
     setSuccess("")
+
+    /** Surface a validation failure both in the inline banner and as a toast. */
+    const fail = (message: string) => {
+      setError(message)
+      toast.error(message)
+      setLoading(false)
+    }
 
     const formData = new FormData(e.currentTarget)
     const data = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>
@@ -318,28 +351,24 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
       .map(([, value]) => String(value || "").trim())
 
     if (cnicValue && !/^\d{5}-\d{7}-\d$/.test(cnicValue)) {
-      setError("CNIC format must be XXXXX-XXXXXXX-X")
-      setLoading(false)
+      fail("CNIC format must be XXXXX-XXXXXXX-X")
       return
     }
 
     const dobForAge = String(data.dateOfBirth || "").trim()
     if (!dobForAge || !isValidGuardAge(dobForAge)) {
-      setError("Guard must be between 18 and 65 years old.")
-      setLoading(false)
+      fail("Guard must be between 18 and 65 years old.")
       return
     }
 
     if (contactNumbers.length === 0) {
-      setError("At least one contact number is required.")
-      setLoading(false)
+      fail("At least one contact number is required.")
       return
     }
 
     for (const number of contactNumbers) {
       if (!/^\+92-\d{3}-\d{7}$/.test(number)) {
-        setError("Contact format must be +92-300-1234567")
-        setLoading(false)
+        fail("Contact format must be +92-300-1234567")
         return
       }
     }
@@ -349,13 +378,11 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
       const currentContact = String(data.currentAddressContact || "").trim()
       const permanentContact = String(data.permanentAddressContact || "").trim()
       if (currentContact && !/^\+92-\d{3}-\d{7}$/.test(currentContact)) {
-        setError("Current Address Contact No format must be +92-300-1234567")
-        setLoading(false)
+        fail("Current Address Contact No format must be +92-300-1234567")
         return
       }
       if (permanentContact && !/^\+92-\d{3}-\d{7}$/.test(permanentContact)) {
-        setError("Permanent Address Contact No format must be +92-300-1234567")
-        setLoading(false)
+        fail("Permanent Address Contact No format must be +92-300-1234567")
         return
       }
     }
@@ -365,22 +392,19 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     const cnicExpiryDate = formData.get("cnicExpiryDate") as string
     if (cnicIssueDate && cnicExpiryDate) {
       if (new Date(cnicIssueDate) >= new Date(cnicExpiryDate)) {
-        setError("CNIC Issue Date must be before the CNIC Expiry Date.")
-        setLoading(false)
+        fail("CNIC Issue Date must be before the CNIC Expiry Date.")
         return
       }
     }
 
     if (ageValue && (!Number.isFinite(Number(ageValue)) || Number(ageValue) < 0)) {
-      setError("Please enter a valid age")
-      setLoading(false)
+      fail("Please enter a valid age")
       return
     }
 
     for (const familyAge of familyAgeValues) {
       if (familyAge && (!Number.isFinite(Number(familyAge)) || Number(familyAge) < 0)) {
-        setError("Please enter a valid age")
-        setLoading(false)
+        fail("Please enter a valid age")
         return
       }
     }
@@ -388,18 +412,15 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     // Validate general section required fields that HTML required can't catch (hidden inputs + selects)
     if (sections.general) {
       if (!String(data.supervisorId || "").trim()) {
-        setError("Supervisor is required.")
-        setLoading(false)
+        fail("Supervisor is required.")
         return
       }
       if (!String(data.bloodGroup || "").trim()) {
-        setError("Blood Group is required.")
-        setLoading(false)
+        fail("Blood Group is required.")
         return
       }
       if (!String(data.maritalStatus || "").trim()) {
-        setError("Marital Status is required.")
-        setLoading(false)
+        fail("Marital Status is required.")
         return
       }
     }
@@ -407,16 +428,14 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     // Validate family members (required — at least one with a name)
     const hasAnyFamilyName = familyRows.some((idx) => String(data[`family_${idx}_name`] || "").trim())
     if (!hasAnyFamilyName) {
-      setError("At least one family member detail is required. Please fill in the Name field.")
-      setLoading(false)
+      fail("At least one family member detail is required. Please fill in the Name field.")
       return
     }
 
     // Validate nearest relatives (required — at least one with a name)
     const hasAnyNearestName = nearestRows.some((idx) => String(data[`nearest_${idx}_name`] || "").trim())
     if (!hasAnyNearestName) {
-      setError("At least one nearest relative detail is required. Please fill in the Name field.")
-      setLoading(false)
+      fail("At least one nearest relative detail is required. Please fill in the Name field.")
       return
     }
 
@@ -424,8 +443,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     for (const idx of nearestRows) {
       const contact = String(data[`nearest_${idx}_contact`] || "").trim()
       if (contact && !/^\+92-\d{3}-\d{7}$/.test(contact)) {
-        setError("Nearest Relative Contact # format must be +92-300-1234567")
-        setLoading(false)
+        fail("Nearest Relative Contact # format must be +92-300-1234567")
         return
       }
     }
@@ -438,30 +456,25 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
         parsedAccounts = JSON.parse(raw)
       } catch { /* ignore */ }
       if (parsedAccounts.length === 0) {
-        setError("At least one bank account is required.")
-        setLoading(false)
+        fail("At least one bank account is required.")
         return
       }
       for (const acc of parsedAccounts) {
         const kind = acc.walletType === "BANK" ? "bank" : "wallet"
         if (!String(acc.bankName || "").trim()) {
-          setError(`Bank account: ${kind === "bank" ? "Bank Name" : "Wallet Type"} is required.`)
-          setLoading(false)
+          fail(`Bank account: ${kind === "bank" ? "Bank Name" : "Wallet Type"} is required.`)
           return
         }
         if (!String(acc.accountNumber || "").trim()) {
-          setError("Bank account: Account Number is required.")
-          setLoading(false)
+          fail("Bank account: Account Number is required.")
           return
         }
         if (!String(acc.accountTitle || "").trim()) {
-          setError("Bank account: Account Title is required.")
-          setLoading(false)
+          fail("Bank account: Account Title is required.")
           return
         }
         if (kind === "bank" && !String(acc.branchLocation || "").trim()) {
-          setError("Bank account: Branch Location is required.")
-          setLoading(false)
+          fail("Bank account: Branch Location is required.")
           return
         }
       }
@@ -472,30 +485,26 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     // block submit for fields the user cannot see.
     if (sections.previousEmployment) {
       if (!guardEmploymentType) {
-        setError("Guard Employment Type is required.")
-        setLoading(false)
+        fail("Guard Employment Type is required.")
         return
       }
       if (guardEmploymentType !== "CIVILIAN") {
         const matching = prevEmployments.filter((e) => e.type === guardEmploymentType)
         if (matching.length === 0) {
-          setError(`At least one previous employment record with type ${guardEmploymentType} is required.`)
-          setLoading(false)
+          fail(`At least one previous employment record with type ${guardEmploymentType} is required.`)
           return
         }
         const incomplete = matching.find(
           (e) => !e.registrationNo.trim() || !e.rank.trim() || !e.unit.trim()
         )
         if (incomplete) {
-          setError(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
-          setLoading(false)
+          fail(`${guardEmploymentType} employment record requires Registration No, Rank, and Unit.`)
           return
         }
       }
       for (const emp of prevEmployments) {
         if (!emp.type) {
-          setError("Each previous employment record must have an Employment Type selected.")
-          setLoading(false)
+          fail("Each previous employment record must have an Employment Type selected.")
           return
         }
       }
@@ -527,22 +536,47 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
         body: JSON.stringify(data),
       })
 
+      const payload = await response.json().catch(() => ({} as Record<string, unknown>))
+
       if (!response.ok) {
-        const responseError = await response.json().catch(() => ({}))
-        throw new Error(responseError.message || "Failed to create guard")
+        // Per CLAUDE.md API envelope: clients read `data.message`, NOT `data.error`.
+        const message =
+          (typeof payload.message === "string" && payload.message) ||
+          "Failed to enroll guard"
+        toast.error(message)
+        setError(message)
+        setLoading(false)
+        return
       }
 
+      // Pull the Parwest ID from whichever shape the API returned.
+      const parwestId =
+        (payload && typeof payload === "object" && "parwestId" in payload && typeof (payload as { parwestId?: unknown }).parwestId === "string"
+          ? (payload as { parwestId: string }).parwestId
+          : undefined) ??
+        (payload && typeof payload === "object" && "data" in payload && payload.data && typeof payload.data === "object" && "parwestId" in (payload as { data: Record<string, unknown> }).data
+          ? String((payload as { data: { parwestId?: unknown } }).data.parwestId ?? "")
+          : undefined) ??
+        (payload && typeof payload === "object" && "guard" in payload && payload.guard && typeof payload.guard === "object" && "parwestId" in (payload as { guard: Record<string, unknown> }).guard
+          ? String((payload as { guard: { parwestId?: unknown } }).guard.parwestId ?? "")
+          : undefined)
+
+      toast.success("Guard enrolled successfully", {
+        description: parwestId ? `Parwest ID: ${parwestId}` : undefined,
+      })
       setSuccess("Guard created successfully.")
       router.push("/guards")
       router.refresh()
     } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Unexpected error")
+      const description = err instanceof Error ? err.message : undefined
+      toast.error("Network error. Please try again.", { description })
+      setError(description ?? "Unexpected error")
       setLoading(false)
     }
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+    <form ref={formRef} onSubmit={handleSubmit} onInvalidCapture={handleInvalid} className="space-y-6">
       {error ? (
         <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}

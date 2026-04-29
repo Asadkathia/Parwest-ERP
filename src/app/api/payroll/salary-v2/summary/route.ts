@@ -146,7 +146,11 @@ export async function GET(request: NextRequest) {
       }
       const row = branchMap.get(key)!
       row.deployGuards.add(dep.guardId)
-      if (dep.isExtraGuard) row.extraGuards += 1
+      // Count as extra when the legacy boolean is true OR the new
+      // `deploymentType === "EXTRA"` (Ticket 34 — boolean is deprecated but
+      // some historical rows only have the boolean set; new rows only set
+      // the type and the boolean is mirrored server-side).
+      if (dep.isExtraGuard || dep.deploymentType === "EXTRA") row.extraGuards += 1
 
       if (dep.clientId) uniqueClients.add(dep.clientId)
       if (dep.branchId) uniqueBranches.add(dep.branchId)

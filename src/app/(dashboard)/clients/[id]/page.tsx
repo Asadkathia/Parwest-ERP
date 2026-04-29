@@ -177,7 +177,12 @@ export default async function ClientDetailPage({
   )
 
   const activeDeploymentRows = allDeployments.filter((row) => row.deployment.status === "ACTIVE")
-  const extraDeploymentRows = activeDeploymentRows.filter((row) => row.deployment.isExtraGuard)
+  // Treat both the legacy `isExtraGuard` boolean and the new
+  // `deploymentType === "EXTRA"` value as "extra" (Ticket 34 — boolean
+  // deprecated, type is the source of truth).
+  const extraDeploymentRows = activeDeploymentRows.filter(
+    (row) => row.deployment.isExtraGuard || row.deployment.deploymentType === "EXTRA"
+  )
 
   const normalizedSearch = listSearch.trim().toLowerCase()
   const normalizedBranch = branch.trim().toLowerCase()

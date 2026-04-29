@@ -255,6 +255,24 @@ async function main() {
     }
     console.log('✓ Created store-inventory v2 categories')
 
+    // OJT Training categories — admin-managed lookup; safe defaults seeded once.
+    const trainingCategoryDefaults: Array<{ name: string; sortOrder: number; description?: string }> = [
+        { name: 'Basic Drill', sortOrder: 10 },
+        { name: 'Firearms Handling', sortOrder: 20 },
+        { name: 'Crowd Control', sortOrder: 30 },
+        { name: 'Fire Safety', sortOrder: 40 },
+        { name: 'First Aid', sortOrder: 50 },
+        { name: 'Customer Service', sortOrder: 60 },
+    ]
+    for (const cat of trainingCategoryDefaults) {
+        await prisma.trainingCategory.upsert({
+            where: { name: cat.name },
+            update: { sortOrder: cat.sortOrder },
+            create: { name: cat.name, sortOrder: cat.sortOrder, description: cat.description },
+        })
+    }
+    console.log('✓ Created OJT training categories')
+
     console.log('\n✅ Database seeded successfully!')
     console.log('\n📝 Login credentials:')
     console.log('   Email: admin@parwestgroup.com')

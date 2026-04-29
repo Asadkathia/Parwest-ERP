@@ -28,7 +28,15 @@ export async function GET(
     const loans = await prisma.loan.findMany({
       where: { id: { in: loanIds } },
       include: {
-        guard: { select: { parwestId: true, name: true, phone: true, cnic: true } },
+        guard: {
+          select: {
+            parwestId: true,
+            name: true,
+            phone: true,
+            cnic: true,
+            designation: true,
+          },
+        },
       },
       orderBy: { createdAt: "asc" },
     })
@@ -36,6 +44,7 @@ export async function GET(
     const headers = [
       "Parwest ID",
       "Name",
+      "Designation",
       "CNIC",
       "Phone",
       "Amount",
@@ -50,6 +59,7 @@ export async function GET(
     const rows = loans.map((l) => [
       l.guard.parwestId,
       l.guard.name,
+      l.guard.designation ?? "",
       l.guard.cnic,
       l.guard.phone ?? "",
       l.amount,

@@ -74,6 +74,8 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             parwestId: true,
+            phone: true,
+            designation: true,
           },
         },
       },

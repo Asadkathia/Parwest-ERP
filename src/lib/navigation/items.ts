@@ -26,6 +26,7 @@ import {
     Search,
     Sparkles,
     ShieldAlert,
+    GraduationCap,
 } from "lucide-react"
 
 export type NavItemAction = "CREATE" | "VIEW" | "UPDATE" | "DELETE" | "REQUISITIONS"
@@ -250,6 +251,7 @@ export const NAV_ITEMS: NavItem[] = [
             { title: "Guard Documents", href: "/settings/guard-pledgeable-documents", icon: FileText },
             { title: "User Types", href: "/settings/user-types", icon: Users },
             { title: "Guard Bank Names", href: "/settings/guard-bank-names", icon: DollarSign },
+            { title: "Training Categories", href: "/settings/training-categories", icon: GraduationCap },
             { title: "Fingerprint Device", href: "/settings/fingerprint-device", icon: Settings },
             { title: "Workflow Rules", href: "/settings/workflow-rules", icon: Settings },
             { title: "System Settings", href: "/settings/system", icon: Settings },
