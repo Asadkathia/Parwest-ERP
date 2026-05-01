@@ -23,7 +23,6 @@ import {
   MapPin,
   PauseCircle,
   Plus,
-  RefreshCw,
   ShieldOff,
   Lock as LockIcon,
 } from "lucide-react"
@@ -74,7 +73,6 @@ type Props = {
   scopedRegionId: string | null
   scopedOfficeId: string | null
   canCreate: boolean
-  canUpdate: boolean
   canDelete: boolean
 }
 
@@ -115,7 +113,6 @@ export default function DeploymentsListClient({
   scopedRegionId,
   scopedOfficeId,
   canCreate,
-  canUpdate,
   canDelete,
 }: Props) {
   const router = useRouter()
@@ -357,32 +354,16 @@ export default function DeploymentsListClient({
               >
                 View
               </Link>
-              {dep.status === "ACTIVE" ? (
+              {dep.status === "ACTIVE" && canDelete ? (
                 <>
-                  {canUpdate && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <Link
-                        href={`/deployments/${dep.id}/edit`}
-                        className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-primary"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <RefreshCw className="h-3 w-3" /> Change
-                      </Link>
-                    </>
-                  )}
-                  {canDelete && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <Link
-                        href={`/deployments/${dep.id}/end`}
-                        className="inline-flex items-center gap-1 font-medium text-destructive hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ShieldOff className="h-3 w-3" /> Revoke
-                      </Link>
-                    </>
-                  )}
+                  <span className="text-muted-foreground">·</span>
+                  <Link
+                    href={`/deployments/${dep.id}/end`}
+                    className="inline-flex items-center gap-1 font-medium text-destructive hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ShieldOff className="h-3 w-3" /> Revoke
+                  </Link>
                 </>
               ) : null}
             </div>
@@ -390,7 +371,7 @@ export default function DeploymentsListClient({
         },
       },
     ],
-    [canUpdate, canDelete]
+    [canDelete]
   )
 
   const handleBulkRevoke = () => {

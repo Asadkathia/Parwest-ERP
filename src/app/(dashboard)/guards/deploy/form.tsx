@@ -329,6 +329,55 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     if (deploymentType === "EXTRA") setDeploymentNature("TEMPORARY")
   }, [deploymentType])
 
+  // ── Live branch capacity probe ───────────────────────────────────────
+  // Fetches current capacity for the chosen branch / designation / shift so
+  // the form can (a) surface a banner when the branch is full and prompt the
+  // user to switch to EXTRA, and (b) hide/disable the EXTRA option until the
+  // branch is actually at capacity. Mirrors the API rules in
+  // src/app/api/deployments/route.ts (Ticket 34).
+  const [capacityInfo, setCapacityInfo] = useState<{
+    atCapacity: boolean
+    used: number
+    limit: number | null
+    uncapped: boolean
+  } | null>(null)
+  useEffect(() => {
+    if (!selectedBranch || !designation || (shiftType !== "DAY" && shiftType !== "NIGHT")) {
+      setCapacityInfo(null)
+      return
+    }
+    let cancelled = false
+    fetch(
+      `/api/branches/${selectedBranch}/capacity?designation=${encodeURIComponent(designation)}&shift=${encodeURIComponent(shiftType)}`
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((payload) => {
+        if (cancelled) return
+        const cap = payload?.data
+        setCapacityInfo(cap ? {
+          atCapacity: !!cap.atCapacity,
+          used: Number(cap.used ?? 0),
+          limit: cap.limit ?? null,
+          uncapped: !!cap.uncapped,
+        } : null)
+      })
+      .catch(() => {
+        if (!cancelled) setCapacityInfo(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedBranch, designation, shiftType])
+
+  // Auto-switch back to REGULAR when capacity opens up (or when EXTRA is no
+  // longer applicable). Don't auto-switch TO extra — let the user opt in via
+  // the banner so the choice is intentional.
+  useEffect(() => {
+    if (deploymentType === "EXTRA" && capacityInfo && !capacityInfo.atCapacity) {
+      setDeploymentType("REGULAR")
+    }
+  }, [capacityInfo, deploymentType])
+
   const loadAllDeployments = async () => {
     try {
       const res = await fetch("/api/deployments")
@@ -526,6 +575,9 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     }
 
     // ── Pre-submit preflight: branch capacity ───────────────────────────
+    // EXTRA is the over-capacity escape hatch — only allowed when the branch
+    // is at capacity. REGULAR/OVERTIME require headroom. Mirror the API rules
+    // (see src/app/api/deployments/route.ts capacity block).
     if (selectedBranch) {
       try {
         const capRes = await fetch(
@@ -536,14 +588,26 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
             data?: { atCapacity?: boolean; used?: number; limit?: number | null; uncapped?: boolean }
           }
           const cap = payload.data
-          if (cap && cap.atCapacity) {
-            const msg = `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${cap.used}/${cap.limit}). No more guards can be deployed to this role/shift.`
-            setError(msg)
-            toast.error("Branch capacity reached", {
-              description: `${shiftType.toLowerCase()} ${designation}: ${cap.used}/${cap.limit}`,
-            })
-            setLoading(false)
-            return
+          if (cap) {
+            if (deploymentType === "EXTRA") {
+              if (!cap.atCapacity) {
+                const msg = cap.uncapped
+                  ? `EXTRA deployment is only allowed when capacity is full. The ${designation} role is uncapped at this branch — deploy as REGULAR instead.`
+                  : `Branch still has ${shiftType.toLowerCase()} ${designation} capacity available (${cap.used}/${cap.limit}). EXTRA is only allowed once the branch is full — deploy as REGULAR.`
+                setError(msg)
+                toast.error("EXTRA not applicable", { description: msg })
+                setLoading(false)
+                return
+              }
+            } else if (cap.atCapacity) {
+              const msg = `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${cap.used}/${cap.limit}). Switch deployment type to EXTRA to deploy this guard.`
+              setError(msg)
+              toast.error("Branch capacity reached", {
+                description: `Use deployment type EXTRA to assign an additional guard.`,
+              })
+              setLoading(false)
+              return
+            }
           }
         }
       } catch {
@@ -924,16 +988,44 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
               </p>
             </div>
 
+            {/* Branch capacity banner — surfaces when the chosen branch has
+                reached its day/night capacity for this designation, prompting
+                the user to switch to EXTRA (Ticket 34). */}
+            {capacityInfo?.atCapacity ? (
+              <div className="md:col-span-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-medium">
+                  Branch is at capacity for {shiftType.toLowerCase()} {designation} ({capacityInfo.used}/{capacityInfo.limit}).
+                </p>
+                <p className="mt-1">
+                  This guard can only be deployed as an <span className="font-semibold">Extra</span> guard for this branch/shift.
+                  {allowExtraType && deploymentType !== "EXTRA" ? (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        onClick={() => setDeploymentType("EXTRA")}
+                        className="underline font-medium hover:text-amber-950"
+                      >
+                        Switch to Extra
+                      </button>
+                      .
+                    </>
+                  ) : null}
+                </p>
+              </div>
+            ) : null}
+
             {activeDeployments.length > 0 ? (
               // Guard already deployed — only Overtime or Extra are sensible
               // deployment-type values for an additional row. (Regular is
               // disallowed by server-side rules when an active deployment exists.)
+              // EXTRA is gated on branch being at capacity (Ticket 34).
               <SearchableCombobox
                 label="Deployment Type (metadata only — does not change pay rate)"
                 value={deploymentType === "REGULAR" ? "OVERTIME" : deploymentType}
                 onChange={setDeploymentType}
                 options={DEPLOYMENT_TYPE_OPTIONS.filter((o) =>
-                  o.id === "OVERTIME" || (o.id === "EXTRA" && allowExtraType)
+                  o.id === "OVERTIME" || (o.id === "EXTRA" && allowExtraType && capacityInfo?.atCapacity)
                 )}
                 placeholder="Select deployment type..."
               />
@@ -942,7 +1034,7 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
                 label="Deployment (metadata only — does not change pay rate)"
                 value={deploymentType}
                 onChange={setDeploymentType}
-                options={DEPLOYMENT_TYPE_OPTIONS.filter((o) => o.id !== "EXTRA" || allowExtraType)}
+                options={DEPLOYMENT_TYPE_OPTIONS.filter((o) => o.id !== "EXTRA" || (allowExtraType && capacityInfo?.atCapacity))}
                 placeholder="Select deployment type..."
               />
             )}

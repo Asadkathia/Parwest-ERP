@@ -10,8 +10,8 @@ export default async function DeploymentsPage() {
     if (!session) redirect("/login")
 
     // Deployments are semantically part of GUARDS (no dedicated DEPLOYMENTS module in MODULES).
+    // Deployments are read-only — only revoke is permitted (Ticket 37).
     const canCreate = hasAction(session, "GUARDS", "CREATE")
-    const canUpdate = hasAction(session, "GUARDS", "UPDATE")
     const canDelete = hasAction(session, "GUARDS", "DELETE")
 
     const scope = deriveRegionalScope(session)
@@ -40,7 +40,6 @@ export default async function DeploymentsPage() {
             scopedRegionId={scopedRegionId}
             scopedOfficeId={scopedOfficeId}
             canCreate={canCreate}
-            canUpdate={canUpdate}
             canDelete={canDelete}
         />
     )

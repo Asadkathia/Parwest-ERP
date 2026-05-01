@@ -68,6 +68,14 @@ next-swc-darwin-arm64-16.1.6.tgz
 test-results/
 playwright-report/
 playwright/.cache/
+.playwright-mcp/
+# Ad-hoc Playwright snapshot dumps written to repo root
+/branches-list.yml
+/branch-detail*.yml
+/branch-edit*.yml
+/client-edit*.yml
+/deployment-detail.yml
+/guard-edit.yml
 
 # graphify
 graphify-out/

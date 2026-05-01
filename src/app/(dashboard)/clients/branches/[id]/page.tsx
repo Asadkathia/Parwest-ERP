@@ -8,6 +8,7 @@ import Link from "next/link"
 import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
 import { deriveBranchModel } from "@/lib/branches/model"
 import BranchDeleteButton from "@/components/clients/BranchDeleteButton"
+import { CAPACITY_USAGE_RULES, countDeploymentsForRule } from "@/lib/branches/capacity"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -47,6 +48,17 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
   const deployments = branch.deployments || []
   const activeDeployments = deployments.filter((d) => d.status === "ACTIVE")
   const branchModel = deriveBranchModel(branch.client?.type)
+
+  // Capacity card rows: show buckets where the role is meaningfully configured
+  // — a positive limit is set, OR there's at least one deployment in that
+  // bucket (so an over-capacity 0/used or a deployment under an uncapped role
+  // is still surfaced). Hide the noise of 0/0 rows from branches that haven't
+  // set up that role at all.
+  const capacityRows = CAPACITY_USAGE_RULES.map((rule) => {
+    const limit = (branch as Record<string, unknown>)[rule.field] as number | null | undefined
+    const used = countDeploymentsForRule(rule, activeDeployments)
+    return { rule, limit: typeof limit === "number" ? limit : null, used }
+  }).filter((r) => (r.limit != null && r.limit > 0) || r.used > 0)
 
   return (
     <div className="space-y-6">
@@ -89,6 +101,16 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Model</p>
             <div className="mt-2">
               <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{branchModel}</Badge>
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+            <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Status</p>
+            <div className="mt-2">
+              <Badge className={
+                (branch.status === "ACTIVE")
+                  ? "font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent"
+                  : "font-bold bg-secondary text-secondary-foreground border-transparent"
+              }>{branch.status ?? "ACTIVE"}</Badge>
             </div>
           </div>
         </CardContent>
@@ -153,6 +175,65 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                   <p className="text-sm font-medium text-[var(--text)]">—</p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Capacity
+              </h3>
+              <Link
+                href={`/clients/branches/${branch.id}/edit#capacity`}
+                className="text-sm text-[var(--brand)] hover:underline inline-flex items-center gap-1"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                Edit Capacity
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {capacityRows.length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">
+                  No capacity limits configured. All roles are uncapped at this branch.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {capacityRows.map(({ rule, limit, used }) => {
+                    const atCap = limit != null && used >= limit
+                    const overCap = limit != null && used > limit
+                    const tone = overCap
+                      ? "bg-red-50 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/60"
+                      : atCap
+                      ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/60"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/60"
+                    return (
+                      <div
+                        key={rule.field}
+                        className={`rounded-md border px-3 py-2 ${limit == null ? "bg-secondary text-secondary-foreground border-[var(--border)]" : tone}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium uppercase tracking-wide opacity-80">
+                            {rule.label}
+                          </span>
+                          {atCap && limit != null ? (
+                            <Badge className="bg-current/10 text-current border-current/30 text-[10px] font-semibold">
+                              {overCap ? "OVER" : "FULL"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-base font-semibold">
+                          {used} <span className="opacity-60">/</span>{" "}
+                          {limit == null ? <span className="opacity-60 text-sm">uncapped</span> : limit}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <p className="mt-4 text-xs text-[var(--text-muted)]">
+                EXTRA deployments are not counted toward the limit — they exist precisely because the cap was reached.
+              </p>
             </CardContent>
           </Card>
 
@@ -242,7 +323,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 <p className="text-sm font-medium text-[var(--text)]">{branch.client?.type || "—"}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Status</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Client Status</p>
                 <Badge className={"font-bold bg-secondary text-secondary-foreground border-transparent"}>{branch.client?.status || "UNKNOWN"}</Badge>
               </div>
               {branch.isHeadOffice ? <Badge className={"font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent"}>{"Head Office"}</Badge> : null}

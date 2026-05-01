@@ -119,9 +119,10 @@ const CAPACITY_LABELS: Record<BranchCapacityField, string> = {
 
 type Props = {
     branch: Branch
+    activeDeploymentCount?: number
 }
 
-export default function BranchEditForm({ branch }: Props) {
+export default function BranchEditForm({ branch, activeDeploymentCount = 0 }: Props) {
     const router = useRouter()
     const branchType = deriveBranchModel(branch.client?.type)
     const [submitting, setSubmitting] = useState(false)
@@ -156,6 +157,15 @@ export default function BranchEditForm({ branch }: Props) {
     })
 
     const onSubmit = async (values: BranchEditForm) => {
+        // Pre-flight: matches the server-side workflow rule
+        // `branches.blockInactiveWithActiveDeployment` (Ticket 32). The server
+        // also enforces this; the client check just gives a better UX.
+        if (values.status === "INACTIVE" && activeDeploymentCount > 0) {
+            toast.error(
+                `Cannot deactivate branch with ${activeDeploymentCount} active deployment${activeDeploymentCount === 1 ? "" : "s"}. Revoke them first.`
+            )
+            return
+        }
         setSubmitting(true)
         try {
             // Capacity fields are stringly-typed in the form (HTML number input);
@@ -313,33 +323,51 @@ export default function BranchEditForm({ branch }: Props) {
                             <FormField
                                 control={form.control}
                                 name="status"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel>Branch Status</FormLabel>
-                                        <Select
-                                            value={field.value ?? "ACTIVE"}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger aria-label="Branch status">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="ACTIVE">Active</SelectItem>
-                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={({ field }) => {
+                                    const blockingInactive =
+                                        field.value === "INACTIVE" && activeDeploymentCount > 0
+                                    return (
+                                        <FormItem className="md:col-span-2">
+                                            <FormLabel>Branch Status</FormLabel>
+                                            <Select
+                                                value={field.value ?? "ACTIVE"}
+                                                onValueChange={field.onChange}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger aria-label="Branch status">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="ACTIVE">Active</SelectItem>
+                                                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            {blockingInactive ? (
+                                                <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                                                    This branch has{" "}
+                                                    <a
+                                                        href={`/deployments?branchId=${branch.id}&status=ACTIVE`}
+                                                        className="font-semibold underline"
+                                                    >
+                                                        {activeDeploymentCount} active deployment
+                                                        {activeDeploymentCount === 1 ? "" : "s"}
+                                                    </a>
+                                                    . Revoke all active deployments before setting the
+                                                    branch to inactive.
+                                                </p>
+                                            ) : null}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
                             />
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Guard / Staff Capacity */}
-                <Card>
+                <Card id="capacity">
                     <CardHeader>
                         <CardTitle>Capacity</CardTitle>
                     </CardHeader>

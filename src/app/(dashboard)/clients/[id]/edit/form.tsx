@@ -131,6 +131,7 @@ type Props = {
     isSuperAdmin?: boolean
     viewerRegionId?: string | null
     viewerRegionalOfficeId?: string | null
+    activeBranches?: { id: string; name: string }[]
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -153,6 +154,7 @@ export default function ClientEditForm({
     isSuperAdmin = false,
     viewerRegionId = null,
     viewerRegionalOfficeId = null,
+    activeBranches = [],
 }: Props) {
     const router = useRouter()
     const formRef = useRef<HTMLFormElement>(null)
@@ -330,6 +332,15 @@ export default function ClientEditForm({
 
     // Submit
     const onSubmit = async (values: ClientEditForm) => {
+        // Pre-flight: matches the server-side workflow rule
+        // `branches.requireInactiveBranchesBeforeClientInactive` (Ticket 33).
+        // The server also enforces this; the client check just gives a better UX.
+        if (values.status === "INACTIVE" && activeBranches.length > 0) {
+            toast.error(
+                `Cannot deactivate client with ${activeBranches.length} active branch${activeBranches.length === 1 ? "" : "es"}. Deactivate them first.`
+            )
+            return
+        }
         // Multi-contact phone format check (mirrors legacy)
         const filled = contactNumbers.filter((n) => n.trim())
         for (const num of filled) {
@@ -509,27 +520,58 @@ export default function ClientEditForm({
                             <FormField
                                 control={form.control}
                                 name="status"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Status</FormLabel>
-                                        <Select
-                                            value={field.value ?? "ACTIVE"}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="ACTIVE">Active</SelectItem>
-                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                                <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={({ field }) => {
+                                    const blockingInactive =
+                                        field.value === "INACTIVE" && activeBranches.length > 0
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>Status</FormLabel>
+                                            <Select
+                                                value={field.value ?? "ACTIVE"}
+                                                onValueChange={field.onChange}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="ACTIVE">Active</SelectItem>
+                                                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                                    <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            {blockingInactive ? (
+                                                <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                                                    <p>
+                                                        This client has {activeBranches.length} active
+                                                        branch{activeBranches.length === 1 ? "" : "es"}.
+                                                        Deactivate all branches before setting the client
+                                                        to inactive:
+                                                    </p>
+                                                    <ul className="mt-1 list-disc pl-5">
+                                                        {activeBranches.slice(0, 8).map((b) => (
+                                                            <li key={b.id}>
+                                                                <a
+                                                                    href={`/clients/branches/${b.id}/edit`}
+                                                                    className="underline font-medium"
+                                                                >
+                                                                    {b.name}
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                        {activeBranches.length > 8 ? (
+                                                            <li>
+                                                                …and {activeBranches.length - 8} more
+                                                            </li>
+                                                        ) : null}
+                                                    </ul>
+                                                </div>
+                                            ) : null}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
                             />
 
                             <FormField

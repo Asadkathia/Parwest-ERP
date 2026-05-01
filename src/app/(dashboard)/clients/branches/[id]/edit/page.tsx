@@ -17,11 +17,17 @@ export default async function EditBranchPage({ params }: { params: Promise<{ id:
 
     if (!branch) notFound()
 
+    // Count active deployments so the form can pre-flight a status=INACTIVE
+    // change against the workflow rule (Ticket 32).
+    const activeDeploymentCount = await prisma.deployment.count({
+        where: { branchId: id, status: "ACTIVE" },
+    })
+
     return (
         <div className="space-y-6">
             <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Edit Branch"}</h2><p className="mt-1 text-sm text-muted-foreground">{(`Update branch information for ${branch.name}`)}</p></div></div>
 
-            <BranchEditForm branch={branch} />
+            <BranchEditForm branch={branch} activeDeploymentCount={activeDeploymentCount} />
         </div>
     )
 }

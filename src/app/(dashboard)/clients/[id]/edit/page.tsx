@@ -15,7 +15,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     const viewerRegionId = scope?.regionId ?? null
     const viewerRegionalOfficeId = scope?.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
 
-    const [client, regions, supervisorAssignment] = await Promise.all([
+    const [client, regions, supervisorAssignment, activeBranches] = await Promise.all([
         prisma.client.findUnique({ where: { id } }),
         prisma.region.findMany({
             where: viewerRegionId ? { id: viewerRegionId } : undefined,
@@ -26,6 +26,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             orderBy: { createdAt: "desc" },
             select: { supervisorId: true },
         }).catch(() => null),
+        // Surface active branches for a status=INACTIVE pre-flight (Ticket 33).
+        prisma.branch.findMany({
+            where: { clientId: id, status: "ACTIVE" },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+        }),
     ])
 
     if (!client) notFound()
@@ -41,6 +47,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                 isSuperAdmin={isSuperAdmin(session)}
                 viewerRegionId={viewerRegionId}
                 viewerRegionalOfficeId={viewerRegionalOfficeId}
+                activeBranches={activeBranches}
             />
         </div>
     )

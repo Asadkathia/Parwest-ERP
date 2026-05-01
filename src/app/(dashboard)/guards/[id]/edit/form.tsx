@@ -843,8 +843,11 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Parwest ID is read-only display, not part of the form,
+                                so use a plain <label> — FormLabel requires a FormField
+                                ancestor (Ticket 38). */}
                             <div className="space-y-2">
-                                <FormLabel>Parwest ID</FormLabel>
+                                <label className="text-sm font-medium leading-none">Parwest ID</label>
                                 <Input value={guard.parwestId} disabled className="bg-muted/50 tabular-nums" />
                             </div>
 
@@ -1186,7 +1189,7 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {lockedRegionId ? (
                                 <div className="space-y-2">
-                                    <FormLabel>Region</FormLabel>
+                                    <label className="text-sm font-medium leading-none">Region</label>
                                     <Input
                                         readOnly
                                         value={regions.find((r) => r.id === lockedRegionId)?.name || "Locked region"}
@@ -1223,7 +1226,7 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
 
                             {lockedRegionalOfficeId ? (
                                 <div className="space-y-2">
-                                    <FormLabel>Regional Office</FormLabel>
+                                    <label className="text-sm font-medium leading-none">Regional Office</label>
                                     <Input
                                         readOnly
                                         value={(() => {

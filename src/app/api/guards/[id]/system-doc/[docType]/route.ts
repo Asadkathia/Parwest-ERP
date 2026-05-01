@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { hasModuleAccess } from "@/lib/api/permissions"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -1627,7 +1627,12 @@ export async function GET(
 ) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
+    // Match the gate that lets the user reach /guards/[id] in the first place
+    // (module-level GUARDS access via middleware). The granular GUARDS:VIEW
+    // action key is not consistently granted to all roles that legitimately
+    // browse guard profiles, which 403'd the View/Download links and rendered
+    // the JSON envelope as text in a new tab (Ticket 29).
+    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
 
     const { id, docType } = await params
     const generator = DOC_GENERATORS[docType]

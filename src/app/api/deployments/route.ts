@@ -252,7 +252,25 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Parse deployment type early so capacity enforcement can carve out EXTRA.
+        // Constrained to REGULAR | OVERTIME | EXTRA via zod (see deploymentTypeSchema).
+        const rawDeploymentType = body.deploymentType
+            ? String(body.deploymentType).toUpperCase()
+            : "REGULAR"
+        const parsedDeploymentType = deploymentTypeSchema.safeParse(rawDeploymentType)
+        if (!parsedDeploymentType.success) {
+            return badRequest("deploymentType must be one of REGULAR, OVERTIME, EXTRA.")
+        }
+        const deploymentType = parsedDeploymentType.data
+
+        if (deploymentType === "EXTRA" && !isWorkflowRuleEnabled("deployments.allowExtraType")) {
+            return forbidden("Extra deployments are disabled by workflow policy.")
+        }
+
         // ── Branch capacity enforcement ─────────────────────────────────────
+        // EXTRA is the explicit over-capacity escape hatch — it requires that the
+        // branch IS at capacity for this designation+shift, and is rejected when
+        // capacity is still available. REGULAR/OVERTIME require headroom.
         if (branch && (shiftType === "DAY" || shiftType === "NIGHT")) {
             const capacityFieldByDesignation: Record<string, { DAY: keyof typeof branch | null; NIGHT: keyof typeof branch | null }> = {
                 "guard": { DAY: "dayGuardCapacity", NIGHT: "nightGuardCapacity" },
@@ -276,13 +294,28 @@ export async function POST(request: NextRequest) {
                         endDate: null,
                         designation: { equals: designation, mode: "insensitive" },
                         shiftType,
+                        // Don't count prior EXTRA rows toward the cap — they exist
+                        // because the cap was already exceeded.
+                        deploymentType: { not: "EXTRA" },
                     },
                 })
-                if (used >= limit) {
+                const atCapacity = used >= limit
+                if (deploymentType === "EXTRA") {
+                    if (!atCapacity) {
+                        return badRequest(
+                            `Branch still has ${shiftType.toLowerCase()} ${designation} capacity available (${used}/${limit}). EXTRA deployment is only allowed once the branch is full — deploy as REGULAR.`
+                        )
+                    }
+                } else if (atCapacity) {
                     return conflict(
-                        `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${used}/${limit}).`
+                        `Branch has reached its ${shiftType.toLowerCase()} ${designation} capacity (${used}/${limit}). Deploy as EXTRA to assign an additional guard.`
                     )
                 }
+            } else if (deploymentType === "EXTRA") {
+                // Uncapped designation — EXTRA has no meaning here.
+                return badRequest(
+                    `EXTRA deployment is only allowed when the branch has a configured capacity that is full. The ${designation} role is uncapped at this branch.`
+                )
             }
         }
 
@@ -417,23 +450,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Parse deployment type early for validation. Constrained to
-        // REGULAR | OVERTIME | EXTRA via zod (see deploymentTypeSchema).
-        const rawDeploymentType = body.deploymentType
-            ? String(body.deploymentType).toUpperCase()
-            : "REGULAR"
-        const parsedDeploymentType = deploymentTypeSchema.safeParse(rawDeploymentType)
-        if (!parsedDeploymentType.success) {
-            return badRequest("deploymentType must be one of REGULAR, OVERTIME, EXTRA.")
-        }
-        const deploymentType = parsedDeploymentType.data
-
-        // Workflow gate: the EXTRA deployment type can be disabled by toggling
-        // `deployments.allowExtraType` off. Default is on.
-        if (deploymentType === "EXTRA" && !isWorkflowRuleEnabled("deployments.allowExtraType")) {
-            return forbidden("Extra deployments are disabled by workflow policy.")
-        }
-
+        // deploymentType already parsed above (before capacity check).
         if (deploymentType === "OVERTIME") {
             const hasRegular = await prisma.deployment.findFirst({
                 where: { guardId, status: "ACTIVE", deploymentType: "REGULAR" },

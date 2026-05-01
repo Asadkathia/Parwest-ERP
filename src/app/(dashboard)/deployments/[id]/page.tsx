@@ -6,13 +6,12 @@ import { prisma } from "@/lib/db"
 import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import Link from "next/link"
-import { ArrowLeft, Edit, Building, User, Calendar, FileText } from "lucide-react"
+import { ArrowLeft, Building, User, Calendar, FileText } from "lucide-react"
 export default async function DeploymentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session) redirect("/login")
 
-  // Deployments semantically belong to GUARDS module (no dedicated DEPLOYMENTS module).
-  const canUpdateDeployment = hasAction(session, "GUARDS", "UPDATE")
+  // Deployments are read-only — only revoke is permitted (Ticket 37).
   const canDeleteDeployment = hasAction(session, "GUARDS", "DELETE")
 
   const { id } = await params
@@ -54,13 +53,7 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
             </Link>
             {deployment.status === "ACTIVE" && canDeleteDeployment ? (
               <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger">
-                End Deployment
-              </Link>
-            ) : null}
-            {!deployment.endDate && canUpdateDeployment ? (
-              <Link href={`/deployments/${deployment.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
+                Revoke Deployment
               </Link>
             ) : null}
           </div>)}</div></div>
@@ -141,7 +134,7 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
             <CardContent className="space-y-2">
               <Link href={`/guards/${deployment.guard.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Guard Profile</Link>
               <Link href={`/clients/${deployment.client.id}`} className="ui-btn ui-btn-secondary w-full text-left">View Client Details</Link>
-              {deployment.status === "ACTIVE" && canDeleteDeployment ? <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger w-full text-left">End Deployment</Link> : null}
+              {deployment.status === "ACTIVE" && canDeleteDeployment ? <Link href={`/deployments/${deployment.id}/end`} className="ui-btn ui-btn-danger w-full text-left">Revoke Deployment</Link> : null}
             </CardContent>
           </Card>
         </div>

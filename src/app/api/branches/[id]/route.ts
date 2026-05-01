@@ -16,6 +16,7 @@ import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { BRANCH_CAPACITY_FIELDS } from "@/lib/schemas/branch"
+import { CAPACITY_USAGE_RULES } from "@/lib/branches/capacity"
 
 // ── Zod schema for PATCH body ───────────────────────────────────────────────
 // Stays tolerant on identity/contact fields (legacy callers pass partials)
@@ -58,34 +59,6 @@ const branchPatchSchema = z
     .passthrough()
 
 type BranchPatchPayload = z.infer<typeof branchPatchSchema>
-
-// Mirrors the designation→capacity mapping in
-// `src/app/api/deployments/route.ts`. Used to reject a capacity decrease below
-// the count of currently active deployments for that designation/shift.
-const CAPACITY_USAGE_RULES: Array<{
-    field: (typeof BRANCH_CAPACITY_FIELDS)[number]
-    designations: string[] // case-insensitive match
-    shiftTypes: Array<"DAY" | "NIGHT" | "BOTH"> // null = any
-    label: string
-}> = [
-    { field: "dayGuardCapacity", designations: ["guard", "security guard"], shiftTypes: ["DAY"], label: "day guards" },
-    { field: "nightGuardCapacity", designations: ["guard", "security guard"], shiftTypes: ["NIGHT"], label: "night guards" },
-    { field: "daySupervisorCapacity", designations: ["supervisor", "location supervisor"], shiftTypes: ["DAY"], label: "day supervisors" },
-    { field: "nightSupervisorCapacity", designations: ["supervisor", "location supervisor"], shiftTypes: ["NIGHT"], label: "night supervisors" },
-    { field: "cpoCapacity", designations: ["cpo"], shiftTypes: ["DAY", "NIGHT", "BOTH"], label: "CPOs" },
-    { field: "dayCpoCapacity", designations: ["cpo"], shiftTypes: ["DAY"], label: "day CPOs" },
-    { field: "nightCpoCapacity", designations: ["cpo"], shiftTypes: ["NIGHT"], label: "night CPOs" },
-    { field: "daySoCapacity", designations: ["so"], shiftTypes: ["DAY"], label: "day SOs" },
-    { field: "nightSoCapacity", designations: ["so"], shiftTypes: ["NIGHT"], label: "night SOs" },
-    { field: "dayAsoCapacity", designations: ["aso"], shiftTypes: ["DAY"], label: "day ASOs" },
-    { field: "nightAsoCapacity", designations: ["aso"], shiftTypes: ["NIGHT"], label: "night ASOs" },
-    { field: "dayLsoCapacity", designations: ["lso"], shiftTypes: ["DAY"], label: "day LSOs" },
-    { field: "nightLsoCapacity", designations: ["lso"], shiftTypes: ["NIGHT"], label: "night LSOs" },
-    { field: "dayCctvCapacity", designations: ["cctv operator"], shiftTypes: ["DAY"], label: "day CCTV operators" },
-    { field: "nightCctvCapacity", designations: ["cctv operator"], shiftTypes: ["NIGHT"], label: "night CCTV operators" },
-    { field: "dayReceptionistCapacity", designations: ["receptionist"], shiftTypes: ["DAY"], label: "day receptionists" },
-    { field: "nightReceptionistCapacity", designations: ["receptionist"], shiftTypes: ["NIGHT"], label: "night receptionists" },
-]
 
 export async function PATCH(
     request: NextRequest,
@@ -194,7 +167,7 @@ export async function PATCH(
                     .reduce((sum, row) => sum + row._count._all, 0)
                 if (nextValue < used) {
                     return conflict(
-                        `Cannot lower ${rule.label} capacity to ${nextValue} — there are currently ${used} active deployment(s) at this branch in that bucket.`
+                        `Cannot lower ${rule.label.toLowerCase()} capacity to ${nextValue} — there are currently ${used} active deployment(s) at this branch in that bucket.`
                     )
                 }
             }

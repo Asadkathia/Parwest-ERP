@@ -4,8 +4,6 @@ import { useActionState } from "react"
 import { useFormStatus } from "react-dom"
 import { authenticate } from "./actions"
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { getSession } from "next-auth/react"
 
 function SubmitButton() {
     const { pending } = useFormStatus()
@@ -22,33 +20,15 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
-    const router = useRouter()
     const [errorMessage, dispatch] = useActionState(authenticate, undefined)
 
     useEffect(() => {
         if (errorMessage !== "success") return
-        let cancelled = false
-        // Server action set the session cookie via signIn(redirect:false), but the
-        // client SessionProvider still holds the pre-login (null) session. Force a
-        // refetch of /api/auth/session BEFORE navigating so <AppSidebar> renders
-        // with permissions on first paint instead of an empty skeleton until the
-        // user manually refreshes (Ticket 25).
-        ;(async () => {
-            try {
-                await getSession()
-            } catch {
-                // If the session fetch fails for any reason, fall through —
-                // router.refresh() below still revalidates server components,
-                // and SessionProvider will eventually catch up on its own poll.
-            }
-            if (cancelled) return
-            router.replace("/dashboard")
-            router.refresh()
-        })()
-        return () => {
-            cancelled = true
-        }
-    }, [errorMessage, router])
+        // Hard navigation forces SessionProvider to remount with the freshly set
+        // JWT cookie, so the sidebar/topbar render with permissions on first
+        // paint. Soft navigation kept the stale provider mounted (Ticket 25).
+        window.location.assign("/dashboard")
+    }, [errorMessage])
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-50">

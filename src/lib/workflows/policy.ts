@@ -47,10 +47,11 @@ const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "deployments.requireVerifiedPrerequisites": true,
   "deployments.allowExtraType": true,
   "branches.requireInactiveBranchesBeforeClientInactive": true,
-  // Default OFF — flagged as a feature-request (QA note 32) rather than a
-  // hard rule. The toggle exists so admins can opt in once the workflow is
-  // validated end-to-end.
-  "branches.blockInactiveWithActiveDeployment": false,
+  // Mirrors the client→branch cascade: a branch with active deployments cannot
+  // be deactivated until those deployments are revoked (Ticket 32). Together
+  // with `requireInactiveBranchesBeforeClientInactive` this enforces the full
+  // cascade: revoke deployments → INACTIVE branch → INACTIVE client.
+  "branches.blockInactiveWithActiveDeployment": true,
   "inventoryDemand.requirePendingInitialStatus": true,
   "inventoryDemand.enforceTransitionMap": true,
   "inventoryDemand.blockCoreEditsAfterTerminal": true,

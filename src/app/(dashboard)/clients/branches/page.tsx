@@ -55,7 +55,7 @@ export default async function BranchesPage({
     const filteredRows: BranchListRow[] = filteredByType
         .filter((branch) => {
             if (!params.status) return true
-            return (branch.client?.status ?? "").toUpperCase() === params.status.toUpperCase()
+            return (branch.status ?? "").toUpperCase() === params.status.toUpperCase()
         })
         .map((branch) => ({
             id: branch.id,
@@ -70,7 +70,7 @@ export default async function BranchesPage({
             branchModel: deriveBranchModel(branch.client?.type) as "CONVENTIONAL" | "ISLAMIC",
             deploymentCount: branch.deployments?.length ?? 0,
             isHeadOffice: branch.isHeadOffice,
-            status: branch.client?.status ?? "UNKNOWN",
+            status: branch.status ?? "ACTIVE",
         }))
 
     const stats = {
