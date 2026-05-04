@@ -1,3 +1,17 @@
 {
-  "regions": ["sin1"]
+  "regions": ["sin1"],
+  "crons": [
+    {
+      "path": "/api/cron/invoices/accrue-daily",
+      "schedule": "30 19 * * *"
+    },
+    {
+      "path": "/api/cron/invoices/remind-pending",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/run-scheduled-reports",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

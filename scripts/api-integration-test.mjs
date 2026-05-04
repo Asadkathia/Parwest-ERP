@@ -796,7 +796,73 @@ async function run() {
 
     // =========== REPORTS ===========
     console.log('\n=== REPORTS ===');
-    const reportDeployment = await api('GET', '/api/reports/guards/deployment');
+
+    // Catalog returns the registered report definitions.
+    const catalogRes = await api('GET', '/api/reports/catalog');
+    const catalogRows = Array.isArray(catalogRes.data?.data) ? catalogRes.data.data : [];
+    const catalogPass = catalogRes.status === 200 && catalogRes.data?.success === true && catalogRows.length >= 20;
+    check('GET /api/reports/catalog', catalogPass, `${catalogRes.status} rows=${catalogRows.length}`);
+    record('/api/reports/catalog GET', catalogPass ? 'PASS' : 'FAIL', '200 + at least 20 reports', `${catalogRes.status} + rows=${catalogRows.length}`, '');
+
+    // Dashboard returns KPIs and chart series.
+    const dashRes = await api('GET', '/api/reports/dashboard');
+    const dashData = dashRes.data?.data ?? {};
+    const dashPass =
+        dashRes.status === 200 &&
+        dashRes.data?.success === true &&
+        typeof dashData.kpis?.totalGuards === 'number' &&
+        Array.isArray(dashData.deployTrend) &&
+        Array.isArray(dashData.salaryMoM) &&
+        Array.isArray(dashData.inventoryByStatus);
+    check('GET /api/reports/dashboard', dashPass, `${dashRes.status}`);
+    record('/api/reports/dashboard GET', dashPass ? 'PASS' : 'FAIL', '200 + kpis + chart series', dashRes.status, `kpis=${typeof dashData.kpis?.totalGuards}`);
+
+    // Run a known report (guards.hired) end-to-end and download the artifact.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const yearAgoIso = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const runRes = await api('POST', '/api/reports/run/guards.hired', {
+        format: 'xlsx',
+        params: { from: yearAgoIso, to: todayIso },
+    });
+    const runData = runRes.data?.data ?? {};
+    const runPass = runRes.status === 200 && runRes.data?.success === true && typeof runData.runId === 'string' && typeof runData.downloadUrl === 'string';
+    check('POST /api/reports/run/guards.hired', runPass, `${runRes.status}`);
+    record('/api/reports/run/[reportKey] POST', runPass ? 'PASS' : 'FAIL', '200 + runId + downloadUrl', runRes.status, `rows=${runData.rowCount}`);
+
+    if (runPass) {
+        const dlRes = await fetch(`${BASE_URL}${runData.downloadUrl}`, { headers: { 'Cookie': serializeCookies() } });
+        absorbCookies(dlRes.headers.get('set-cookie'));
+        const dlPass = dlRes.status === 200 && (dlRes.headers.get('content-type') || '').includes('spreadsheetml');
+        check('GET /api/reports/library/[runId]/download', dlPass, `${dlRes.status}`);
+        record('/api/reports/library/[runId]/download GET', dlPass ? 'PASS' : 'FAIL', '200 + xlsx content-type', dlRes.status, dlRes.headers.get('content-type'));
+    }
+
+    // Unknown report key returns 404.
+    const runUnknown = await api('POST', '/api/reports/run/does.not.exist', { format: 'csv', params: {} });
+    const runUnknownPass = runUnknown.status === 404;
+    check('POST /api/reports/run unknown key', runUnknownPass, `${runUnknown.status}`);
+    record('/api/reports/run/[reportKey] unknown', runUnknownPass ? 'PASS' : 'FAIL', 404, runUnknown.status, runUnknown.data?.message);
+
+    // Invalid format is rejected.
+    const runBadFmt = await api('POST', '/api/reports/run/guards.hired', { format: 'doc', params: {} });
+    const runBadFmtPass = runBadFmt.status === 400;
+    check('POST /api/reports/run invalid format', runBadFmtPass, `${runBadFmt.status}`);
+    record('/api/reports/run/[reportKey] invalid format', runBadFmtPass ? 'PASS' : 'FAIL', 400, runBadFmt.status, runBadFmt.data?.message);
+
+    // Library list endpoint.
+    const libRes = await api('GET', '/api/reports/library?take=10');
+    const libPass = libRes.status === 200 && libRes.data?.success === true && Array.isArray(libRes.data?.data);
+    check('GET /api/reports/library', libPass, `${libRes.status}`);
+    record('/api/reports/library GET', libPass ? 'PASS' : 'FAIL', '200 + array', libRes.status, `rows=${libRes.data?.data?.length ?? 0}`);
+
+    // Scheduled list endpoint.
+    const reportScheduled = await api('GET', '/api/reports/scheduled');
+    const reportScheduledPass = reportScheduled.status === 200 && reportScheduled.data?.success === true && Array.isArray(reportScheduled.data?.data);
+    check('GET /api/reports/scheduled', reportScheduledPass, `${reportScheduled.status}`);
+    record('/api/reports/scheduled GET', reportScheduledPass ? 'PASS' : 'FAIL', '200 + array', reportScheduled.status, `rows=${reportScheduled.data?.data?.length ?? 0}`);
+
+    // Legacy deleted-block stripped below — kept original variable references commented for grep history.
+    /* DELETED LEGACY REPORTS BLOCK
     const reportDeploymentData = reportDeployment.data?.data || {};
     const reportDeploymentRowsData = Array.isArray(reportDeploymentData?.rows) ? reportDeploymentData.rows : [];
     const reportDeploymentRows = reportDeploymentRowsData.length;
@@ -915,6 +981,7 @@ async function run() {
     const reportInvalidMonthPass = reportInvalidMonth.status === 400;
     check('GET /api/reports/clients/summary invalid month', reportInvalidMonthPass, `${reportInvalidMonth.status}`);
     record('/api/reports/clients/summary GET invalid month', reportInvalidMonthPass ? 'PASS' : 'FAIL', 400, reportInvalidMonth.status, reportInvalidMonth.data?.message);
+    */ // END DELETED LEGACY REPORTS BLOCK
 
     // =========== PAYROLL ===========
     console.log('\n=== PAYROLL (smoke) ===');

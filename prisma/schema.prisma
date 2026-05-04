@@ -110,9 +110,31 @@ model User {
   storeInventoryAssignmentsIssued   StoreInventoryAssignment[]     @relation("StoreInventoryAssignmentIssuer")
   storeInventoryAssignmentsReturned StoreInventoryAssignment[]     @relation("StoreInventoryAssignmentReturner")
   storeInventoryMovementsPerformed  StoreInventoryMovement[]       @relation("StoreInventoryMovementPerformedBy")
+  notifications                     Notification[]
+  reportRuns                        ReportRun[]                    @relation("ReportRunRequestedBy")
+  scheduledReports                  ScheduledReport[]              @relation("ScheduledReportCreatedBy")
 
   @@index([email])
   @@index([roleId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // INVOICE_DRAFT_PENDING, ...
+  title     String
+  body      String?
+  link      String?
+  payload   Json?
+  dedupeKey String? // unique-per-user dedupe (e.g. "INVOICE_DRAFT_PENDING:<invoiceId>:<YYYY-MM-DD>")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, dedupeKey], map: "Notification_user_dedupe_key")
+  @@index([userId, readAt])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model Role {
@@ -192,6 +214,7 @@ model Region {
   guards          Guard[]
   clients         Client[]
   deploymentRates DeploymentRate[]
+  cwfRates        CwfRegionRate[]
 }
 
 model RegionalOffice {
@@ -346,6 +369,19 @@ model Guard {
   guardInsurances           GuardInsurance[]
   guardCourses              GuardCourse[]
   reserveLedger             PayrollReserveLedger[]
+
+  // Deductions policy relations (Wave 3)
+  uniformIssuances           UniformIssuance[]
+  uniformResignationRecovery UniformResignationRecovery[]
+  advanceSalaries            AdvanceSalary[]
+  nightCallLogs              NightCallLog[]
+  nightCallDeductions        NightCallDeduction[]
+  eobiEnrollment             EobiEnrollment?
+  essiEnrollment             EssiEnrollment?
+  trainingSchoolFeeIssuances TrainingSchoolFeeIssuance[]
+
+  // Resignation timestamp (drives uniform tenure-tier recovery)
+  resignedOn DateTime?
 
   // Age approval flags
   ageApprovalRequired Boolean @default(false)
@@ -699,12 +735,12 @@ model TrainingCategory {
 // Composite unique (ojtId, categoryId) means each category appears at most
 // once per OJT record — UI toggles `completed` on/off.
 model OjtTrainingCheck {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   ojtId       String
-  ojt         Training  @relation(fields: [ojtId], references: [id], onDelete: Cascade)
+  ojt         Training         @relation(fields: [ojtId], references: [id], onDelete: Cascade)
   categoryId  String
   category    TrainingCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  completed   Boolean   @default(false)
+  completed   Boolean          @default(false)
   completedAt DateTime?
   notes       String?
 
@@ -920,6 +956,7 @@ model Branch {
   payrollSpecialDuties  PayrollSpecialDuty[]
   invoices              Invoice[]
   advancePayments       ClientAdvancePayment[]
+  apsaaRates            ApsaaBranchRate[]
 
   @@index([clientId])
   @@index([status])
@@ -2223,21 +2260,27 @@ model GuardInsurance {
 // ============================================
 
 model PayrollDeductionType {
-  id            String   @id @default(cuid())
-  code          String   @unique // e.g. "EOBI", "CWF", "TRAINING_FEE"
-  name          String // display name
-  description   String?
-  defaultAmount Float    @default(0) // default amount when auto-applied
-  isActive      Boolean  @default(true)
-  sortOrder     Int      @default(0)
-  createdById   String?
-  createdByName String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  code            String   @unique // canonical: APSAA | CWF | ADVANCE_SALARY | UNIFORM | APSAA_PUNJAB | NIGHT_CALL | ABSENT | EOBI | OTHER (free-form for legacy types)
+  name            String // display name
+  description     String?
+  defaultAmount   Float    @default(0) // legacy fallback for non-policy types only
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  // Wave 3: rate source tells the engine which resolver to call.
+  // CLIENT_BRANCH_RATE | REGION_RATE | ACTUAL | INSTALLMENT_PLAN |
+  // ATTENDANCE_DERIVED | CALL_LOG_DERIVED | EOBI_RATE | MANUAL
+  rateSource      String   @default("MANUAL")
+  isPolicyManaged Boolean  @default(false) // true => row locked to canonical config; users cannot edit code/rateSource
+  createdById     String?
+  createdByName   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   entries PayrollDeductionEntry[]
 
   @@index([isActive])
+  @@index([rateSource])
 }
 
 model PayrollDeductionEntry {
@@ -2246,13 +2289,25 @@ model PayrollDeductionEntry {
   payroll         Payroll              @relation(fields: [payrollId], references: [id], onDelete: Cascade)
   deductionTypeId String
   deductionType   PayrollDeductionType @relation(fields: [deductionTypeId], references: [id])
+  // Final applied amount on this payroll (override OR computed)
   amount          Float
+  // Wave 3: traceability + override audit
+  computedAmount  Float? // engine-computed value before override
+  rateRowId       String? // id of the rate row (ApsaaBranchRate / CwfRegionRate / EobiRate / etc.) used to compute
+  rateSource      String? // copy of type's rateSource at compute time (for historical accuracy)
+  breakdown       Json? // structured breakdown e.g. [{ branchId, days, rate, subTotal }]
+  isOverride      Boolean              @default(false)
+  overrideById    String?
+  overrideByName  String?
+  overrideReason  String?
+  overrideAt      DateTime?
   notes           String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
   @@unique([payrollId, deductionTypeId])
   @@index([payrollId])
+  @@index([rateRowId])
 }
 
 model PayrollReserveLedger {
@@ -2309,4 +2364,514 @@ model InvoiceLineItem {
   createdAt   DateTime @default(now())
 
   @@index([invoiceId])
+}
+
+// ============================================
+// DEDUCTIONS POLICY (Wave 3 — May 2026)
+// ============================================
+// Canonical, effective-dated rate tables. Every change is a new row;
+// active rows have effectiveTo = NULL. Engine reads these via
+// `resolveRate(table, scopeKey, monthStart)`.
+
+// status: DRAFT | ACTIVE | SUPERSEDED
+// Separation of duties: proposer must differ from approver (enforced in API).
+
+model ApsaaBranchRate {
+  id                String    @id @default(cuid())
+  branchId          String
+  branch            Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  amount            Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT") // DRAFT | ACTIVE | SUPERSEDED
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([branchId])
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+model CwfRegionRate {
+  id                String    @id @default(cuid())
+  regionId          String
+  region            Region    @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  amount            Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT")
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([regionId])
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// EOBI notified rate (global)
+model EobiRate {
+  id                String    @id @default(cuid())
+  amount            Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT")
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// APSAA Punjab — auto-applied at enrollment for guards deployed in Punjab (global rate)
+model ApsaaPunjabRate {
+  id                String    @id @default(cuid())
+  amount            Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT")
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// Uniform / jersey installment plan (global, effective-dated singleton)
+model UniformPlan {
+  id                String    @id @default(cuid())
+  totalCost         Float // jersey cost
+  installmentAmount Float
+  installmentCount  Int
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT")
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// Tenure-tier resignation recovery (e.g. <3mo => Rs 5000, 3-6mo => Rs 3000)
+model UniformResignationTier {
+  id             String    @id @default(cuid())
+  minMonths      Int // inclusive
+  maxMonths      Int // exclusive; use 9999 for "no cap"
+  amount         Float
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  status         String    @default("DRAFT")
+  proposedById   String?
+  proposedByName String?
+  proposedAt     DateTime  @default(now())
+  approvedById   String?
+  approvedByName String?
+  approvedAt     DateTime?
+  supersededById String?
+  supersededAt   DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// Night-call rule config (global, effective-dated)
+// dayRateBasis: BASE_DIV_30 | CUSTOM
+model NightCallRule {
+  id                               String    @id @default(cuid())
+  callsPerNight                    Int       @default(3)
+  twoMissedDeduction               Int       @default(1) // days deducted when 2 missed in one night
+  repeatedDayPenalty               Int       @default(1) // days deducted for next-day repeat
+  consecutiveOneMissedWarningDay   Int       @default(1)
+  consecutiveOneMissedDeductionDay Int       @default(1)
+  dayRateBasis                     String    @default("BASE_DIV_30") // BASE_DIV_30 | CUSTOM
+  customDayRate                    Float?
+  effectiveFrom                    DateTime
+  effectiveTo                      DateTime?
+  status                           String    @default("DRAFT")
+  proposedById                     String?
+  proposedByName                   String?
+  proposedAt                       DateTime  @default(now())
+  approvedById                     String?
+  approvedByName                   String?
+  approvedAt                       DateTime?
+  supersededById                   String?
+  supersededAt                     DateTime?
+  notes                            String?
+  createdAt                        DateTime  @default(now())
+  updatedAt                        DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+// ----- Per-guard ledgers driven by triggers -----
+
+// One row per jersey issuance event; spawns N installments
+model UniformIssuance {
+  id                String   @id @default(cuid())
+  guardId           String
+  guard             Guard    @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  uniformPlanId     String // snapshot of plan used at issuance
+  issuedOn          DateTime
+  totalCost         Float
+  installmentAmount Float
+  installmentCount  Int
+  status            String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  notes             String?
+  issuedById        String?
+  issuedByName      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  installments UniformInstallment[]
+
+  @@index([guardId])
+  @@index([status])
+}
+
+model UniformInstallment {
+  id                String          @id @default(cuid())
+  uniformIssuanceId String
+  issuance          UniformIssuance @relation(fields: [uniformIssuanceId], references: [id], onDelete: Cascade)
+  guardId           String // denormalized for fast guard-month lookup
+  payrollMonth      DateTime // first of month it should apply
+  amount            Float
+  status            String          @default("PENDING") // PENDING | DEDUCTED | SKIPPED | CANCELLED
+  payrollId         String? // set when applied
+  appliedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([uniformIssuanceId, payrollMonth])
+  @@index([guardId, payrollMonth])
+  @@index([status])
+}
+
+model UniformResignationRecovery {
+  id           String    @id @default(cuid())
+  guardId      String
+  guard        Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  resignedOn   DateTime
+  monthsServed Int
+  tierId       String? // ref UniformResignationTier id
+  amount       Float
+  payrollMonth DateTime // when it should apply
+  status       String    @default("PENDING") // PENDING | DEDUCTED | CANCELLED
+  payrollId    String?
+  appliedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([guardId, payrollMonth])
+  @@index([guardId])
+  @@index([status])
+}
+
+// Advance salary issuance + per-installment recovery schedule
+model AdvanceSalary {
+  id           String   @id @default(cuid())
+  guardId      String
+  guard        Guard    @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  principal    Float
+  issuedOn     DateTime
+  reason       String?
+  status       String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  issuedById   String?
+  issuedByName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  schedule AdvanceSalaryRecovery[]
+
+  @@index([guardId])
+  @@index([status])
+}
+
+model AdvanceSalaryRecovery {
+  id              String        @id @default(cuid())
+  advanceSalaryId String
+  advance         AdvanceSalary @relation(fields: [advanceSalaryId], references: [id], onDelete: Cascade)
+  guardId         String // denormalized
+  payrollMonth    DateTime
+  amount          Float
+  status          String        @default("PENDING") // PENDING | DEDUCTED | SKIPPED | CANCELLED
+  payrollId       String?
+  appliedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([advanceSalaryId, payrollMonth])
+  @@index([guardId, payrollMonth])
+  @@index([status])
+}
+
+// Night-call control room logs (raw)
+model NightCallLog {
+  id        String   @id @default(cuid())
+  guardId   String
+  guard     Guard    @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  callTime  DateTime
+  status    String // PLACED | MISSED | ANSWERED
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([guardId, callTime])
+  @@index([status])
+}
+
+// Aggregated per-day deduction rows produced from logs
+model NightCallDeduction {
+  id           String    @id @default(cuid())
+  guardId      String
+  guard        Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  date         DateTime
+  type         String // TWO_MISSED | REPEATED_NEXT_DAY | CONSECUTIVE_DAY1_WARNING | CONSECUTIVE_DAY2_DEDUCTION
+  daysDeducted Int       @default(0)
+  ruleRowId    String? // NightCallRule.id snapshot
+  payrollMonth DateTime
+  status       String    @default("PENDING") // PENDING | DEDUCTED | CANCELLED
+  payrollId    String?
+  appliedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([guardId, date, type])
+  @@index([guardId, payrollMonth])
+  @@index([status])
+}
+
+// EOBI registration per guard (drives EOBI deduction eligibility + reports)
+model EobiEnrollment {
+  id               String    @id @default(cuid())
+  guardId          String    @unique
+  guard            Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  eobiNumber       String?
+  registrationDate DateTime?
+  isActive         Boolean   @default(true)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+// ESSI (Provincial Employees Social Security Institution) — parallel to EOBI.
+// Flat global notified rate; per-guard enrollment gates eligibility.
+model EssiRate {
+  id                String    @id @default(cuid())
+  amount            Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT")
+  proposedById      String?
+  proposedByName    String?
+  proposedAt        DateTime  @default(now())
+  approvedById      String?
+  approvedByName    String?
+  approvedAt        DateTime?
+  supersededById    String?
+  supersededAt      DateTime?
+  sourceDocumentUrl String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([effectiveFrom])
+}
+
+model EssiEnrollment {
+  id               String    @id @default(cuid())
+  guardId          String    @unique
+  guard            Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  essiNumber       String?
+  registrationDate DateTime?
+  isActive         Boolean   @default(true)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+// Training School Fees — course tuition recovered via installments
+// (mirrors UniformIssuance/Installment).
+model TrainingSchoolFeeIssuance {
+  id                String   @id @default(cuid())
+  guardId           String
+  guard             Guard    @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  courseName        String
+  issuedOn          DateTime
+  totalCost         Float
+  installmentAmount Float
+  installmentCount  Int
+  status            String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  notes             String?
+  issuedById        String?
+  issuedByName      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  installments TrainingSchoolFeeInstallment[]
+
+  @@index([guardId])
+  @@index([status])
+}
+
+model TrainingSchoolFeeInstallment {
+  id           String                    @id @default(cuid())
+  issuanceId   String
+  issuance     TrainingSchoolFeeIssuance @relation(fields: [issuanceId], references: [id], onDelete: Cascade)
+  guardId      String
+  payrollMonth DateTime
+  amount       Float
+  status       String                    @default("PENDING") // PENDING | DEDUCTED | SKIPPED | CANCELLED
+  payrollId    String?
+  appliedAt    DateTime?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  @@unique([issuanceId, payrollMonth])
+  @@index([guardId, payrollMonth])
+  @@index([status])
+}
+
+// Audit trail for any rate row change (propose / approve / supersede / retroactive)
+model DeductionPolicyAudit {
+  id         String   @id @default(cuid())
+  rateTable  String // 'ApsaaBranchRate' | 'CwfRegionRate' | ...
+  rateRowId  String
+  action     String // PROPOSED | APPROVED | SUPERSEDED | RETROACTIVE_FORCED
+  scopeKey   String? // branchId / regionId / null
+  beforeJson Json?
+  afterJson  Json?
+  byUserId   String?
+  byUserName String?
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([rateTable, rateRowId])
+  @@index([createdAt])
+}
+
+// =====================================================================
+// Reporting module
+// =====================================================================
+
+enum ReportFormat {
+  CSV
+  XLSX
+  PDF
+}
+
+enum ReportRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model ReportRun {
+  id            String           @id @default(cuid())
+  reportKey     String
+  paramsJson    Json
+  format        ReportFormat
+  status        ReportRunStatus  @default(PENDING)
+  requestedById String?
+  requestedBy   User?            @relation("ReportRunRequestedBy", fields: [requestedById], references: [id])
+  scheduledId   String?
+  scheduled     ScheduledReport? @relation(fields: [scheduledId], references: [id], onDelete: SetNull)
+  fileKey       String?
+  fileSize      Int?
+  rowCount      Int?
+  error         String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([reportKey, createdAt])
+  @@index([scheduledId])
+  @@index([requestedById, createdAt])
+}
+
+model ScheduledReport {
+  id          String         @id @default(cuid())
+  reportKey   String
+  paramsJson  Json
+  formats     ReportFormat[]
+  cron        String
+  timezone    String         @default("Asia/Karachi")
+  recipients  String[]
+  managerIds  String[]
+  priority    Int            @default(0)
+  active      Boolean        @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  createdById String
+  createdBy   User           @relation("ScheduledReportCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  runs        ReportRun[]
+
+  @@index([active, nextRunAt])
+  @@index([createdById])
+}
+
+model ReportRunBlob {
+  fileKey   String   @id
+  bytes     Bytes
+  createdAt DateTime @default(now())
 }

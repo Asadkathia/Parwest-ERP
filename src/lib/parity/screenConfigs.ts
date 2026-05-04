@@ -289,14 +289,10 @@ export const inventoryLinks = [
 ]
 
 export const reportLinks = [
-  { label: "Overview", href: "/reports" },
+  { label: "Dashboard", href: "/reports" },
+  { label: "Catalog", href: "/reports/catalog" },
   { label: "Scheduled", href: "/reports/scheduled" },
-  { label: "Guard Deployment", href: "/reports/guard-deployment" },
-  { label: "Day & Night", href: "/reports/day-night-duty" },
-  { label: "Client Enrolled", href: "/reports/client-enrolled" },
-  { label: "Inventory Summary", href: "/reports/inventory-store-summary" },
-  { label: "AI/Prompt", href: "/reports/ai" },
-  { label: "Generated List", href: "/reports/generated" },
+  { label: "Library", href: "/reports/library" },
 ]
 
 export const importLinks = [
