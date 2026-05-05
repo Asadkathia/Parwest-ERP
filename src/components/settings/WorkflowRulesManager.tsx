@@ -81,6 +81,37 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
     "Core demand fields cannot be edited after a terminal status. Disabling allows data tampering on closed records.",
   "inventoryDemand.requireSufficientStockForFulfillment":
     "Store must have sufficient stock before a demand can be fulfilled.",
+  // Deductions policy
+  "deductions.applyApsaaBranchRate":
+    "Auto-apply APSAA at the client branch–wise approved rate every month.",
+  "deductions.applyCwfRegionRate":
+    "Auto-apply CWF at the region-wise approved rate every month.",
+  "deductions.applyApsaaPunjabOnEnrollment":
+    "When a guard is enrolled and deployed in Punjab, auto-seed the APSAA Punjab deduction.",
+  "deductions.uniformAutoInstallments":
+    "Issuing a jersey auto-creates installment deductions per the active uniform plan.",
+  "deductions.uniformResignationRecovery":
+    "Resignation auto-applies tenure-tier recovery (e.g. <3mo → Rs 5,000, 3–6mo → Rs 3,000) to final payroll.",
+  "deductions.nightCallAutoDeduct":
+    "Derive day-salary deductions from night-call logs per the active night-call rule.",
+  "deductions.eobiAutoDeduct":
+    "Auto-deduct EOBI monthly for guards with active EOBI enrollment, at the notified rate.",
+  "deductions.essiAutoDeduct":
+    "Auto-deduct ESSI monthly for guards with active ESSI enrollment, at the notified provincial rate.",
+  "deductions.trainingSchoolFeesAutoInstallments":
+    "Issuing a training course auto-creates monthly installment deductions for the tuition.",
+  "deductions.absentAutoDeduct":
+    "Emit an explicit ABSENT deduction line on each payroll, computed from verified attendance.",
+  "deductions.advanceSalaryAutoRecover":
+    "Apply scheduled advance-salary recoveries automatically on the matching payroll month.",
+  "deductions.requireRateApprovalSeparation":
+    "A rate row's proposer must differ from its approver (separation of duties).",
+  "deductions.requireApprovalDocument":
+    "A source approval document URL is required before a rate row can be activated.",
+  "deductions.lockRetroactiveChanges":
+    "Block backdated effectiveFrom on rate rows unless the user has DEDUCTIONS:RATE_RETROACTIVE.",
+  "deductions.allowOverrideOnFinalized":
+    "Allow per-payroll deduction line overrides even on finalized payrolls. Disabling forces unfinalize first.",
 }
 
 // Rules whose disable transition is destructive / non-reversible in effect.
@@ -88,6 +119,10 @@ const DESTRUCTIVE_RULES = new Set<string>([
   "deployments.lockAfterEnd",
   "deployments.blockInactiveUpdate",
   "inventoryDemand.blockCoreEditsAfterTerminal",
+  "deductions.requireRateApprovalSeparation",
+  "deductions.requireApprovalDocument",
+  "deductions.lockRetroactiveChanges",
+  "deductions.allowOverrideOnFinalized",
 ])
 
 const DESTRUCTIVE_CONSEQUENCES: Record<string, string> = {
@@ -97,11 +132,20 @@ const DESTRUCTIVE_CONSEQUENCES: Record<string, string> = {
     "Disabling blockInactiveUpdate will allow modifications to ended/inactive deployments. This may compromise audit integrity.",
   "inventoryDemand.blockCoreEditsAfterTerminal":
     "Disabling blockCoreEditsAfterTerminal will allow tampering with core demand fields on closed records.",
+  "deductions.requireRateApprovalSeparation":
+    "Disabling separation-of-duties allows the same user to both propose and approve a rate change. This weakens financial controls.",
+  "deductions.requireApprovalDocument":
+    "Disabling will allow rates to be activated without a linked approval document — auditors will lose the paper trail.",
+  "deductions.lockRetroactiveChanges":
+    "Disabling allows any rate-editing user to backdate effectiveFrom and silently rewrite past payroll deductions.",
+  "deductions.allowOverrideOnFinalized":
+    "Enabling allows deduction line overrides on already-finalized payrolls. This bypasses the unfinalize → recompute → re-finalize flow.",
 }
 
 const MODULE_LABELS: Record<string, string> = {
   deployments: "Deployments",
   inventoryDemand: "Inventory Demand",
+  deductions: "Deductions Policy",
 }
 
 function moduleOf(ruleKey: string): string {

@@ -14,13 +14,19 @@ const EARNING_KEYS = [
   "arrears",
 ] as const
 
+// Canonical deduction codes from the deductions policy.
 const DEDUCTION_KEYS = [
-  "advanceSalary",
-  "eobi",
-  "mess",
-  "specialBranch",
-  "apsaaTraining",
-  "absencePenalty",
+  "ADVANCE_SALARY",
+  "EOBI",
+  "ESSI",
+  "CWF",
+  "APSAA",
+  "APSAA_PUNJAB",
+  "UNIFORM",
+  "TRAINING_SCHOOL_FEES",
+  "NIGHT_CALL",
+  "ABSENT",
+  "OTHER",
 ] as const
 
 type EarningKey = (typeof EARNING_KEYS)[number]

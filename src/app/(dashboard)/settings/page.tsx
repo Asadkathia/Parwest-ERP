@@ -7,6 +7,7 @@ import {
   Gauge,
   GraduationCap,
   MapPin,
+  Receipt,
   ScrollText,
   Settings as SettingsIcon,
   Users,
@@ -80,6 +81,13 @@ const links = [
     href: "/settings/insights",
     description: "Tune dashboard insight thresholds and aggregations.",
     icon: Gauge,
+  },
+  {
+    title: "Deductions Policy",
+    href: "/settings/deductions",
+    description:
+      "Canonical effective-dated rates: APSAA, CWF, EOBI, ESSI, uniform plan, night-call, training fees.",
+    icon: Receipt,
   },
 ]
 

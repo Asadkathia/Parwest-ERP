@@ -6,7 +6,7 @@ import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { applyAvailableAdvances } from "@/lib/invoicing/applyAdvances"
-import { fromContract } from "@/lib/invoicing/rates"
+import { buildInvoiceLines } from "@/lib/invoicing/buildLines"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -18,121 +18,9 @@ function nextMonth(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1))
 }
 function round2(n: number) { return Math.round(n * 100) / 100 }
-function fmtDate(d: Date) { return d.toISOString().slice(0, 10) }
 function generateInvoiceNumber(seq: number) {
   const ts = Date.now().toString().slice(-6)
   return `INV-${ts}-${String(seq).padStart(3, "0")}`
-}
-
-type GeneratedItem = {
-  kind: "GUARD_SALARY" | "SPECIAL_DUTY"
-  refId: string | null
-  description: string
-  quantity: number
-  unitPrice: number
-  lineTotal: number
-}
-
-async function buildLineItems(args: {
-  clientId: string
-  branchId: string | null
-  monthStart: Date
-  monthEnd: Date
-}) {
-  const items: GeneratedItem[] = []
-  const warnings: string[] = []
-
-  const specialDuties = await prisma.payrollSpecialDuty.findMany({
-    where: {
-      clientId: args.clientId,
-      ...(args.branchId ? { branchId: args.branchId } : {}),
-      status: "ACTIVE",
-      dateFrom: { lt: args.monthEnd },
-      dateTo: { gte: args.monthStart },
-    },
-    include: { guard: { select: { name: true, parwestId: true } } },
-  })
-  for (const sd of specialDuties) {
-    items.push({
-      kind: "SPECIAL_DUTY",
-      refId: sd.id,
-      description: `Special duty: ${sd.guard.name} (${sd.guard.parwestId}) ${fmtDate(sd.dateFrom)}..${fmtDate(sd.dateTo)}`,
-      quantity: sd.hours,
-      unitPrice: sd.hourRate,
-      lineTotal: round2(sd.hours * sd.hourRate),
-    })
-  }
-
-  const deployments = await prisma.deployment.findMany({
-    where: {
-      clientId: args.clientId,
-      ...(args.branchId ? { branchId: args.branchId } : {}),
-      deploymentDate: { gte: args.monthStart, lt: args.monthEnd },
-    },
-    select: {
-      id: true, guardId: true, deploymentDate: true,
-      extraHours: true, guardType: true,
-      guard: { select: { name: true, parwestId: true } },
-    },
-  })
-
-  type Agg = {
-    guard: { name: string; parwestId: string }
-    guardType: string | null
-    days: Set<string>
-    latestId: string
-    latestDate: Date
-    otHours: number
-  }
-  const byGuard = new Map<string, Agg>()
-  for (const d of deployments) {
-    const dayKey = fmtDate(d.deploymentDate)
-    let agg = byGuard.get(d.guardId)
-    if (!agg) {
-      agg = { guard: d.guard, guardType: d.guardType, days: new Set(),
-              latestId: d.id, latestDate: d.deploymentDate, otHours: 0 }
-      byGuard.set(d.guardId, agg)
-    }
-    agg.days.add(dayKey)
-    if (d.deploymentDate > agg.latestDate) {
-      agg.latestDate = d.deploymentDate
-      agg.latestId = d.id
-      if (!agg.guardType && d.guardType) agg.guardType = d.guardType
-    }
-    const oh = Number(d.extraHours ?? 0)
-    if (oh > 0) agg.otHours += oh
-  }
-
-  for (const agg of byGuard.values()) {
-    const days = agg.days.size
-    const rate = await fromContract({
-      clientId: args.clientId, branchId: args.branchId, guardType: agg.guardType, asOf: agg.latestDate,
-    })
-    if (rate.dailyRate <= 0) {
-      warnings.push(`No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — guard type "${agg.guardType ?? "unknown"}".`)
-      continue
-    }
-    items.push({
-      kind: "GUARD_SALARY",
-      refId: agg.latestId,
-      description: `Salary: ${agg.guard.name} (${agg.guard.parwestId}) — ${days} day${days === 1 ? "" : "s"} @ ${rate.dailyRate}`,
-      quantity: days,
-      unitPrice: rate.dailyRate,
-      lineTotal: round2(days * rate.dailyRate),
-    })
-    if (agg.otHours > 0 && rate.overtimeHourly > 0) {
-      items.push({
-        kind: "GUARD_SALARY",
-        refId: agg.latestId,
-        description: `Overtime: ${agg.guard.name} (${agg.guard.parwestId}) — ${agg.otHours}h @ ${rate.overtimeHourly}`,
-        quantity: agg.otHours,
-        unitPrice: rate.overtimeHourly,
-        lineTotal: round2(agg.otHours * rate.overtimeHourly),
-      })
-    }
-  }
-
-  return { items, warnings }
 }
 
 export async function POST(request: NextRequest) {
@@ -203,7 +91,7 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          const { items } = await buildLineItems({
+          const { items } = await buildInvoiceLines({
             clientId: client.id, branchId: t.branchId, monthStart, monthEnd,
           })
           if (!items.length) {

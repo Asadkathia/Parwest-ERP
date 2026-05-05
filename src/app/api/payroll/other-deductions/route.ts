@@ -1,9 +1,10 @@
 /**
  * /api/payroll/other-deductions
  *
- * Manages a single PayrollDeductionEntry with deduction type code "MISC"
- * (Other Deductions). The legacy `Payroll.otherDeductions` column is no
- * longer written here directly — it is recomputed by the canonical engine.
+ * Manages a single PayrollDeductionEntry with the canonical OTHER code
+ * (manual ad-hoc deductions). The legacy `Payroll.otherDeductions` float
+ * column was dropped in the deductions-policy cleanup; entries are now the
+ * sole source of truth.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -19,7 +20,8 @@ import { persistGuardPayroll } from "@/lib/payroll/persist"
 import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 
 const LOCK_MESSAGE_FRAGMENT = "Cannot recalculate payroll"
-const MISC_CODE = "MISC"
+// Canonical code; seeded as a policy-managed type by the deductions-policy migration.
+const OTHER_CODE = "OTHER"
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // Find MISC deduction type id (may not yet exist).
     const miscType = await prisma.payrollDeductionType.findUnique({
-      where: { code: MISC_CODE },
+      where: { code: OTHER_CODE },
       select: { id: true },
     })
 
@@ -136,18 +138,16 @@ export async function POST(request: NextRequest) {
       return forbidden("Forbidden: guard is outside your scope.")
     }
 
-    // Idempotent upsert of the MISC deduction type (real seeding lives elsewhere).
-    const miscType = await prisma.payrollDeductionType.upsert({
-      where: { code: MISC_CODE },
-      update: {},
-      create: {
-        code: MISC_CODE,
-        name: "Other Deductions",
-        defaultAmount: 0,
-        sortOrder: 90,
-        isActive: true,
-      },
+    // OTHER is seeded by the deductions-policy migration.
+    const miscType = await prisma.payrollDeductionType.findUnique({
+      where: { code: OTHER_CODE },
+      select: { id: true },
     })
+    if (!miscType) {
+      return internalServerError(
+        "OTHER deduction type missing — run prisma migrate to apply deductions policy."
+      )
+    }
 
     const year = month.getUTCFullYear()
     const actorUserId =

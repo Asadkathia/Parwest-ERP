@@ -18,6 +18,7 @@ import StoreInventoryTab from "@/components/guards/tabs/StoreInventoryTab"
 import ServiceHistoryTab from "@/components/guards/tabs/ServiceHistoryTab"
 import InsuranceTab from "@/components/guards/tabs/InsuranceTab"
 import StatusHistoryTab from "@/components/guards/tabs/StatusHistoryTab"
+import StatutoryTab from "@/components/guards/tabs/StatutoryTab"
 import PBADocumentsTab from "@/components/guards/tabs/PBADocumentsTab"
 import ReserveLedgerPanel from "@/components/payroll/ReserveLedgerPanel"
 import type { GuardTabModel } from "@/components/guards/tabs/types"
@@ -38,6 +39,7 @@ import {
     Shield,
     Activity,
     Wallet,
+    Receipt,
     type LucideIcon,
 } from "lucide-react"
 
@@ -74,6 +76,7 @@ const tabRowTwo: TabDef[] = [
     { id: "status-history", label: "Status History", icon: Activity },
     { id: "pba-docs", label: "PBA Documents", icon: FileText },
     { id: "reserve", label: "Reserve", icon: Wallet },
+    { id: "statutory", label: "Statutory (EOBI/ESSI)", icon: Receipt },
 ]
 
 const allTabIds = new Set([...tabRowOne, ...tabRowTwo].map((t) => t.id))
@@ -186,6 +189,9 @@ export default function GuardProfileTabs({
             </TabsContent>
             <TabsContent value="reserve" className="mt-0">
                 <ReserveLedgerPanel guardId={guard.id || ""} />
+            </TabsContent>
+            <TabsContent value="statutory" className="mt-0">
+                <StatutoryTab guardId={guard.id || ""} />
             </TabsContent>
         </Tabs>
     )

@@ -194,6 +194,15 @@ export async function applyTransition(
       },
     })
 
+    // Resignation hook: TERMINATED + reason=RESIGNED triggers uniform tenure-tier
+    // recovery per the canonical deductions policy. Stamps Guard.resignedOn and
+    // upserts a UniformResignationRecovery row (idempotent on (guardId, month)).
+    // Gated by `deductions.uniformResignationRecovery` workflow rule.
+    if (to === "TERMINATED" && ctx.terminationReason === "RESIGNED") {
+      const { applyResignationRecovery } = await import("@/lib/deductions/resignation")
+      await applyResignationRecovery(tx, { guardId })
+    }
+
     return {
       fromStatus: from,
       toStatus: to,

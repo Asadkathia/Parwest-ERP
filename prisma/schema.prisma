@@ -1095,38 +1095,33 @@ model Invoice {
 // ============================================
 
 model Payroll {
-  id                 String    @id @default(cuid())
-  guardId            String
-  guard              Guard     @relation(fields: [guardId], references: [id])
-  month              DateTime
-  year               Int
-  deploymentDays     Int       @default(0)
-  baseSalary         Float     @default(0)
-  extraHours         Float     @default(0)
-  extraHoursAmount   Float     @default(0)
-  specialDutyHours   Float     @default(0)
-  specialDutyAmount  Float     @default(0)
-  loans              Float     @default(0)
-  otherDeductions    Float     @default(0)
-  trainingSchoolFees Float     @default(0)
-  cwf                Float     @default(0) // Contribution Welfare Fund
-  eobi               Float     @default(0)
-  essi               Float     @default(0)
-  netSalary          Float     @default(0)
-  paymentStatus      String    @default("PENDING") // PENDING, PAID, UNPAID
-  paymentMethod      String? // BANK, CASH, MOBILE
-  paymentRemarks     String?
-  paymentUpdatedAt   DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  guardId           String
+  guard             Guard     @relation(fields: [guardId], references: [id])
+  month             DateTime
+  year              Int
+  deploymentDays    Int       @default(0)
+  baseSalary        Float     @default(0)
+  extraHours        Float     @default(0)
+  extraHoursAmount  Float     @default(0)
+  specialDutyHours  Float     @default(0)
+  specialDutyAmount Float     @default(0)
+  loans             Float     @default(0)
+  netSalary         Float     @default(0)
+  paymentStatus     String    @default("PENDING") // PENDING, PAID, UNPAID
+  paymentMethod     String? // BANK, CASH, MOBILE
+  paymentRemarks    String?
+  paymentUpdatedAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // New: separated overtime/extras tracking
   overtimeHours  Float @default(0)
   overtimeAmount Float @default(0)
   // NOTE: extraHours / extraHoursAmount above are retained. In the new model they
   // represent manually-entered extra hours (separate from per-deployment overtime).
-  // Wave 2: trainingSchoolFees, cwf, eobi, essi will be deprecated in favor of
-  // PayrollDeductionEntry. For now they coexist.
+  // Legacy float columns (trainingSchoolFees, cwf, eobi, essi, otherDeductions)
+  // were dropped — PayrollDeductionEntry is the single source of truth.
 
   // New: reserve tracking
   reservePct       Float @default(0.30)

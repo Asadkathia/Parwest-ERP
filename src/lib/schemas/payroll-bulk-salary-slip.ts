@@ -27,13 +27,21 @@ export const PAYROLL_SALARY_SLIP_EARNINGS = [
   { key: "arrears", label: "Arrears" },
 ] as const
 
+// Canonical deduction codes from the deductions policy. These align with
+// PayrollDeductionType.code so a slip can pull the same line directly from
+// PayrollDeductionEntry without a key-translation step.
 export const PAYROLL_SALARY_SLIP_DEDUCTIONS = [
-  { key: "advanceSalary", label: "Advance Salary" },
-  { key: "eobi", label: "EOBI" },
-  { key: "mess", label: "Mess Deduction" },
-  { key: "specialBranch", label: "Special Branch" },
-  { key: "apsaaTraining", label: "APSAA Training" },
-  { key: "absencePenalty", label: "Absence Penalty" },
+  { key: "ADVANCE_SALARY", label: "Advance Salary" },
+  { key: "EOBI", label: "EOBI" },
+  { key: "ESSI", label: "ESSI" },
+  { key: "CWF", label: "CWF" },
+  { key: "APSAA", label: "APSAA" },
+  { key: "APSAA_PUNJAB", label: "APSAA — Punjab" },
+  { key: "UNIFORM", label: "Uniform / Jersey" },
+  { key: "TRAINING_SCHOOL_FEES", label: "Training School Fees" },
+  { key: "NIGHT_CALL", label: "Night Call Monitoring" },
+  { key: "ABSENT", label: "Absentees" },
+  { key: "OTHER", label: "Other" },
 ] as const
 
 export const payrollBulkSalarySlipGenerateSchema = z.object({

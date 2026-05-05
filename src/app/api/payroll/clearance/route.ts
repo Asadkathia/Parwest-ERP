@@ -102,8 +102,11 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Upsert a payroll row marked as clearance settlement
-      await tx.payroll.upsert({
+      // Upsert the payroll row (clearance settlement) and write the
+      // settlement amount as a canonical OTHER deduction entry.
+      // PayrollDeductionEntry is the source of truth — legacy float columns
+      // were dropped in the deductions-policy cleanup.
+      const payrollRow = await tx.payroll.upsert({
         where: {
           guardId_month_year: {
             guardId,
@@ -115,15 +118,46 @@ export async function POST(request: NextRequest) {
           guardId,
           month,
           year: month.getUTCFullYear(),
-          otherDeductions: otherDeduction,
           paymentStatus: "PAID",
           paymentMethod: "CASH",
         },
         update: {
-          otherDeductions: otherDeduction,
           paymentStatus: "PAID",
         },
+        select: { id: true },
       })
+
+      if (otherDeduction > 0) {
+        const otherType = await tx.payrollDeductionType.findUnique({
+          where: { code: "OTHER" },
+          select: { id: true },
+        })
+        if (otherType) {
+          await tx.payrollDeductionEntry.upsert({
+            where: {
+              payrollId_deductionTypeId: {
+                payrollId: payrollRow.id,
+                deductionTypeId: otherType.id,
+              },
+            },
+            create: {
+              payrollId: payrollRow.id,
+              deductionTypeId: otherType.id,
+              amount: otherDeduction,
+              computedAmount: otherDeduction,
+              rateSource: "MANUAL",
+              isOverride: false,
+              notes: "Clearance settlement",
+            },
+            update: {
+              amount: otherDeduction,
+              computedAmount: otherDeduction,
+              rateSource: "MANUAL",
+              notes: "Clearance settlement",
+            },
+          })
+        }
+      }
 
       return { deployResult, invResult, pledgeResult }
     })

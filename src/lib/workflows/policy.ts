@@ -19,6 +19,24 @@ export type WorkflowRuleKey =
   | "inventoryDemand.enforceTransitionMap"
   | "inventoryDemand.blockCoreEditsAfterTerminal"
   | "inventoryDemand.requireSufficientStockForFulfillment"
+  | "invoicing.autoAccrualEnabled"
+  | "invoicing.draftReminderEnabled"
+  // ----- Deductions policy (Wave 3) -----
+  | "deductions.applyApsaaBranchRate"
+  | "deductions.applyCwfRegionRate"
+  | "deductions.applyApsaaPunjabOnEnrollment"
+  | "deductions.uniformAutoInstallments"
+  | "deductions.uniformResignationRecovery"
+  | "deductions.nightCallAutoDeduct"
+  | "deductions.eobiAutoDeduct"
+  | "deductions.essiAutoDeduct"
+  | "deductions.trainingSchoolFeesAutoInstallments"
+  | "deductions.absentAutoDeduct"
+  | "deductions.advanceSalaryAutoRecover"
+  | "deductions.requireRateApprovalSeparation"
+  | "deductions.requireApprovalDocument"
+  | "deductions.lockRetroactiveChanges"
+  | "deductions.allowOverrideOnFinalized"
 
 export type WorkflowRuleConfig = Record<WorkflowRuleKey, boolean>
 export type WorkflowPresetId = "balanced" | "strict" | "relaxed"
@@ -56,6 +74,26 @@ const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "inventoryDemand.enforceTransitionMap": true,
   "inventoryDemand.blockCoreEditsAfterTerminal": true,
   "inventoryDemand.requireSufficientStockForFulfillment": true,
+  "invoicing.autoAccrualEnabled": true,
+  "invoicing.draftReminderEnabled": true,
+  // Deductions policy — all canonical automations enabled by default.
+  // Disable via /settings/workflow-rules or env vars to fall back to manual entry.
+  "deductions.applyApsaaBranchRate": true,
+  "deductions.applyCwfRegionRate": true,
+  "deductions.applyApsaaPunjabOnEnrollment": true,
+  "deductions.uniformAutoInstallments": true,
+  "deductions.uniformResignationRecovery": true,
+  "deductions.nightCallAutoDeduct": true,
+  "deductions.eobiAutoDeduct": true,
+  "deductions.essiAutoDeduct": true,
+  "deductions.trainingSchoolFeesAutoInstallments": true,
+  "deductions.absentAutoDeduct": true,
+  "deductions.advanceSalaryAutoRecover": true,
+  "deductions.requireRateApprovalSeparation": true,
+  "deductions.requireApprovalDocument": true,
+  "deductions.lockRetroactiveChanges": true,
+  // Overrides on finalized payrolls require explicit unfinalize first.
+  "deductions.allowOverrideOnFinalized": false,
 }
 
 export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
@@ -98,6 +136,24 @@ export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
       "inventoryDemand.enforceTransitionMap": false,
       "inventoryDemand.blockCoreEditsAfterTerminal": false,
       "inventoryDemand.requireSufficientStockForFulfillment": false,
+      "invoicing.autoAccrualEnabled": false,
+      "invoicing.draftReminderEnabled": false,
+      // Relaxed mode: turn off all deduction automations + dual-control. Manual entry only.
+      "deductions.applyApsaaBranchRate": false,
+      "deductions.applyCwfRegionRate": false,
+      "deductions.applyApsaaPunjabOnEnrollment": false,
+      "deductions.uniformAutoInstallments": false,
+      "deductions.uniformResignationRecovery": false,
+      "deductions.nightCallAutoDeduct": false,
+      "deductions.eobiAutoDeduct": false,
+      "deductions.essiAutoDeduct": false,
+      "deductions.trainingSchoolFeesAutoInstallments": false,
+      "deductions.absentAutoDeduct": false,
+      "deductions.advanceSalaryAutoRecover": false,
+      "deductions.requireRateApprovalSeparation": false,
+      "deductions.requireApprovalDocument": false,
+      "deductions.lockRetroactiveChanges": false,
+      "deductions.allowOverrideOnFinalized": true,
     },
   },
 }
@@ -128,6 +184,31 @@ export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
     "WORKFLOW_RULE_INVENTORY_DEMAND_BLOCK_CORE_EDITS_AFTER_TERMINAL",
   "inventoryDemand.requireSufficientStockForFulfillment":
     "WORKFLOW_RULE_INVENTORY_DEMAND_REQUIRE_SUFFICIENT_STOCK_FOR_FULFILLMENT",
+  "invoicing.autoAccrualEnabled": "WORKFLOW_RULE_INVOICING_AUTO_ACCRUAL_ENABLED",
+  "invoicing.draftReminderEnabled": "WORKFLOW_RULE_INVOICING_DRAFT_REMINDER_ENABLED",
+  "deductions.applyApsaaBranchRate": "WORKFLOW_RULE_DEDUCTIONS_APPLY_APSAA_BRANCH_RATE",
+  "deductions.applyCwfRegionRate": "WORKFLOW_RULE_DEDUCTIONS_APPLY_CWF_REGION_RATE",
+  "deductions.applyApsaaPunjabOnEnrollment":
+    "WORKFLOW_RULE_DEDUCTIONS_APPLY_APSAA_PUNJAB_ON_ENROLLMENT",
+  "deductions.uniformAutoInstallments": "WORKFLOW_RULE_DEDUCTIONS_UNIFORM_AUTO_INSTALLMENTS",
+  "deductions.uniformResignationRecovery":
+    "WORKFLOW_RULE_DEDUCTIONS_UNIFORM_RESIGNATION_RECOVERY",
+  "deductions.nightCallAutoDeduct": "WORKFLOW_RULE_DEDUCTIONS_NIGHT_CALL_AUTO_DEDUCT",
+  "deductions.eobiAutoDeduct": "WORKFLOW_RULE_DEDUCTIONS_EOBI_AUTO_DEDUCT",
+  "deductions.essiAutoDeduct": "WORKFLOW_RULE_DEDUCTIONS_ESSI_AUTO_DEDUCT",
+  "deductions.trainingSchoolFeesAutoInstallments":
+    "WORKFLOW_RULE_DEDUCTIONS_TRAINING_SCHOOL_FEES_AUTO_INSTALLMENTS",
+  "deductions.absentAutoDeduct": "WORKFLOW_RULE_DEDUCTIONS_ABSENT_AUTO_DEDUCT",
+  "deductions.advanceSalaryAutoRecover":
+    "WORKFLOW_RULE_DEDUCTIONS_ADVANCE_SALARY_AUTO_RECOVER",
+  "deductions.requireRateApprovalSeparation":
+    "WORKFLOW_RULE_DEDUCTIONS_REQUIRE_RATE_APPROVAL_SEPARATION",
+  "deductions.requireApprovalDocument":
+    "WORKFLOW_RULE_DEDUCTIONS_REQUIRE_APPROVAL_DOCUMENT",
+  "deductions.lockRetroactiveChanges":
+    "WORKFLOW_RULE_DEDUCTIONS_LOCK_RETROACTIVE_CHANGES",
+  "deductions.allowOverrideOnFinalized":
+    "WORKFLOW_RULE_DEDUCTIONS_ALLOW_OVERRIDE_ON_FINALIZED",
 }
 
 function toWorkflowPresetId(value: string | undefined): WorkflowPresetId | null {

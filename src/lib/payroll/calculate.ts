@@ -9,6 +9,8 @@
 
 import type { Prisma } from "@prisma/client"
 import { prisma as defaultPrisma } from "@/lib/db"
+import { resolveDeductionsForPayroll } from "@/lib/deductions"
+import type { ResolverContext } from "@/lib/deductions"
 
 const DEFAULT_RESERVE_PCT = 0.30
 
@@ -31,7 +33,18 @@ export type PayrollComputation = {
 
   // Deductions breakdown (for transparency)
   loanTotal: number
-  deductionEntries: Array<{ deductionTypeId: string; code: string; name: string; amount: number }>
+  deductionEntries: Array<{
+    deductionTypeId: string
+    code: string
+    name: string
+    amount: number
+    computedAmount: number
+    rateSource: string
+    rateRowId: string | null
+    breakdown: unknown[]
+    isOverride: boolean
+    overrideReason: string | null
+  }>
   deductionsTotal: number
 
   // Reserve
@@ -123,6 +136,9 @@ export async function calculateGuardPayroll(
           regionalOffice: { select: { reservePct: true } },
         },
       },
+      branch: {
+        select: { id: true, name: true, province: true },
+      },
     },
   })
 
@@ -134,6 +150,9 @@ export async function calculateGuardPayroll(
     string,
     { clientName: string; pct: number; weight: number }
   >()
+  // Per-branch weight aggregation for APSAA branch-rate resolver
+  const branchWeights = new Map<string, { branchName: string; days: number }>()
+  let deployedInPunjab = false
 
   for (const dep of deployments) {
     const amount = Number(dep.salary ?? dep.rate ?? 0)
@@ -154,6 +173,20 @@ export async function calculateGuardPayroll(
         pct,
         weight: amount,
       })
+    }
+
+    if (dep.branchId && dep.branch) {
+      const bw = branchWeights.get(dep.branchId)
+      if (bw) {
+        bw.days += 1
+      } else {
+        branchWeights.set(dep.branchId, {
+          branchName: dep.branch.name ?? "(unknown)",
+          days: 1,
+        })
+      }
+      const province = (dep.branch.province ?? "").trim().toLowerCase()
+      if (province === "punjab") deployedInPunjab = true
     }
   }
 
@@ -319,34 +352,41 @@ export async function calculateGuardPayroll(
   }
   holidayPay = round2(holidayPay)
 
-  // ---- Deductions (active types + per-payroll overrides) ----------------
-  const deductionTypes = await db.payrollDeductionType.findMany({
-    where: { isActive: true },
-    select: { id: true, code: true, name: true, defaultAmount: true },
-    orderBy: { sortOrder: "asc" },
-  })
-
-  let existingEntries: Array<{ deductionTypeId: string; amount: number }> = []
-  if (existingPayroll) {
-    existingEntries = await db.payrollDeductionEntry.findMany({
-      where: { payrollId: existingPayroll.id },
-      select: { deductionTypeId: true, amount: true },
-    })
+  // ---- Deductions (canonical, policy-managed resolvers) -----------------
+  // See src/lib/deductions for per-code resolver dispatch. Each resolver is
+  // gated by an `isWorkflowRuleEnabled("deductions.*")` toggle; rates come
+  // from effective-dated tables (no hardcoded constants, no silent fallbacks).
+  const resolverContext: ResolverContext = {
+    guardId,
+    monthStart,
+    monthEnd,
+    basePay,
+    deploymentDayCount,
+    branchWeights,
+    deployedInPunjab,
+    guardRegionId: guard.regionId ?? null,
   }
-  const existingByType = new Map(existingEntries.map((e) => [e.deductionTypeId, Number(e.amount)]))
-
-  const deductionEntries = deductionTypes.map((dt) => {
-    const override = existingByType.get(dt.id)
-    const amount = round2(override ?? Number(dt.defaultAmount ?? 0))
-    return {
-      deductionTypeId: dt.id,
-      code: dt.code,
-      name: dt.name,
-      amount,
-    }
+  const resolved = await resolveDeductionsForPayroll(db, resolverContext, {
+    existingPayrollId: existingPayroll?.id ?? null,
   })
+  warnings.push(...resolved.warnings)
 
-  const otherDeductionsTotal = round2(deductionEntries.reduce((s, e) => s + e.amount, 0))
+  const deductionEntries = resolved.entries.map((e) => ({
+    deductionTypeId: e.deductionTypeId,
+    code: e.code,
+    name: e.name,
+    amount: e.amount,
+    computedAmount: round2(e.computedAmount),
+    rateSource: String(e.rateSource),
+    rateRowId: e.rateRowId,
+    breakdown: e.breakdown,
+    isOverride: e.isOverride,
+    overrideReason: e.overrideReason,
+  }))
+
+  const otherDeductionsTotal = round2(
+    deductionEntries.reduce((s, e) => s + e.amount, 0)
+  )
   const deductionsTotal = round2(loanTotal + otherDeductionsTotal)
 
   // ---- Reserve % (weighted) ---------------------------------------------

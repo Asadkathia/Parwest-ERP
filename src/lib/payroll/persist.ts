@@ -2,9 +2,11 @@
  * Persistence layer for canonical payroll computation.
  *
  * - Upserts the Payroll row keyed on (guardId, month, year).
- * - Syncs PayrollDeductionEntry rows (upsert active, delete obsolete).
+ * - Syncs PayrollDeductionEntry rows (upsert active, delete obsolete) —
+ *   PayrollDeductionEntry is the single source of truth for deductions;
+ *   the legacy float columns (cwf, eobi, essi, trainingSchoolFees,
+ *   otherDeductions) were dropped in the deductions-policy cleanup.
  * - Honors state-machine rules for `setStateToCalculated`.
- * - Does NOT touch deprecated columns (trainingSchoolFees/cwf/eobi/essi).
  * - Does NOT create reserve ledger entries (Agent E owns REGIONAL_LOCKED transition).
  */
 
@@ -63,6 +65,8 @@ export async function persistGuardPayroll(
   }
 
   // ---- Build payroll fields --------------------------------------------
+  // Per-code totals live in PayrollDeductionEntry; this row holds only the
+  // headline aggregates (gross, net, reserve) needed for fast list queries.
   const baseFields = {
     deploymentDays: computation.deploymentDayCount,
     baseSalary: computation.basePay,
@@ -70,7 +74,6 @@ export async function persistGuardPayroll(
     extraHoursAmount: computation.extraHoursPay,
     specialDutyAmount: computation.specialDutyPay,
     loans: computation.loanTotal,
-    otherDeductions: computation.deductionsTotal - computation.loanTotal,
     netSalary: computation.netPayable,
     netBeforeReserve: computation.netBeforeReserve,
     reservePct: computation.reservePct,
@@ -120,24 +123,56 @@ export async function persistGuardPayroll(
     })
   }
 
-  // Upsert each active entry
+  // Upsert each active entry. Override rows (isOverride=true) preserve their
+  // override metadata across recompute; non-override rows reflect the engine's
+  // latest computed amount + rate-row trace + breakdown.
   for (const entry of computation.deductionEntries) {
-    await db.payrollDeductionEntry.upsert({
-      where: {
-        payrollId_deductionTypeId: {
+    const breakdownJson = entry.breakdown as unknown as
+      | Prisma.InputJsonValue
+      | undefined
+    if (entry.isOverride) {
+      // Existing override — only refresh computed/trace fields, leave amount alone.
+      await db.payrollDeductionEntry.update({
+        where: {
+          payrollId_deductionTypeId: {
+            payrollId: upserted.id,
+            deductionTypeId: entry.deductionTypeId,
+          },
+        },
+        data: {
+          computedAmount: entry.computedAmount,
+          rateSource: entry.rateSource,
+          rateRowId: entry.rateRowId,
+          breakdown: breakdownJson,
+        },
+      })
+    } else {
+      await db.payrollDeductionEntry.upsert({
+        where: {
+          payrollId_deductionTypeId: {
+            payrollId: upserted.id,
+            deductionTypeId: entry.deductionTypeId,
+          },
+        },
+        create: {
           payrollId: upserted.id,
           deductionTypeId: entry.deductionTypeId,
+          amount: entry.amount,
+          computedAmount: entry.computedAmount,
+          rateSource: entry.rateSource,
+          rateRowId: entry.rateRowId,
+          breakdown: breakdownJson,
+          isOverride: false,
         },
-      },
-      create: {
-        payrollId: upserted.id,
-        deductionTypeId: entry.deductionTypeId,
-        amount: entry.amount,
-      },
-      update: {
-        amount: entry.amount,
-      },
-    })
+        update: {
+          amount: entry.amount,
+          computedAmount: entry.computedAmount,
+          rateSource: entry.rateSource,
+          rateRowId: entry.rateRowId,
+          breakdown: breakdownJson,
+        },
+      })
+    }
   }
 
   return { payrollId: upserted.id }

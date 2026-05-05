@@ -30,6 +30,7 @@ export const MODULES = [
     "REQUISITIONS",
     "AUDIT",
     "ADMIN_APPROVALS",
+    "DEDUCTIONS",
 ] as const
 
 export const ACTIONS = [
@@ -39,6 +40,24 @@ export const ACTIONS = [
     "DELETE",
     "REQUISITIONS",
 ] as const
+
+/**
+ * Extended (non-CRUD) action keys for granular policy controls.
+ * These are NOT rendered in the generic permissions matrix UI;
+ * they are surfaced on dedicated screens (e.g. Deductions Policy settings).
+ * Checked via `hasAction(session, module, action)` directly.
+ */
+export const EXTENDED_ACTIONS = [
+    // Deductions policy
+    "RATE_PROPOSE",
+    "RATE_APPROVE",
+    "RATE_RETROACTIVE",
+    "POLICY_EDIT",
+    // Payroll-side per-line override
+    "DEDUCTION_OVERRIDE",
+] as const
+
+export type ExtendedActionKey = (typeof EXTENDED_ACTIONS)[number]
 
 export type ModuleKey = (typeof MODULES)[number]
 export type ActionKey = (typeof ACTIONS)[number]

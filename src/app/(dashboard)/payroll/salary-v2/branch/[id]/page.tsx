@@ -64,50 +64,24 @@ export default function BranchDetailsPage({ params }: { params: Promise<{ id: st
 
   const totalBasePay = filteredGuards.reduce((sum, g) => sum + g.basePay, 0)
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (!detail) return
-    const header = [
-      "Sr",
-      "Parwest ID",
-      "Guard Name",
-      "Guard Type",
-      "Extra Guard",
-      "Total Days (incl. double duty)",
-      "Base Pay",
-      "Gross Pay",
-      "Loan Deduction",
-      "Net Payable",
-    ]
-    const escape = (v: unknown) => {
-      const s = v == null ? "" : String(v)
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-    }
-    const csv = [header.join(",")]
-      .concat(
-        filteredGuards.map((g) =>
-          [
-            g.sr,
-            g.parwestId,
-            g.guardName,
-            g.guardType ?? "",
-            g.extraGuard ? "Yes" : "No",
-            g.totalDays,
-            g.basePay,
-            g.grossPay,
-            g.loanDeduction,
-            g.netPayable,
-          ]
-            .map(escape)
-            .join(",")
-        )
-      )
-      .join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
+    const response = await fetch(
+      `/api/payroll/salary-v2/branch/${branchId}/export?month=${monthParam}-01`,
+    )
+    if (!response.ok) return
+    const blob = await response.blob()
+    const disposition = response.headers.get("Content-Disposition") || ""
+    const match = disposition.match(/filename="?([^";]+)"?/)
+    const filename =
+      match?.[1] || `branch_salary_details_${detail.branch.code ?? detail.branch.id}_${monthParam}.xlsx`
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `branch-${detail.branch.code ?? detail.branch.id}-${monthParam}.csv`
+    a.download = filename
+    document.body.appendChild(a)
     a.click()
+    a.remove()
     URL.revokeObjectURL(url)
   }
 

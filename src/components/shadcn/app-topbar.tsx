@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import {
-  Bell,
   Languages,
   LogOut,
   Menu,
@@ -34,14 +33,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/shadcn/popover"
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar"
-import { Card, CardContent } from "@/components/shadcn/card"
 import { RegionSelector } from "@/components/shadcn/region-selector"
+import { NotificationBell } from "@/components/shadcn/notification-bell"
 import { useRegions } from "@/lib/hooks/useRegions"
 
 // TODO: extract once Phase 2A nav-config lands at src/lib/navigation/items.ts
@@ -435,24 +429,7 @@ export function AppTopbar({
       </DropdownMenu>
 
       {/* 8. Notification bell */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Notifications">
-            <Bell className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-80 p-2">
-          <Card className="border-0 shadow-none">
-            <CardContent className="flex flex-col items-center justify-center gap-1 p-6 text-center">
-              <Bell className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm font-medium">No notifications</p>
-              <p className="text-xs text-muted-foreground">
-                You&apos;re all caught up.
-              </p>
-            </CardContent>
-          </Card>
-        </PopoverContent>
-      </Popover>
+      <NotificationBell />
 
       {/* 9. User menu */}
       <DropdownMenu>

@@ -26,6 +26,7 @@ const MODULE_ROUTES: [string, string][] = [
     ["/requisitions", "REQUISITIONS"],
     ["/audit", "AUDIT"],
     ["/admin-approvals", "ADMIN_APPROVALS"],
+    ["/settings/deductions", "DEDUCTIONS"],
 ]
 
 export async function middleware(req: NextRequest) {

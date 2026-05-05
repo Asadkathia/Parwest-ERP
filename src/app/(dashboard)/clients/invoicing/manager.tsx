@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/shadcn/button"
@@ -30,12 +31,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/shadcn/alert-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import InvoiceComposer from "./InvoiceComposer"
 import InvoiceList from "./InvoiceList"
 import InvoiceDetailModal from "./InvoiceDetailModal"
 import InvoiceSummaryTiles from "./InvoiceSummaryTiles"
 import AdvancesPanel from "./AdvancesPanel"
+import DraftsPanel from "./DraftsPanel"
 import { currentMonth, type InvoiceRow } from "./types"
 
 type ApiClientRow = { id: string; name?: string | null }
@@ -50,6 +53,12 @@ export default function ClientInvoicingManager(_props: {
 } = {}) {
   const searchParams = useSearchParams()
   const urlRegionId = searchParams?.get("regionId") || ""
+  const initialTab = searchParams?.get("tab") === "drafts" ? "drafts" : "manage"
+  const { data: sessionData } = useSession()
+  const role = (sessionData?.user as { role?: string } | undefined)?.role ?? ""
+  const perms = (sessionData?.user as { permissions?: string[] } | undefined)?.permissions ?? []
+  const isAdmin = role === "Super User" || (role === "Admin" && perms.length === 0)
+  const [tab, setTab] = useState<string>(initialTab)
   const [period, setPeriod] = useState(currentMonth())
   const [clientId, setClientId] = useState("")
   const [branchId, setBranchId] = useState("")
@@ -247,6 +256,18 @@ export default function ClientInvoicingManager(_props: {
         </div>
       </div>
 
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="manage">Manage</TabsTrigger>
+          <TabsTrigger value="drafts">Drafts (auto-accruing)</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="drafts" className="space-y-4">
+          <DraftsPanel isAdmin={isAdmin} />
+        </TabsContent>
+
+        <TabsContent value="manage" className="space-y-4">
+
       <InvoiceSummaryTiles rows={invoices} />
 
       <InvoiceComposer
@@ -295,6 +316,8 @@ export default function ClientInvoicingManager(_props: {
           }}
         />
       ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
