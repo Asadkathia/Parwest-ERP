@@ -36,6 +36,7 @@ import { branchCreateSchema, type BranchCreateForm } from "@/lib/schemas/branch"
 
 import { Button } from "@/components/shadcn/button"
 import { Input } from "@/components/shadcn/input"
+import { Label } from "@/components/shadcn/label"
 import { Textarea } from "@/components/shadcn/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
@@ -527,12 +528,12 @@ export default function BranchForm({
 
                         {/* Map picker — Leaflet preserved as-is */}
                         <div>
-                            <FormLabel>
+                            <Label>
                                 Pick Branch Location on Map
                                 <span className="ml-1 text-xs font-normal text-muted-foreground">
                                     (search or click to drop marker — or type coordinates manually below)
                                 </span>
-                            </FormLabel>
+                            </Label>
                             <div className="mt-2">
                                 <LocationPickerMap
                                     latName="latitude"
@@ -549,10 +550,10 @@ export default function BranchForm({
                         {/* Manual coordinate override */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Latitude <span className="text-destructive">*</span>{" "}
                                     <span className="text-xs font-normal">(manual override)</span>
-                                </FormLabel>
+                                </Label>
                                 <Input
                                     name="latitudeManual"
                                     placeholder="e.g. 31.5204"
@@ -562,10 +563,10 @@ export default function BranchForm({
                                 />
                             </div>
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Longitude <span className="text-destructive">*</span>{" "}
                                     <span className="text-xs font-normal">(manual override)</span>
-                                </FormLabel>
+                                </Label>
                                 <Input
                                     name="longitudeManual"
                                     placeholder="e.g. 74.3587"
@@ -586,7 +587,7 @@ export default function BranchForm({
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <FormLabel>Select Region</FormLabel>
+                                <Label>Select Region</Label>
                                 <Select
                                     value={selectedRegionId || "__NONE__"}
                                     onValueChange={(v) => setSelectedRegionId(v === "__NONE__" ? "" : v)}
@@ -605,13 +606,13 @@ export default function BranchForm({
                                     </SelectContent>
                                 </Select>
                                 {isRegionalViewer && (
-                                    <FormDescription className="mt-1">
+                                    <p className="mt-1 text-sm text-muted-foreground">
                                         Locked to your assigned region.
-                                    </FormDescription>
+                                    </p>
                                 )}
                             </div>
                             <div>
-                                <FormLabel>Select Regional Office</FormLabel>
+                                <Label>Select Regional Office</Label>
                                 <Select
                                     value={selectedRegionalOfficeId || "__NONE__"}
                                     onValueChange={(v) => setSelectedRegionalOfficeId(v === "__NONE__" ? "" : v)}
@@ -639,13 +640,13 @@ export default function BranchForm({
                                 </Select>
                                 <input type="hidden" name="regionalOfficeId" value={selectedRegionalOfficeId} />
                                 {lockedRegionalOffice && (
-                                    <FormDescription className="mt-1">
+                                    <p className="mt-1 text-sm text-muted-foreground">
                                         Locked to your assigned regional office.
-                                    </FormDescription>
+                                    </p>
                                 )}
                             </div>
                             <div>
-                                <FormLabel>Assigned Manager</FormLabel>
+                                <Label>Assigned Manager</Label>
                                 <div className="mt-2">
                                     <SearchSelect
                                         name="assignedManagerId"
@@ -720,9 +721,9 @@ export default function BranchForm({
                                 )}
                             />
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Locker Branch <span className="text-destructive">*</span>
-                                </FormLabel>
+                                </Label>
                                 <div className="flex items-center gap-6 mt-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -825,9 +826,9 @@ export default function BranchForm({
                                 )}
                             />
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Phone Number <span className="text-destructive">*</span>
-                                </FormLabel>
+                                </Label>
                                 <div className="space-y-2 mt-2">
                                     {contactPhones.map((num, idx) => {
                                         const invalid = num.trim().length > 0 && !isValidPhone(num.trim())
@@ -978,9 +979,9 @@ export default function BranchForm({
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Manager <span className="text-destructive">*</span>
-                                </FormLabel>
+                                </Label>
                                 <div className="mt-2">
                                     <SearchSelect
                                         name="_operationsManagerId"
@@ -1032,9 +1033,9 @@ export default function BranchForm({
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <FormLabel>
+                                <Label>
                                     Supervisor <span className="text-destructive">*</span>
-                                </FormLabel>
+                                </Label>
                                 <div className="mt-2">
                                     <SearchSelect
                                         name="assignedSupervisorId"
@@ -1144,7 +1145,7 @@ export default function BranchForm({
                                 <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Day Guards</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <FormLabel>Guard Designation</FormLabel>
+                                        <Label>Guard Designation</Label>
                                         <div className="mt-2">
                                             <MultiSearchSelect
                                                 name="contractDayGuardDesignation"
@@ -1154,7 +1155,7 @@ export default function BranchForm({
                                         </div>
                                     </div>
                                     <div>
-                                        <FormLabel>Guard Ex Service</FormLabel>
+                                        <Label>Guard Ex Service</Label>
                                         <div className="mt-2">
                                             <MultiSearchSelect
                                                 name="contractDayGuardExService"
@@ -1171,7 +1172,7 @@ export default function BranchForm({
                                 <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Night Guards</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <FormLabel>Guard Designation</FormLabel>
+                                        <Label>Guard Designation</Label>
                                         <div className="mt-2">
                                             <MultiSearchSelect
                                                 name="contractNightGuardDesignation"
@@ -1181,7 +1182,7 @@ export default function BranchForm({
                                         </div>
                                     </div>
                                     <div>
-                                        <FormLabel>Guard Ex Service</FormLabel>
+                                        <Label>Guard Ex Service</Label>
                                         <div className="mt-2">
                                             <MultiSearchSelect
                                                 name="contractNightGuardExService"
@@ -1243,7 +1244,7 @@ export default function BranchForm({
                     <CardContent>
                         <div className="space-y-3">
                             <div>
-                                <FormLabel>Upload Files (PDF, Word, Images)</FormLabel>
+                                <Label>Upload Files (PDF, Word, Images)</Label>
                                 <input
                                     ref={fileRef}
                                     type="file"
@@ -1252,9 +1253,9 @@ export default function BranchForm({
                                     onChange={handleFileAdd}
                                     className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[var(--brand)] file:text-white hover:file:opacity-90 cursor-pointer border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1.5 mt-2"
                                 />
-                                <FormDescription className="mt-1">
+                                <p className="mt-1 text-sm text-muted-foreground">
                                     You can select multiple files.
-                                </FormDescription>
+                                </p>
                             </div>
                             {attachments.length > 0 ? (
                                 <div className="space-y-2">
