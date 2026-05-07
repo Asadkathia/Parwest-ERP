@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -71,6 +71,8 @@ type Branch = {
     contactPerson: string | null
     contactPhone: string | null
     contactEmail: string | null
+    assignedManagerId?: string | null
+    operationsManagerId?: string | null
     // Capacity fields (all optional / nullable on the model)
     dayGuardCapacity?: number | null
     nightGuardCapacity?: number | null
@@ -120,13 +122,43 @@ const CAPACITY_LABELS: Record<BranchCapacityField, string> = {
 type Props = {
     branch: Branch
     activeDeploymentCount?: number
+    currentSupervisorId?: string | null
+    clientRegionId?: string | null
+    initialUsers?: { id: string; name: string }[]
 }
 
-export default function BranchEditForm({ branch, activeDeploymentCount = 0 }: Props) {
+const UNASSIGNED = "__none__"
+
+const mergeUserOptions = (
+    primary: { id: string; name: string }[],
+    extras: { id: string; name: string }[],
+) => {
+    const seen = new Set(primary.map((u) => u.id))
+    const merged = [...primary]
+    for (const u of extras) {
+        if (!seen.has(u.id) && u.name) {
+            merged.push(u)
+            seen.add(u.id)
+        }
+    }
+    return merged.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export default function BranchEditForm({
+    branch,
+    activeDeploymentCount = 0,
+    currentSupervisorId = null,
+    clientRegionId = null,
+    initialUsers = [],
+}: Props) {
     const router = useRouter()
     const branchType = deriveBranchModel(branch.client?.type)
     const [submitting, setSubmitting] = useState(false)
     const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
+    // Seed both lists with the pre-resolved currently-assigned users so the
+    // selection has a label on first paint, before /api/users resolves.
+    const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>(initialUsers)
+    const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>(initialUsers)
 
     const capacityDefaults = BRANCH_CAPACITY_FIELDS.reduce<Record<BranchCapacityField, string>>(
         (acc, key) => {
@@ -152,9 +184,43 @@ export default function BranchEditForm({ branch, activeDeploymentCount = 0 }: Pr
             contactPerson: branch.contactPerson ?? "",
             contactPhone: branch.contactPhone ?? "",
             contactEmail: branch.contactEmail ?? "",
+            assignedManagerId: branch.assignedManagerId ?? "",
+            operationsManagerId: branch.operationsManagerId ?? "",
+            assignedSupervisorId: currentSupervisorId ?? "",
             ...capacityDefaults,
         },
     })
+
+    // Load managers/supervisors for the branch's region. Filter mirrors the
+    // create form: User.role.name == "Manager" / "Supervisor" (case-insensitive).
+    useEffect(() => {
+        const url = clientRegionId
+            ? `/api/users?limit=500&regionId=${clientRegionId}`
+            : "/api/users?limit=500"
+        let cancelled = false
+        fetch(url)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data: unknown) => {
+                if (cancelled || !Array.isArray(data)) return
+                const users = data as { id: string; name?: string | null; role?: { name?: string | null } }[]
+                const toOption = (u: typeof users[0]) => ({ id: u.id, name: u.name as string })
+                const managers = users
+                    .filter((u) => u.name && u.role?.name?.toLowerCase() === "manager")
+                    .map(toOption)
+                const supervisors = users
+                    .filter((u) => u.name && u.role?.name?.toLowerCase() === "supervisor")
+                    .map(toOption)
+                // Merge the pre-resolved currently-assigned users so the dropdown
+                // always has a label for the existing selection, even if that
+                // user no longer matches the role/region filter.
+                setManagerUsers(mergeUserOptions(managers, initialUsers))
+                setSupervisorUsers(mergeUserOptions(supervisors, initialUsers))
+            })
+            .catch(() => {})
+        return () => {
+            cancelled = true
+        }
+    }, [clientRegionId, initialUsers])
 
     const onSubmit = async (values: BranchEditForm) => {
         // Pre-flight: matches the server-side workflow rule
@@ -561,6 +627,103 @@ export default function BranchEditForm({ branch, activeDeploymentCount = 0 }: Pr
                                                 value={field.value ?? ""}
                                             />
                                         </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Assignment (Bug #41) */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Assignment</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="assignedManagerId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Branch Manager</FormLabel>
+                                        <Select
+                                            value={field.value ? String(field.value) : UNASSIGNED}
+                                            onValueChange={(v) => field.onChange(v === UNASSIGNED ? "" : v)}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="— Unassigned —" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
+                                                {managerUsers.map((u) => (
+                                                    <SelectItem key={u.id} value={u.id}>
+                                                        {u.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="operationsManagerId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Operations Manager</FormLabel>
+                                        <Select
+                                            value={field.value ? String(field.value) : UNASSIGNED}
+                                            onValueChange={(v) => field.onChange(v === UNASSIGNED ? "" : v)}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="— Unassigned —" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
+                                                {managerUsers.map((u) => (
+                                                    <SelectItem key={u.id} value={u.id}>
+                                                        {u.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="assignedSupervisorId"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Supervisor</FormLabel>
+                                        <Select
+                                            value={field.value ? String(field.value) : UNASSIGNED}
+                                            onValueChange={(v) => field.onChange(v === UNASSIGNED ? "" : v)}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="— Unassigned —" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
+                                                {supervisorUsers.map((u) => (
+                                                    <SelectItem key={u.id} value={u.id}>
+                                                        {u.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}

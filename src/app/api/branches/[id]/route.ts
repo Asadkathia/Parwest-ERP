@@ -54,6 +54,9 @@ const branchPatchSchema = z
         isHeadOffice: z.boolean().optional(),
         branchType: z.enum(["CONVENTIONAL", "ISLAMIC"]).optional(),
         status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+        assignedManagerId: z.string().nullable().optional(),
+        operationsManagerId: z.string().nullable().optional(),
+        assignedSupervisorId: z.string().nullable().optional(),
         ...capacityShape,
     })
     .passthrough()
@@ -187,16 +190,65 @@ export async function PATCH(
         if (body.contactEmail !== undefined) updateData.contactEmail = body.contactEmail ? String(body.contactEmail) : null
         if (body.isHeadOffice !== undefined) updateData.isHeadOffice = body.isHeadOffice === true
         if (body.status !== undefined) updateData.status = body.status
+        if (body.assignedManagerId !== undefined) {
+            const v = body.assignedManagerId ? String(body.assignedManagerId).trim() : ""
+            updateData.assignedManagerId = v || null
+        }
+        if (body.operationsManagerId !== undefined) {
+            const v = body.operationsManagerId ? String(body.operationsManagerId).trim() : ""
+            updateData.operationsManagerId = v || null
+        }
 
         for (const key of BRANCH_CAPACITY_FIELDS) {
             const v = body[key]
             if (v !== undefined) updateData[key] = v
         }
 
-        const branch = await prisma.branch.update({
-            where: { id },
-            data: updateData,
-            include: { client: true },
+        // Branch update + supervisor assignment delta in a single transaction so
+        // a stale ACTIVE row never coexists with a new one (single source of
+        // truth: at most one ACTIVE ClientSupervisorAssignment per branch).
+        const branch = await prisma.$transaction(async (tx) => {
+            const updated = await tx.branch.update({
+                where: { id },
+                data: updateData,
+                include: { client: true },
+            })
+
+            if (body.assignedSupervisorId !== undefined) {
+                const nextSupervisorId = body.assignedSupervisorId
+                    ? String(body.assignedSupervisorId).trim()
+                    : ""
+                const current = await tx.clientSupervisorAssignment.findFirst({
+                    where: { branchId: id, status: "ACTIVE" },
+                    orderBy: { effectiveDate: "desc" },
+                })
+
+                if (current && current.supervisorId !== nextSupervisorId) {
+                    await tx.clientSupervisorAssignment.update({
+                        where: { id: current.id },
+                        data: { status: "INACTIVE" },
+                    })
+                }
+
+                if (nextSupervisorId && (!current || current.supervisorId !== nextSupervisorId)) {
+                    const supervisor = await tx.user.findUnique({
+                        where: { id: nextSupervisorId },
+                        select: { id: true },
+                    })
+                    if (!supervisor) {
+                        throw new Error("Selected supervisor was not found.")
+                    }
+                    await tx.clientSupervisorAssignment.create({
+                        data: {
+                            clientId: updated.clientId,
+                            branchId: id,
+                            supervisorId: nextSupervisorId,
+                        },
+                    })
+                }
+            }
+
+            return updated
         })
 
         await safeAuditLog({
@@ -208,6 +260,9 @@ export async function PATCH(
 
         return NextResponse.json(branch, { status: 200 })
     } catch (error: unknown) {
+        if (error instanceof Error && error.message === "Selected supervisor was not found.") {
+            return badRequest(error.message)
+        }
         console.error("Error updating branch:", error)
         return internalServerError("Failed to update branch")
     }

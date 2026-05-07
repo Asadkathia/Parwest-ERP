@@ -94,6 +94,13 @@ export const branchEditSchema = z.object({
             "Enter a valid email address.",
         ),
 
+    // Assignment (Branch.assignedManagerId / operationsManagerId are direct
+    // FK columns; assignedSupervisorId is materialised through the
+    // ClientSupervisorAssignment join model — see PATCH handler).
+    assignedManagerId: z.string().trim().optional().default(""),
+    operationsManagerId: z.string().trim().optional().default(""),
+    assignedSupervisorId: z.string().trim().optional().default(""),
+
     ...capacityShape,
 })
 
