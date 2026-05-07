@@ -50,13 +50,6 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
     const [error, setError] = useState("")
 
     useEffect(() => {
-        const guardsUrl = lockedRegionId
-            ? `/api/guards?status=ACTIVE&regionId=${lockedRegionId}`
-            : "/api/guards?status=ACTIVE"
-        fetch(guardsUrl)
-            .then(r => r.ok ? r.json() : [])
-            .then(setGuards)
-            .catch(() => {})
         const officesUrl = lockedRegionId
             ? `/api/regional-offices?regionId=${lockedRegionId}`
             : "/api/regional-offices"
@@ -74,6 +67,34 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
             })
             .catch(() => {})
     }, [lockedRegionId, lockedRegionalOfficeId])
+
+    // Refetch the guard list whenever the user changes the Regional Office
+    // selection (or the locked-region context changes). Without this, the
+    // dropdown only ever held the guards loaded on mount, which made it appear
+    // empty after the user picked an office.
+    useEffect(() => {
+        const params = new URLSearchParams()
+        params.set("status", "ACTIVE")
+        if (lockedRegionId) params.set("regionId", lockedRegionId)
+        if (form.regionalOfficeId) params.set("regionalOfficeId", form.regionalOfficeId)
+        fetch(`/api/guards?${params.toString()}`)
+            .then(r => r.ok ? r.json() : [])
+            .then((data: unknown) => {
+                // The route returns a bare array today, but defensively unwrap
+                // an envelope if a future change introduces one.
+                if (Array.isArray(data)) {
+                    setGuards(data as GuardOption[])
+                } else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) {
+                    setGuards((data as { data: GuardOption[] }).data)
+                } else {
+                    setGuards([])
+                }
+            })
+            .catch(() => setGuards([]))
+        // Clear any guard selection that may no longer be valid for the new
+        // office; prevents submitting a guard that isn't in the visible list.
+        setForm(f => (f.guardId ? { ...f, guardId: "" } : f))
+    }, [lockedRegionId, form.regionalOfficeId])
 
     useEffect(() => {
         setClients([])
