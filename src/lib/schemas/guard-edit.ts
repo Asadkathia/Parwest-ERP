@@ -103,7 +103,12 @@ export const guardEditSchema = z.object({
     regionId: z.string().trim().optional().or(z.literal("")),
     regionalOfficeId: z.string().trim().optional().or(z.literal("")),
     joiningDate: z.string().trim().optional().or(z.literal("")),
-    status: z.string().trim().optional().or(z.literal("")),
+    // Canonical guard lifecycle (PENDING | ACTIVE | INACTIVE | TERMINATED).
+    // The legacy Guard.status shadow is kept in sync server-side via
+    // src/lib/guards/lifecycle.ts — never edited from the form.
+    // TERMINATED is intentionally not selectable here; it requires a
+    // termination reason and goes through a dedicated flow.
+    lifecycleStatus: z.enum(["PENDING", "ACTIVE", "INACTIVE", "TERMINATED"]).optional(),
     paymentMode: z.string().trim().optional().or(z.literal("")),
     guardCategory: z.string().trim().optional().or(z.literal("")),
     supervisorId: z.string().trim().optional().or(z.literal("")),

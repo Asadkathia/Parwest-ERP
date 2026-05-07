@@ -7,6 +7,7 @@ import { badRequest, forbidden, internalServerError, notFound, unauthorized } fr
 import { calculateAgeYears, MIN_GUARD_AGE, MAX_GUARD_AGE } from "@/lib/validation/formats"
 import { hasAction } from "@/lib/api/permissions"
 import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
+import { applyTransition, canTransition, LIFECYCLE_STATUSES, type LifecycleStatus } from "@/lib/guards/lifecycle"
 
 export async function PUT(
     request: NextRequest,
@@ -126,8 +127,41 @@ export async function PUT(
         }
         const activeAccount = parsedBankAccounts.find((a) => a.isActive) ?? parsedBankAccounts[0] ?? null
 
-        // Update guard
-        const guard = await prisma.guard.update({
+        // Lifecycle transition guard — Bug #38.
+        // The form now binds to canonical `lifecycleStatus`. Direct writes to
+        // the legacy `status` shadow are rejected here; the transition (if any)
+        // is applied through `applyTransition` which:
+        //   - validates the transition against ALLOWED_TRANSITIONS,
+        //   - dual-writes the legacy `status` shadow consistently,
+        //   - revokes active deployments for INACTIVE/TERMINATED,
+        //   - writes a GuardStatusHistory row,
+        // all atomically. TERMINATED is rejected here because it requires a
+        // `terminationReason` and goes through a dedicated termination flow.
+        const requestedLifecycle = body?.lifecycleStatus
+            ? String(body.lifecycleStatus).toUpperCase()
+            : null
+        let pendingTransition: LifecycleStatus | null = null
+        if (requestedLifecycle) {
+            if (!(LIFECYCLE_STATUSES as readonly string[]).includes(requestedLifecycle)) {
+                return badRequest(`Invalid lifecycleStatus: ${requestedLifecycle}.`)
+            }
+            const next = requestedLifecycle as LifecycleStatus
+            const current = existingGuard.lifecycleStatus as LifecycleStatus
+            if (next === "TERMINATED" && current !== "TERMINATED") {
+                return badRequest(
+                    "Termination must go through the dedicated termination flow (requires a reason).",
+                )
+            }
+            if (next !== current) {
+                const check = canTransition(current, next)
+                if (!check.ok) return badRequest(check.reason)
+                pendingTransition = next
+            }
+        }
+
+        // Update guard + (optional) lifecycle transition atomically.
+        const guard = await prisma.$transaction(async (tx) => {
+            const updated = await tx.guard.update({
             where: { id },
             data: {
                 name: body.name,
@@ -146,7 +180,6 @@ export async function PUT(
                 regionId: bodyRegionId,
                 regionalOfficeId: body.regionalOfficeId || null,
                 joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
-                status: body.status || "PENDING",
                 isExService: nextIsExService,
                 exServiceType: nextExServiceType,
                 exServiceRank: primaryExService?.rank || body.exServiceRank || null,
@@ -190,30 +223,48 @@ export async function PUT(
                     }
                 })(),
             },
-        })
-
-        // Handle supervisor assignment change
-        if (body.supervisorId !== undefined) {
-            const newSupervisorId = body.supervisorId ? String(body.supervisorId) : null
-
-            // End all current active assignments for this guard
-            await prisma.guardSupervisorAssignment.updateMany({
-                where: { guardId: id, status: "ACTIVE" },
-                data: { status: "ENDED", endedAt: new Date() },
             })
 
-            // Create new assignment if a supervisor was selected
-            if (newSupervisorId) {
-                await prisma.guardSupervisorAssignment.create({
-                    data: {
-                        guardId: id,
-                        supervisorId: newSupervisorId,
-                        status: "ACTIVE",
-                        assignedAt: new Date(),
+            // Supervisor assignment change — kept inside the same transaction
+            // so the swap is atomic with the field update.
+            if (body.supervisorId !== undefined) {
+                const newSupervisorId = body.supervisorId ? String(body.supervisorId) : null
+                await tx.guardSupervisorAssignment.updateMany({
+                    where: { guardId: id, status: "ACTIVE" },
+                    data: { status: "ENDED", endedAt: new Date() },
+                })
+                if (newSupervisorId) {
+                    await tx.guardSupervisorAssignment.create({
+                        data: {
+                            guardId: id,
+                            supervisorId: newSupervisorId,
+                            status: "ACTIVE",
+                            assignedAt: new Date(),
+                        },
+                    })
+                }
+            }
+
+            // Lifecycle transition (if requested). applyTransition writes the
+            // canonical lifecycleStatus, the legacy `status` shadow, the
+            // history row, and (when needed) revokes active deployments.
+            if (pendingTransition) {
+                await applyTransition(tx, {
+                    guardId: id,
+                    to: pendingTransition,
+                    ctx: {
+                        actorId: session.user?.id ?? null,
+                        actorName: session.user?.name ?? null,
+                        trigger: "MANUAL",
                     },
                 })
+                // Re-read so the response reflects the new status + shadow.
+                const refreshed = await tx.guard.findUnique({ where: { id } })
+                if (refreshed) return refreshed
             }
-        }
+
+            return updated
+        })
 
         return NextResponse.json(guard, { status: 200 })
     } catch (error: unknown) {

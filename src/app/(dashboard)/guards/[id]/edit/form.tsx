@@ -89,6 +89,7 @@ type Guard = {
     regionalOfficeId: string | null
     joiningDate: Date | null
     status: string
+    lifecycleStatus?: string | null
     isExService: boolean
     exServiceType: string | null
     exServiceRank: string | null
@@ -696,7 +697,11 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
             regionId: guard.regionId || "",
             regionalOfficeId: guard.regionalOfficeId || "",
             joiningDate: formatDateForInput(guard.joiningDate),
-            status: guard.status || "PENDING",
+            lifecycleStatus: ((): "PENDING" | "ACTIVE" | "INACTIVE" | "TERMINATED" => {
+                const v = String(guard.lifecycleStatus ?? "").toUpperCase()
+                if (v === "PENDING" || v === "ACTIVE" || v === "INACTIVE" || v === "TERMINATED") return v
+                return "PENDING"
+            })(),
             paymentMode: guard.paymentMode || "BANK",
             guardCategory: guard.guardCategory || "REGULAR",
             supervisorId: currentSupervisorId || "",
@@ -1286,25 +1291,40 @@ export default function GuardEditForm({ guard, regions, regionalOffices, current
 
                             <FormField
                                 control={form.control}
-                                name="status"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Status</FormLabel>
-                                        <Select value={field.value || "PENDING"} onValueChange={field.onChange}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="PENDING">Pending</SelectItem>
-                                                <SelectItem value="ACTIVE">Active</SelectItem>
-                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                name="lifecycleStatus"
+                                render={({ field }) => {
+                                    const isTerminated = guard.lifecycleStatus === "TERMINATED"
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>Status</FormLabel>
+                                            <Select
+                                                value={field.value || "PENDING"}
+                                                onValueChange={field.onChange}
+                                                disabled={isTerminated}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="PENDING">Pending</SelectItem>
+                                                    <SelectItem value="ACTIVE">Active</SelectItem>
+                                                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                                    {isTerminated && (
+                                                        <SelectItem value="TERMINATED">Terminated</SelectItem>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            {isTerminated ? (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    Terminated guards cannot be edited from this form.
+                                                </p>
+                                            ) : null}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
                             />
 
                             <FormField
