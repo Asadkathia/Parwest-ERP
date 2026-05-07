@@ -74,7 +74,12 @@ export default function NewTrainingForm({ lockedRegionId = null, lockedRegionalO
     // empty after the user picked an office.
     useEffect(() => {
         const params = new URLSearchParams()
-        params.set("status", "ACTIVE")
+        // Legacy Guard.status enum: PENDING | ACTIVE | PRESENT | DEFAULT |
+// INACTIVE | TERMINATED. The deployable subset (and therefore the
+// trainable subset) is the non-terminated/non-inactive part. Filtering
+// by "ACTIVE" alone returns zero guards in production because the
+// legacy shadow stays at PRESENT/DEFAULT after deployment.
+params.set("status", "ACTIVE,PRESENT,DEFAULT,PENDING")
         if (lockedRegionId) params.set("regionId", lockedRegionId)
         if (form.regionalOfficeId) params.set("regionalOfficeId", form.regionalOfficeId)
         fetch(`/api/guards?${params.toString()}`)
