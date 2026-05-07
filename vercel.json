@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/run-scheduled-reports",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }
