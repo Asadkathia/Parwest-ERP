@@ -9,6 +9,19 @@ import { useSearchParams } from "next/navigation"
 import { AlertCircle, Search, RotateCcw } from "lucide-react"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { buttonVariants } from "@/components/shadcn/button"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import DataTable from "@/components/shared/DataTable"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
@@ -52,10 +65,13 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
   const [tableSearch, setTableSearch] = useState("")
   const [selectDate, setSelectDate] = useState("")
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<ClientRow | null>(null)
 
-  const handleStatusUpdate = async (row: ClientRow) => {
+  const pendingNextStatus =
+    pendingStatusUpdate?.status.toUpperCase() === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+
+  const performStatusUpdate = async (row: ClientRow) => {
     const next = row.status.toUpperCase() === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-    if (!confirm(`Change status of "${row.name}" to ${next}?`)) return
     setStatusUpdating(row.id)
     try {
       const res = await fetch(`/api/clients/${row.id}`, {
@@ -63,10 +79,15 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: next }),
       })
-      if (!res.ok) throw new Error("Failed to update status")
-      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: next } : r))
-    } catch {
-      alert("Failed to update client status. Please try again.")
+      const data = await res.json().catch(() => ({} as { message?: string }))
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to update client status.")
+        return
+      }
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)))
+      toast.success(`Client "${row.name}" set to ${next}.`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update client status.")
     } finally {
       setStatusUpdating(null)
     }
@@ -304,7 +325,7 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
                   <button
                     type="button"
                     disabled={statusUpdating === row.id}
-                    onClick={() => handleStatusUpdate(row)}
+                    onClick={() => setPendingStatusUpdate(row)}
                     className="text-amber-700 hover:underline disabled:opacity-50"
                   >
                     {statusUpdating === row.id ? "Updating..." : "Update Status"}
@@ -320,6 +341,46 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
         pageSize={pageSize}
         stickyHeader
       />
+
+      <AlertDialog
+        open={pendingStatusUpdate !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatusUpdate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Set client to {pendingNextStatus}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingStatusUpdate
+                ? `Change status of "${pendingStatusUpdate.name}" to ${pendingNextStatus}.`
+                : ""}
+              {pendingNextStatus === "INACTIVE"
+                ? " The server will block this if the client still has active branches or deployments."
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                pendingNextStatus === "INACTIVE"
+                  ? buttonVariants({ variant: "destructive" })
+                  : ""
+              )}
+              onClick={async () => {
+                const row = pendingStatusUpdate
+                setPendingStatusUpdate(null)
+                if (row) await performStatusUpdate(row)
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
