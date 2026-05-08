@@ -60,10 +60,13 @@ function resolveViewableUrl(data: string): string {
 // best-effort navigation in the current tab.
 function openDocumentInWindow(win: Window | null, data: string) {
   const url = resolveViewableUrl(data)
-  if (win) {
+  if (win && !win.closed) {
     win.location.href = url
   } else {
-    window.open(url, "_blank", "noopener,noreferrer")
+    // Fallback path. We do NOT pass "noopener,noreferrer" here because
+    // that causes window.open to return null, which trips popup blockers
+    // when called after an await — same trap that broke ticket #44.
+    window.open(url, "_blank")
   }
 }
 
@@ -104,7 +107,7 @@ async function fetchAttachmentPayload(
 // an async await is blocked by Safari/Firefox/Chrome popup blockers, which
 // is what made #44 reproducible in QA.
 async function viewAttachment(guardId: string, row: PrereqRow) {
-  const win = window.open("about:blank", "_blank", "noopener,noreferrer")
+  const win = window.open("about:blank", "_blank")
   const data = row.documentUrl || (await fetchAttachmentPayload(guardId, row.prereqId))
   if (!data) {
     win?.close()
@@ -183,7 +186,7 @@ function HistoryPanel({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
-                            const win = window.open("about:blank", "_blank", "noopener,noreferrer")
+                            const win = window.open("about:blank", "_blank")
                             openDocumentInWindow(win, data)
                           }}
                           className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
