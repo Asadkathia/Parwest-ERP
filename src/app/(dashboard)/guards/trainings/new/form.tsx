@@ -26,6 +26,7 @@ const EMPTY = {
     conductedBy: "",
     remarks: "",
     armorer: false,
+    armorerName: "",
     supervisorWithUniform: false,
 }
 
@@ -162,6 +163,7 @@ params.set("status", "ACTIVE,PRESENT,DEFAULT,PENDING")
                 `Branch Supervisor: ${form.branchSupervisor || "-"}`,
                 `Branch Manager: ${form.branchManager || "-"}`,
                 `Armorer: ${form.armorer ? "Yes" : "No"}`,
+                ...(form.armorer && form.armorerName.trim() ? [`Armorer Name: ${form.armorerName.trim()}`] : []),
                 `Supervisor With Uniform: ${form.supervisorWithUniform ? "Yes" : "No"}`,
                 `Conducted By: ${form.conductedBy || "-"}`,
                 ...(form.remarks ? [`Remarks: ${form.remarks}`] : []),
@@ -337,16 +339,31 @@ params.set("status", "ACTIVE,PRESENT,DEFAULT,PENDING")
 
                     {/* Armorer & Supervisor Uniform */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border rounded-lg px-4 py-3 flex items-center justify-between bg-gray-50">
-                            <span className="text-sm font-medium text-gray-700">Armorer</span>
-                            <div className="flex gap-5 text-sm">
-                                <label className="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" checked={form.armorer} onChange={() => setForm(f => ({ ...f, armorer: true }))} /> Yes
-                                </label>
-                                <label className="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" checked={!form.armorer} onChange={() => setForm(f => ({ ...f, armorer: false }))} /> No
-                                </label>
+                        <div className="border rounded-lg px-4 py-3 bg-gray-50 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Armorer</span>
+                                <div className="flex gap-5 text-sm">
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" checked={form.armorer} onChange={() => setForm(f => ({ ...f, armorer: true }))} /> Yes
+                                    </label>
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            checked={!form.armorer}
+                                            onChange={() => setForm(f => ({ ...f, armorer: false, armorerName: "" }))}
+                                        /> No
+                                    </label>
+                                </div>
                             </div>
+                            {form.armorer && (
+                                <input
+                                    className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    value={form.armorerName}
+                                    onChange={(e) => setForm(f => ({ ...f, armorerName: e.target.value }))}
+                                    placeholder="Armorer name"
+                                    maxLength={200}
+                                />
+                            )}
                         </div>
                         <div className="border rounded-lg px-4 py-3 flex items-center justify-between bg-gray-50">
                             <span className="text-sm font-medium text-gray-700">Supervisor With Uniform</span>
