@@ -88,6 +88,7 @@ const EMPTY_FORM = {
     conductedBy: "",
     remarks: "",
     armorer: false,
+    armorerName: "",
     supervisorWithUniform: false,
 }
 
@@ -276,6 +277,7 @@ export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelet
                 `Branch Supervisor: ${form.branchSupervisor || "-"}`,
                 `Branch Manager: ${form.branchManager || "-"}`,
                 `Armorer: ${form.armorer ? "Yes" : "No"}`,
+                ...(form.armorer && form.armorerName.trim() ? [`Armorer Name: ${form.armorerName.trim()}`] : []),
                 `Supervisor With Uniform: ${form.supervisorWithUniform ? "Yes" : "No"}`,
                 `Conducted By: ${form.conductedBy || "-"}`,
                 ...(form.remarks ? [`Remarks: ${form.remarks}`] : []),
@@ -408,7 +410,11 @@ export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelet
                                         <td className="px-4 py-3 text-sm">{n["client"] || "—"}</td>
                                         <td className="px-4 py-3 text-sm">{n["branch"] || "—"}</td>
                                         <td className="px-4 py-3 text-sm">{n["conducted by"] || t.instructor || "—"}</td>
-                                        <td className="px-4 py-3 text-sm">{n["armorer"] || "—"}</td>
+                                        <td className="px-4 py-3 text-sm">
+                                            {n["armorer"] === "Yes"
+                                                ? (n["armorer name"] ? `Yes (${n["armorer name"]})` : "Yes")
+                                                : (n["armorer"] || "—")}
+                                        </td>
                                         <td className="px-4 py-3 text-sm">{n["supervisor with uniform"] || "—"}</td>
                                         <td className="px-4 py-3 text-sm">
                                             {(() => {
@@ -572,18 +578,33 @@ export default function OnJobTrainingsTab({ guardId, canCreate = false, canDelet
 
                             {/* Armorer & Supervisor Uniform */}
                             <div className="sm:col-span-2 grid grid-cols-2 gap-4">
-                                <div className="border rounded-lg px-4 py-3 flex items-center justify-between">
-                                    <span className="text-sm font-medium text-gray-700">Armorer</span>
-                                    <div className="flex gap-4 text-sm">
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input type="radio" checked={form.armorer} onChange={() => setForm(f => ({ ...f, armorer: true }))} />
-                                            Yes
-                                        </label>
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input type="radio" checked={!form.armorer} onChange={() => setForm(f => ({ ...f, armorer: false }))} />
-                                            No
-                                        </label>
+                                <div className="border rounded-lg px-4 py-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700">Armorer</span>
+                                        <div className="flex gap-4 text-sm">
+                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                                <input type="radio" checked={form.armorer} onChange={() => setForm(f => ({ ...f, armorer: true }))} />
+                                                Yes
+                                            </label>
+                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    checked={!form.armorer}
+                                                    onChange={() => setForm(f => ({ ...f, armorer: false, armorerName: "" }))}
+                                                />
+                                                No
+                                            </label>
+                                        </div>
                                     </div>
+                                    {form.armorer && (
+                                        <input
+                                            className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={form.armorerName}
+                                            onChange={e => setForm(f => ({ ...f, armorerName: e.target.value }))}
+                                            placeholder="Armorer name"
+                                            maxLength={200}
+                                        />
+                                    )}
                                 </div>
                                 <div className="border rounded-lg px-4 py-3 flex items-center justify-between">
                                     <span className="text-sm font-medium text-gray-700">Supervisor Uniform</span>

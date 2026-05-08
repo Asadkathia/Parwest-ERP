@@ -76,14 +76,6 @@ const OFFICE_TYPE_OPTIONS = [
     "Field Office", "Cash Office", "ATM Site", "Warehouse", "Checkpoint", "Other",
 ].map((t) => ({ value: t, label: t }))
 
-const CITY_OPTIONS = [
-    "All Cities", "Lahore", "Gujranwala", "Sahiwal", "Islamabad", "Karachi", "Multan", "Faisalabad",
-    "Khanpur", "Chichawatni", "Bahawalpur", "Mian Channu", "Khanewal", "Ahmedpur East",
-    "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Basti Malook", "Bhagalchur",
-    "Bhalwal", "Bahawalnagar", "Bhaipheru", "Bhakkar", "Burewala", "Chailianwala", "Chakwal",
-    "Chiniot", "Chowk Azam", "Chowk Sarwar Shaheed", "Daska",
-].map((c) => ({ value: c, label: c }))
-
 const PROVINCE_OPTIONS = [
     { value: "Punjab", label: "Punjab" },
     { value: "Sindh", label: "Sindh" },
@@ -91,6 +83,46 @@ const PROVINCE_OPTIONS = [
     { value: "Balochistan", label: "Balochistan" },
     { value: "Islamabad", label: "Islamabad Capital Territory" },
 ]
+
+// Province → cities map. The City dropdown is filtered by the selected
+// Province so e.g. "KPK" cannot have "Lahore" picked (ticket #47).
+const CITIES_BY_PROVINCE: Record<string, string[]> = {
+    Punjab: [
+        "Lahore", "Faisalabad", "Rawalpindi", "Multan", "Gujranwala", "Sialkot",
+        "Bahawalpur", "Sargodha", "Sahiwal", "Sheikhupura", "Kasur", "Okara",
+        "Khanewal", "Mian Channu", "Burewala", "Jhang", "Toba Tek Singh",
+        "Dera Ghazi Khan", "Rahim Yar Khan", "Khanpur", "Ahmedpur East", "Ali Pur",
+        "Arifwala", "Attock", "Bahawalnagar", "Bhalwal", "Bhakkar", "Chakwal",
+        "Chiniot", "Chichawatni", "Daska", "Bhaipheru", "Chowk Azam",
+        "Chowk Sarwar Shaheed", "Basti Malook", "Bhagalchur", "Chailianwala",
+        "Ahmed Nager Chatha",
+    ],
+    Sindh: [
+        "Karachi", "Hyderabad", "Sukkur", "Larkana", "Mirpur Khas", "Nawabshah",
+        "Thatta", "Jacobabad", "Shikarpur", "Khairpur", "Dadu", "Ghotki", "Badin",
+        "Tando Adam", "Tando Allahyar", "Tando Muhammad Khan",
+    ],
+    KPK: [
+        "Peshawar", "Mardan", "Mingora", "Abbottabad", "Kohat", "Bannu",
+        "Dera Ismail Khan", "Swabi", "Charsadda", "Nowshera", "Haripur", "Mansehra",
+        "Chitral", "Hangu", "Karak", "Lakki Marwat", "Tank", "Battagram",
+    ],
+    Balochistan: [
+        "Quetta", "Turbat", "Khuzdar", "Hub", "Chaman", "Gwadar", "Sibi",
+        "Dera Murad Jamali", "Loralai", "Zhob", "Kalat", "Mastung", "Pasni",
+    ],
+    Islamabad: ["Islamabad"],
+}
+
+const ALL_CITY_OPTIONS = Object.values(CITIES_BY_PROVINCE)
+    .flat()
+    .map((c) => ({ value: c, label: c }))
+
+function getCityOptionsForProvince(province: string): { value: string; label: string }[] {
+    if (!province) return ALL_CITY_OPTIONS
+    const cities = CITIES_BY_PROVINCE[province] ?? []
+    return cities.map((c) => ({ value: c, label: c }))
+}
 
 const BRANCH_MODEL_OPTIONS = [
     { value: "CONVENTIONAL", label: "Conventional" },
@@ -118,8 +150,12 @@ export default function BranchForm({
     const [selectedRegionId, setSelectedRegionId] = useState(
         isRegionalViewer ? (viewerRegionId ?? "") : (defaultRegionId ?? ""),
     )
+    // Ticket #46: Don't pre-select a regional office unless the viewer is
+    // region-locked. Even when a `defaultRegionalOfficeId` is passed in, an
+    // unlocked Super Admin should explicitly choose. Preselecting was the
+    // QA-reported "by default it shouldn't be selecting a regional office".
     const [selectedRegionalOfficeId, setSelectedRegionalOfficeId] = useState(
-        lockedRegionalOffice ?? (defaultRegionalOfficeId ?? ""),
+        lockedRegionalOffice ?? "",
     )
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
 
@@ -481,28 +517,12 @@ export default function BranchForm({
                                 )}
                             />
 
-                            <FormField
-                                control={form.control}
-                                name="city"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>City</FormLabel>
-                                        <FormControl>
-                                            <div>
-                                                <SearchSelect
-                                                    name="city"
-                                                    options={CITY_OPTIONS}
-                                                    defaultValue={field.value || ""}
-                                                    placeholder="Select city"
-                                                    onChange={(v) => field.onChange(v)}
-                                                />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
+                            {/*
+                              Ticket #47: city options depend on province.
+                              We render Province first, then City filtered by it.
+                              Selecting a new province clears the city if the
+                              old city isn't valid in the new province.
+                            */}
                             <FormField
                                 control={form.control}
                                 name="province"
@@ -516,13 +536,49 @@ export default function BranchForm({
                                                     options={PROVINCE_OPTIONS}
                                                     defaultValue={field.value || ""}
                                                     placeholder="Select province"
-                                                    onChange={(v) => field.onChange(v)}
+                                                    onChange={(v) => {
+                                                        field.onChange(v)
+                                                        const validCities = CITIES_BY_PROVINCE[v] ?? []
+                                                        const currentCity = form.getValues("city")
+                                                        if (currentCity && !validCities.includes(currentCity)) {
+                                                            form.setValue("city", "", { shouldValidate: true })
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => {
+                                    const province = form.watch("province")
+                                    const cityOptions = getCityOptionsForProvince(province ?? "")
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>City</FormLabel>
+                                            <FormControl>
+                                                <div>
+                                                    <SearchSelect
+                                                        // key forces remount when province changes so
+                                                        // SearchSelect's internal defaultValue resets
+                                                        key={`city-${province ?? "all"}`}
+                                                        name="city"
+                                                        options={cityOptions}
+                                                        defaultValue={field.value || ""}
+                                                        placeholder={province ? "Select city" : "Select province first"}
+                                                        onChange={(v) => field.onChange(v)}
+                                                    />
+                                                </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
                             />
                         </div>
 

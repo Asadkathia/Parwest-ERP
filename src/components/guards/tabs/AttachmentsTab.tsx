@@ -44,15 +44,26 @@ function readFileAsBase64(file: File): Promise<string> {
   })
 }
 
-function openDocument(data: string) {
-  const win = window.open()
-  if (!win) return
+// Resolve a viewable URL for either a data: URL (base64 attachment) or a
+// regular HTTP url. For data: URLs we materialize a Blob so the browser
+// can preview PDFs/images natively without choking on huge data: strings.
+function resolveViewableUrl(data: string): string {
   if (data.startsWith("data:")) {
     const blob = dataURLtoBlob(data)
-    const url = URL.createObjectURL(blob)
+    return URL.createObjectURL(blob)
+  }
+  return data
+}
+
+// Open `data` in `win` (a window already opened synchronously inside the
+// user-gesture handler). If `win` is null (popup blocked), fall back to a
+// best-effort navigation in the current tab.
+function openDocumentInWindow(win: Window | null, data: string) {
+  const url = resolveViewableUrl(data)
+  if (win) {
     win.location.href = url
   } else {
-    win.location.href = data
+    window.open(url, "_blank", "noopener,noreferrer")
   }
 }
 
@@ -88,9 +99,18 @@ async function fetchAttachmentPayload(
   }
 }
 
+// Open the popup synchronously (still inside the click's user-gesture stack)
+// then resolve the attachment payload and navigate the popup. Opening AFTER
+// an async await is blocked by Safari/Firefox/Chrome popup blockers, which
+// is what made #44 reproducible in QA.
 async function viewAttachment(guardId: string, row: PrereqRow) {
+  const win = window.open("about:blank", "_blank", "noopener,noreferrer")
   const data = row.documentUrl || (await fetchAttachmentPayload(guardId, row.prereqId))
-  if (data) openDocument(data)
+  if (!data) {
+    win?.close()
+    return
+  }
+  openDocumentInWindow(win, data)
 }
 
 async function downloadAttachment(guardId: string, row: PrereqRow) {
@@ -162,7 +182,10 @@ function HistoryPanel({
                     {data && (
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => openDocument(data)}
+                          onClick={() => {
+                            const win = window.open("about:blank", "_blank", "noopener,noreferrer")
+                            openDocumentInWindow(win, data)
+                          }}
                           className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
                         >
                           <Eye className="h-3 w-3" /> View

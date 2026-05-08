@@ -48,6 +48,12 @@ export const guardTrainingCreateSchema = z.object({
         .optional()
         .or(z.literal("")),
     armorer: z.boolean(),
+    armorerName: z
+        .string()
+        .trim()
+        .max(200, "Armorer name is too long")
+        .optional()
+        .or(z.literal("")),
     supervisorWithUniform: z.boolean(),
 })
 

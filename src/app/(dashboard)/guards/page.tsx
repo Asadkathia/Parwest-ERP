@@ -73,7 +73,7 @@ export default async function GuardsPage({
     if (scope?.regionId) where.regionId = scope.regionId
     if (scope?.regionalOfficeIds?.length) where.regionalOfficeId = { in: scope.regionalOfficeIds }
 
-    const [guardRows, total, active, pending, inactive, officeRows, designationTypes, distinctDesignations] = await Promise.all([
+    const [guardRows, total, active, pending, inactive, officeRows, designationTypes, distinctDesignations, activeOjtCategoryCount] = await Promise.all([
       prisma.guard.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -103,6 +103,19 @@ export default async function GuardsPage({
             orderBy: { deploymentDate: "desc" },
             select: {
               client: { select: { name: true } },
+            },
+          },
+          // Ticket #30: roll up OJT training-checks for the listing.
+          // Pull every check the guard has across all training sessions and
+          // dedupe by categoryId in JS — this gives "categories ever
+          // completed" rather than a per-session snapshot, which is what
+          // QA asked to surface against the guards listing & profile.
+          trainings: {
+            select: {
+              ojtChecks: {
+                where: { completed: true },
+                select: { categoryId: true },
+              },
             },
           },
         },
@@ -137,6 +150,9 @@ export default async function GuardsPage({
         select: { designation: true },
         distinct: ["designation"],
       }),
+      // Active training categories — denominator for the OJT checks rollup
+      // shown in the guards listing column ("X / Y categories completed").
+      prisma.trainingCategory.count({ where: { isActive: true } }),
     ])
 
     const designationSet = new Set<string>()
@@ -150,19 +166,27 @@ export default async function GuardsPage({
       .sort((a, b) => a.localeCompare(b))
       .map((value) => ({ value, label: value }))
 
-    guards = guardRows.map((guard) => ({
-      id: guard.id,
-      parwestId: guard.parwestId,
-      name: guard.name,
-      cnic: guard.cnic,
-      phone: guard.phone || null,
-      status: guard.status,
-      regionId: guard.regionId || null,
-      regionalOfficeId: guard.regionalOfficeId || null,
-      supervisorName: guard.supervisorAssignments?.[0]?.supervisor?.name ?? null,
-      regionalOfficeName: guard.regionalOffice?.name ?? null,
-      clientName: guard.deployments?.[0]?.client?.name ?? null,
-    }))
+    guards = guardRows.map((guard) => {
+      const completedCategoryIds = new Set<string>()
+      for (const t of guard.trainings ?? []) {
+        for (const c of t.ojtChecks ?? []) completedCategoryIds.add(c.categoryId)
+      }
+      return {
+        id: guard.id,
+        parwestId: guard.parwestId,
+        name: guard.name,
+        cnic: guard.cnic,
+        phone: guard.phone || null,
+        status: guard.status,
+        regionId: guard.regionId || null,
+        regionalOfficeId: guard.regionalOfficeId || null,
+        supervisorName: guard.supervisorAssignments?.[0]?.supervisor?.name ?? null,
+        regionalOfficeName: guard.regionalOffice?.name ?? null,
+        clientName: guard.deployments?.[0]?.client?.name ?? null,
+        ojtChecksDone: completedCategoryIds.size,
+        ojtChecksTotal: activeOjtCategoryCount,
+      }
+    })
     offices = officeRows
     stats.total = total
     stats.active = active

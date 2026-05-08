@@ -9,6 +9,7 @@ import {
     CardTitle,
 } from "@/components/shadcn/card"
 import { Button } from "@/components/shadcn/button"
+import GuardOjtChecksCard from "@/components/guards/GuardOjtChecksCard"
 import type { GuardTabModel } from "@/components/guards/tabs/types"
 
 interface ProfileTabProps {
@@ -82,6 +83,8 @@ export default function ProfileTab({ guard }: ProfileTabProps) {
                     )
                 })}
             </div>
+
+            {guard.id && <GuardOjtChecksCard guardId={guard.id} />}
         </div>
     )
 }

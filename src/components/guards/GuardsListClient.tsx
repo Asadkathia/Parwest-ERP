@@ -36,6 +36,10 @@ export type GuardListRow = {
   supervisorName: string | null
   regionalOfficeName: string | null
   clientName: string | null
+  /** Distinct OJT training categories the guard has ever completed. */
+  ojtChecksDone: number
+  /** Total active OJT training categories (denominator). */
+  ojtChecksTotal: number
 }
 
 type RegionalOffice = { id: string; name: string }
@@ -223,6 +227,23 @@ export default function GuardsListClient({
         accessorKey: "clientName",
         header: "Assigned Client",
         cell: ({ row }) => row.original.clientName || "—",
+      },
+      {
+        id: "ojtChecks",
+        header: "OJT Checks",
+        cell: ({ row }) => {
+          const { ojtChecksDone, ojtChecksTotal } = row.original
+          if (!ojtChecksTotal) return <span className="text-muted-foreground">—</span>
+          const complete = ojtChecksDone >= ojtChecksTotal
+          return (
+            <span
+              className={`tabular-nums text-xs font-medium ${complete ? "text-emerald-700" : "text-muted-foreground"}`}
+              title={`${ojtChecksDone} of ${ojtChecksTotal} training categories completed`}
+            >
+              {ojtChecksDone}/{ojtChecksTotal}
+            </span>
+          )
+        },
       },
       {
         id: "actions",
