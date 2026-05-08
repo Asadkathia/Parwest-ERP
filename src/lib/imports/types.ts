@@ -1,0 +1,189 @@
+/**
+ * Bulk Import Registry — public types.
+ *
+ * A `BulkImportDefinition` is data, not code: every (module, subModule) pair
+ * registers one of these objects describing its headers, per-row validators,
+ * cross-row checks, and a `persist` function. The generic validate/process
+ * pipeline drives the registry, so adding a new sub-import means writing a
+ * definition file — no controller/route/UI changes required.
+ */
+
+import type { Prisma, PrismaClient } from "@prisma/client"
+import type { z } from "zod"
+
+export type ImportModuleKey = string
+
+/** A single per-row error captured during validation or processing. */
+export type ImportRowError = {
+  /** 1-based row number in the source file (header row is 1, first data row is 2). */
+  row: number
+  /** The header/field name responsible — `"__row__"` for whole-row errors. */
+  field: string
+  /** Human-readable error explanation. */
+  message: string
+  /** Original row values (best-effort) so QA can reproduce. */
+  values?: Record<string, unknown>
+}
+
+/** Header validation outcome. Hard-stops the import when `valid === false`. */
+export type HeaderValidationResult = {
+  valid: boolean
+  /** Required headers absent from the uploaded sheet. */
+  missing: string[]
+  /** Headers in the uploaded sheet not declared by the schema. */
+  unknown: string[]
+}
+
+/**
+ * Per-row validation outcome. `data` is the typed/normalised row when valid;
+ * `errors` accumulates everything wrong with that row.
+ */
+export type RowValidationResult<T> =
+  | { valid: true; data: T; errors: [] }
+  | { valid: false; errors: ImportRowError[] }
+
+/**
+ * Reference resolver — looks up FK existence (e.g. role name → role id).
+ * Returns the resolved value (often an id) or null when not found. The
+ * generic validator treats null as a row error using the supplied message.
+ */
+export type ReferenceResolver<T = unknown> = (
+  value: string,
+  ctx: ImportRunContext,
+) => Promise<T | null>
+
+/**
+ * Persist hook — invoked once per valid row. Should be idempotent where
+ * possible. Throw to mark the row failed; the engine collects the message.
+ *
+ * `tx` is the active Prisma transaction client when the engine runs in
+ * transactional mode (configured per-definition). For per-row independence
+ * (default), `tx` is the regular Prisma client.
+ */
+export type PersistFn<T> = (
+  row: T,
+  ctx: ImportRunContext & { tx: PrismaClient | Prisma.TransactionClient },
+) => Promise<void>
+
+/**
+ * Context passed through validation and persistence — gives definitions
+ * access to the active session, prisma client, current job id, and any
+ * memoised lookups built during the run.
+ */
+export type ImportRunContext = {
+  prisma: PrismaClient
+  jobId: string
+  /** Logged-in user id from the API session (null in mock mode). */
+  actorUserId: string | null
+  /**
+   * Region / regional-office scope of the actor — definitions should respect
+   * this when looking up references (e.g. only resolve guards within scope).
+   */
+  scope: {
+    regionId?: string | null
+    regionalOfficeIds?: string[] | null
+  }
+  /** Generic memoisation cache shared across rows for this run. */
+  cache: Map<string, unknown>
+}
+
+export type DuplicateScope = "payload" | "db" | "both"
+
+export type DuplicateRule = {
+  /** Which header(s) form the dedup key. Composite when length > 1. */
+  fields: string[]
+  /** Where to check — within the uploaded payload, the DB, or both. */
+  scope: DuplicateScope
+  /**
+   * DB lookup — required when scope includes "db". Returns true if the
+   * composite-key tuple already exists.
+   */
+  existsInDb?: (
+    values: Record<string, string>,
+    ctx: ImportRunContext,
+  ) => Promise<boolean>
+  /** Optional override for the error message. */
+  message?: string
+}
+
+export type ConditionalRule = {
+  /** Header that triggers the rule when its predicate returns true. */
+  when: { field: string; predicate: (value: string) => boolean }
+  /** Field that becomes required when the predicate is satisfied. */
+  thenRequired: string[]
+  /** Optional override message. */
+  message?: string
+}
+
+/**
+ * A registered bulk-import definition. The shape is deliberately verbose so
+ * each registration is self-describing — debugging a misbehaving import
+ * means reading one file, not chasing across the codebase.
+ */
+export interface BulkImportDefinition<TRow = Record<string, unknown>> {
+  /** Module key. Matches the route segment, e.g. "guards". */
+  module: ImportModuleKey
+  /** Sub-import key. Optional for top-level module imports (e.g. "users"). */
+  subModule?: string
+  /** Display label shown in the UI. */
+  label: string
+  /** Long-form description (shown under the title on the import screen). */
+  description?: string
+
+  /** Required headers in the order they appear in the template. */
+  requiredHeaders: string[]
+  /** Optional headers the schema understands. Unknown headers fail validation. */
+  optionalHeaders?: string[]
+
+  /**
+   * Zod schema applied to each row AFTER reference resolution. Use this for
+   * required / format / length / enum checks. Reference + duplicate +
+   * conditional checks are configured separately so the engine can short-
+   * circuit DB queries when zod already failed.
+   */
+  rowSchema: z.ZodType<TRow>
+
+  /**
+   * FK resolvers — keyed by header. Each receives the raw cell string and
+   * returns the resolved value (often a database id) or null. Resolved
+   * values are merged into the row before zod runs.
+   */
+  referenceResolvers?: Record<string, ReferenceResolver>
+
+  /** Conditional "X required when Y satisfies P" rules. */
+  conditionals?: ConditionalRule[]
+
+  /** Duplicate-detection rules. Multiple supported. */
+  duplicates?: DuplicateRule[]
+
+  /**
+   * Whether to persist all rows in a single Prisma transaction. Default
+   * false — independent per-row persistence so one bad row doesn't roll
+   * back the rest. Set true for imports that must be all-or-nothing.
+   */
+  persistInTransaction?: boolean
+
+  /** Persist hook. */
+  persist: PersistFn<TRow>
+
+  /**
+   * Sample row(s) shown in the downloadable .xlsx template. The first row
+   * after the header is filled with these values to give users a worked
+   * example.
+   */
+  sampleRows?: Array<Record<string, string | number>>
+
+  /** Required permission action. Defaults to ("IMPORTS", "CREATE"). */
+  permission?: { module: string; action: string }
+}
+
+/**
+ * Lightweight index for the UI — what the menu shows before a specific
+ * definition is opened.
+ */
+export type BulkImportSummary = {
+  module: ImportModuleKey
+  subModule?: string
+  label: string
+  description?: string
+}

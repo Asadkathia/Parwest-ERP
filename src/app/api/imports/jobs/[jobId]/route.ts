@@ -4,8 +4,8 @@ import { hasAction } from "@/lib/api/permissions"
 import { getImportJob } from "@/lib/imports/workflow"
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ jobId: string }> }
+  _request: Request,
+  { params }: { params: Promise<{ jobId: string }> },
 ) {
   try {
     const session = await auth()
@@ -15,11 +15,8 @@ export async function GET(
     const { jobId } = await params
     if (!jobId) return badRequest("jobId is required")
 
-    const job = getImportJob(jobId)
-    if (!job) {
-      return badRequest("Import job not found")
-    }
-
+    const job = await getImportJob(jobId)
+    if (!job) return badRequest("Import job not found")
     return ok(job)
   } catch (error) {
     console.error("Error fetching import job:", error)

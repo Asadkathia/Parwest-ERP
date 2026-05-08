@@ -1,0 +1,184 @@
+import { z } from "zod"
+
+import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
+import { registerImport } from "@/lib/imports/registry"
+import { nonNegativeInt, optionalString, requiredString } from "@/lib/imports/rules"
+
+/**
+ * Inventory v2 bulk import.
+ *
+ * This is the only legacy module that actually writes to the database.
+ * The persistence path is the same store/brand/unit/status/product/balance
+ * upsert chain that lived inline in `workflow.ts::processInventoryRows`,
+ * now expressed as a definition so the generic engine can drive it.
+ */
+function toSlug(input: string) {
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24)
+}
+
+const rowSchema = z
+  .object({
+    sku: optionalString(64),
+    name: requiredString("name", 200),
+    storeCode: optionalString(64),
+    storeName: optionalString(200),
+    quantityOnHand: nonNegativeInt("quantityOnHand").optional(),
+    quantity: nonNegativeInt("quantity").optional(),
+    avgUnitCost: z
+      .preprocess(
+        (v) => (v == null || v === "" ? undefined : Number(String(v).trim())),
+        z.number().nonnegative().optional(),
+      ),
+    unitCost: z
+      .preprocess(
+        (v) => (v == null || v === "" ? undefined : Number(String(v).trim())),
+        z.number().nonnegative().optional(),
+      ),
+    brand: optionalString(120),
+    unit: optionalString(64),
+    category: optionalString(120),
+    status: optionalString(64),
+  })
+  .refine(
+    (row) => {
+      const hasV2 = Boolean(row.sku && row.name && row.storeCode)
+      const hasLegacy = Boolean(row.name && row.category)
+      return hasV2 || hasLegacy
+    },
+    {
+      path: ["__row__"],
+      message:
+        "Each row must include either v2 shape (sku + name + storeCode) or legacy shape (name + category).",
+    },
+  )
+
+registerImport({
+  module: "inventory",
+  label: "Inventory v2",
+  description: "Upsert store + product + balance in a single sheet (Inventory v2).",
+  requiredHeaders: ["name"],
+  optionalHeaders: [
+    "sku",
+    "storeCode",
+    "storeName",
+    "quantityOnHand",
+    "quantity",
+    "avgUnitCost",
+    "unitCost",
+    "brand",
+    "unit",
+    "category",
+    "status",
+  ],
+  rowSchema,
+  duplicates: [{ fields: ["sku"], scope: "payload", message: "Duplicate SKU in upload" }],
+  sampleRows: [
+    {
+      sku: "WT-001",
+      name: "Walkie Talkie",
+      storeCode: "RO-L",
+      quantityOnHand: 12,
+      brand: "Motorola",
+      unit: "PCS",
+      status: "ACTIVE",
+    },
+    {
+      sku: "UF-001",
+      name: "Uniform Set",
+      storeCode: "RO-L",
+      quantityOnHand: 50,
+      brand: "Parwest",
+      unit: "SET",
+      status: "ACTIVE",
+    },
+  ],
+  persist: async (row, ctx) => {
+    const flags = getInventoryV2Flags()
+    if (!flags.writeEnabled) {
+      throw new Error(
+        "Inventory v2 write flag is disabled. Set INVENTORY_V2_WRITE_ENABLED=true before processing imports.",
+      )
+    }
+
+    const r = row as {
+      sku?: string
+      name: string
+      storeCode?: string
+      storeName?: string
+      quantityOnHand?: number
+      quantity?: number
+      avgUnitCost?: number
+      unitCost?: number
+      brand?: string
+      unit?: string
+      status?: string
+    }
+
+    const sku = r.sku || `LEG-${toSlug(r.name)}-${Date.now()}`
+    const storeCode = r.storeCode || "RO-UNASSIGNED"
+    const storeName = r.storeName || `${storeCode} Imported Store`
+    const quantityOnHand = Math.max(0, Math.round(r.quantityOnHand ?? r.quantity ?? 0))
+    const avgUnitCostRaw = r.avgUnitCost ?? r.unitCost ?? 0
+    const avgUnitCost = avgUnitCostRaw > 0 ? avgUnitCostRaw : null
+    const statusName = r.status || "ACTIVE"
+
+    const { tx } = ctx
+
+    const store = await tx.store.upsert({
+      where: { code: storeCode },
+      create: { code: storeCode, name: storeName, type: "IMPORTED", isActive: true },
+      update: { name: storeName, isActive: true },
+    })
+
+    const brand = r.brand
+      ? await tx.storeInventoryBrand.upsert({
+          where: { name: r.brand },
+          create: { name: r.brand },
+          update: {},
+        })
+      : null
+
+    const unit = r.unit
+      ? await tx.storeInventoryUnit.upsert({
+          where: { name: r.unit },
+          create: { name: r.unit, shortCode: toSlug(r.unit).slice(0, 8) || "UNIT" },
+          update: {},
+        })
+      : null
+
+    const status = await tx.storeInventoryStatus.upsert({
+      where: { name: statusName },
+      create: { name: statusName },
+      update: {},
+    })
+
+    const product = await tx.storeInventoryProduct.upsert({
+      where: { sku },
+      create: {
+        sku,
+        name: r.name,
+        brandId: brand?.id ?? null,
+        unitId: unit?.id ?? null,
+        statusId: status.id,
+        serialRequired: false,
+      },
+      update: {
+        name: r.name,
+        brandId: brand?.id ?? null,
+        unitId: unit?.id ?? null,
+        statusId: status.id,
+      },
+    })
+
+    await tx.storeInventoryBalance.upsert({
+      where: { storeId_productId: { storeId: store.id, productId: product.id } },
+      create: { storeId: store.id, productId: product.id, quantityOnHand, avgUnitCost },
+      update: { quantityOnHand, avgUnitCost },
+    })
+  },
+})

@@ -134,7 +134,7 @@ export default function BranchForm({
     clientName,
     regions,
     defaultRegionId,
-    defaultRegionalOfficeId,
+    defaultRegionalOfficeId: _defaultRegionalOfficeId,
     defaultManagerId,
     isSuperAdmin = false,
     viewerRegionId = null,
