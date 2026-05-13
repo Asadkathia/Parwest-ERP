@@ -8,6 +8,13 @@ import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/shadcn/card"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
+type TrainingCheck = {
+    id: string
+    categoryId: string
+    completed: boolean
+    category?: { id: string; name: string; sortOrder: number }
+}
+
 type TrainingRow = {
     id: string
     trainingType: string
@@ -20,6 +27,7 @@ type TrainingRow = {
         parwestId: string
         regionalOffice: { name: string } | null
     } | null
+    ojtChecks?: TrainingCheck[]
 }
 
 type ParsedNotes = {
@@ -30,6 +38,7 @@ type ParsedNotes = {
     supervisorWithUniform?: string
     branchManager?: string
     armorer?: string
+    armorerName?: string
     conductedBy?: string
     dueDate?: string
     remarks?: string
@@ -64,6 +73,7 @@ function parseNotes(raw: string | null): ParsedNotes {
         else if (key === "supervisor with uniform") parsed.supervisorWithUniform = value
         else if (key === "branch manager") parsed.branchManager = value
         else if (key === "armorer") parsed.armorer = value
+        else if (key === "armorer name") parsed.armorerName = value
         else if (key === "conducted by") parsed.conductedBy = value
         else if (key === "due date") parsed.dueDate = value
         else if (key === "remarks") parsed.remarks = value
@@ -75,7 +85,7 @@ function parseNotes(raw: string | null): ParsedNotes {
 }
 
 function exportCsv(rows: TrainingRow[], filename: string) {
-    const headers = ["Date", "Date of OJT", "Regional Office", "Client", "Branch", "Guard", "Branch Supervisor", "Supervisor Uniform", "Branch Manager", "Armorer", "Conducted By", "Due Date", "Remarks"]
+    const headers = ["Date", "Date of OJT", "Regional Office", "Client", "Branch", "Guard", "Branch Supervisor", "Supervisor Uniform", "Branch Manager", "Armorer", "Armorer Name", "Training Checks", "Conducted By", "Due Date", "Remarks"]
     const csvRows = [headers.join(",")]
     for (const row of rows) {
         const notes = parseNotes(row.notes)
@@ -83,6 +93,8 @@ function exportCsv(rows: TrainingRow[], filename: string) {
         const due = new Date(created)
         due.setMonth(due.getMonth() + 1)
         const guardRegionalOffice = row.guard?.regionalOffice?.name || ""
+        const checks = row.ojtChecks ?? []
+        const checksDone = checks.filter(c => c.completed).length
         const cells = [
             created.toLocaleDateString("en-US"),
             created.toLocaleDateString("en-US"),
@@ -94,6 +106,8 @@ function exportCsv(rows: TrainingRow[], filename: string) {
             notes.supervisorWithUniform || "",
             notes.branchManager || "",
             notes.armorer || "",
+            notes.armorer === "Yes" ? (notes.armorerName || "") : "",
+            checks.length === 0 ? "" : `${checksDone}/${checks.length}`,
             notes.conductedBy || row.instructor || "",
             notes.dueDate || due.toLocaleDateString("en-US"),
             notes.remarks || "",
@@ -372,6 +386,7 @@ export default function TrainingsManager({
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Supervisor Uniform</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Branch Manager</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Armorer</th>
+                            <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Training Checks</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Conducted By</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Due Date</th>
                             <th className="px-6 py-3 text-left text-xs uppercase text-[var(--text-muted)]">Remarks</th>
@@ -379,9 +394,9 @@ export default function TrainingsManager({
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
                         {loading ? (
-                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">Loading...</td></tr>
+                            <tr><td colSpan={14} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">Loading...</td></tr>
                         ) : filteredRows.length === 0 ? (
-                            <tr><td colSpan={13} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">No training records found.</td></tr>
+                            <tr><td colSpan={14} className="px-6 py-8 text-center text-sm text-[var(--text-muted)]">No training records found.</td></tr>
                         ) : (
                             filteredRows.slice(0, Number.parseInt(itemsPerPage, 10) || 10).map((training) => {
                                 const notes = parseNotes(training.notes)
@@ -402,7 +417,26 @@ export default function TrainingsManager({
                                         <td className="px-6 py-4 text-sm">{notes.branchSupervisor || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.supervisorWithUniform || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.branchManager || "—"}</td>
-                                        <td className="px-6 py-4 text-sm">{notes.armorer || "—"}</td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {notes.armorer === "Yes"
+                                                ? (notes.armorerName ? `Yes (${notes.armorerName})` : "Yes")
+                                                : (notes.armorer || "—")}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {(() => {
+                                                const checks = training.ojtChecks ?? []
+                                                if (checks.length === 0) return <span className="text-[var(--text-muted)]">—</span>
+                                                const done = checks.filter(c => c.completed).length
+                                                const title = checks
+                                                    .map(c => `${c.category?.name ?? c.categoryId}: ${c.completed ? "Yes" : "No"}`)
+                                                    .join("\n")
+                                                return (
+                                                    <span title={title}>
+                                                        {done}/{checks.length}
+                                                    </span>
+                                                )
+                                            })()}
+                                        </td>
                                         <td className="px-6 py-4 text-sm">{notes.conductedBy || training.instructor || "—"}</td>
                                         <td className="px-6 py-4 text-sm">{notes.dueDate || due.toLocaleDateString("en-US")}</td>
                                         <td className="px-6 py-4 text-sm">{notes.remarks || "—"}</td>

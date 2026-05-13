@@ -68,6 +68,19 @@
   --chart-3: var(--viz-3);  /* amber   */
   --chart-4: var(--viz-4);  /* red     */
   --chart-5: var(--viz-5);  /* indigo  */
+
+  /* ─── Z-index layering ──────────────────────────────────────────────────
+     Single source of truth for stacking order. Leaflet's panes and controls
+     go up to z-index 1000, so any overlay that may sit above a map MUST be
+     ≥ --z-popover. Use these tokens via `z-[var(--z-popover)]` etc. — do
+     NOT hand-roll z-index numbers in component code.
+     ───────────────────────────────────────────────────────────────────── */
+  --z-map:            1000;  /* Leaflet ceiling (zoom controls, tooltips) */
+  --z-modal-overlay:  1100;  /* Dialog/AlertDialog/Sheet backdrop */
+  --z-modal:          1110;  /* Dialog/AlertDialog/Sheet content */
+  --z-popover:        1200;  /* Select, Popover, DropdownMenu, ContextMenu */
+  --z-tooltip:        1250;  /* Tooltip (must sit above popovers inside modals) */
+  --z-toast:          1300;  /* Sonner toasts — top of stack */
 }
 
 [data-theme="dark"] {

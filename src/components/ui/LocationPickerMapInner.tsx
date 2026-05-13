@@ -161,9 +161,8 @@ export default function LocationPickerMapInner({ latName, lngName, defaultLat, d
                     </button>
                 </div>
 
-                {/* Search results — z-[2100] to always appear above Leaflet */}
                 {showResults && results.length > 0 && (
-                    <div className="absolute z-[2100] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-52 overflow-y-auto">
+                    <div className="absolute z-[var(--z-popover)] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-lg max-h-52 overflow-y-auto">
                         {results.map((r, i) => (
                             <button key={i} type="button" onClick={() => pickResult(r)}
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-muted)] flex items-start gap-2">
@@ -174,7 +173,7 @@ export default function LocationPickerMapInner({ latName, lngName, defaultLat, d
                     </div>
                 )}
                 {showResults && results.length === 0 && !searching && (
-                    <div className="absolute z-[2100] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow px-3 py-2 text-sm text-[var(--text-muted)]">
+                    <div className="absolute z-[var(--z-popover)] mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow px-3 py-2 text-sm text-[var(--text-muted)]">
                         No results found.
                     </div>
                 )}

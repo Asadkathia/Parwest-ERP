@@ -40,6 +40,9 @@ export async function GET(request: NextRequest) {
                         regionalOffice: { select: { name: true } },
                     },
                 },
+                ojtChecks: {
+                    include: { category: { select: { id: true, name: true, sortOrder: true } } },
+                },
             },
             take: 300,
         })
