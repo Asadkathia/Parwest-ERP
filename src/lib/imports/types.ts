@@ -136,6 +136,21 @@ export interface BulkImportDefinition<TRow = Record<string, unknown>> {
   optionalHeaders?: string[]
 
   /**
+   * Optional alias map: header-as-it-appears-in-the-sheet → canonical key.
+   *
+   * Used when the source template uses human-friendly headers
+   * ("father name") but the zod schema / persist code expects camelCase
+   * keys ("fatherName"). The engine remaps EVERY row's keys through this
+   * map BEFORE reference resolution, zod parsing, and duplicate checks
+   * run. Header validation is performed against the *aliased* headers,
+   * so `requiredHeaders` + `optionalHeaders` should list the sheet-side
+   * strings (the keys of this map), not the canonical names.
+   *
+   * Aliases are case-sensitive — match the team's template exactly.
+   */
+  headerAliases?: Record<string, string>
+
+  /**
    * Zod schema applied to each row AFTER reference resolution. Use this for
    * required / format / length / enum checks. Reference + duplicate +
    * conditional checks are configured separately so the engine can short-

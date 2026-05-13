@@ -38,7 +38,7 @@ type ImportJob = {
   errors: ValidationError[]
 }
 
-type PreviewRow = Record<string, string | number> & { __rowId?: string | number }
+type PreviewRow = Record<string, string | number>
 
 function parseCsv(text: string): PreviewRow[] {
   const lines = text
@@ -48,9 +48,9 @@ function parseCsv(text: string): PreviewRow[] {
 
   if (lines.length === 0) return []
   const headers = lines[0].split(",").map((h) => h.trim())
-  return lines.slice(1).map((line, index) => {
+  return lines.slice(1).map((line) => {
     const values = line.split(",")
-    const row: PreviewRow = { __rowId: index }
+    const row: PreviewRow = {}
     headers.forEach((header, index) => {
       row[header] = values[index]?.trim() || ""
     })
@@ -379,7 +379,7 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
               ? Object.keys(previewRows[0]).map((key) => ({ key, header: key }))
               : [{ key: "empty", header: "No Data", render: () => "-" }]
           }
-          getRowKey={(row, index) => String(row.__rowId || index)}
+          getRowKey={(_row, index) => String(index)}
           emptyText="No preview rows."
           searchable={false}
         />

@@ -8,6 +8,29 @@
 
 import ExcelJS from "exceljs"
 
+/** Pads a number to a 2-digit string ("3" → "03"). */
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+
+/**
+ * Picks the calendar day a Date most likely "meant" when parsed from Excel.
+ *
+ *   - If UTC wall-time is midnight → use UTC components.
+ *   - Else if local wall-time is midnight → use local components.
+ *   - Otherwise fall back to local components (mixed-time cells are rare
+ *     in bulk imports — we prefer to give the user the locally-displayed
+ *     date rather than silently jumping a day).
+ *
+ * Returns "YYYY-MM-DD".
+ */
+function extractCalendarDate(d: Date): string {
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+  }
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
 export type ParsedSheet = {
   /** Header row, as captured from the file (post-trim). */
   headers: string[]
@@ -74,8 +97,17 @@ export async function parseImportFile(
         // Rich text / hyperlink cells
         normalised = (value as { text: string }).text.trim()
       } else if (value instanceof Date) {
-        // ISO `YYYY-MM-DD` is the canonical date format we accept
-        normalised = value.toISOString().slice(0, 10)
+        // ISO `YYYY-MM-DD` is the canonical date format we accept.
+        // exceljs interprets Excel date cells via the workbook's date system
+        // (1900/1904) and the host locale, so the Date it returns can be
+        // either UTC-midnight or local-midnight depending on the source
+        // file. A naive `toISOString().slice(0,10)` drifts ±1 day when the
+        // parser machine is in a different timezone than the file author —
+        // e.g. a Pakistan-authored 1987-10-09 cell read on a US machine
+        // becomes "1987-10-08". Prefer whichever side has a midnight wall
+        // time; fall back to local components so we always emit a calendar
+        // date close to the user's intent.
+        normalised = extractCalendarDate(value)
       } else if (typeof value === "number" || typeof value === "boolean") {
         normalised = value
       } else {

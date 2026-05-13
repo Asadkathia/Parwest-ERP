@@ -11,6 +11,8 @@ import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
+import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
+import { generateNextParwestId } from "@/lib/guards/parwest-id"
 import type { Prisma } from "@prisma/client"
 
 export async function GET(request: NextRequest) {
@@ -209,25 +211,9 @@ export async function POST(request: NextRequest) {
             return badRequest("A guard with this CNIC already exists")
         }
 
-        const generateNextParwestId = async () => {
-            const prefix = officeSeriesCode ? `PW-${officeSeriesCode}` : "PW"
-            const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-            const pattern = new RegExp(`^${escapedPrefix}-(\\d+)$`)
-            const latest = await prisma.guard.findFirst({
-                where: { parwestId: { startsWith: `${prefix}-` } },
-                select: { parwestId: true },
-                orderBy: { parwestId: "desc" },
-            })
-            let maxNumber = 0
-            if (latest) {
-                const match = latest.parwestId.match(pattern)
-                if (match) {
-                    const numeric = Number(match[1])
-                    if (Number.isFinite(numeric)) maxNumber = numeric
-                }
-            }
-            return `${prefix}-${String(maxNumber + 1).padStart(5, "0")}`
-        }
+        // parwest id generation is shared with the bulk-import path via
+        // src/lib/guards/parwest-id.ts — see that module for the bug-fix
+        // history (lexical interference between RO-prefixed and bare PW-).
 
         // Parse bankAccounts JSON array if provided
         type BankAccountEntry = { bankName?: string; accountNumber?: string; accountType?: string; iban?: string; branchCode?: string; walletType?: string; isActive?: boolean }
@@ -239,8 +225,6 @@ export async function POST(request: NextRequest) {
                 // ignore parse errors — fall back to flat fields
             }
         }
-        const activeAccount = parsedBankAccounts.find((a) => a.isActive) ?? parsedBankAccounts[0] ?? null
-
         // Build nearest relatives JSON from nearest_X_* fields
         const nearestRelatives: Record<string, string>[] = []
         const nearestIndexes = new Set<string>()
@@ -273,11 +257,6 @@ export async function POST(request: NextRequest) {
             if (Object.keys(member).length > 0) familyMembers.push(member)
         }
 
-        const str = (v: unknown) => (v ? String(v).trim() || null : null)
-        const num = (v: unknown) => { const n = parseInt(String(v || "")); return Number.isFinite(n) ? n : null }
-        const flt = (v: unknown) => { const n = parseFloat(String(v || "")); return Number.isFinite(n) ? n : null }
-        const dt  = (v: unknown) => { if (!v || !String(v).trim()) return null; const d = new Date(String(v)); return Number.isNaN(d.getTime()) ? null : d }
-
         // Parse previousEmploymentsJson if provided (new multi-entry format)
         type PrevEmpEntry = { type?: string; isExService?: boolean; rank?: string; registrationNo?: string; unit?: string; years?: string; months?: string; dateOfEnrollment?: string; dateOfDischarge?: string; remarks?: string }
         let parsedPrevEmployments: PrevEmpEntry[] = []
@@ -287,7 +266,7 @@ export async function POST(request: NextRequest) {
 
         // Guard Employment Type — explicit body value is authoritative; row-derivation
         // is a fallback for legacy clients that don't send the new field.
-        const explicitExServiceType = str(body.exServiceType)
+        const explicitExServiceType = body.exServiceType ? String(body.exServiceType).trim() || null : null
         let exServiceType: string
         let isExService: boolean
         if (explicitExServiceType) {
@@ -303,93 +282,26 @@ export async function POST(request: NextRequest) {
                 : ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].includes(exServiceType)
         }
 
-        // For the flat legacy fields, fall back to first multi-entry's values when body fields are absent
-        const fe = parsedPrevEmployments.find((e) => e.type === exServiceType) ?? parsedPrevEmployments[0] ?? null
-
-        const createGuardPayload = (parwestId: string) => ({
-            parwestId,
-            name: body.name,
-            cnic,
-            phone: str(body.phone),
-            email: str(body.email),
-            dateOfBirth: dt(body.dateOfBirth),
-            age: num(body.age),
-            fatherName: str(body.fatherName),
-            motherName: str(body.motherName),
-            nationality: str(body.nationality),
-            nextOfKin: str(body.nextOfKin),
-            religion: str(body.religion),
-            maritalStatus: str(body.maritalStatus),
-            education: str(body.education),
-            addressPermanent: str(body.addressPermanent),
-            addressCurrent: str(body.addressCurrent),
-            emergencyContact: str(body.emergencyContact),
-            additionalContactNumbers: str(body.additionalContactNumbers),
-            profileIntroducer: str(body.profileIntroducer),
-            nearestRelativesJson: nearestRelatives.length > 0 ? JSON.stringify(nearestRelatives) : null,
-            status: str(body.status) || "PENDING",
-            lifecycleStatus: "PENDING",
-            // General extras
-            sect: str(body.sect),
-            cast: str(body.cast),
-            bloodGroup: str(body.bloodGroup),
-            policeStation: str(body.policeStation),
-            cnicIssueDate: dt(body.cnicIssueDate),
-            cnicExpiryDate: dt(body.cnicExpiryDate),
-            salary: flt(body.salary),
-            designation: str(body.designation),
-            joiningDate: dt(body.joiningDate),
-            joiningAge: num(body.joiningAge),
-            enrolledBy: str(body.enrolledBy),
-            // Previous employment — flat fields fall back to first multi-entry record
-            isExService,
-            exServiceType,
-            exServiceRank: str(body.exServiceRank) ?? str(fe?.rank),
-            exServiceRegiment: str(body.exServiceRegiment) ?? str(fe?.unit),
-            exServiceRegistrationNo: str(body.exServiceRegistrationNo) ?? str(fe?.registrationNo),
-            exServiceUnit: str(body.exServiceUnit) ?? str(fe?.unit),
-            exServicePeriod: str(body.exServicePeriod),
-            exServiceYears: num(body.exServiceYears) ?? num(fe?.years),
-            exServiceMonths: num(body.exServiceMonths) ?? num(fe?.months),
-            exServiceOtherLabel: str(body.exServiceOtherLabel),
-            dateOfEnrollment: dt(body.dateOfEnrollment) ?? dt(fe?.dateOfEnrollment),
-            dateOfDischarge: dt(body.dateOfDischarge) ?? dt(fe?.dateOfDischarge),
-            exServiceRemarks: str(body.exServiceRemarks) ?? str(fe?.remarks),
-            // Address contacts
-            currentAddressContact: str(body.currentAddressContact),
-            permanentAddressContact: str(body.permanentAddressContact),
-            // Education extras
-            passingYear: str(body.passingYear),
-            educationInstitute: str(body.educationInstitute),
-            // Introducer
-            introducerName: str(body.introducerName),
-            introducerCnic: str(body.introducerCnic),
-            introducerAddress: str(body.introducerAddress),
-            introducerContact: str(body.introducerContact),
-            // Physical
-            height: str(body.height),
-            weight: str(body.weight),
-            eyeColor: str(body.eyeColor),
-            hairColor: str(body.hairColor),
-            disability: str(body.disability),
-            identificationMark: str(body.identificationMark),
-            // Family
-            familyMembersJson: familyMembers.length > 0 ? JSON.stringify(familyMembers) : null,
-            // Previous employments (multi-entry)
-            previousEmploymentsJson: parsedPrevEmployments.length > 0 ? JSON.stringify(parsedPrevEmployments) : null,
-            // Bank
-            bankName: activeAccount?.bankName || str(body.bankName),
-            bankAccountNumber: activeAccount?.accountNumber || str(body.bankAccountNumber),
-            bankAccountType: activeAccount?.accountType || str(body.bankAccountType),
-            bankIban: activeAccount?.iban || str(body.bankIban),
-            bankBranchCode: activeAccount?.branchCode || str(body.bankBranchCode),
-            bankAccountsJson: parsedBankAccounts.length > 0 ? JSON.stringify(parsedBankAccounts) : null,
-            regionId: bodyRegionId,
-            regionalOfficeId: bodyRegionalOfficeId,
-        })
+        const createGuardPayload = (parwestId: string) =>
+            buildGuardCreatePayload({
+                parwestId,
+                name: String(body.name ?? ""),
+                cnic,
+                bodyRegionId,
+                bodyRegionalOfficeId,
+                flat: body as Record<string, unknown>,
+                nearestRelatives,
+                familyMembers,
+                previousEmployments: parsedPrevEmployments,
+                bankAccounts: parsedBankAccounts,
+                exServiceType,
+                isExService,
+            })
 
         // Check age against configured limits
-        const guardAge = num(body.age)
+        const ageParsed = parseInt(String(body.age || ""), 10)
+        const guardAge = Number.isFinite(ageParsed) ? ageParsed : null
+        const str = (v: unknown) => (v ? String(v).trim() || null : null)
         let ageApprovalRequired = false
         let ageApprovalReason: "OVERAGE" | "UNDERAGE" | null = null
 
@@ -412,7 +324,7 @@ export async function POST(request: NextRequest) {
 
         let lastCreateError: unknown = null
         for (let attempt = 0; attempt < 3; attempt++) {
-            const parwestId = await generateNextParwestId()
+            const parwestId = await generateNextParwestId(prisma, officeSeriesCode)
             try {
                 const payload = {
                     ...createGuardPayload(parwestId),

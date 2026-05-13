@@ -7,6 +7,14 @@ import { Card, CardContent } from "@/components/shadcn/card"
 import { Button } from "@/components/shadcn/button"
 import DataTable from "@/components/shared/DataTable"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog"
 import { AlertCircle, CheckCircle2, Pencil, Check, X, MapPin, Map } from "lucide-react"
 
 // Dynamic import — Leaflet requires window
@@ -60,12 +68,29 @@ export default function RegionalOfficesManager() {
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
 
-  // Inline edit state
+  // Inline edit state (coordinates only — fast-path for pin updates)
   const [editId, setEditId] = useState<string | null>(null)
   const [editLat, setEditLat] = useState("")
   const [editLng, setEditLng] = useState("")
   const [editSaving, setEditSaving] = useState(false)
   const [showEditMap, setShowEditMap] = useState(false)
+
+  // Modal edit state — full record edit (name, seriesCode, region, contacts, reservePct).
+  // Coordinates are intentionally not in this form because the inline editor
+  // already handles them with a map picker and we don't want two paths writing
+  // the same field set at once.
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalRowId, setModalRowId] = useState<string | null>(null)
+  const [modalName, setModalName] = useState("")
+  const [modalSeriesCode, setModalSeriesCode] = useState("")
+  const [modalRegionId, setModalRegionId] = useState("")
+  const [modalOfficeHead, setModalOfficeHead] = useState("")
+  const [modalPhone, setModalPhone] = useState("")
+  const [modalMobile, setModalMobile] = useState("")
+  const [modalFax, setModalFax] = useState("")
+  const [modalReservePctInput, setModalReservePctInput] = useState("")
+  const [modalSaving, setModalSaving] = useState(false)
+  const [modalError, setModalError] = useState("")
 
   const load = async () => {
     setLoading(true)
@@ -210,6 +235,75 @@ export default function RegionalOfficesManager() {
       setError(saveError instanceof Error ? saveError.message : "Failed to update coordinates.")
     } finally {
       setEditSaving(false)
+    }
+  }
+
+  const openEditModal = (row: OfficeRow) => {
+    setModalRowId(row.id)
+    setModalName(row.name ?? "")
+    setModalSeriesCode(row.seriesCode ?? "")
+    setModalRegionId(row.regionId ?? "")
+    setModalOfficeHead(row.officeHead ?? "")
+    setModalPhone(row.phone ?? "")
+    setModalMobile(row.mobile ?? "")
+    setModalFax(row.fax ?? "")
+    setModalReservePctInput(
+      row.reservePct != null ? String(Math.round(row.reservePct * 10000) / 100) : "",
+    )
+    setModalError("")
+    setModalOpen(true)
+  }
+
+  const closeEditModal = () => {
+    setModalOpen(false)
+    setModalRowId(null)
+    setModalError("")
+  }
+
+  const saveEditModal = async () => {
+    if (!modalRowId) return
+    setModalError("")
+    if (!modalName.trim() || !modalSeriesCode.trim() || !modalRegionId) {
+      setModalError("Name, series code, and region are required.")
+      return
+    }
+    let reservePctDecimal: number | null = null
+    const rp = modalReservePctInput.trim()
+    if (rp !== "") {
+      const pct = parseFloat(rp)
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        setModalError("Reserve Salary % must be between 0 and 100.")
+        return
+      }
+      reservePctDecimal = Math.round((pct / 100) * 10000) / 10000
+    }
+    setModalSaving(true)
+    try {
+      const response = await fetch(`/api/regional-offices/${modalRowId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: modalName.trim(),
+          seriesCode: modalSeriesCode.trim().toUpperCase(),
+          regionId: modalRegionId,
+          officeHead: modalOfficeHead.trim() || null,
+          phone: modalPhone.trim() || null,
+          mobile: modalMobile.trim() || null,
+          fax: modalFax.trim() || null,
+          reservePct: reservePctDecimal,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.message || "Failed to update office.")
+      }
+      setNotice("Regional office updated.")
+      closeEditModal()
+      await load()
+    } catch (saveError) {
+      setModalError(saveError instanceof Error ? saveError.message : "Failed to update office.")
+    } finally {
+      setModalSaving(false)
     }
   }
 
@@ -447,9 +541,17 @@ export default function RegionalOfficesManager() {
             key: "action",
             header: "Action",
             render: (row) => (
-              <button className="text-red-600 hover:underline" onClick={() => void onDelete(row.id)}>
-                Delete
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-[var(--brand)] hover:underline"
+                  onClick={() => openEditModal(row)}
+                >
+                  Edit
+                </button>
+                <button className="text-red-600 hover:underline" onClick={() => void onDelete(row.id)}>
+                  Delete
+                </button>
+              </div>
             ),
           },
         ]}
@@ -458,6 +560,73 @@ export default function RegionalOfficesManager() {
         stickyHeader
         emptyText={loading ? "Loading offices..." : "No offices found."}
       />
+
+      <Dialog open={modalOpen} onOpenChange={(open) => (open ? null : closeEditModal())}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Regional Office</DialogTitle>
+            <DialogDescription>
+              Updates the office record. Coordinates are edited inline in the table.
+            </DialogDescription>
+          </DialogHeader>
+
+          {modalError ? (
+            <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{modalError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm text-[var(--text-muted)] mb-1">Region *</label>
+              <select
+                className="ui-select"
+                value={modalRegionId}
+                onChange={(e) => setModalRegionId(e.target.value)}
+              >
+                <option value="">Select Region</option>
+                {regions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input label="Office Name *" value={modalName} onChange={setModalName} placeholder="Office name" />
+            <Input label="Series Code *" value={modalSeriesCode} onChange={setModalSeriesCode} placeholder="K" />
+            <Input label="Office Head" value={modalOfficeHead} onChange={setModalOfficeHead} placeholder="Office head" />
+            <Input label="Phone" value={modalPhone} onChange={setModalPhone} placeholder="Phone" />
+            <Input label="Mobile" value={modalMobile} onChange={setModalMobile} placeholder="Mobile" />
+            <Input label="Fax" value={modalFax} onChange={setModalFax} placeholder="Fax" />
+            <div className="md:col-span-2">
+              <label className="block text-sm text-[var(--text-muted)] mb-1">Reserve Salary %</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={modalReservePctInput}
+                onChange={(e) => setModalReservePctInput(e.target.value)}
+                className="ui-input md:max-w-xs"
+                placeholder="e.g. 30"
+              />
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Blank uses the global default (30%). Client-level override still takes precedence.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeEditModal} disabled={modalSaving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveEditModal()} disabled={modalSaving}>
+              {modalSaving ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

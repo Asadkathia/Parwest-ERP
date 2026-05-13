@@ -1,74 +1,311 @@
+/**
+ * Guards bulk import — aligned with the ERP team's 114-column template.
+ *
+ * The template uses lowercase / space-separated headers ("father name",
+ * "first nearest relative cnic number", "marital_status"). We declare
+ * those headers verbatim, then remap each row to canonical camelCase
+ * keys via `headerAliases` before validation runs. The persist function
+ * uses the shared `buildGuardCreatePayload` builder so single-create
+ * (`POST /api/guards`) and bulk write the same column set — drift between
+ * the two paths is structurally impossible.
+ *
+ * Storage map at a glance:
+ *   - 60+ flat columns        → Guard scalar fields (via build-payload).
+ *   - 3 nearest-relative cols → Guard.nearestRelativesJson.
+ *   - 3 family-member cols    → Guard.familyMembersJson.
+ *   - 3 prev-employment cols  → Guard.previousEmploymentsJson.
+ *   - 3 judicial-case cols    → GuardJudicialCase rows (relation).
+ *   - `parwest id`           → honoured when present; else generated.
+ *   - `regional office`      → series-code letter resolved to RO.id.
+ */
+
 import { z } from "zod"
 
 import { prisma } from "@/lib/db"
 import { registerImport } from "@/lib/imports/registry"
-import { cnicField, memoizedResolver, optionalString, requiredString } from "@/lib/imports/rules"
-import type { Prisma, PrismaClient } from "@prisma/client"
+import { cnicField, memoizedResolver, requiredString } from "@/lib/imports/rules"
+import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
+import { coerceCnic, coerceDate, coerceString } from "@/lib/imports/coerce"
+import { recordGuardServiceEvent } from "@/lib/guards/service-history"
+import { recordGuardStatusChange } from "@/lib/guards/status-history"
+import { generateNextParwestId } from "@/lib/guards/parwest-id"
+import type { Prisma } from "@prisma/client"
+
+/* ────────────────────────────────────────────────────────────────────── */
+/* Header strings — exact match to the ERP team's Guard_Basic_Details.xlsx */
+/* ────────────────────────────────────────────────────────────────────── */
+
+/** Required: name + cnic. Every other column is optional. */
+const REQUIRED_HEADERS = ["name", "cnic"] as const
+
+const OPTIONAL_HEADERS = [
+  "parwest id", "regional office", "father name", "mother name", "date of birth",
+  "cnic issue date", "cnic expiry date", "next of kin", "contact no",
+  "passport no", "passport expiry date", "religion", "sect", "cast",
+  "designation", "salary", "police station", "blood group", "ex service",
+  "other", "registration no", "rank", "group", "service period",
+  "service years", "service months", "date of enrolment", "date of discharge",
+  "remarks", "current address", "current address number", "permanent address",
+  "permanent address number", "education level", "education passing year",
+  "education name of institution", "introducer name", "introducer cnic",
+  "introducer number", "introducer address", "height", "weight", "eye color",
+  "hair color", "disability", "mark of identification", "current status",
+  "termination date",
+  // First / second / third previous employment
+  "first employment company", "first employment start date", "first employment end date",
+  "second employment company", "second employment start date", "second employment end date",
+  "third employment company", "third employment start date", "third employment end date",
+  // First / second / third nearest relative (8 cols each)
+  "first nearest relative", "first nearest relative father name", "first nearest relative relation",
+  "first nearest relative cnic number", "first nearest relative cnic issue date",
+  "first nearest relative profession", "first nearest relative contact number",
+  "first nearest relative address",
+  "second nearest relative", "second nearest relative father name", "second nearest relative relation",
+  "second nearest relative cnic number", "second nearest relative cnic issue date",
+  "second nearest relative profession", "second nearest relative contact number",
+  "second nearest relative address",
+  "third nearest relative", "third nearest relative father name", "third nearest relative relation",
+  "third nearest relative cnic number", "third nearest relative cnic issue date",
+  "third nearest relative profession", "third nearest relative contact number",
+  "third nearest relative address",
+  // First / second / third family member (5 cols each)
+  "first family name", "first family relation", "first family age",
+  "first family profession", "first family address",
+  "second family name", "second family relation", "second family age",
+  "second family profession", "second family address",
+  "third family name", "third family relation", "third family age",
+  "third family profession", "third family address",
+  // First / second / third judicial case (5 cols each)
+  "first judicial case no", "first judicial case date", "first judicial case police station",
+  "first judicial case investigation result", "first judicial case court result",
+  "second judicial case no", "second judicial case date", "second judicial case police station",
+  "second judicial case investigation result", "second judicial case court result",
+  "third judicial case no", "third judicial case date", "third judicial case police station",
+  "third judicial case investigation result", "third judicial case court result",
+  // Misc
+  "marital_status",
+] as const
+
+/* ────────────────────────────────────────────────────────────────────── */
+/* Header alias map — sheet header → canonical camelCase key              */
+/* ────────────────────────────────────────────────────────────────────── */
+
+const HEADER_ALIASES: Record<string, string> = {
+  "parwest id": "parwestIdInput",
+  "regional office": "regionalOfficeSeries",
+  "father name": "fatherName",
+  "mother name": "motherName",
+  "date of birth": "dateOfBirth",
+  "cnic issue date": "cnicIssueDate",
+  "cnic expiry date": "cnicExpiryDate",
+  "next of kin": "nextOfKin",
+  "contact no": "phone",
+  "passport no": "passportNo",
+  "passport expiry date": "passportExpiryDate",
+  religion: "religion",
+  sect: "sect",
+  cast: "cast",
+  designation: "designation",
+  salary: "salary",
+  "police station": "policeStation",
+  "blood group": "bloodGroup",
+  "ex service": "exServiceTypeRaw",
+  other: "exServiceOtherLabel",
+  "registration no": "exServiceRegistrationNo",
+  rank: "exServiceRank",
+  group: "exServiceUnit",
+  "service period": "exServicePeriod",
+  "service years": "exServiceYears",
+  "service months": "exServiceMonths",
+  "date of enrolment": "dateOfEnrollment",
+  "date of discharge": "dateOfDischarge",
+  remarks: "exServiceRemarks",
+  "current address": "addressCurrent",
+  "current address number": "currentAddressContact",
+  "permanent address": "addressPermanent",
+  "permanent address number": "permanentAddressContact",
+  "education level": "education",
+  "education passing year": "passingYear",
+  "education name of institution": "educationInstitute",
+  "introducer name": "introducerName",
+  "introducer cnic": "introducerCnic",
+  "introducer number": "introducerContact",
+  "introducer address": "introducerAddress",
+  height: "height",
+  weight: "weight",
+  "eye color": "eyeColor",
+  "hair color": "hairColor",
+  disability: "disability",
+  "mark of identification": "identificationMark",
+  "current status": "currentStatusRaw",
+  "termination date": "terminationDate",
+  marital_status: "maritalStatus",
+}
+// Indexed groups (nearest / family / employment / judicial). The persist
+// function reads them by canonical name so the alias map collapses each
+// group's columns to predictable keys.
+for (const ord of ["first", "second", "third"] as const) {
+  const idx = ord === "first" ? 1 : ord === "second" ? 2 : 3
+  HEADER_ALIASES[`${ord} nearest relative`] = `nearest_${idx}_name`
+  HEADER_ALIASES[`${ord} nearest relative father name`] = `nearest_${idx}_fatherName`
+  HEADER_ALIASES[`${ord} nearest relative relation`] = `nearest_${idx}_relation`
+  HEADER_ALIASES[`${ord} nearest relative cnic number`] = `nearest_${idx}_cnic`
+  HEADER_ALIASES[`${ord} nearest relative cnic issue date`] = `nearest_${idx}_cnicIssueDate`
+  HEADER_ALIASES[`${ord} nearest relative profession`] = `nearest_${idx}_profession`
+  HEADER_ALIASES[`${ord} nearest relative contact number`] = `nearest_${idx}_contact`
+  HEADER_ALIASES[`${ord} nearest relative address`] = `nearest_${idx}_address`
+
+  HEADER_ALIASES[`${ord} family name`] = `family_${idx}_name`
+  HEADER_ALIASES[`${ord} family relation`] = `family_${idx}_relation`
+  HEADER_ALIASES[`${ord} family age`] = `family_${idx}_age`
+  HEADER_ALIASES[`${ord} family profession`] = `family_${idx}_profession`
+  HEADER_ALIASES[`${ord} family address`] = `family_${idx}_address`
+
+  HEADER_ALIASES[`${ord} employment company`] = `employment_${idx}_unit`
+  HEADER_ALIASES[`${ord} employment start date`] = `employment_${idx}_dateOfEnrollment`
+  HEADER_ALIASES[`${ord} employment end date`] = `employment_${idx}_dateOfDischarge`
+
+  HEADER_ALIASES[`${ord} judicial case no`] = `judicial_${idx}_caseNo`
+  HEADER_ALIASES[`${ord} judicial case date`] = `judicial_${idx}_caseDate`
+  HEADER_ALIASES[`${ord} judicial case police station`] = `judicial_${idx}_policeStation`
+  HEADER_ALIASES[`${ord} judicial case investigation result`] = `judicial_${idx}_investigationResult`
+  HEADER_ALIASES[`${ord} judicial case court result`] = `judicial_${idx}_courtResult`
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/* Row schema — required: name + cnic. Everything else is opaque pass-     */
+/* through. Validation of the regional-office code is owned by its         */
+/* resolver (see below); the schema runs AFTER resolution, so any length   */
+/* / format check declared here would see the resolved RegionalOffice.id   */
+/* (a 25-char cuid), not the original cell value. Coercion of optional     */
+/* fields happens inside `buildGuardCreatePayload` via the coerce helpers. */
+/* ────────────────────────────────────────────────────────────────────── */
+
+const rowSchema = z
+  .object({
+    name: requiredString("name", 200),
+    cnic: cnicField(),
+  })
+  .passthrough()
+
+/* ────────────────────────────────────────────────────────────────────── */
+/* RegionalOffice resolver — input is the series-code letter (e.g. "K")   */
+/* ────────────────────────────────────────────────────────────────────── */
 
 /**
- * Guards bulk import (top-level).
+ * Resolves a regional-office series-code letter (e.g. "K") to the
+ * RegionalOffice.id. On miss, throws an enriched error listing every
+ * seriesCode currently registered in the system — saves the user a trip
+ * to /settings/regions just to discover which codes are available.
  *
- * Minimal create — name + CNIC required, parwestId is auto-generated
- * using the supplied regional-office series code (matches the
- * single-guard create flow at `POST /api/guards`). Richer per-guard
- * data should go through the dedicated enrolment form, not bulk.
+ * The list is cached in the run-scoped cache so we don't query the table
+ * once per missing row.
  */
-const rowSchema = z.object({
-  name: requiredString("name", 200),
-  cnic: cnicField(),
-  phone: optionalString(32),
-  regionalOfficeSeries: optionalString(8),
-})
-
-/** Resolves a RegionalOffice by `seriesCode`. Returns the RO id (string). */
 const regionalOfficeResolver = memoizedResolver<string>(
   "guard.regionalOffice",
-  async (raw) => {
+  async (raw, ctx) => {
     const code = raw.trim().toUpperCase()
     if (!code) return null
     const ro = await prisma.regionalOffice.findUnique({
       where: { seriesCode: code },
       select: { id: true },
     })
-    return ro?.id ?? null
+    if (ro) return ro.id
+
+    // Miss — enrich the failure with the set of valid codes.
+    const AVAILABLE_KEY = "guard.regionalOffice.availableCodes"
+    let available = ctx.cache.get(AVAILABLE_KEY) as string[] | undefined
+    if (!available) {
+      const rows = await prisma.regionalOffice.findMany({
+        select: { seriesCode: true },
+        orderBy: { seriesCode: "asc" },
+      })
+      available = rows.map((r) => r.seriesCode).filter(Boolean)
+      ctx.cache.set(AVAILABLE_KEY, available)
+    }
+    const hint = available.length
+      ? `Available codes: ${available.join(", ")}.`
+      : "No regional offices exist yet — create one in /settings/regions first."
+    throw new Error(`Regional office "${code}" not found. ${hint}`)
   },
 )
 
-/**
- * Generates the next available `parwestId` for the supplied office prefix.
- * Mirrors the logic in `POST /api/guards` so single + bulk converge on the
- * same numbering. Uses `findFirst({ orderBy: { parwestId: "desc" } })`
- * per the CLAUDE.md gotcha — do not revert to a `findMany` scan.
- */
-async function generateNextParwestId(
-  tx: PrismaClient | Prisma.TransactionClient,
-  officeSeriesCode: string | null,
-): Promise<string> {
-  const prefix = officeSeriesCode ? `PW-${officeSeriesCode}` : "PW"
-  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const pattern = new RegExp(`^${escapedPrefix}-(\\d+)$`)
-  const latest = await tx.guard.findFirst({
-    where: { parwestId: { startsWith: `${prefix}-` } },
-    select: { parwestId: true },
-    orderBy: { parwestId: "desc" },
-  })
-  let maxNumber = 0
-  if (latest) {
-    const match = latest.parwestId.match(pattern)
-    if (match) {
-      const numeric = Number(match[1])
-      if (Number.isFinite(numeric)) maxNumber = numeric
+/* ────────────────────────────────────────────────────────────────────── */
+/* Group-assembly helpers — fold the indexed columns into JSON arrays /   */
+/* judicial-case rows                                                     */
+/* ────────────────────────────────────────────────────────────────────── */
+
+type Indexed<T extends string> = `${T}_${1 | 2 | 3}_${string}`
+function pickGroup<T extends string>(
+  row: Record<string, unknown>,
+  prefix: T,
+  fields: string[],
+): Array<Record<string, string>> {
+  const out: Array<Record<string, string>> = []
+  for (const idx of [1, 2, 3] as const) {
+    const entry: Record<string, string> = {}
+    for (const f of fields) {
+      const key = `${prefix}_${idx}_${f}` as Indexed<T>
+      const v = coerceString(row[key])
+      if (v) entry[f] = v
+    }
+    if (Object.keys(entry).length > 0) out.push(entry)
+  }
+  return out
+}
+
+type JudicialCase = {
+  caseNo: string | null
+  caseDate: Date | null
+  policeStation: string | null
+  investigationResult: string | null
+  courtResult: string | null
+}
+function pickJudicialCases(row: Record<string, unknown>): JudicialCase[] {
+  const out: JudicialCase[] = []
+  for (const idx of [1, 2, 3] as const) {
+    const c: JudicialCase = {
+      caseNo: coerceString(row[`judicial_${idx}_caseNo`]),
+      caseDate: coerceDate(row[`judicial_${idx}_caseDate`]),
+      policeStation: coerceString(row[`judicial_${idx}_policeStation`]),
+      investigationResult: coerceString(row[`judicial_${idx}_investigationResult`]),
+      courtResult: coerceString(row[`judicial_${idx}_courtResult`]),
+    }
+    if (
+      c.caseNo ||
+      c.caseDate ||
+      c.policeStation ||
+      c.investigationResult ||
+      c.courtResult
+    ) {
+      out.push(c)
     }
   }
-  return `${prefix}-${String(maxNumber + 1).padStart(5, "0")}`
+  return out
 }
+
+/** Maps the team's `current status` strings to a lifecycle value. */
+function mapCurrentStatus(raw: string | null): { status: string; lifecycleStatus: string } {
+  if (!raw) return { status: "PENDING", lifecycleStatus: "PENDING" }
+  const v = raw.trim().toLowerCase()
+  if (["active", "present", "default"].includes(v)) return { status: "ACTIVE", lifecycleStatus: "ACTIVE" }
+  if (v === "inactive") return { status: "INACTIVE", lifecycleStatus: "INACTIVE" }
+  if (["terminated", "fired", "resigned", "absconded"].includes(v)) return { status: "TERMINATED", lifecycleStatus: "TERMINATED" }
+  return { status: "PENDING", lifecycleStatus: "PENDING" }
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/* Definition registration                                                */
+/* ────────────────────────────────────────────────────────────────────── */
 
 registerImport({
   module: "guards",
   label: "Guards",
-  description: "Bulk-enrol guards (name + CNIC). Use sub-imports for richer data sets.",
-  requiredHeaders: ["name", "cnic"],
-  optionalHeaders: ["phone", "regionalOfficeSeries"],
+  description:
+    "Bulk-enrol guards. Accepts the ERP team's 114-column Guard_Basic_Details template.",
+  requiredHeaders: [...REQUIRED_HEADERS],
+  optionalHeaders: [...OPTIONAL_HEADERS],
+  headerAliases: HEADER_ALIASES,
   rowSchema,
   referenceResolvers: { regionalOfficeSeries: regionalOfficeResolver },
   duplicates: [
@@ -77,8 +314,9 @@ registerImport({
       scope: "both",
       message: "CNIC already exists",
       existsInDb: async (values) => {
+        const cnic = coerceCnic(values.cnic) ?? values.cnic
         const found = await prisma.guard.findUnique({
-          where: { cnic: values.cnic },
+          where: { cnic },
           select: { id: true },
         })
         return Boolean(found)
@@ -86,41 +324,138 @@ registerImport({
     },
   ],
   sampleRows: [
-    { name: "Guard One", cnic: "35202-1234567-1", regionalOfficeSeries: "L" },
-    { name: "Guard Two", cnic: "35202-7654321-1", regionalOfficeSeries: "K" },
+    { name: "Sample One", cnic: "35202-1234567-1", "regional office": "K" },
+    { name: "Sample Two", cnic: "35202-7654321-1", "regional office": "L" },
   ],
   persist: async (row, ctx) => {
-    const r = row as {
-      name: string
-      cnic: string
-      phone?: string
-      regionalOfficeSeries?: string // resolved → regionalOfficeId or empty
-    }
+    const r = row as Record<string, unknown>
+
+    // ── Regional office (already resolved to RO.id by the engine) ──
     let regionalOfficeId: string | null = null
     let regionId: string | null = null
     let officeSeriesCode: string | null = null
-    if (r.regionalOfficeSeries) {
+    let regionName: string | null = null
+    let officeName: string | null = null
+    const roIdInput = coerceString(r.regionalOfficeSeries)
+    if (roIdInput) {
       const ro = await ctx.tx.regionalOffice.findUnique({
-        where: { id: r.regionalOfficeSeries },
-        select: { id: true, regionId: true, seriesCode: true },
+        where: { id: roIdInput },
+        select: { id: true, regionId: true, seriesCode: true, name: true, region: { select: { name: true } } },
       })
       if (!ro) throw new Error("Regional office no longer exists")
       regionalOfficeId = ro.id
       regionId = ro.regionId
       officeSeriesCode = ro.seriesCode
+      regionName = ro.region?.name ?? null
+      officeName = ro.name
     }
-    const parwestId = await generateNextParwestId(ctx.tx, officeSeriesCode)
-    await ctx.tx.guard.create({
+
+    // ── parwestId: honour template value when valid, else generate ──
+    const parwestIdInput = coerceString(r.parwestIdInput)
+    let parwestId: string
+    if (parwestIdInput && /^PW-[A-Z]+-\d+$/.test(parwestIdInput.toUpperCase())) {
+      const normalized = parwestIdInput.toUpperCase()
+      const existing = await ctx.tx.guard.findUnique({
+        where: { parwestId: normalized },
+        select: { id: true },
+      })
+      if (existing) {
+        throw new Error(`parwest id "${normalized}" already exists`)
+      }
+      parwestId = normalized
+    } else if (parwestIdInput) {
+      // Team's template often supplies short ids like "K-39995". Normalise.
+      const ksMatch = parwestIdInput.match(/^([A-Z]+)[-\s]?(\d+)$/i)
+      if (ksMatch) {
+        const candidate = `PW-${ksMatch[1].toUpperCase()}-${ksMatch[2].padStart(5, "0")}`
+        const existing = await ctx.tx.guard.findUnique({
+          where: { parwestId: candidate },
+          select: { id: true },
+        })
+        parwestId = existing ? await generateNextParwestId(ctx.tx, officeSeriesCode) : candidate
+      } else {
+        parwestId = await generateNextParwestId(ctx.tx, officeSeriesCode)
+      }
+    } else {
+      parwestId = await generateNextParwestId(ctx.tx, officeSeriesCode)
+    }
+
+    // ── Multi-entry groups ──
+    const nearestRelatives = pickGroup(r, "nearest", [
+      "name", "fatherName", "relation", "cnic", "cnicIssueDate", "profession", "contact", "address",
+    ])
+    const familyMembers = pickGroup(r, "family", [
+      "name", "relation", "age", "profession", "address",
+    ])
+    const previousEmployments = pickGroup(r, "employment", [
+      "unit", "dateOfEnrollment", "dateOfDischarge",
+    ])
+    const judicialCases = pickJudicialCases(r)
+
+    // ── Ex-service type derivation ──
+    const exServiceTypeRaw = (coerceString(r.exServiceTypeRaw) ?? "").toLowerCase()
+    const knownExService = ["army", "police", "rangers", "mujahid", "other"]
+    const exServiceType = knownExService.includes(exServiceTypeRaw)
+      ? exServiceTypeRaw.toUpperCase()
+      : "CIVILIAN"
+    const isExService = exServiceType !== "CIVILIAN"
+
+    // ── Current status mapping ──
+    const lifecycle = mapCurrentStatus(coerceString(r.currentStatusRaw))
+
+    // ── Compose the create payload via the shared builder ──
+    const flat: Record<string, unknown> = { ...r, status: lifecycle.status }
+    const payload = buildGuardCreatePayload({
+      parwestId,
+      name: coerceString(r.name) ?? "",
+      cnic: coerceCnic(r.cnic) ?? String(r.cnic ?? "").trim(),
+      bodyRegionId: regionId,
+      bodyRegionalOfficeId: regionalOfficeId,
+      flat,
+      nearestRelatives,
+      familyMembers,
+      previousEmployments,
+      exServiceType,
+      isExService,
+    })
+    // Lifecycle override (builder defaults to PENDING).
+    payload.lifecycleStatus = lifecycle.lifecycleStatus
+
+    // ── Write Guard + judicial cases atomically per row ──
+    const created = await ctx.tx.guard.create({
       data: {
-        parwestId,
-        name: r.name,
-        cnic: r.cnic,
-        phone: r.phone ?? null,
-        status: "PENDING",
-        lifecycleStatus: "PENDING",
-        regionId,
-        regionalOfficeId,
+        ...(payload as Prisma.GuardCreateInput),
+        ...(judicialCases.length > 0
+          ? { judicialCases: { create: judicialCases } }
+          : {}),
       },
+    })
+
+    // ── Side effects: service-history + status-history (fire-and-forget) ──
+    void recordGuardServiceEvent({
+      cnic: created.cnic,
+      guardId: created.id,
+      parwestId: created.parwestId,
+      guardName: created.name,
+      event: "ENROLLED",
+      toStatus: created.status,
+      description: `Guard enrolled via bulk import (job ${ctx.jobId})`,
+      changedByName: null,
+      regionName,
+      officeName,
+    })
+    void recordGuardStatusChange({
+      guardId: created.id,
+      cnic: created.cnic,
+      parwestId: created.parwestId,
+      guardName: created.name,
+      fromStatus: null,
+      toStatus: created.status,
+      reason: `Guard enrolled via bulk import (job ${ctx.jobId})`,
+      changedByName: null,
+      changedByType: "ENROLLMENT",
+      regionName,
+      officeName,
     })
   },
 })

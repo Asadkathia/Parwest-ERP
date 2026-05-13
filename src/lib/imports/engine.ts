@@ -64,6 +64,26 @@ function cellToString(v: unknown): string {
   return String(v)
 }
 
+/**
+ * Internal — remaps a parsed row's keys through the definition's
+ * `headerAliases` (sheet-side header → canonical key). Unmapped keys pass
+ * through unchanged so non-aliased optional headers still reach the schema.
+ */
+function applyHeaderAliases(
+  definition: BulkImportDefinition,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const aliases = definition.headerAliases
+  if (!aliases) return row
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(row)) {
+    const canonical = aliases[k] ?? k
+    if (canonical in out && (v === undefined || v === null || v === "")) continue
+    out[canonical] = v
+  }
+  return out
+}
+
 async function resolveReferences(
   definition: BulkImportDefinition,
   row: Record<string, unknown>,
@@ -263,7 +283,8 @@ export async function runImport(
   for (let i = 0; i < parsed.rows.length; i += 1) {
     const rowNumber = i + 2
     const original = parsed.rows[i]
-    const refResult = await resolveReferences(definition, original, ctx, rowNumber)
+    const aliased = applyHeaderAliases(definition, original)
+    const refResult = await resolveReferences(definition, aliased, ctx, rowNumber)
     const conditionalErrors = applyConditionals(definition, refResult.row, rowNumber)
     const earlyErrors = [...refResult.errors, ...conditionalErrors]
     if (earlyErrors.length > 0) {
@@ -285,9 +306,12 @@ export async function runImport(
     validRows.push({ rowNumber, data: parsedRow.data })
   }
 
-  // Cross-row duplicates (payload-scoped, then DB-scoped)
-  perRowErrors.push(...payloadDuplicates(definition, parsed.rows))
-  perRowErrors.push(...(await dbDuplicates(definition, parsed.rows, ctx)))
+  // Cross-row duplicates (payload-scoped, then DB-scoped). Rows are aliased
+  // here so duplicate rules reference canonical key names, not sheet-side
+  // header strings.
+  const aliasedRows = parsed.rows.map((r) => applyHeaderAliases(definition, r))
+  perRowErrors.push(...payloadDuplicates(definition, aliasedRows))
+  perRowErrors.push(...(await dbDuplicates(definition, aliasedRows, ctx)))
 
   // Drop rows whose validation failed for any reason from the persist set.
   const failedRowSet = new Set(perRowErrors.map((e) => e.row))

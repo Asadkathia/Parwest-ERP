@@ -78,9 +78,20 @@ export async function readImportPayload(request: Request): Promise<ImportPayload
   }
 
   const body = await request.json().catch(() => ({}))
-  const rows = Array.isArray(body?.rows) ? (body.rows as Array<Record<string, unknown>>) : []
+  const rawRows = Array.isArray(body?.rows) ? (body.rows as Array<Record<string, unknown>>) : []
+  // Strip client-side marker keys (anything beginning with "__") from both
+  // rows and the derived header set. The UI uses keys like `__rowId` for
+  // table row identity; they must never reach header validation.
+  const rows = rawRows.map((row) => {
+    const cleaned: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(row)) {
+      if (k.startsWith("__")) continue
+      cleaned[k] = v
+    }
+    return cleaned
+  })
   const headers: string[] = Array.isArray(body?.headers)
-    ? (body.headers as unknown[]).map((h) => String(h).trim()).filter(Boolean)
+    ? (body.headers as unknown[]).map((h) => String(h).trim()).filter((h) => h && !h.startsWith("__"))
     : rows.length
       ? Object.keys(rows[0])
       : []
@@ -184,10 +195,29 @@ export async function processImportRequest(opts: {
   return { ok: true, jobId: job.id, result: toResult(engineResult, opts) }
 }
 
+/**
+ * Shapes the engine result into the response body consumed by the UI.
+ *
+ * Two key sets are emitted side-by-side so a single response populates
+ * both UI cards (validation summary + import job summary) without
+ * needing a second fetch:
+ *   - `validRows` / `invalidRows`   → validation-summary card.
+ *   - `successRows` / `failedRows` / `processedRows`
+ *                                   → import-job card (matches
+ *                                     `getImportJob`'s shape so the
+ *                                     same UI state works for both
+ *                                     responses and Refresh Status).
+ */
 function toResult(
   engineResult: Awaited<ReturnType<typeof runImport>>,
   opts: { module: string; subModule?: string; payload: ImportPayload },
-): ImportValidationResult & { status: string; jobId?: string } {
+): ImportValidationResult & {
+  status: string
+  jobId?: string
+  successRows: number
+  failedRows: number
+  processedRows: number
+} {
   return {
     module: opts.module,
     subModule: opts.subModule,
@@ -198,6 +228,9 @@ function toResult(
     valid: engineResult.errors.length === 0,
     errors: engineResult.errors.map((e) => ({ row: e.row, field: e.field, message: e.message })),
     status: engineResult.status,
+    successRows: engineResult.successRows,
+    failedRows: engineResult.failedRows,
+    processedRows: engineResult.totalRows,
   }
 }
 

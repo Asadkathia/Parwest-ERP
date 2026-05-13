@@ -353,6 +353,7 @@ model Guard {
   regionId         String?
   region           Region?         @relation(fields: [regionId], references: [id])
 
+  judicialCases             GuardJudicialCase[]
   prerequisites             GuardPrerequisite[]
   pledgedDocumentRecords    GuardPledgedDocumentRecord[]
   deployments               Deployment[]
@@ -392,6 +393,24 @@ model Guard {
   @@index([cnic])
   @@index([status])
   @@index([lifecycleStatus])
+}
+
+// Judicial / criminal cases tied to a guard. Searchable, reportable, and
+// audit-friendly — replaces the JSON-blob approach used elsewhere.
+model GuardJudicialCase {
+  id                   String    @id @default(cuid())
+  guardId              String
+  guard                Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  caseNo               String?
+  caseDate             DateTime?
+  policeStation        String?
+  investigationResult  String?
+  courtResult          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([guardId])
+  @@index([caseDate])
 }
 
 // Singleton config for guard age limits
