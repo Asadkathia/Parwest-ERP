@@ -32,6 +32,11 @@ export type ImportValidationError = {
   row: number
   field: string
   message: string
+  /** Original row values captured by the engine so QA can see *which*
+   *  cell needs correcting, not just *what* was wrong. Best-effort —
+   *  may be absent for whole-job errors (e.g. header validation) where
+   *  no row data exists. */
+  values?: Record<string, unknown>
 }
 
 export type ImportValidationResult = {
@@ -226,7 +231,12 @@ function toResult(
     validRows: engineResult.successRows,
     invalidRows: engineResult.failedRows,
     valid: engineResult.errors.length === 0,
-    errors: engineResult.errors.map((e) => ({ row: e.row, field: e.field, message: e.message })),
+    errors: engineResult.errors.map((e) => ({
+      row: e.row,
+      field: e.field,
+      message: e.message,
+      values: e.values,
+    })),
     status: engineResult.status,
     successRows: engineResult.successRows,
     failedRows: engineResult.failedRows,
@@ -265,12 +275,18 @@ export async function getImportJob(jobId: string): Promise<ImportJobRecord | nul
   }
 }
 
-/** Renders an error list as CSV — kept for the legacy `format=csv` route. */
+/** Renders an error list as CSV — kept for the legacy `format=csv` route.
+ *
+ *  Columns: `row,field,message,values` where `values` is a JSON snapshot
+ *  of the offending row's cells. QA opens the CSV and sees both *what*
+ *  was wrong and *which* data to correct in the source sheet. */
 export function toErrorCsv(errors: ImportValidationError[]): string {
-  const header = "row,field,message"
-  const lines = errors.map(
-    (e) => `${e.row},${e.field},"${String(e.message).replaceAll('"', '""')}"`,
-  )
+  const header = "row,field,message,values"
+  const csvEscape = (s: string) => `"${s.replaceAll('"', '""')}"`
+  const lines = errors.map((e) => {
+    const valuesJson = e.values ? JSON.stringify(e.values) : ""
+    return `${e.row},${csvEscape(e.field)},${csvEscape(String(e.message))},${csvEscape(valuesJson)}`
+  })
   return [header, ...lines].join("\n")
 }
 

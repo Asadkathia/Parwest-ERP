@@ -31,6 +31,72 @@ function extractCalendarDate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+/**
+ * Normalises a single exceljs cell value into the narrow set our
+ * downstream pipeline understands: string / number / boolean / null.
+ *
+ * exceljs returns cell values in many shapes depending on the source
+ * XML — primitives for plain cells, `Date` for date cells, and a
+ * grab-bag of objects for formulas, rich text, hyperlinks, shared
+ * formulas and error cells. A previous version of this code used a
+ * `String(value)` catch-all for unrecognised objects, which silently
+ * produced the literal `"[object Object]"` and:
+ *
+ *   1. Tricked the empty-row guard into keeping otherwise-empty rows
+ *      (a deleted-but-formatted cell would make a phantom row pass
+ *      validation as far as "has data", then fail every required-field
+ *      check), and
+ *   2. Hid legitimate formula results from the schema (e.g. a city
+ *      name produced by a VLOOKUP would never reach `obj[header]`).
+ *
+ * The cases below cover every documented exceljs cell shape; anything
+ * we genuinely don't recognise becomes `null` rather than a synthetic
+ * string, so it can't pollute the empty-row check or downstream zod
+ * parsing.
+ */
+function normaliseCellValue(
+  value: unknown,
+): string | number | boolean | null {
+  if (value == null) return null
+  if (value instanceof Date) return extractCalendarDate(value)
+  if (typeof value === "number" || typeof value === "boolean") return value
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed === "" ? null : trimmed
+  }
+  if (typeof value === "object") {
+    const v = value as Record<string, unknown>
+    // Formula / shared formula cells: trust the evaluated result.
+    if ("result" in v) return normaliseCellValue(v.result)
+    // Error cells (e.g. #N/A, #REF!) — treat as no value rather than
+    // letting the error sigil leak into the dataset.
+    if ("error" in v) return null
+    // Rich-text array: join the segments' text.
+    if (Array.isArray(v.richText)) {
+      const text = (v.richText as Array<{ text?: unknown }>)
+        .map((seg) => (typeof seg?.text === "string" ? seg.text : ""))
+        .join("")
+        .trim()
+      return text === "" ? null : text
+    }
+    // Hyperlink / inline-text shapes: { text, hyperlink? } or { text: { richText: [...] } }
+    if ("text" in v) {
+      const t = v.text
+      if (typeof t === "string") {
+        const trimmed = t.trim()
+        return trimmed === "" ? null : trimmed
+      }
+      // Nested rich-text inside `text` (exceljs does this for some hyperlink cells).
+      if (t && typeof t === "object") return normaliseCellValue(t)
+    }
+    // Unknown object shape — drop rather than coerce to "[object Object]".
+    return null
+  }
+  // Any other primitive (bigint, symbol) — coerce safely.
+  const s = String(value).trim()
+  return s === "" ? null : s
+}
+
 export type ParsedSheet = {
   /** Header row, as captured from the file (post-trim). */
   headers: string[]
@@ -90,29 +156,7 @@ export async function parseImportFile(
     headers.forEach((header, idx) => {
       if (!header) return
       const cell = row.getCell(idx + 1)
-      const value = cell.value
-      let normalised: string | number | boolean | null
-      if (value == null) normalised = null
-      else if (typeof value === "object" && "text" in value && typeof (value as { text: unknown }).text === "string") {
-        // Rich text / hyperlink cells
-        normalised = (value as { text: string }).text.trim()
-      } else if (value instanceof Date) {
-        // ISO `YYYY-MM-DD` is the canonical date format we accept.
-        // exceljs interprets Excel date cells via the workbook's date system
-        // (1900/1904) and the host locale, so the Date it returns can be
-        // either UTC-midnight or local-midnight depending on the source
-        // file. A naive `toISOString().slice(0,10)` drifts ±1 day when the
-        // parser machine is in a different timezone than the file author —
-        // e.g. a Pakistan-authored 1987-10-09 cell read on a US machine
-        // becomes "1987-10-08". Prefer whichever side has a midnight wall
-        // time; fall back to local components so we always emit a calendar
-        // date close to the user's intent.
-        normalised = extractCalendarDate(value)
-      } else if (typeof value === "number" || typeof value === "boolean") {
-        normalised = value
-      } else {
-        normalised = String(value).trim()
-      }
+      const normalised = normaliseCellValue(cell.value)
       if (normalised !== null && normalised !== "") hasAnyValue = true
       obj[header] = normalised
     })
@@ -188,8 +232,16 @@ export async function buildErrorReportXlsx(opts: {
   headers: string[]
   /** All originally-parsed rows in order. */
   rows: Array<Record<string, unknown>>
-  /** Errors collected during the run. */
-  errors: Array<{ row: number; field: string; message: string }>
+  /** Errors collected during the run. When an error carries a `values`
+   *  snapshot, it is used as a fallback row payload so the report still
+   *  shows the offending cells when the caller has no `rows[]` array
+   *  (the post-job download path is in this situation). */
+  errors: Array<{
+    row: number
+    field: string
+    message: string
+    values?: Record<string, unknown>
+  }>
 }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   wb.creator = "Parwest ERP"
@@ -197,11 +249,20 @@ export async function buildErrorReportXlsx(opts: {
   const ws = wb.addWorksheet("Errors")
 
   // Group errors by row number (1-based, header is row 1, first data row is 2).
+  // We also collect the first non-empty `values` snapshot we see for each row;
+  // every error on a given row carries the same row data, so any one of them
+  // is sufficient. This lets QA see *which* cell value to correct even when
+  // the caller didn't supply a parallel `rows[]` (the job route doesn't —
+  // it only has the persisted error list).
   const errorsByRow = new Map<number, string[]>()
+  const valuesByRow = new Map<number, Record<string, unknown>>()
   for (const e of opts.errors) {
     const list = errorsByRow.get(e.row) ?? []
     list.push(`${e.field}: ${e.message}`)
     errorsByRow.set(e.row, list)
+    if (e.values && !valuesByRow.has(e.row)) {
+      valuesByRow.set(e.row, e.values)
+    }
   }
 
   ws.columns = [
@@ -218,9 +279,12 @@ export async function buildErrorReportXlsx(opts: {
 
   // Only emit rows that actually had errors. Row indexes from `errors` are
   // file-1-based (header=1), so the corresponding entry in `rows` is row-2.
+  // Prefer the caller-supplied parallel `rows[]` snapshot (most faithful to
+  // the original file); fall back to the per-error `values` snapshot so the
+  // report is never blank just because the caller didn't have the rows array.
   for (const [rowNumber, messages] of [...errorsByRow.entries()].sort((a, b) => a[0] - b[0])) {
     const dataIdx = rowNumber - 2
-    const original = opts.rows[dataIdx] ?? {}
+    const original = opts.rows[dataIdx] ?? valuesByRow.get(rowNumber) ?? {}
     ws.addRow({ ...original, __error_reason: messages.join("; ") })
   }
 
