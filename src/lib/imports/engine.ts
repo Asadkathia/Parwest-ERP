@@ -209,6 +209,76 @@ async function dbDuplicates(
   return errors
 }
 
+/**
+ * Per-row validation pipeline — single source of truth for both the
+ * batch `runImport` path and the draft editor's per-cell PATCH path.
+ *
+ * Runs (in order): header aliasing → reference resolution → conditional
+ * rules → zod schema → per-row DB duplicate checks. Cross-row payload
+ * duplicates are NOT included here — caller must run
+ * `recomputePayloadDuplicates` separately when it has the full row set.
+ *
+ * Returns the resolved + aliased row, the typed/parsed data when
+ * validation succeeded, and any per-row errors collected. Errors carry
+ * the original (pre-alias) values so the error sheet / UI shows what
+ * the user typed.
+ */
+export async function validateRow(
+  definition: BulkImportDefinition,
+  originalRow: Record<string, unknown>,
+  ctx: ImportRunContext,
+  rowNumber: number,
+): Promise<{
+  row: Record<string, unknown>
+  data?: unknown
+  errors: ImportRowError[]
+}> {
+  const aliased = applyHeaderAliases(definition, originalRow)
+  const refResult = await resolveReferences(definition, aliased, ctx, rowNumber)
+  const conditionalErrors = applyConditionals(definition, refResult.row, rowNumber)
+  const earlyErrors = [...refResult.errors, ...conditionalErrors]
+  if (earlyErrors.length > 0) {
+    return { row: refResult.row, errors: earlyErrors.map((e) => ({ ...e, values: originalRow })) }
+  }
+  const parsed = definition.rowSchema.safeParse(refResult.row)
+  if (!parsed.success) {
+    const errors: ImportRowError[] = (parsed.error as z.ZodError).issues.map((issue) => ({
+      row: rowNumber,
+      field: issue.path.join(".") || "__row__",
+      message: issue.message,
+      values: originalRow,
+    }))
+    return { row: refResult.row, errors }
+  }
+  // Per-row DB-duplicate checks
+  const dbErrors: ImportRowError[] = []
+  for (const rule of definition.duplicates ?? []) {
+    if (rule.scope !== "db" && rule.scope !== "both") continue
+    if (!rule.existsInDb) continue
+    const values: Record<string, string> = {}
+    let hasAny = false
+    for (const f of rule.fields) {
+      const v = cellToString(refResult.row[f])
+      if (v) hasAny = true
+      values[f] = v
+    }
+    if (!hasAny) continue
+    const exists = await rule.existsInDb(values, ctx)
+    if (exists) {
+      dbErrors.push({
+        row: rowNumber,
+        field: rule.fields.join("+"),
+        message:
+          rule.message ??
+          `Already exists in the database (${rule.fields.join(", ")} = ${rule.fields.map((f) => values[f]).join(", ")})`,
+        values: originalRow,
+      })
+    }
+  }
+  if (dbErrors.length > 0) return { row: refResult.row, errors: dbErrors }
+  return { row: refResult.row, data: parsed.data, errors: [] }
+}
+
 export type EngineResult = {
   totalRows: number
   successRows: number
@@ -283,27 +353,12 @@ export async function runImport(
   for (let i = 0; i < parsed.rows.length; i += 1) {
     const rowNumber = i + 2
     const original = parsed.rows[i]
-    const aliased = applyHeaderAliases(definition, original)
-    const refResult = await resolveReferences(definition, aliased, ctx, rowNumber)
-    const conditionalErrors = applyConditionals(definition, refResult.row, rowNumber)
-    const earlyErrors = [...refResult.errors, ...conditionalErrors]
-    if (earlyErrors.length > 0) {
-      perRowErrors.push(...earlyErrors)
+    const result = await validateRow(definition, original, ctx, rowNumber)
+    if (result.errors.length > 0) {
+      perRowErrors.push(...result.errors)
       continue
     }
-    const parsedRow = definition.rowSchema.safeParse(refResult.row)
-    if (!parsedRow.success) {
-      for (const issue of (parsedRow.error as z.ZodError).issues) {
-        perRowErrors.push({
-          row: rowNumber,
-          field: issue.path.join(".") || "__row__",
-          message: issue.message,
-          values: original,
-        })
-      }
-      continue
-    }
-    validRows.push({ rowNumber, data: parsedRow.data })
+    validRows.push({ rowNumber, data: result.data })
   }
 
   // Cross-row duplicates (payload-scoped, then DB-scoped). Rows are aliased
