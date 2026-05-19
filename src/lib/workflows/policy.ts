@@ -37,6 +37,8 @@ export type WorkflowRuleKey =
   | "deductions.requireApprovalDocument"
   | "deductions.lockRetroactiveChanges"
   | "deductions.allowOverrideOnFinalized"
+  // ----- Imports -----
+  | "imports.draftEditor"
 
 export type WorkflowRuleConfig = Record<WorkflowRuleKey, boolean>
 export type WorkflowPresetId = "balanced" | "strict" | "relaxed"
@@ -94,6 +96,8 @@ const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "deductions.lockRetroactiveChanges": true,
   // Overrides on finalized payrolls require explicit unfinalize first.
   "deductions.allowOverrideOnFinalized": false,
+  // Bulk-import draft editor — off by default; flipped per the Phase-3 rollout.
+  "imports.draftEditor": false,
 }
 
 export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
@@ -209,6 +213,7 @@ export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
     "WORKFLOW_RULE_DEDUCTIONS_LOCK_RETROACTIVE_CHANGES",
   "deductions.allowOverrideOnFinalized":
     "WORKFLOW_RULE_DEDUCTIONS_ALLOW_OVERRIDE_ON_FINALIZED",
+  "imports.draftEditor": "WORKFLOW_RULE_IMPORTS_DRAFT_EDITOR",
 }
 
 function toWorkflowPresetId(value: string | undefined): WorkflowPresetId | null {
