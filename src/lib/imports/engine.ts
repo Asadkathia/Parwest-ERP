@@ -145,68 +145,46 @@ function applyConditionals(
   return errors
 }
 
-function payloadDuplicates(
+/**
+ * Computes the cross-row payload-duplicate errors for a given row set.
+ *
+ * Returns a Map keyed by `rowNumber` of the errors that row should
+ * carry. Rows with no dup errors are absent from the map. This shape
+ * lets callers diff against a previous map to find rows whose dup
+ * status changed (the editor uses this to repaint sibling rows).
+ *
+ * Skipped rows are excluded from the seen-set so a skipped row never
+ * triggers or absorbs a duplicate.
+ */
+export function recomputePayloadDuplicates(
   definition: BulkImportDefinition,
-  rows: Array<Record<string, unknown>>,
-): ImportRowError[] {
-  const errors: ImportRowError[] = []
+  rows: Array<{ rowNumber: number; data: Record<string, unknown>; skipped?: boolean }>,
+): Map<number, ImportRowError[]> {
+  const out = new Map<number, ImportRowError[]>()
   for (const rule of definition.duplicates ?? []) {
     if (rule.scope !== "payload" && rule.scope !== "both") continue
-    const seen = new Map<string, number>()
-    rows.forEach((row, idx) => {
-      const composite = rule.fields.map((f) => cellToString(row[f]).toLowerCase()).join("||")
-      if (!composite || composite === rule.fields.map(() => "").join("||")) return
-      const firstSeen = seen.get(composite)
-      if (firstSeen !== undefined) {
-        errors.push({
-          row: idx + 2,
+    const seen = new Map<string, number>() // composite key → first rowNumber
+    for (const r of rows) {
+      if (r.skipped) continue
+      const composite = rule.fields.map((f) => cellToString(r.data[f]).toLowerCase()).join("||")
+      if (!composite || composite === rule.fields.map(() => "").join("||")) continue
+      const firstRow = seen.get(composite)
+      if (firstRow !== undefined) {
+        const list = out.get(r.rowNumber) ?? []
+        list.push({
+          row: r.rowNumber,
           field: rule.fields.join("+"),
           message:
-            rule.message ??
-            `Duplicate of row ${firstSeen + 2} on (${rule.fields.join(", ")})`,
-          values: row,
+            rule.message ?? `Duplicate of row ${firstRow} on (${rule.fields.join(", ")})`,
+          values: r.data,
         })
+        out.set(r.rowNumber, list)
       } else {
-        seen.set(composite, idx)
-      }
-    })
-  }
-  return errors
-}
-
-async function dbDuplicates(
-  definition: BulkImportDefinition,
-  rows: Array<Record<string, unknown>>,
-  ctx: ImportRunContext,
-): Promise<ImportRowError[]> {
-  const errors: ImportRowError[] = []
-  for (const rule of definition.duplicates ?? []) {
-    if (rule.scope !== "db" && rule.scope !== "both") continue
-    if (!rule.existsInDb) continue
-    for (let idx = 0; idx < rows.length; idx += 1) {
-      const row = rows[idx]
-      const values: Record<string, string> = {}
-      let hasAny = false
-      for (const f of rule.fields) {
-        const v = cellToString(row[f])
-        if (v) hasAny = true
-        values[f] = v
-      }
-      if (!hasAny) continue
-      const exists = await rule.existsInDb(values, ctx)
-      if (exists) {
-        errors.push({
-          row: idx + 2,
-          field: rule.fields.join("+"),
-          message:
-            rule.message ??
-            `Already exists in the database (${rule.fields.join(", ")} = ${rule.fields.map((f) => values[f]).join(", ")})`,
-          values: row,
-        })
+        seen.set(composite, r.rowNumber)
       }
     }
   }
-  return errors
+  return out
 }
 
 /**
@@ -361,12 +339,16 @@ export async function runImport(
     validRows.push({ rowNumber, data: result.data })
   }
 
-  // Cross-row duplicates (payload-scoped, then DB-scoped). Rows are aliased
-  // here so duplicate rules reference canonical key names, not sheet-side
-  // header strings.
-  const aliasedRows = parsed.rows.map((r) => applyHeaderAliases(definition, r))
-  perRowErrors.push(...payloadDuplicates(definition, aliasedRows))
-  perRowErrors.push(...(await dbDuplicates(definition, aliasedRows, ctx)))
+  // Cross-row payload duplicates. Per-row DB-duplicate checks already
+  // ran inside `validateRow` above, so we don't repeat them here. Rows are
+  // aliased so duplicate rules reference canonical key names, not
+  // sheet-side header strings.
+  const aliasedView = parsed.rows.map((r, i) => ({
+    rowNumber: i + 2,
+    data: applyHeaderAliases(definition, r),
+  }))
+  const payloadDupMap = recomputePayloadDuplicates(definition, aliasedView)
+  for (const [, errs] of payloadDupMap) perRowErrors.push(...errs)
 
   // Drop rows whose validation failed for any reason from the persist set.
   const failedRowSet = new Set(perRowErrors.map((e) => e.row))
