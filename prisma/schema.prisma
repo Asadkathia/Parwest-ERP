@@ -2905,6 +2905,7 @@ model ReportRunBlob {
 // the controller can write to ReportRunBlob-style external storage and store
 // only the key in `fileKey`.
 enum BulkImportStatus {
+  DRAFT
   QUEUED
   VALIDATING
   PROCESSING
@@ -2932,10 +2933,31 @@ model BulkImportJob {
   createdBy     User?            @relation("BulkImportJobCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   startedAt     DateTime?
   finishedAt    DateTime?
+  expiresAt     DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  rows          BulkImportJobRow[]
 
   @@index([module, subModule, createdAt])
   @@index([createdById, createdAt])
   @@index([status, createdAt])
+  @@index([status, expiresAt])
+}
+
+model BulkImportJobRow {
+  id             String        @id @default(cuid())
+  jobId          String
+  job            BulkImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rowNumber      Int
+  data           Json
+  errors         Json          @default("[]")
+  skipped        Boolean       @default(false)
+  dirty          Boolean       @default(false)
+  lastEditedById String?
+  lastEditedAt   DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([jobId, rowNumber])
+  @@index([jobId, skipped])
 }
