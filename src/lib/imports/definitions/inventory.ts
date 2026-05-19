@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
 import { registerImport } from "@/lib/imports/registry"
 import { nonNegativeInt, optionalString, requiredString } from "@/lib/imports/rules"
+import type { ColumnDescriptor } from "@/lib/imports/types"
 
 /**
  * Inventory v2 bulk import.
@@ -77,6 +78,41 @@ registerImport({
   ],
   rowSchema,
   duplicates: [{ fields: ["sku"], scope: "payload", message: "Duplicate SKU in upload" }],
+  columns: [
+    { key: "name", header: "name", label: "Name", kind: "text", required: true },
+    { key: "sku", header: "sku", label: "SKU", kind: "text", required: false },
+    {
+      key: "storeCode",
+      header: "storeCode",
+      label: "Store Code",
+      kind: "fk",
+      required: false,
+      fkOptionsLoader: async (ctx) => {
+        const rows = await ctx.prisma.store.findMany({
+          where: { isActive: true },
+          select: { code: true, name: true },
+          orderBy: { code: "asc" },
+        })
+        return rows.map((r) => ({ value: r.code, label: `${r.code} — ${r.name}` }))
+      },
+    },
+    { key: "storeName", header: "storeName", label: "Store Name", kind: "text", required: false },
+    { key: "quantityOnHand", header: "quantityOnHand", label: "Quantity On Hand", kind: "number", required: false },
+    { key: "quantity", header: "quantity", label: "Quantity", kind: "number", required: false },
+    { key: "avgUnitCost", header: "avgUnitCost", label: "Avg Unit Cost", kind: "number", required: false },
+    { key: "unitCost", header: "unitCost", label: "Unit Cost", kind: "number", required: false },
+    { key: "brand", header: "brand", label: "Brand", kind: "text", required: false },
+    { key: "unit", header: "unit", label: "Unit", kind: "text", required: false },
+    { key: "category", header: "category", label: "Category", kind: "text", required: false },
+    {
+      key: "status",
+      header: "status",
+      label: "Status",
+      kind: "enum",
+      required: false,
+      enumValues: ["ACTIVE", "INACTIVE"],
+    },
+  ] satisfies ColumnDescriptor[],
   sampleRows: [
     {
       sku: "WT-001",

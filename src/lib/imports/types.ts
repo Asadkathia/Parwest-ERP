@@ -106,6 +106,33 @@ export type DuplicateRule = {
   message?: string
 }
 
+export type ColumnKind = "text" | "cnic" | "date" | "number" | "enum" | "fk"
+
+/**
+ * Per-column editor metadata, used by the draft editor to pick the
+ * right cell editor (text input vs date picker vs dropdown vs FK
+ * combobox). The list is also returned by GET /api/imports/:module/columns.
+ *
+ * `key` matches the canonical (post-alias) field name — this is what the
+ * row schema sees. `header` is the sheet-side string (the same string
+ * that appears in `requiredHeaders` / `optionalHeaders`).
+ */
+export type ColumnDescriptor = {
+  key: string
+  header: string
+  label: string
+  kind: ColumnKind
+  required: boolean
+  /** When `kind === "enum"`. Values must match what the schema accepts (case-sensitive). */
+  enumValues?: string[]
+  /**
+   * When `kind === "fk"`. Async loader run server-side; the resolved options
+   * are returned by GET /api/imports/:module/columns. Keep light — runs once
+   * per draft open, not per-cell.
+   */
+  fkOptionsLoader?: (ctx: ImportRunContext) => Promise<Array<{ value: string; label: string }>>
+}
+
 export type ConditionalRule = {
   /** Header that triggers the rule when its predicate returns true. */
   when: { field: string; predicate: (value: string) => boolean }
@@ -190,6 +217,14 @@ export interface BulkImportDefinition<TRow = Record<string, unknown>> {
 
   /** Required permission action. Defaults to ("IMPORTS", "CREATE"). */
   permission?: { module: string; action: string }
+
+  /**
+   * Editor metadata for the draft editor's grid. Each entry describes one
+   * cell editor. Optional — when omitted, every column falls back to plain
+   * text input. Define at least the columns that have non-trivial editors
+   * (dates, enums, FKs) and let `text` be the default for the rest.
+   */
+  columns?: ColumnDescriptor[]
 }
 
 /**

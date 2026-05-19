@@ -4,6 +4,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { registerImport } from "@/lib/imports/registry"
 import { memoizedResolver, optionalString, requiredString } from "@/lib/imports/rules"
+import type { ColumnDescriptor } from "@/lib/imports/types"
 
 /**
  * Users bulk import.
@@ -78,6 +79,42 @@ registerImport({
     role: roleResolver,
     regionalOfficeSeries: regionalOfficeResolver,
   },
+  columns: [
+    { key: "name", header: "name", label: "Name", kind: "text", required: true },
+    { key: "email", header: "email", label: "Email", kind: "text", required: true },
+    {
+      key: "role",
+      header: "role",
+      label: "Role",
+      kind: "fk",
+      required: true,
+      fkOptionsLoader: async (ctx) => {
+        const rows = await ctx.prisma.role.findMany({
+          select: { name: true },
+          orderBy: { name: "asc" },
+        })
+        return rows.map((r) => ({ value: r.name, label: r.name }))
+      },
+    },
+    {
+      key: "regionalOfficeSeries",
+      header: "regionalOfficeSeries",
+      label: "Regional Office",
+      kind: "fk",
+      required: true,
+      fkOptionsLoader: async (ctx) => {
+        const rows = await ctx.prisma.regionalOffice.findMany({
+          select: { seriesCode: true, name: true },
+          orderBy: { name: "asc" },
+        })
+        return rows
+          .filter((r) => r.seriesCode)
+          .map((r) => ({ value: r.seriesCode as string, label: `${r.seriesCode} — ${r.name}` }))
+      },
+    },
+    { key: "contactNumber", header: "contactNumber", label: "Contact Number", kind: "text", required: true },
+    { key: "password", header: "password", label: "Password", kind: "text", required: false },
+  ] satisfies ColumnDescriptor[],
   duplicates: [
     {
       fields: ["email"],

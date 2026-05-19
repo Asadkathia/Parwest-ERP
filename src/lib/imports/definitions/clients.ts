@@ -3,6 +3,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { registerImport } from "@/lib/imports/registry"
 import { memoizedResolver, optionalString, requiredString } from "@/lib/imports/rules"
+import type { ColumnDescriptor } from "@/lib/imports/types"
 
 const rowSchema = z.object({
   name: requiredString("name", 200),
@@ -36,6 +37,26 @@ registerImport({
   optionalHeaders: ["city", "email", "phone"],
   rowSchema,
   referenceResolvers: { type: clientTypeResolver },
+  columns: [
+    { key: "name", header: "name", label: "Name", kind: "text", required: true },
+    {
+      key: "type",
+      header: "type",
+      label: "Client Type",
+      kind: "fk",
+      required: true,
+      fkOptionsLoader: async (ctx) => {
+        const rows = await ctx.prisma.clientType.findMany({
+          select: { name: true },
+          orderBy: { name: "asc" },
+        })
+        return rows.map((r) => ({ value: r.name, label: r.name }))
+      },
+    },
+    { key: "city", header: "city", label: "City", kind: "text", required: false },
+    { key: "email", header: "email", label: "Email", kind: "text", required: false },
+    { key: "phone", header: "phone", label: "Phone", kind: "text", required: false },
+  ] satisfies ColumnDescriptor[],
   duplicates: [{ fields: ["name"], scope: "payload", message: "Duplicate client name in upload" }],
   sampleRows: [
     { name: "Client One", type: "BANK", city: "Lahore" },
