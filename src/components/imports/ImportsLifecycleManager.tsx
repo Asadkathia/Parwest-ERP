@@ -1,10 +1,21 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/shadcn/button"
 import { CheckCircle2, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Card, CardContent } from "@/components/shadcn/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
 import { useEffect, useMemo, useState } from "react"
 import DataTable from "@/components/shared/DataTable"
 import { importLinks } from "@/lib/parity/screenConfigs"
@@ -87,8 +98,12 @@ type JobHistoryEntry = {
   createdBy: { id: string; name: string | null; email: string | null } | null
 }
 
-export default function ImportsLifecycleManager({ initialModule = "users" }: { initialModule?: ImportModule }) {
+type Props = { initialModule?: ImportModule; draftEditorEnabled?: boolean }
+
+export default function ImportsLifecycleManager({ initialModule = "users", draftEditorEnabled = false }: Props) {
+  const router = useRouter()
   const [moduleName, setModuleName] = useState<ImportModule>(MODULES.includes(initialModule) ? initialModule : "users")
+  const [resumePrompt, setResumePrompt] = useState<{ existingDraftId: string } | null>(null)
   const [subModule, setSubModule] = useState<string>("")
   const [csvInput, setCsvInput] = useState(sampleCsv(initialModule))
   const [file, setFile] = useState<File | null>(null)
@@ -240,6 +255,37 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
     }
   }
 
+  const onUploadOpenEditor = async () => {
+    if (!file && !csvInput.trim()) {
+      setNotice({ type: "error", message: "Choose a file or paste CSV first." })
+      return
+    }
+    setLoadingProcess(true)
+    setNotice(null)
+    try {
+      const payload = await uploadBody()
+      const res = await fetch(`/api/imports/${moduleName}/draft${queryString}`, {
+        method: "POST",
+        headers: payload.headers,
+        body: payload.body,
+      })
+      const data = await res.json()
+      if (res.status === 409 && data?.data?.existingDraftId) {
+        setResumePrompt({ existingDraftId: data.data.existingDraftId })
+        return
+      }
+      if (!res.ok) {
+        setNotice({ type: "error", message: data?.message || "Upload failed" })
+        return
+      }
+      router.push(`/imports/drafts/${data.data.draftId}`)
+    } catch {
+      setNotice({ type: "error", message: "Upload request failed." })
+    } finally {
+      setLoadingProcess(false)
+    }
+  }
+
   const refreshStatus = async () => {
     if (!job?.jobId) return
     setLoadingStatus(true)
@@ -349,12 +395,20 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
           </div>
           <div className="flex items-end flex-wrap gap-2">
             <Button variant="secondary" onClick={downloadTemplate}>Download Template</Button>
-            <Button onClick={onValidate} disabled={loadingValidate}>
-              {loadingValidate ? "Validating..." : "Validate"}
-            </Button>
-            <Button variant="secondary" onClick={onProcess} disabled={loadingProcess}>
-              {loadingProcess ? "Processing..." : "Import"}
-            </Button>
+            {draftEditorEnabled ? (
+              <Button onClick={onUploadOpenEditor} disabled={loadingProcess}>
+                {loadingProcess ? "Uploading…" : "Upload & Open Editor"}
+              </Button>
+            ) : (
+              <>
+                <Button onClick={onValidate} disabled={loadingValidate}>
+                  {loadingValidate ? "Validating..." : "Validate"}
+                </Button>
+                <Button variant="secondary" onClick={onProcess} disabled={loadingProcess}>
+                  {loadingProcess ? "Processing..." : "Import"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
         <div>
@@ -458,7 +512,9 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
                             ? "text-emerald-700"
                             : h.status === "FAILED"
                               ? "text-rose-700"
-                              : "text-amber-700"
+                              : h.status === "DRAFT"
+                                ? "text-amber-700"
+                                : "text-amber-700"
                         }
                       >
                         {h.status}
@@ -472,7 +528,14 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
                       {h.createdBy?.name || h.createdBy?.email || "—"}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {h.failedRows > 0 ? (
+                      {h.status === "DRAFT" ? (
+                        <Link
+                          href={`/imports/drafts/${h.id}`}
+                          className="text-xs text-[var(--brand)] hover:underline"
+                        >
+                          Continue
+                        </Link>
+                      ) : h.failedRows > 0 ? (
                         <a
                           href={`/api/imports/jobs/${h.id}/errors?format=xlsx`}
                           className="text-xs text-[var(--brand)] hover:underline"
@@ -525,6 +588,36 @@ export default function ImportsLifecycleManager({ initialModule = "users" }: { i
             searchable={false}
           />
         </section>
+      ) : null}
+
+      {resumePrompt ? (
+        <AlertDialog open onOpenChange={() => setResumePrompt(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>You have an in-progress {moduleName} draft</AlertDialogTitle>
+              <AlertDialogDescription>
+                Resume editing where you left off, or discard it and start fresh?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setResumePrompt(null)}>Cancel</AlertDialogCancel>
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  const existingId = resumePrompt.existingDraftId
+                  await fetch(`/api/imports/drafts/${existingId}`, { method: "DELETE" })
+                  setResumePrompt(null)
+                  onUploadOpenEditor()
+                }}
+              >
+                Discard &amp; Start Over
+              </Button>
+              <AlertDialogAction onClick={() => router.push(`/imports/drafts/${resumePrompt.existingDraftId}`)}>
+                Resume
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : null}
     </div>
   )
