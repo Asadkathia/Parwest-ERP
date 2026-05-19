@@ -37,12 +37,15 @@ export function DraftGrid({ rows, columns, onPatchRow, onToggleSkip }: DraftGrid
 
   return (
     <div className="overflow-auto rounded-md border max-h-[70vh]">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50 sticky top-0 z-10">
+      <table className="w-full text-sm border-collapse">
+        <thead className="bg-muted sticky top-0 z-10">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
               {hg.headers.map((h) => (
-                <th key={h.id} className="px-2 py-1.5 text-left font-medium">
+                <th
+                  key={h.id}
+                  className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide text-muted-foreground border-b border-r last:border-r-0"
+                >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
               ))}
@@ -51,9 +54,21 @@ export function DraftGrid({ rows, columns, onPatchRow, onToggleSkip }: DraftGrid
         </thead>
         <tbody>
           {table.getRowModel().rows.map((r) => (
-            <tr key={r.id} className={r.original.skipped ? "bg-muted/30 text-muted-foreground" : ""}>
+            <tr
+              key={r.id}
+              className={
+                r.original.skipped
+                  ? "bg-muted/30 text-muted-foreground"
+                  : "hover:bg-muted/20"
+              }
+            >
               {r.getVisibleCells().map((c) => (
-                <td key={c.id} className="border-t px-2 py-1 align-middle">{flexRender(c.column.columnDef.cell, c.getContext())}</td>
+                <td
+                  key={c.id}
+                  className="border-b border-r last:border-r-0 px-2 py-1 align-middle min-w-[140px]"
+                >
+                  {flexRender(c.column.columnDef.cell, c.getContext())}
+                </td>
               ))}
             </tr>
           ))}
@@ -84,7 +99,7 @@ function Cell({
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="border border-destructive bg-destructive/5 rounded">{editor}</div>
+          <div className="w-full">{editor}</div>
         </TooltipTrigger>
         <TooltipContent>{cellError!.message}</TooltipContent>
       </Tooltip>

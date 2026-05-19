@@ -10,7 +10,14 @@ export function EnumCell({ value, onCommit, invalid, enumValues }: Props) {
       value={value == null ? "" : String(value)}
       onValueChange={(v) => onCommit(v || null)}
     >
-      <SelectTrigger className={`h-7 w-full px-2 py-0 text-sm ${invalid ? "text-destructive" : ""}`}>
+      <SelectTrigger
+        className={
+          "h-7 w-full rounded-sm border bg-background px-2 py-0 text-sm transition-colors hover:bg-muted/30 " +
+          (invalid
+            ? "border-destructive bg-destructive/5 text-destructive"
+            : "border-input/40 hover:border-input")
+        }
+      >
         <SelectValue placeholder="—" />
       </SelectTrigger>
       <SelectContent>

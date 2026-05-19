@@ -70,7 +70,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ mod
           { status: 409 },
         )
       }
-      if (err.code === "INVALID_HEADERS" || err.code === "TOO_LARGE" || err.code === "NOT_FOUND") {
+      if (err.code === "INVALID_HEADERS") {
+        // Surface which headers were missing/unknown so QA can fix the source file.
+        const payload = err.payload as { missing?: string[]; unknown?: string[] } | undefined
+        const parts: string[] = []
+        if (payload?.missing?.length) parts.push(`missing: ${payload.missing.join(", ")}`)
+        if (payload?.unknown?.length) parts.push(`unknown: ${payload.unknown.join(", ")}`)
+        const detail = parts.length ? ` (${parts.join("; ")})` : ""
+        return NextResponse.json(
+          { success: false, message: `Invalid headers${detail}`, code: "INVALID_HEADERS", data: payload },
+          { status: 400 },
+        )
+      }
+      if (err.code === "TOO_LARGE" || err.code === "NOT_FOUND") {
         return badRequest(err.message)
       }
     }

@@ -16,7 +16,12 @@ export function FkCell({ value, onCommit, invalid, fkOptions = [] }: Props) {
         <Button
           type="button"
           variant="ghost"
-          className={`h-7 w-full justify-start px-2 py-0 text-sm font-normal ${invalid ? "text-destructive" : ""}`}
+          className={
+            "h-7 w-full justify-start rounded-sm border bg-background px-2 py-0 text-sm font-normal transition-colors hover:bg-muted/30 " +
+            (invalid
+              ? "border-destructive bg-destructive/5 text-destructive hover:bg-destructive/10"
+              : "border-input/40 hover:border-input")
+          }
         >
           {current?.label ?? (value as string) ?? <span className="text-muted-foreground">—</span>}
         </Button>

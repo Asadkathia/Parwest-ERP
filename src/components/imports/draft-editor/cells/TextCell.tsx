@@ -21,7 +21,13 @@ export function TextCell({ value, onCommit, invalid, placeholder, autoFocus }: C
   }
   return (
     <input
-      className={`w-full bg-transparent text-sm outline-none ${invalid ? "text-destructive" : ""}`}
+      className={
+        "h-7 w-full rounded-sm border bg-background px-2 text-sm transition-colors " +
+        "hover:border-input focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring " +
+        (invalid
+          ? "border-destructive bg-destructive/5 text-destructive"
+          : "border-input/40 hover:bg-muted/30 focus:bg-background")
+      }
       value={v}
       placeholder={placeholder}
       autoFocus={autoFocus}
