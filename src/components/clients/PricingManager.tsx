@@ -4,17 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import { Plus, ChevronRight, FileText, Tag, CheckCircle2, Pencil } from "lucide-react"
 
 // ── Static data ────────────────────────────────────────────────────────────────
-const PROVINCE_OPTIONS = ["Punjab", "Sindh", "KPK", "Balochistan", "Islamabad", "All Pakistan"]
-
-const CITY_OPTIONS = [
-    "All Cities","Lahore","Gujranwala","Sahiwal","Islamabad","Karachi","Multan",
-    "Faisalabad","Khanpur","Chichawatni","Bahawalpur","Mian Channu","Khanewal",
-    "Ahmedpur East","Attock","Bahawalnagar","Bhakkar","Burewala","Chakwal",
-    "Chiniot","Daska","Gujrat","Hafizabad","Jhang","Kasur","Khushab",
-    "Mandi Bahauddin","Mianwali","Narowal","Okara","Pakpattan","Rahim Yar Khan",
-    "Rawalpindi","Sheikhupura","Sialkot","Toba Tek Singh","Vehari",
-]
-
 const CONTRACT_TYPE_OPTIONS = ["GENERAL", "SPECIAL", "RENEWAL"]
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -35,7 +24,7 @@ type Contract = {
     id: string
     clientId: string
     branchId: string | null
-    branch: { id: string; name: string } | null
+    branch: { id: string; name: string; province: string | null; city: string | null } | null
     name: string
     type: string
     startDate: string | null
@@ -55,6 +44,8 @@ type Props = {
     clientName: string
     branches: Branch[]
     isBranchless: boolean
+    operationalProvinces: string | null
+    regionName: string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -190,17 +181,27 @@ function ContractFormModal({
 
 // ── Add Rate Modal ─────────────────────────────────────────────────────────────
 function AddRateModal({
-    clientId, contractId, guardTypes, exServiceTypes, onClose, onCreated,
+    clientId, contractId, branch, operationalProvinces, regionName, guardTypes, exServiceTypes, onClose, onCreated,
 }: {
     clientId: string
     contractId: string
+    branch: { province: string | null; city: string | null } | null
+    operationalProvinces: string | null
+    regionName: string | null
     guardTypes: string[]
     exServiceTypes: string[]
     onClose: () => void
     onCreated: (r: ContractRate) => void
 }) {
+    // Province/city are derived (server is authoritative); shown read-only here.
+    const isBranchContract = !!branch
+    const derivedProvince = (isBranchContract ? branch?.province : operationalProvinces) || "—"
+    const derivedCity = (isBranchContract ? branch?.city : regionName) || "—"
+
     const [form, setForm] = useState({
-        province: "", city: "", guardType: guardTypes[0] ?? "", exService: "",
+        guardType: guardTypes[0] ?? "",
+        exServiceYes: false,
+        exServiceType: exServiceTypes[0] ?? "",
         rate: "", extraHourRate: "", isCurrentRate: false,
         rateStartDate: "", rateEndDate: "",
     })
@@ -211,17 +212,17 @@ function AddRateModal({
 
     async function submit() {
         if (!form.guardType) { setError("Guard type is required."); return }
+        if (form.exServiceYes && !form.exServiceType) { setError("Select an ex-service type."); return }
         if (!form.rate || isNaN(Number(form.rate))) { setError("A valid rate is required."); return }
         setLoading(true); setError("")
         try {
+            const exService = form.exServiceYes ? form.exServiceType : "CIVILIAN"
             const res = await fetch(`/api/clients/${clientId}/contracts/${contractId}/rates`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    province: form.province || null,
-                    city: form.city || null,
                     guardType: form.guardType,
-                    exService: form.exService || null,
+                    exService,
                     rate: Number(form.rate),
                     extraHourRate: form.extraHourRate ? Number(form.extraHourRate) : null,
                     isCurrentRate: form.isCurrentRate,
@@ -245,7 +246,7 @@ function AddRateModal({
                 <div className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
                     <div>
                         <p className="text-sm font-medium text-[var(--text)]">Mark as Current Rate</p>
-                        <p className="text-xs text-[var(--text-muted)]">Deactivates previous current rate for this guard type</p>
+                        <p className="text-xs text-[var(--text-muted)]">Deactivates previous current rate for this ex-service + location</p>
                     </div>
                     <button
                         type="button"
@@ -256,35 +257,49 @@ function AddRateModal({
                     </button>
                 </div>
 
+                {/* Derived location (read-only) */}
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Rate Start Date">
-                        <input type="date" value={form.rateStartDate} onChange={(e) => set("rateStartDate", e.target.value)} className={inputCls} />
+                    <Field label="Province (auto)">
+                        <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>{derivedProvince}</div>
                     </Field>
-                    <Field label="Rate End Date">
-                        <input type="date" value={form.rateEndDate} onChange={(e) => set("rateEndDate", e.target.value)} className={inputCls} />
+                    <Field label={isBranchContract ? "City (branch, auto)" : "City (region, auto)"}>
+                        <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>{derivedCity}</div>
                     </Field>
-                    <Field label="Province">
-                        <select value={form.province} onChange={(e) => set("province", e.target.value)} className={inputCls}>
-                            <option value="">— All Provinces —</option>
-                            {PROVINCE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                    </Field>
-                    <Field label="City">
-                        <select value={form.city} onChange={(e) => set("city", e.target.value)} className={inputCls}>
-                            <option value="">— All Cities —</option>
-                            {CITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </Field>
+                </div>
+
+                {/* Ex-service yes/no + type */}
+                <div className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
+                    <div>
+                        <p className="text-sm font-medium text-[var(--text)]">Ex-Service</p>
+                        <p className="text-xs text-[var(--text-muted)]">Has the guard previously served? If no, the rate is stored as Civilian.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => set("exServiceYes", !form.exServiceYes)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.exServiceYes ? "bg-green-500" : "bg-muted-foreground/30 dark:bg-muted-foreground/40"}`}
+                    >
+                        <span className={`inline-block h-4 w-4 rounded-full bg-card shadow transition-transform ${form.exServiceYes ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {form.exServiceYes && (
+                        <Field label="Ex-Service Type *">
+                            <select value={form.exServiceType} onChange={(e) => set("exServiceType", e.target.value)} className={inputCls}>
+                                {exServiceTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </Field>
+                    )}
                     <Field label="Guard Type *">
                         <select value={form.guardType} onChange={(e) => set("guardType", e.target.value)} className={inputCls}>
                             {guardTypes.map((g) => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </Field>
-                    <Field label="Ex-Service Type">
-                        <select value={form.exService} onChange={(e) => set("exService", e.target.value)} className={inputCls}>
-                            <option value="">— Any —</option>
-                            {exServiceTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                    <Field label="Rate Start Date">
+                        <input type="date" value={form.rateStartDate} onChange={(e) => set("rateStartDate", e.target.value)} className={inputCls} />
+                    </Field>
+                    <Field label="Rate End Date">
+                        <input type="date" value={form.rateEndDate} onChange={(e) => set("rateEndDate", e.target.value)} className={inputCls} />
                     </Field>
                     <Field label="Effective Rate (PKR) *">
                         <input type="number" value={form.rate} onChange={(e) => set("rate", e.target.value)} placeholder="e.g. 40000" className={inputCls} />
@@ -308,10 +323,12 @@ function AddRateModal({
 
 // ── Contract Card ──────────────────────────────────────────────────────────────
 function ContractCard({
-    contract, clientId, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
+    contract, clientId, operationalProvinces, regionName, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
 }: {
     contract: Contract
     clientId: string
+    operationalProvinces: string | null
+    regionName: string | null
     guardTypes: string[]
     exServiceTypes: string[]
     onContractUpdated: (c: Contract) => void
@@ -455,6 +472,9 @@ function ContractCard({
                 <AddRateModal
                     clientId={clientId}
                     contractId={contract.id}
+                    branch={contract.branch ? { province: contract.branch.province, city: contract.branch.city } : null}
+                    operationalProvinces={operationalProvinces}
+                    regionName={regionName}
                     guardTypes={guardTypes}
                     exServiceTypes={exServiceTypes}
                     onClose={() => setShowAddRate(false)}
@@ -476,7 +496,7 @@ function ContractCard({
 }
 
 // ── Main PricingManager ────────────────────────────────────────────────────────
-export default function PricingManager({ clientId, clientName, branches, isBranchless }: Props) {
+export default function PricingManager({ clientId, clientName, branches, isBranchless, operationalProvinces, regionName }: Props) {
     const [contracts, setContracts] = useState<Contract[]>([])
     const [loading, setLoading] = useState(true)
     const [showAddContract, setShowAddContract] = useState(false)
@@ -594,6 +614,8 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                             key={contract.id}
                             contract={contract}
                             clientId={clientId}
+                            operationalProvinces={operationalProvinces}
+                            regionName={regionName}
                             guardTypes={guardTypes}
                             exServiceTypes={exServiceTypes}
                             onContractUpdated={onContractUpdated}

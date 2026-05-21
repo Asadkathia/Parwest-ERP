@@ -44,20 +44,38 @@ export async function POST(
         const rate = parseFloat(String(body?.rate ?? ""))
         if (isNaN(rate)) return badRequest("Rate must be a number.")
 
+        const exService = String(body?.exService || "").trim()
+        if (!exService) return badRequest("Ex-service selection is required.")
+
         const contract = await prisma.clientContract.findUnique({
             where: { id: contractId },
-            select: { id: true, name: true },
+            select: {
+                id: true,
+                name: true,
+                branchId: true,
+                branch: { select: { province: true, city: true } },
+                client: { select: { operationalProvinces: true, region: { select: { name: true } } } },
+            },
         })
         if (!contract) return notFound("Contract not found")
+
+        // Province/city are authoritative: derived from the contract's branch
+        // (branch-specific) or the client's territory + region (client-level).
+        const derivedProvince = contract.branchId
+            ? (contract.branch?.province ?? null)
+            : (contract.client?.operationalProvinces ?? null)
+        const derivedCity = contract.branchId
+            ? (contract.branch?.city ?? null)
+            : (contract.client?.region?.name ?? null)
 
         const newRate = await prisma.$transaction(async (tx) => {
             const created = await tx.clientContractRate.create({
                 data: {
                     contractId,
-                    province: body?.province ? String(body.province) : null,
-                    city: body?.city ? String(body.city) : null,
+                    province: derivedProvince,
+                    city: derivedCity,
                     guardType,
-                    exService: body?.exService ? String(body.exService) : null,
+                    exService,
                     rate,
                     extraHourRate: body?.extraHourRate ? parseFloat(String(body.extraHourRate)) || null : null,
                     isCurrentRate: body?.isCurrentRate === true,
@@ -70,8 +88,9 @@ export async function POST(
                 await tx.clientContractRate.updateMany({
                     where: {
                         contractId,
-                        guardType,
-                        exService: body?.exService ? String(body.exService) : null,
+                        exService,
+                        province: derivedProvince,
+                        city: derivedCity,
                         isCurrentRate: true,
                         id: { not: created.id },
                     },
@@ -88,7 +107,7 @@ export async function POST(
                     userId: actorId,
                     event: "CONTRACT_RATE_ADDED",
                     module: "CLIENTS",
-                    description: `Rate added to contract "${contract.name}" (${contractId}) for client ${clientId} — ${guardType} / ${body?.exService || "any"} @ PKR ${rate}. By: ${actorName}`,
+                    description: `Rate added to contract "${contract.name}" (${contractId}) for client ${clientId} — ${guardType} / ${exService} @ PKR ${rate}. By: ${actorName}`,
                 },
             })
             .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
@@ -139,8 +158,9 @@ export async function PATCH(
             await tx.clientContractRate.updateMany({
                 where: {
                     contractId,
-                    guardType: rate.guardType,
                     exService: rate.exService,
+                    province: rate.province,
+                    city: rate.city,
                     isCurrentRate: true,
                 },
                 data: { isCurrentRate: false },

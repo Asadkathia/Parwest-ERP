@@ -35,7 +35,7 @@ export async function GET(
         const contracts = await prisma.clientContract.findMany({
             where: { clientId },
             include: {
-                branch: { select: { id: true, name: true } },
+                branch: { select: { id: true, name: true, province: true, city: true } },
                 rates: { orderBy: [{ province: "asc" }, { city: "asc" }, { guardType: "asc" }] },
             },
             orderBy: { createdAt: "desc" },
@@ -84,7 +84,7 @@ export async function POST(
                 isActive: true,
             },
             include: {
-                branch: { select: { id: true, name: true } },
+                branch: { select: { id: true, name: true, province: true, city: true } },
                 rates: true,
             },
         })

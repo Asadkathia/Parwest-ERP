@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-import { fromContract } from "@/lib/invoicing/rates"
+import { resolveContractRateContext, toRateLookup } from "@/lib/invoicing/rates"
+import { resolveBillingExService, resolveBillingGeo, selectContractRate } from "@/lib/invoicing/rateSelection"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -106,14 +107,12 @@ export async function POST(request: NextRequest) {
         guardId: true,
         deploymentDate: true,
         extraHours: true,
-        guardType: true,
-        guard: { select: { id: true, name: true, parwestId: true } },
+        guard: { select: { id: true, name: true, parwestId: true, isExService: true, exServiceType: true } },
       },
     })
 
     type GuardAgg = {
-      guard: { id: string; name: string; parwestId: string }
-      guardType: string | null
+      guard: { id: string; name: string; parwestId: string; isExService: boolean | null; exServiceType: string | null }
       days: Set<string>
       latestDeploymentId: string
       latestDeploymentDate: Date
@@ -127,7 +126,6 @@ export async function POST(request: NextRequest) {
       if (!agg) {
         agg = {
           guard: d.guard,
-          guardType: d.guardType,
           days: new Set(),
           latestDeploymentId: d.id,
           latestDeploymentDate: d.deploymentDate,
@@ -139,24 +137,52 @@ export async function POST(request: NextRequest) {
       if (d.deploymentDate > agg.latestDeploymentDate) {
         agg.latestDeploymentDate = d.deploymentDate
         agg.latestDeploymentId = d.id
-        if (!agg.guardType && d.guardType) agg.guardType = d.guardType
       }
       const oh = Number(d.extraHours ?? 0)
       if (oh > 0) agg.overtimeHoursTotal += oh
     }
 
+    const { rates, contractId, contractBranchId } = await resolveContractRateContext({ clientId, branchId })
+    const clientGeo = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { operationalProvinces: true, region: { select: { name: true } } },
+    })
+    const usingBranchContract = contractBranchId != null
+    const branchGeo = usingBranchContract && branchId
+      ? await prisma.branch.findUnique({ where: { id: branchId }, select: { province: true, city: true } })
+      : null
+    const geo = resolveBillingGeo({
+      hasBranch: usingBranchContract,
+      branch: branchGeo,
+      client: {
+        operationalProvinces: clientGeo?.operationalProvinces ?? null,
+        regionName: clientGeo?.region?.name ?? null,
+      },
+    })
+
     for (const agg of byGuard.values()) {
       const dayCount = agg.days.size
-      const rate = await fromContract({
-        clientId,
-        branchId,
-        guardType: agg.guardType,
+      const exService = resolveBillingExService({
+        isExService: agg.guard.isExService,
+        exServiceType: agg.guard.exServiceType,
+      })
+      if (exService === null) {
+        warnings.push(
+          `Ex-service type missing for ${agg.guard.name} (${agg.guard.parwestId}) — cannot resolve a contract rate.`,
+        )
+        continue
+      }
+      const selected = selectContractRate(rates, {
+        exService,
+        province: geo.province,
+        city: geo.city,
         asOf: agg.latestDeploymentDate,
       })
+      const rate = toRateLookup(selected, contractId)
 
       if (rate.dailyRate <= 0) {
         warnings.push(
-          `No contract rate found for ${agg.guard.name} (${agg.guard.parwestId}) — add a contract rate for guard type "${agg.guardType ?? "unknown"}".`,
+          `No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — exService "${exService}", ${geo.province ?? "?"}/${geo.city ?? "?"}.`,
         )
         continue
       }
@@ -185,7 +211,7 @@ export async function POST(request: NextRequest) {
           })
         } else {
           warnings.push(
-            `Overtime hours present for ${agg.guard.name} but no overtime rate in contract for guard type "${agg.guardType ?? "unknown"}".`,
+            `Overtime hours present for ${agg.guard.name} but no overtime rate for exService "${exService}".`,
           )
         }
       }

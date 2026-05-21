@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
-import { fromContract } from "@/lib/invoicing/rates"
+import { resolveContractRateContext, toRateLookup } from "@/lib/invoicing/rates"
+import { resolveBillingExService, resolveBillingGeo, selectContractRate } from "@/lib/invoicing/rateSelection"
 
 export type GeneratedLineKind = "GUARD_SALARY" | "SPECIAL_DUTY"
 
@@ -69,14 +70,13 @@ export async function buildInvoiceLines(args: {
       guardId: true,
       deploymentDate: true,
       extraHours: true,
-      guardType: true,
-      guard: { select: { name: true, parwestId: true } },
+      guard: { select: { name: true, parwestId: true, isExService: true, exServiceType: true } },
     },
   })
 
+  type Guard = { name: string; parwestId: string; isExService: boolean | null; exServiceType: string | null }
   type Agg = {
-    guard: { name: string; parwestId: string }
-    guardType: string | null
+    guard: Guard
     days: Set<string>
     latestId: string
     latestDate: Date
@@ -89,7 +89,6 @@ export async function buildInvoiceLines(args: {
     if (!agg) {
       agg = {
         guard: d.guard,
-        guardType: d.guardType,
         days: new Set(),
         latestId: d.id,
         latestDate: d.deploymentDate,
@@ -101,23 +100,55 @@ export async function buildInvoiceLines(args: {
     if (d.deploymentDate > agg.latestDate) {
       agg.latestDate = d.deploymentDate
       agg.latestId = d.id
-      if (!agg.guardType && d.guardType) agg.guardType = d.guardType
     }
     const oh = Number(d.extraHours ?? 0)
     if (oh > 0) agg.otHours += oh
   }
 
+  // Resolve the applicable contract + its rates once, plus billing geo.
+  const { rates, contractId, contractBranchId } = await resolveContractRateContext({
+    clientId: args.clientId,
+    branchId: args.branchId,
+  })
+  const client = await prisma.client.findUnique({
+    where: { id: args.clientId },
+    select: { operationalProvinces: true, region: { select: { name: true } } },
+  })
+  const usingBranchContract = contractBranchId != null
+  const branch = usingBranchContract && args.branchId
+    ? await prisma.branch.findUnique({ where: { id: args.branchId }, select: { province: true, city: true } })
+    : null
+  const geo = resolveBillingGeo({
+    hasBranch: usingBranchContract,
+    branch,
+    client: {
+      operationalProvinces: client?.operationalProvinces ?? null,
+      regionName: client?.region?.name ?? null,
+    },
+  })
+
   for (const agg of byGuard.values()) {
     const days = agg.days.size
-    const rate = await fromContract({
-      clientId: args.clientId,
-      branchId: args.branchId,
-      guardType: agg.guardType,
+    const exService = resolveBillingExService({
+      isExService: agg.guard.isExService,
+      exServiceType: agg.guard.exServiceType,
+    })
+    if (exService === null) {
+      warnings.push(
+        `Ex-service type missing for ${agg.guard.name} (${agg.guard.parwestId}) — cannot resolve a contract rate.`,
+      )
+      continue
+    }
+    const selected = selectContractRate(rates, {
+      exService,
+      province: geo.province,
+      city: geo.city,
       asOf: agg.latestDate,
     })
+    const rate = toRateLookup(selected, contractId)
     if (rate.dailyRate <= 0) {
       warnings.push(
-        `No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — guard type "${agg.guardType ?? "unknown"}".`
+        `No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — exService "${exService}", ${geo.province ?? "?"}/${geo.city ?? "?"}.`,
       )
       continue
     }
