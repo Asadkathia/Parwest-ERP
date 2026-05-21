@@ -68,9 +68,7 @@ registerImport({
     "storeCode",
     "storeName",
     "quantityOnHand",
-    "quantity",
     "avgUnitCost",
-    "unitCost",
     "brand",
     "unit",
     "category",
@@ -98,9 +96,7 @@ registerImport({
     },
     { key: "storeName", header: "storeName", label: "Store Name", kind: "text", required: false },
     { key: "quantityOnHand", header: "quantityOnHand", label: "Quantity On Hand", kind: "number", required: false },
-    { key: "quantity", header: "quantity", label: "Quantity", kind: "number", required: false },
     { key: "avgUnitCost", header: "avgUnitCost", label: "Avg Unit Cost", kind: "number", required: false },
-    { key: "unitCost", header: "unitCost", label: "Unit Cost", kind: "number", required: false },
     { key: "brand", header: "brand", label: "Brand", kind: "text", required: false },
     { key: "unit", header: "unit", label: "Unit", kind: "text", required: false },
     { key: "category", header: "category", label: "Category", kind: "text", required: false },
@@ -152,6 +148,7 @@ registerImport({
       unitCost?: number
       brand?: string
       unit?: string
+      category?: string
       status?: string
     }
 
@@ -193,6 +190,15 @@ registerImport({
       update: {},
     })
 
+    const categoryName = r.category?.trim()
+    const category = categoryName
+      ? await tx.storeInventoryCategory.upsert({
+          where: { name: categoryName },
+          create: { name: categoryName },
+          update: {},
+        })
+      : null
+
     const product = await tx.storeInventoryProduct.upsert({
       where: { sku },
       create: {
@@ -201,6 +207,7 @@ registerImport({
         brandId: brand?.id ?? null,
         unitId: unit?.id ?? null,
         statusId: status.id,
+        categoryId: category?.id ?? null,
         serialRequired: false,
       },
       update: {
@@ -208,6 +215,7 @@ registerImport({
         brandId: brand?.id ?? null,
         unitId: unit?.id ?? null,
         statusId: status.id,
+        categoryId: category?.id ?? null,
       },
     })
 

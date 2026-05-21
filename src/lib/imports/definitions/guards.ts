@@ -42,7 +42,7 @@ const REQUIRED_HEADERS = ["name", "cnic"] as const
 const OPTIONAL_HEADERS = [
   "parwest id", "regional office", "father name", "mother name", "date of birth",
   "cnic issue date", "cnic expiry date", "next of kin", "contact no",
-  "passport no", "passport expiry date", "religion", "sect", "cast",
+  "religion", "sect", "cast",
   "designation", "salary", "police station", "blood group", "ex service",
   "other", "registration no", "rank", "group", "service period",
   "service years", "service months", "date of enrolment", "date of discharge",
@@ -51,7 +51,6 @@ const OPTIONAL_HEADERS = [
   "education name of institution", "introducer name", "introducer cnic",
   "introducer number", "introducer address", "height", "weight", "eye color",
   "hair color", "disability", "mark of identification", "current status",
-  "termination date",
   // First / second / third previous employment
   "first employment company", "first employment start date", "first employment end date",
   "second employment company", "second employment start date", "second employment end date",
@@ -101,8 +100,6 @@ const HEADER_ALIASES: Record<string, string> = {
   "cnic expiry date": "cnicExpiryDate",
   "next of kin": "nextOfKin",
   "contact no": "phone",
-  "passport no": "passportNo",
-  "passport expiry date": "passportExpiryDate",
   religion: "religion",
   sect: "sect",
   cast: "cast",
@@ -139,7 +136,6 @@ const HEADER_ALIASES: Record<string, string> = {
   disability: "disability",
   "mark of identification": "identificationMark",
   "current status": "currentStatusRaw",
-  "termination date": "terminationDate",
   marital_status: "maritalStatus",
 }
 // Indexed groups (nearest / family / employment / judicial). The persist
@@ -329,8 +325,6 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "cnicExpiryDate", header: "cnic expiry date", label: "CNIC Expiry Date", kind: "date", required: false },
   { key: "nextOfKin", header: "next of kin", label: "Next of Kin", kind: "text", required: false },
   { key: "phone", header: "contact no", label: "Contact No", kind: "text", required: false },
-  { key: "passportNo", header: "passport no", label: "Passport No", kind: "text", required: false },
-  { key: "passportExpiryDate", header: "passport expiry date", label: "Passport Expiry Date", kind: "date", required: false },
   { key: "religion", header: "religion", label: "Religion", kind: "text", required: false },
   { key: "sect", header: "sect", label: "Sect", kind: "text", required: false },
   { key: "cast", header: "cast", label: "Cast", kind: "text", required: false },
@@ -366,8 +360,14 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "hairColor", header: "hair color", label: "Hair Color", kind: "text", required: false },
   { key: "disability", header: "disability", label: "Disability", kind: "text", required: false },
   { key: "identificationMark", header: "mark of identification", label: "Mark of Identification", kind: "text", required: false },
-  { key: "currentStatusRaw", header: "current status", label: "Current Status", kind: "text", required: false },
-  { key: "terminationDate", header: "termination date", label: "Termination Date", kind: "date", required: false },
+  {
+    key: "currentStatusRaw",
+    header: "current status",
+    label: "Current Status",
+    kind: "enum",
+    required: false,
+    enumValues: ["active", "inactive", "terminated", "resigned", "absconded", "fired"],
+  },
 
   // First / second / third previous employment
   { key: "employment_1_unit", header: "first employment company", label: "First Employment Company", kind: "text", required: false },
