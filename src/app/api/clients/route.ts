@@ -7,6 +7,7 @@ import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerS
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
+import { cityForBranch, cityForRegionId } from "@/lib/geo/regionCity"
 
 export async function GET(request: NextRequest) {
     try {
@@ -108,12 +109,13 @@ export async function POST(request: NextRequest) {
             ? "Default Branch"
             : rawBranchName
 
-        // Resolve city — form sends it as `clientLocation`
-        const city = body.clientLocation || body.city || null
-
         // Resolve regionId and regionalOfficeId
         const regionId = body.regionId || body.locationRegionalOffice || null
         const regionalOfficeId = body.regionalOfficeId || null
+
+        // Derive city from the region — Region.name IS the operating city.
+        // Ignore any client-sent city/clientLocation to prevent region/city drift.
+        const city = await cityForRegionId(prisma, regionId)
 
         // Resolve GPS — prefer manual override over map picker
         const latitude  = parseFloat(body.latitudeManual  || body.latitude  || "") || null
@@ -122,6 +124,13 @@ export async function POST(request: NextRequest) {
         // Parse numeric capacities
         const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
         const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
+
+        // Derive the default branch's city from its own region (may differ from the client's region).
+        const branchCity = await cityForBranch(prisma, {
+            regionalOfficeId: body.branchRegionalOfficeId || regionalOfficeId || null,
+            regionId: body.branchRegionId || regionId || null,
+            clientId: null,
+        })
 
         const client = await prisma.client.create({
             data: {
@@ -198,7 +207,7 @@ export async function POST(request: NextRequest) {
                             type:          body.branchType        || null,
                             isHeadOffice:  true,
                             address:       body.headOfficeAddress || null,
-                            city,
+                            city:          branchCity,
                             contactPerson: body.branchContactPerson || body.contactPerson || null,
                             contactPhone:  body.branchContactPhone  || body.contactNumber  || null,
                             // branch-specific fields from the expanded branch section

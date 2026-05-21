@@ -64,13 +64,6 @@ import {
 } from "@/components/shadcn/alert-dialog"
 
 // ── Constants ───────────────────────────────────────────────────────────────
-const CITY_OPTIONS = [
-    "All Cities", "Lahore", "Gujranwala", "Sahiwal", "Islamabad", "Karachi", "Multan", "Faisalabad",
-    "Khanpur", "Chichawatni", "Bahawalpur", "Mian Channu", "Khanewal", "Ahmedpur East",
-    "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Basti Malook", "Bhagalchur",
-    "Bhalwal", "Bahawalnagar", "Bhaipheru", "Bhakkar", "Burewala", "Chailianwala", "Chakwal",
-    "Chiniot", "Chowk Azam", "Chowk Sarwar Shaheed", "Daska",
-].map((c) => ({ value: c, label: c }))
 
 const PROVINCE_OPTIONS = [
     { value: "Punjab", label: "Punjab" },
@@ -234,6 +227,12 @@ export default function ClientEditForm({
 
     const watchedRegionId = useWatch({ control: form.control, name: "regionId" })
     const isBranchless = useWatch({ control: form.control, name: "isBranchless" }) ?? true
+
+    // Derive: city always mirrors the selected region's name
+    useEffect(() => {
+        const regionName = regions.find((r) => r.id === watchedRegionId)?.name ?? ""
+        form.setValue("clientLocation", regionName, { shouldDirty: true })
+    }, [watchedRegionId, regions, form])
 
     // Cascade: regional offices
     useEffect(() => {
@@ -708,18 +707,20 @@ export default function ClientEditForm({
                                 name="clientLocation"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Client Location</FormLabel>
+                                        <FormLabel>City (follows region)</FormLabel>
                                         <FormControl>
-                                            <div>
-                                                <SearchSelect
-                                                    name="clientLocation"
-                                                    options={CITY_OPTIONS}
-                                                    defaultValue={field.value || ""}
-                                                    placeholder="Select city"
-                                                    onChange={(v) => field.onChange(v)}
-                                                />
-                                            </div>
+                                            <Input
+                                                {...field}
+                                                value={field.value ?? ""}
+                                                readOnly
+                                                disabled
+                                                placeholder="Set by selecting a region"
+                                                className="bg-[var(--surface-muted)] cursor-not-allowed"
+                                            />
                                         </FormControl>
+                                        <FormDescription>
+                                            Derived automatically from the selected region.
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}

@@ -6,6 +6,7 @@ import { badRequest, conflict, forbidden, internalServerError, notFound, unautho
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+import { cityForRegionId } from "@/lib/geo/regionCity"
 
 const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
 const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
@@ -58,8 +59,9 @@ export async function PUT(
             return forbidden("Forbidden: cannot move client outside your scope.")
         }
 
-        // Resolve city — form sends it as `clientLocation`
-        const city = body.clientLocation || body.city || null
+        // Derive city from the region — Region.name IS the operating city.
+        // Ignore any client-sent city/clientLocation to prevent region/city drift.
+        const city = await cityForRegionId(prisma, body.regionId || null)
 
         // Reserve % override — accept null/blank or a decimal between 0 and 1.
         let reservePctValue: number | null | undefined = undefined

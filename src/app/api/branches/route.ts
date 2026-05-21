@@ -6,6 +6,7 @@ import { badRequest, forbidden, internalServerError, notFound, unauthorized } fr
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { cityForBranch } from "@/lib/geo/regionCity"
 
 export async function GET(request: NextRequest) {
     try {
@@ -105,13 +106,21 @@ export async function POST(request: NextRequest) {
         const toBool = (v: unknown) => v === true || v === "true" || v === "on"
 
         const branch = await prisma.$transaction(async (tx) => {
+            // Derive city from the branch's region — Region.name IS the operating city.
+            // Ignore any client-sent city to prevent region/city drift.
+            const city = await cityForBranch(tx, {
+                regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
+                regionId: body?.regionId ? String(body.regionId) : null,
+                clientId,
+            })
+
             const created = await tx.branch.create({
                 data: {
                     clientId,
                     name,
                     code: body?.code ? String(body.code).trim() : null,
                     address: body?.address ? String(body.address) : null,
-                    city: body?.city ? String(body.city) : null,
+                    city,
                     province: body?.province ? String(body.province) : null,
                     contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
                     contactPersonDesignation: body?.contactPersonDesignation ? String(body.contactPersonDesignation) : null,

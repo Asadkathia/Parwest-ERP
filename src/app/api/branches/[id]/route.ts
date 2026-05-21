@@ -17,6 +17,7 @@ import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { BRANCH_CAPACITY_FIELDS } from "@/lib/schemas/branch"
 import { CAPACITY_USAGE_RULES } from "@/lib/branches/capacity"
+import { cityForBranch } from "@/lib/geo/regionCity"
 
 // ── Zod schema for PATCH body ───────────────────────────────────────────────
 // Stays tolerant on identity/contact fields (legacy callers pass partials)
@@ -183,7 +184,7 @@ export async function PATCH(
         if (body.name !== undefined) updateData.name = body.name.trim()
         if (body.code !== undefined) updateData.code = body.code ? String(body.code).trim() : null
         if (body.address !== undefined) updateData.address = body.address ? String(body.address) : null
-        if (body.city !== undefined) updateData.city = body.city ? String(body.city) : null
+        // city is always derived from the branch's region — never taken from body.city.
         if (body.province !== undefined) updateData.province = body.province ? String(body.province) : null
         if (body.contactPerson !== undefined) updateData.contactPerson = body.contactPerson ? String(body.contactPerson) : null
         if (body.contactPhone !== undefined) updateData.contactPhone = body.contactPhone ? String(body.contactPhone) : null
@@ -208,6 +209,22 @@ export async function PATCH(
         // a stale ACTIVE row never coexists with a new one (single source of
         // truth: at most one ACTIVE ClientSupervisorAssignment per branch).
         const branch = await prisma.$transaction(async (tx) => {
+            // Derive city strictly from the branch's EXISTING, persisted region.
+            // regionalOfficeId and regionId are intentionally NOT editable via this
+            // endpoint — body.regionalOfficeId / body.regionId are ignored here to
+            // prevent region/city drift where city would reflect a new office while
+            // the stored region stays old.
+            // NOTE: if branch-region editing is ever added to this endpoint, the
+            // caller must also persist regionalOfficeId into updateData AND then
+            // re-derive city here using the new persisted value — not body directly.
+            const resolvedClientId = body.clientId ? body.clientId : existing.clientId
+            const derivedCity = await cityForBranch(tx, {
+                regionalOfficeId: existing.regionalOfficeId,
+                regionId: null,
+                clientId: resolvedClientId,
+            })
+            updateData.city = derivedCity
+
             const updated = await tx.branch.update({
                 where: { id },
                 data: updateData,

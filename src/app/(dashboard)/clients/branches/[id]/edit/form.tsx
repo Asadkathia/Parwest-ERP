@@ -510,12 +510,14 @@ export default function BranchEditForm({
                                 name="city"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>City</FormLabel>
+                                        <FormLabel>City <span className="text-xs font-normal text-muted-foreground">(follows region)</span></FormLabel>
                                         <FormControl>
                                             <Input
-                                                placeholder="e.g., Lahore, Karachi"
+                                                readOnly
+                                                disabled
                                                 {...field}
                                                 value={field.value ?? ""}
+                                                className="bg-[var(--surface-muted)] cursor-not-allowed"
                                             />
                                         </FormControl>
                                         <FormMessage />

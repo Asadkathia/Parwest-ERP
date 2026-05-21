@@ -84,45 +84,6 @@ const PROVINCE_OPTIONS = [
     { value: "Islamabad", label: "Islamabad Capital Territory" },
 ]
 
-// Province → cities map. The City dropdown is filtered by the selected
-// Province so e.g. "KPK" cannot have "Lahore" picked (ticket #47).
-const CITIES_BY_PROVINCE: Record<string, string[]> = {
-    Punjab: [
-        "Lahore", "Faisalabad", "Rawalpindi", "Multan", "Gujranwala", "Sialkot",
-        "Bahawalpur", "Sargodha", "Sahiwal", "Sheikhupura", "Kasur", "Okara",
-        "Khanewal", "Mian Channu", "Burewala", "Jhang", "Toba Tek Singh",
-        "Dera Ghazi Khan", "Rahim Yar Khan", "Khanpur", "Ahmedpur East", "Ali Pur",
-        "Arifwala", "Attock", "Bahawalnagar", "Bhalwal", "Bhakkar", "Chakwal",
-        "Chiniot", "Chichawatni", "Daska", "Bhaipheru", "Chowk Azam",
-        "Chowk Sarwar Shaheed", "Basti Malook", "Bhagalchur", "Chailianwala",
-        "Ahmed Nager Chatha",
-    ],
-    Sindh: [
-        "Karachi", "Hyderabad", "Sukkur", "Larkana", "Mirpur Khas", "Nawabshah",
-        "Thatta", "Jacobabad", "Shikarpur", "Khairpur", "Dadu", "Ghotki", "Badin",
-        "Tando Adam", "Tando Allahyar", "Tando Muhammad Khan",
-    ],
-    KPK: [
-        "Peshawar", "Mardan", "Mingora", "Abbottabad", "Kohat", "Bannu",
-        "Dera Ismail Khan", "Swabi", "Charsadda", "Nowshera", "Haripur", "Mansehra",
-        "Chitral", "Hangu", "Karak", "Lakki Marwat", "Tank", "Battagram",
-    ],
-    Balochistan: [
-        "Quetta", "Turbat", "Khuzdar", "Hub", "Chaman", "Gwadar", "Sibi",
-        "Dera Murad Jamali", "Loralai", "Zhob", "Kalat", "Mastung", "Pasni",
-    ],
-    Islamabad: ["Islamabad"],
-}
-
-const ALL_CITY_OPTIONS = Object.values(CITIES_BY_PROVINCE)
-    .flat()
-    .map((c) => ({ value: c, label: c }))
-
-function getCityOptionsForProvince(province: string): { value: string; label: string }[] {
-    if (!province) return ALL_CITY_OPTIONS
-    const cities = CITIES_BY_PROVINCE[province] ?? []
-    return cities.map((c) => ({ value: c, label: c }))
-}
 
 const BRANCH_MODEL_OPTIONS = [
     { value: "CONVENTIONAL", label: "Conventional" },
@@ -244,6 +205,13 @@ export default function BranchForm({
             })
             .catch(() => {})
     }, [])
+
+    // Mirror city from selected region (Region.name IS the operating city).
+    useEffect(() => {
+        const regionName = regions.find((r) => r.id === selectedRegionId)?.name ?? ""
+        form.setValue("city", regionName, { shouldValidate: false, shouldDirty: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedRegionId, regions])
 
     // Load regional offices when region changes
     useEffect(() => {
@@ -517,12 +485,6 @@ export default function BranchForm({
                                 )}
                             />
 
-                            {/*
-                              Ticket #47: city options depend on province.
-                              We render Province first, then City filtered by it.
-                              Selecting a new province clears the city if the
-                              old city isn't valid in the new province.
-                            */}
                             <FormField
                                 control={form.control}
                                 name="province"
@@ -536,14 +498,7 @@ export default function BranchForm({
                                                     options={PROVINCE_OPTIONS}
                                                     defaultValue={field.value || ""}
                                                     placeholder="Select province"
-                                                    onChange={(v) => {
-                                                        field.onChange(v)
-                                                        const validCities = CITIES_BY_PROVINCE[v] ?? []
-                                                        const currentCity = form.getValues("city")
-                                                        if (currentCity && !validCities.includes(currentCity)) {
-                                                            form.setValue("city", "", { shouldValidate: true })
-                                                        }
-                                                    }}
+                                                    onChange={(v) => field.onChange(v)}
                                                 />
                                             </div>
                                         </FormControl>
@@ -555,30 +510,22 @@ export default function BranchForm({
                             <FormField
                                 control={form.control}
                                 name="city"
-                                render={({ field }) => {
-                                    const province = form.watch("province")
-                                    const cityOptions = getCityOptionsForProvince(province ?? "")
-                                    return (
-                                        <FormItem>
-                                            <FormLabel>City</FormLabel>
-                                            <FormControl>
-                                                <div>
-                                                    <SearchSelect
-                                                        // key forces remount when province changes so
-                                                        // SearchSelect's internal defaultValue resets
-                                                        key={`city-${province ?? "all"}`}
-                                                        name="city"
-                                                        options={cityOptions}
-                                                        defaultValue={field.value || ""}
-                                                        placeholder={province ? "Select city" : "Select province first"}
-                                                        onChange={(v) => field.onChange(v)}
-                                                    />
-                                                </div>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )
-                                }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>City <span className="text-xs font-normal text-muted-foreground">(follows region)</span></FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                readOnly
+                                                disabled
+                                                placeholder="— Select a region above —"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                                className="bg-[var(--surface-muted)] cursor-not-allowed"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div>
 

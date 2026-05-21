@@ -69,13 +69,6 @@ import {
 } from "@/components/shadcn/form"
 
 // ── Constants ───────────────────────────────────────────────────────────────
-const CITY_OPTIONS = [
-    "All Cities", "Lahore", "Gujranwala", "Sahiwal", "Islamabad", "Karachi", "Multan", "Faisalabad",
-    "Khanpur", "Chichawatni", "Bahawalpur", "Mian Channu", "Khanewal", "Ahmedpur East",
-    "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Basti Malook", "Bhagalchur",
-    "Bhalwal", "Bahawalnagar", "Bhaipheru", "Bhakkar", "Burewala", "Chailianwala", "Chakwal",
-    "Chiniot", "Chowk Azam", "Chowk Sarwar Shaheed", "Daska",
-].map((c) => ({ value: c, label: c }))
 
 const PROVINCE_OPTIONS = [
     { value: "Punjab", label: "Punjab" },
@@ -158,7 +151,7 @@ export default function ClientEnrollmentForm({
             contactPersonDesignation: "",
             contactNumber: "",
             contactNumbers: [],
-            clientLocation: "Lahore",
+            clientLocation: "",
             clientPostalCode: "",
             headOfficeAddress: "",
 
@@ -264,6 +257,12 @@ export default function ClientEnrollmentForm({
             .catch(() => {})
     }, [])
 
+    // ── Derive: client city always mirrors region name ─────────────────────────
+    useEffect(() => {
+        const regionName = regions.find((r) => r.id === watchedRegionId)?.name ?? ""
+        form.setValue("clientLocation", regionName, { shouldDirty: true })
+    }, [watchedRegionId, regions, form])
+
     // ── Cascade: client-level region → regional offices + managers ────────────
     useEffect(() => {
         setRegionalOffices([])
@@ -349,6 +348,17 @@ export default function ClientEnrollmentForm({
             })
             .catch(() => {})
     }, [branchRegionId])
+
+    // ── Derive: branch city always mirrors branch region name ─────────────────
+    const [branchCityDerived, setBranchCityDerived] = useState(
+        isRegionalViewer && viewerRegionId
+            ? (regions.find((r) => r.id === viewerRegionId)?.name ?? "")
+            : "",
+    )
+    useEffect(() => {
+        const regionName = regions.find((r) => r.id === branchRegionId)?.name ?? ""
+        setBranchCityDerived(regionName)
+    }, [branchRegionId, regions])
 
     // ── OCR + attachment helpers ──────────────────────────────────────────────
     const applyOcrFields = (fields: Record<string, string>) => {
@@ -843,18 +853,20 @@ export default function ClientEnrollmentForm({
                                 name="clientLocation"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Client Location</FormLabel>
+                                        <FormLabel>City (follows region)</FormLabel>
                                         <FormControl>
-                                            <div>
-                                                <SearchSelect
-                                                    name="clientLocation"
-                                                    options={CITY_OPTIONS}
-                                                    defaultValue={field.value || "Lahore"}
-                                                    placeholder="Select city"
-                                                    onChange={(v) => field.onChange(v)}
-                                                />
-                                            </div>
+                                            <Input
+                                                {...field}
+                                                value={field.value ?? ""}
+                                                readOnly
+                                                disabled
+                                                placeholder="Set by selecting a region"
+                                                className="bg-[var(--surface-muted)] cursor-not-allowed"
+                                            />
                                         </FormControl>
+                                        <FormDescription>
+                                            Derived automatically from the selected region.
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -1339,12 +1351,19 @@ export default function ClientEnrollmentForm({
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-                                    <SearchSelect
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">City (follows region)</label>
+                                    <input
+                                        type="text"
                                         name="branchCity"
-                                        options={CITY_OPTIONS}
-                                        placeholder="— Select City —"
+                                        value={branchCityDerived}
+                                        readOnly
+                                        disabled
+                                        placeholder="Set by selecting a region"
+                                        className="ui-input bg-[var(--surface-muted)] cursor-not-allowed opacity-75"
                                     />
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                        Derived automatically from the selected region.
+                                    </p>
                                 </div>
                             </div>
 
