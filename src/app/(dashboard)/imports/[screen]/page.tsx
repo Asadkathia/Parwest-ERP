@@ -4,7 +4,7 @@ import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 export default async function ImportScreenPage({ params }: { params: Promise<{ screen: string }> }) {
   const { screen } = await params
-  const supported = ["users", "guards", "clients", "inventory"]
+  const supported = ["users", "guards", "clients", "inventory", "loans"]
 
   if (!supported.includes(screen)) {
     notFound()
@@ -12,7 +12,7 @@ export default async function ImportScreenPage({ params }: { params: Promise<{ s
 
   return (
     <ImportsLifecycleManager
-      initialModule={screen as "users" | "guards" | "clients" | "inventory"}
+      initialModule={screen as "users" | "guards" | "clients" | "inventory" | "loans"}
       draftEditorEnabled={isWorkflowRuleEnabled("imports.draftEditor")}
     />
   )

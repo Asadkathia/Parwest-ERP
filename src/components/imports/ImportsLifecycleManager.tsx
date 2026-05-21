@@ -20,8 +20,8 @@ import { useEffect, useMemo, useState } from "react"
 import DataTable from "@/components/shared/DataTable"
 import { importLinks } from "@/lib/parity/screenConfigs"
 
-type ImportModule = "users" | "guards" | "clients" | "inventory"
-const MODULES: ImportModule[] = ["users", "guards", "clients", "inventory"]
+type ImportModule = "users" | "guards" | "clients" | "inventory" | "loans"
+const MODULES: ImportModule[] = ["users", "guards", "clients", "inventory", "loans"]
 
 type ValidationError = {
   row: number
@@ -78,6 +78,9 @@ function sampleCsv(moduleName: ImportModule) {
   }
   if (moduleName === "clients") {
     return "name,type\nClient One,BANK\nClient Two,OTHER"
+  }
+  if (moduleName === "loans") {
+    return "parwest id,month,amount\nPW-00001,2026-05,5000\nPW-00002,2026-05,3000"
   }
   return "sku,name,storeCode,quantityOnHand,brand,status\nWT-001,Walkie Talkie,RO-L,12,Motorola,ACTIVE\nUF-001,Uniform Set,RO-L,50,Parwest,ACTIVE"
 }
@@ -361,6 +364,7 @@ export default function ImportsLifecycleManager({ initialModule = "users", draft
               <option value="guards">Guards</option>
               <option value="clients">Clients</option>
               <option value="inventory">Inventory</option>
+              <option value="loans">Guard Loans</option>
             </select>
           </div>
           <div>
