@@ -3,7 +3,8 @@
  * editor. No knowledge of Request/Response — routes handle auth and the
  * API envelope. Functions throw typed errors that routes map to HTTP.
  *
- * Concurrency: finalize takes a row-level lock on BulkImportJob; PATCH
+ * Concurrency: finalize atomically claims the job (DRAFT → PROCESSING via
+ * a single guarded updateMany) so only one concurrent finalize proceeds; PATCH
  * row mutations are last-write-wins within a row but cross-row updates
  * (e.g. duplicate recompute) are atomic within a single PATCH thanks to
  * the per-job transaction.
@@ -316,85 +317,110 @@ export async function finalizeDraft(opts: {
   scope: DraftScope
 }): Promise<{ jobId: string; status: string; successRows: number; failedRows: number }> {
   const definition = await loadDefinitionForJob(opts.jobId)
-  const job = await prisma.$queryRaw<Array<BulkImportJob>>`
-    SELECT * FROM "BulkImportJob" WHERE id = ${opts.jobId} FOR UPDATE
-  `
-  if (!job[0] || job[0].status !== "DRAFT") throw new DraftError("Not a draft", "NOT_FOUND")
 
-  await revalidateAllRows(opts.jobId, definition, opts.scope)
-
-  const rows = await prisma.bulkImportJobRow.findMany({
-    where: { jobId: opts.jobId, skipped: false },
-    orderBy: { rowNumber: "asc" },
+  // Atomic claim: flip DRAFT → PROCESSING in a single statement. Postgres
+  // serialises the UPDATE, so when two finalize calls race (double-click,
+  // two tabs), exactly one sees count === 1 and proceeds; the loser sees 0
+  // and bails. This is the real mutual-exclusion guard — a `SELECT ... FOR
+  // UPDATE` outside a transaction (the previous approach) released the lock
+  // immediately and protected nothing.
+  const claim = await prisma.bulkImportJob.updateMany({
+    where: { id: opts.jobId, status: "DRAFT" },
+    data: { status: "PROCESSING" },
   })
-  const stillBroken = rows.filter(
-    (r) => ((r.errors as unknown as ImportRowError[]) ?? []).length > 0,
-  )
-  if (stillBroken.length > 0) {
-    throw new DraftError("Cannot finalize — errors remain", "VALIDATION_FAILED", {
-      errorRowCount: stillBroken.length,
-    })
-  }
-
-  const ctx = buildCtx(opts.jobId, opts.scope)
-  let successCount = 0
-  const persistErrors: ImportRowError[] = []
-  const persistOne = async (
-    row: BulkImportJobRow,
-    txClient: Prisma.TransactionClient | typeof prisma,
-  ) => {
-    const result = await validateRow(
-      definition,
-      row.data as Record<string, unknown>,
-      { ...ctx, prisma: txClient as never },
-      row.rowNumber,
+  if (claim.count !== 1) {
+    throw new DraftError(
+      "Draft is not available to finalize (already processing or finalized)",
+      "CONFLICT",
     )
-    if (result.errors.length > 0 || !result.data) {
-      persistErrors.push(...result.errors)
-      return
-    }
-    try {
-      await definition.persist(result.data as never, {
-        ...ctx,
-        prisma: txClient as never,
-        tx: txClient as never,
-      })
-      successCount += 1
-    } catch (err) {
-      persistErrors.push({
-        row: row.rowNumber,
-        field: "__row__",
-        message: err instanceof Error ? err.message : "Failed to persist row",
-      })
-    }
   }
-  if (definition.persistInTransaction) {
-    try {
-      await prisma.$transaction(async (tx) => {
-        for (const r of rows) await persistOne(r, tx)
-        if (persistErrors.length > 0) throw new Error(`${persistErrors.length} rows failed`)
+
+  // From here the job is PROCESSING. Any early exit MUST restore it to DRAFT
+  // so the user isn't stranded (getOwnedDraft only returns DRAFT jobs).
+  try {
+    await revalidateAllRows(opts.jobId, definition, opts.scope)
+
+    const rows = await prisma.bulkImportJobRow.findMany({
+      where: { jobId: opts.jobId, skipped: false },
+      orderBy: { rowNumber: "asc" },
+    })
+    const stillBroken = rows.filter(
+      (r) => ((r.errors as unknown as ImportRowError[]) ?? []).length > 0,
+    )
+    if (stillBroken.length > 0) {
+      throw new DraftError("Cannot finalize — errors remain", "VALIDATION_FAILED", {
+        errorRowCount: stillBroken.length,
       })
-    } catch {
-      successCount = 0
     }
-  } else {
-    for (const r of rows) await persistOne(r, prisma)
+
+    const ctx = buildCtx(opts.jobId, opts.scope)
+    let successCount = 0
+    const persistErrors: ImportRowError[] = []
+    const persistOne = async (
+      row: BulkImportJobRow,
+      txClient: Prisma.TransactionClient | typeof prisma,
+    ) => {
+      const result = await validateRow(
+        definition,
+        row.data as Record<string, unknown>,
+        { ...ctx, prisma: txClient as never },
+        row.rowNumber,
+      )
+      if (result.errors.length > 0 || !result.data) {
+        persistErrors.push(...result.errors)
+        return
+      }
+      try {
+        await definition.persist(result.data as never, {
+          ...ctx,
+          prisma: txClient as never,
+          tx: txClient as never,
+        })
+        successCount += 1
+      } catch (err) {
+        persistErrors.push({
+          row: row.rowNumber,
+          field: "__row__",
+          message: err instanceof Error ? err.message : "Failed to persist row",
+        })
+      }
+    }
+    if (definition.persistInTransaction) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const r of rows) await persistOne(r, tx)
+          if (persistErrors.length > 0) throw new Error(`${persistErrors.length} rows failed`)
+        })
+      } catch {
+        successCount = 0
+      }
+    } else {
+      for (const r of rows) await persistOne(r, prisma)
+    }
+    const failed = rows.length - successCount
+    const status =
+      successCount === 0 ? "FAILED" : failed === 0 ? "COMPLETED" : "PARTIALLY_COMPLETED"
+    await prisma.bulkImportJob.update({
+      where: { id: opts.jobId },
+      data: {
+        status,
+        finishedAt: new Date(),
+        successRows: successCount,
+        failedRows: failed,
+        processedRows: rows.length,
+        expiresAt: null,
+        errorRows: persistErrors as unknown as Prisma.InputJsonValue,
+      },
+    })
+    return { jobId: opts.jobId, status, successRows: successCount, failedRows: failed }
+  } catch (err) {
+    // Restore the claim so the draft remains editable / retryable. Guard on
+    // status=PROCESSING so we never clobber a terminal status set elsewhere.
+    await prisma.bulkImportJob
+      .updateMany({ where: { id: opts.jobId, status: "PROCESSING" }, data: { status: "DRAFT" } })
+      .catch(() => {})
+    throw err
   }
-  const failed = rows.length - successCount
-  const status = successCount === 0 ? "FAILED" : failed === 0 ? "COMPLETED" : "PARTIALLY_COMPLETED"
-  await prisma.bulkImportJob.update({
-    where: { id: opts.jobId },
-    data: {
-      status,
-      finishedAt: new Date(),
-      successRows: successCount,
-      failedRows: failed,
-      processedRows: rows.length,
-      expiresAt: null,
-      errorRows: persistErrors as unknown as Prisma.InputJsonValue,
-    },
-  })
-  return { jobId: opts.jobId, status, successRows: successCount, failedRows: failed }
 }
 
 export async function deleteDraft(jobId: string, actorUserId: string): Promise<void> {

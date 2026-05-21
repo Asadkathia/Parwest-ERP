@@ -38,6 +38,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
           { status: 422 },
         )
       }
+      if (err.code === "CONFLICT") {
+        return NextResponse.json(
+          { success: false, message: err.message, code: "CONFLICT" },
+          { status: 409 },
+        )
+      }
       if (err.code === "NOT_FOUND") return notFound(err.message)
     }
     throw err
