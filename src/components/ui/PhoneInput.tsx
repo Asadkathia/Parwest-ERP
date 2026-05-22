@@ -8,6 +8,7 @@ interface PhoneInputProps {
     placeholder?: string
     defaultValue?: string
     className?: string
+    disabled?: boolean
 }
 
 const PREFIX = "+92-"
@@ -25,6 +26,7 @@ export default function PhoneInput({
     placeholder = "+92-300-1234567",
     defaultValue,
     className = "ui-input",
+    disabled = false,
 }: PhoneInputProps) {
     const initDigits = defaultValue
         ? defaultValue.replace(/^\+92-?/, "").replace(/\D/g, "")
@@ -91,6 +93,7 @@ export default function PhoneInput({
                 onFocus={handleFocus}
                 placeholder={placeholder}
                 maxLength={16}  // +92-300-1234567 = 16 chars
+                disabled={disabled}
                 className={`${className} ${error ? "border-red-400 focus:ring-red-300" : ""} pr-8`}
                 autoComplete="tel"
             />

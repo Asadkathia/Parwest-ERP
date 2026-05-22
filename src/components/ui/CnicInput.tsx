@@ -9,6 +9,7 @@ type Props = {
   placeholder?: string
   defaultValue?: string
   className?: string
+  disabled?: boolean
   /** Async uniqueness check endpoint. Should return { exists: boolean, message?: string }. Receives ?cnic=XXXXX-XXXXXXX-X */
   uniqueCheckUrl?: string
   /** Exclude this guard id when checking uniqueness (for edit pages). */
@@ -21,6 +22,7 @@ export default function CnicInput({
   placeholder = "xxxxx-xxxxxxx-x",
   defaultValue,
   className = "ui-input",
+  disabled = false,
   uniqueCheckUrl,
   excludeGuardId,
 }: Props) {
@@ -88,6 +90,7 @@ export default function CnicInput({
         maxLength={15}
         inputMode="numeric"
         autoComplete="off"
+        disabled={disabled}
         className={`${className} ${hasError ? "border-red-400 focus:ring-red-300" : ""} pr-8`}
         aria-invalid={hasError}
         aria-describedby={hasError ? `${name}-error` : undefined}

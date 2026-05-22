@@ -105,6 +105,7 @@ function toIsoDate(value?: string | Date | null): string {
 export default function GeneralInformationTab({ guard, canUpdate = false }: GeneralInformationProps) {
     const router = useRouter()
     const [submitting, setSubmitting] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
 
     const form = useForm<GuardPersonalInput>({
         resolver: zodResolver(guardPersonalSchema),
@@ -145,6 +146,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                 return
             }
             toast.success("Personal details updated")
+            setIsEditing(false)
             router.refresh()
         } catch {
             toast.error("Network error — please try again")
@@ -186,6 +188,11 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">General Information</h2>
+                {canUpdate && !isEditing && (
+                    <Button type="button" onClick={() => setIsEditing(true)}>
+                        Edit
+                    </Button>
+                )}
             </div>
 
             {/* Editable Personal Information — canonical Form pattern */}
@@ -216,7 +223,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                         Full Name<RequiredMark />
                                     </FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Enter full name" {...field} disabled={!canUpdate} />
+                                        <Input placeholder="Enter full name" {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -246,6 +253,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                                 defaultValue={field.value}
                                                 uniqueCheckUrl="/api/guards/check-cnic"
                                                 excludeGuardId={guard.id}
+                                                disabled={!isEditing}
                                                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                         </div>
@@ -273,6 +281,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                             <PhoneInput
                                                 name="phone"
                                                 defaultValue={field.value || ""}
+                                                disabled={!isEditing}
                                                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                         </div>
@@ -290,7 +299,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Email</FormLabel>
                                     <FormControl>
-                                        <Input type="email" placeholder="name@example.com" {...field} disabled={!canUpdate} />
+                                        <Input type="email" placeholder="name@example.com" {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -315,7 +324,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                                     <Button
                                                         type="button"
                                                         variant="outline"
-                                                        disabled={!canUpdate}
+                                                        disabled={!isEditing}
                                                         className={cn(
                                                             "w-full justify-start text-left font-normal",
                                                             !valid && "text-muted-foreground"
@@ -353,7 +362,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Father&apos;s Name</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -368,7 +377,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Mother&apos;s Name</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -383,7 +392,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Religion</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -400,7 +409,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                     <Select
                                         value={field.value || ""}
                                         onValueChange={field.onChange}
-                                        disabled={!canUpdate}
+                                        disabled={!isEditing}
                                     >
                                         <FormControl>
                                             <SelectTrigger>
@@ -427,7 +436,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Nationality</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -442,7 +451,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem>
                                     <FormLabel>Emergency Contact</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -457,7 +466,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem className="md:col-span-2">
                                     <FormLabel>Current Address</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -472,7 +481,7 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                                 <FormItem className="md:col-span-2">
                                     <FormLabel>Permanent Address</FormLabel>
                                     <FormControl>
-                                        <Input {...field} disabled={!canUpdate} />
+                                        <Input {...field} disabled={!isEditing} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -480,15 +489,15 @@ export default function GeneralInformationTab({ guard, canUpdate = false }: Gene
                         />
                     </div>
 
-                    {canUpdate ? (
+                    {isEditing ? (
                         <div className="flex justify-end gap-3">
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => form.reset()}
+                                onClick={() => { form.reset(); setIsEditing(false) }}
                                 disabled={submitting}
                             >
-                                Reset
+                                Cancel
                             </Button>
                             <Button type="submit" disabled={submitting}>
                                 {submitting ? (
