@@ -17,27 +17,43 @@ export async function GET(req: NextRequest) {
     return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
   }
 
-  // Existence-only check is intentionally unscoped: a CNIC enrolled in
-  // another region must still block creation here, otherwise the unique
-  // constraint on Guard.cnic surfaces as a 500 mid-form.
+  // Existence check is intentionally unscoped: a CNIC enrolled in another
+  // region must still surface here. We inspect the MOST RECENT profile for the
+  // CNIC (Guard.cnic is no longer @unique — a DB partial-unique index allows
+  // multiple rows per CNIC as long as at most one is non-terminated, so the
+  // most-recent row determines availability).
   const [guard, blacklisted] = await Promise.all([
     prisma.guard.findFirst({
       where: {
         cnic,
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
-      select: { id: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, lifecycleStatus: true },
     }),
     prisma.blacklistedCnic.findUnique({ where: { cnic } }),
   ])
 
+  // New-profile model: a non-terminated most-recent profile BLOCKS. If the most
+  // recent profile is TERMINATED (resigned/terminated) — or no profile exists —
+  // the CNIC is available for a brand-new profile (reEnrollable). `exists`
+  // remains true whenever any profile is found so existing callers keep
+  // working; new callers branch on `reEnrollable` to allow the submit.
+  const isTerminated = guard?.lifecycleStatus === "TERMINATED"
+  const blocked = Boolean(guard) && !isTerminated && !blacklisted
+  const reEnrollable = !blacklisted && (!guard || isTerminated)
+
   return ok({
     exists: Boolean(guard),
     blacklisted: Boolean(blacklisted),
+    status: guard?.lifecycleStatus ?? null,
+    reEnrollable,
     message: blacklisted
       ? "This CNIC is blacklisted and cannot be enrolled"
-      : guard
-        ? "A guard with this CNIC already exists"
-        : undefined,
+      : blocked
+        ? "This guard is already enrolled and active. You cannot enroll the same CNIC again unless the previous profile is marked as Resigned or Terminated."
+        : guard
+          ? "This CNIC belongs to a terminated guard and is available for a new profile"
+          : undefined,
   })
 }

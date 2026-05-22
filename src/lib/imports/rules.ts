@@ -8,12 +8,18 @@
 
 import { z } from "zod"
 
+import { CNIC_REGEX, PHONE_REGEX } from "@/lib/validation/formats"
+import { isSentinel } from "./coerce"
 import type { ConditionalRule, DuplicateRule, ReferenceResolver } from "./types"
 
-/** Standard CNIC regex used elsewhere — re-exported for definition use. */
-export const CNIC_REGEX = /^\d{5}-\d{7}-\d$/
-/** Pakistani phone format used in the rest of the app. */
-export const PHONE_REGEX = /^\+92-\d{3}-\d{7}$/
+/**
+ * CNIC + phone formats are owned by `@/lib/validation/formats` so the
+ * single-create enrollment form/route and the bulk-import definitions share
+ * ONE regex each — the two enrollment paths cannot drift apart. We re-export
+ * them here so existing import-definition call sites keep working without
+ * reaching across modules.
+ */
+export { CNIC_REGEX, PHONE_REGEX }
 
 /** ISO date `YYYY-MM-DD` (also accepts the same coerced from Excel cells). */
 export const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
@@ -40,6 +46,82 @@ export const nonNegativeInt = (label: string) =>
     const n = typeof v === "number" ? v : Number(String(v).trim())
     return Number.isFinite(n) ? n : NaN
   }, z.number({ message: `${label} is required` }).int(`${label} must be an integer`).nonnegative(`${label} must be ≥ 0`))
+
+/**
+ * Zod helper for a required field whose value must be a *real* value — not a
+ * template sentinel ("Nil", "N/A", "-", "BULK", …). A plain `requiredString`
+ * would accept "Nil" (non-empty) while `coerceString` later turns it into
+ * `null` at persist time → silent data loss on a column the form treats as
+ * mandatory. This builder rejects sentinels up front so a required cell that
+ * holds a placeholder fails validation instead of persisting empty.
+ */
+export const requiredImportString = (label: string, max = 200) =>
+  requiredString(label, max).refine((v) => !isSentinel(v), {
+    message: `${label} is required`,
+  })
+
+/**
+ * Zod helper for a REQUIRED Pakistani phone-number cell. Mirrors the
+ * single-create form rule (PHONE_REGEX, "+92-300-1234567"). Sentinels are
+ * rejected (same reason as `requiredImportString`).
+ */
+export const requiredPhoneField = (label: string) =>
+  requiredImportString(label, 20).regex(
+    PHONE_REGEX,
+    `${label} must be in the format +92-300-1234567`,
+  )
+
+/**
+ * Zod helper for an OPTIONAL Pakistani phone-number cell — empty / sentinel
+ * passes through, but a present value must match PHONE_REGEX. Used for the
+ * optional emergency contact (parity with the single-create form, which only
+ * format-checks emergency contact when supplied).
+ */
+export const optionalPhoneField = (label: string) =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z
+      .union([z.string(), z.number(), z.null(), z.undefined()])
+      .optional()
+      .refine(
+        (v) => isSentinel(v) || PHONE_REGEX.test(String(v)),
+        `${label} must be in the format +92-300-1234567`,
+      ),
+  )
+
+/**
+ * Zod helper for an OPTIONAL email cell — empty / sentinel passes through, but
+ * a present value must be a valid email (parity with the single-create form,
+ * which only validates email when supplied).
+ */
+export const optionalEmailField = (label = "Email") =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z
+      .union([z.string(), z.null(), z.undefined()])
+      .optional()
+      .refine(
+        (v) => isSentinel(v) || z.string().email().safeParse(v).success,
+        `${label} must be a valid email address`,
+      ),
+  )
+
+/**
+ * Zod helper for a REQUIRED non-negative money/amount cell. Accepts Excel
+ * numeric cells or numeric strings; rejects empty / sentinel / non-numeric /
+ * negative. Mirrors the single-create salary rule (numeric, ≥ 0).
+ */
+export const requiredNonNegativeAmount = (label: string) =>
+  z.preprocess(
+    (v) => {
+      if (isSentinel(v)) return undefined
+      const n = typeof v === "number" ? v : Number(String(v).trim())
+      return Number.isFinite(n) ? n : NaN
+    },
+    z
+      .number({ message: `${label} is required` })
+      .nonnegative(`${label} must be ≥ 0`),
+  )
 
 /** Zod helper for a CNIC field with format check. */
 export const cnicField = (label = "CNIC") =>

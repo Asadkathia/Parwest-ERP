@@ -6,7 +6,7 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { calculateAgeYears, MIN_GUARD_AGE, MAX_GUARD_AGE } from "@/lib/validation/formats"
+import { validateGuardDates } from "@/lib/validation/guard-dates"
 import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
@@ -121,35 +121,15 @@ export async function POST(request: NextRequest) {
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
         }
-        const dobStr = body?.dateOfBirth ? String(body.dateOfBirth) : ""
-        if (dobStr) {
-            const computedAge = calculateAgeYears(dobStr)
-            if (computedAge == null || computedAge < MIN_GUARD_AGE || computedAge > MAX_GUARD_AGE) {
-                return badRequest("Guard age must be between 18 and 65.")
-            }
-        }
-        const cnicIssueStr = body?.cnicIssueDate ? String(body.cnicIssueDate).trim() : ""
-        const cnicExpiryStr = body?.cnicExpiryDate ? String(body.cnicExpiryDate).trim() : ""
-        if (cnicIssueStr) {
-            const issue = new Date(cnicIssueStr)
-            if (Number.isNaN(issue.getTime())) {
-                return badRequest("CNIC issue date is invalid.")
-            }
-            if (issue.getTime() > Date.now()) {
-                return badRequest("CNIC issue date cannot be in the future.")
-            }
-        }
-        if (cnicExpiryStr) {
-            const expiry = new Date(cnicExpiryStr)
-            if (Number.isNaN(expiry.getTime())) {
-                return badRequest("CNIC expiry date is invalid.")
-            }
-            if (cnicIssueStr) {
-                const issue = new Date(cnicIssueStr)
-                if (!Number.isNaN(issue.getTime()) && expiry.getTime() <= issue.getTime()) {
-                    return badRequest("CNIC expiry date must be after the issue date.")
-                }
-            }
+        // Date/age validation is shared with the bulk-import path via
+        // validateGuardDates so the two enrollment paths cannot drift apart.
+        const dateError = validateGuardDates({
+            dateOfBirth: body?.dateOfBirth ? String(body.dateOfBirth) : null,
+            cnicIssueDate: body?.cnicIssueDate ? String(body.cnicIssueDate) : null,
+            cnicExpiryDate: body?.cnicExpiryDate ? String(body.cnicExpiryDate) : null,
+        })
+        if (dateError) {
+            return badRequest(dateError)
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
@@ -203,12 +183,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(mock, { status: 201 })
         }
 
-        const existingCnic = await prisma.guard.findUnique({
+        // CNIC re-enrollment gate (new-profile model). Guard.cnic is no longer
+        // @unique — a DB partial-unique index permits multiple rows per CNIC as
+        // long as at most one is non-terminated. We inspect the MOST RECENT
+        // profile for the CNIC: if it's non-terminated (ACTIVE / PENDING /
+        // INACTIVE) we block; otherwise (most recent is TERMINATED, or no
+        // profile exists at all) we fall through and create a BRAND-NEW row.
+        // No reactivation of the old record.
+        const latest = await prisma.guard.findFirst({
             where: { cnic },
-            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            select: { id: true, lifecycleStatus: true },
         })
-        if (existingCnic) {
-            return badRequest("A guard with this CNIC already exists")
+        if (latest && latest.lifecycleStatus !== "TERMINATED") {
+            return badRequest("This guard is already enrolled and active. You cannot enroll the same CNIC again unless the previous profile is marked as Resigned or Terminated.")
         }
 
         // parwest id generation is shared with the bulk-import path via
@@ -322,6 +310,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        const supervisorId = str(body.supervisorId)
+
         let lastCreateError: unknown = null
         for (let attempt = 0; attempt < 3; attempt++) {
             const parwestId = await generateNextParwestId(prisma, officeSeriesCode)
@@ -331,7 +321,6 @@ export async function POST(request: NextRequest) {
                     ageApprovalRequired,
                     ageApprovalStatus: ageApprovalRequired ? "PENDING" : null,
                 }
-                const supervisorId = str(body.supervisorId)
 
                 const guard = await prisma.$transaction(async (tx) => {
                     const newGuard = await tx.guard.create({ data: payload })

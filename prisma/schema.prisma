@@ -258,7 +258,7 @@ model Guard {
   id                       String    @id @default(cuid())
   parwestId                String    @unique
   name                     String
-  cnic                     String    @unique
+  cnic                     String
   phone                    String?
   email                    String?
   dateOfBirth              DateTime?
@@ -398,16 +398,16 @@ model Guard {
 // Judicial / criminal cases tied to a guard. Searchable, reportable, and
 // audit-friendly — replaces the JSON-blob approach used elsewhere.
 model GuardJudicialCase {
-  id                   String    @id @default(cuid())
-  guardId              String
-  guard                Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
-  caseNo               String?
-  caseDate             DateTime?
-  policeStation        String?
-  investigationResult  String?
-  courtResult          String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  guardId             String
+  guard               Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  caseNo              String?
+  caseDate            DateTime?
+  policeStation       String?
+  investigationResult String?
+  courtResult         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([guardId])
   @@index([caseDate])
@@ -2915,27 +2915,27 @@ enum BulkImportStatus {
 }
 
 model BulkImportJob {
-  id            String           @id @default(cuid())
+  id            String             @id @default(cuid())
   module        String // "users" | "guards" | "clients" | "inventory"
   subModule     String? // sub-import key, e.g. "loans", "attendance"
-  status        BulkImportStatus @default(QUEUED)
-  totalRows     Int              @default(0)
-  processedRows Int              @default(0)
-  successRows   Int              @default(0)
-  failedRows    Int              @default(0)
-  headers       String[]         @default([])
+  status        BulkImportStatus   @default(QUEUED)
+  totalRows     Int                @default(0)
+  processedRows Int                @default(0)
+  successRows   Int                @default(0)
+  failedRows    Int                @default(0)
+  headers       String[]           @default([])
   errorRows     Json? // [{ row, field, message, ... }]
   metadata      Json? // arbitrary per-import context
   fileKey       String? // external blob ref (large imports)
   fileBlob      Bytes? // inline original sheet (small imports)
   fileName      String?
   createdById   String?
-  createdBy     User?            @relation("BulkImportJobCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy     User?              @relation("BulkImportJobCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   startedAt     DateTime?
   finishedAt    DateTime?
   expiresAt     DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   rows          BulkImportJobRow[]
 
   @@index([module, subModule, createdAt])

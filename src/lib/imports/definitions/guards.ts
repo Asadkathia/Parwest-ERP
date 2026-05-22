@@ -23,9 +23,20 @@ import { z } from "zod"
 
 import { prisma } from "@/lib/db"
 import { registerImport } from "@/lib/imports/registry"
-import { cnicField, memoizedResolver, requiredString } from "@/lib/imports/rules"
+import {
+  cnicField,
+  memoizedResolver,
+  optionalPhoneField,
+  optionalEmailField,
+  requiredImportString,
+  requiredNonNegativeAmount,
+  requiredPhoneField,
+} from "@/lib/imports/rules"
 import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
 import { coerceCnic, coerceDate, coerceString } from "@/lib/imports/coerce"
+import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
+import { managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
+import { validateGuardDates } from "@/lib/validation/guard-dates"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { generateNextParwestId } from "@/lib/guards/parwest-id"
@@ -36,18 +47,26 @@ import type { ColumnDescriptor } from "@/lib/imports/types"
 /* Header strings — exact match to the ERP team's Guard_Basic_Details.xlsx */
 /* ────────────────────────────────────────────────────────────────────── */
 
-/** Required: name + cnic. Every other column is optional. */
-const REQUIRED_HEADERS = ["name", "cnic"] as const
+/**
+ * Required headers — must be present in the uploaded file. These mirror the
+ * mandatory fields the enrollment form enforces (validation parity), limited to
+ * the fields the import template has columns for. Every other column is optional.
+ */
+const REQUIRED_HEADERS = [
+  "name", "cnic", "regional office", "father name", "mother name", "date of birth",
+  "marital_status", "blood group", "police station", "next of kin",
+  "permanent address", "permanent address number", "current address", "current address number",
+  "contact no", "salary",
+] as const
 
 const OPTIONAL_HEADERS = [
-  "parwest id", "regional office", "father name", "mother name", "date of birth",
-  "cnic issue date", "cnic expiry date", "next of kin", "contact no",
+  "parwest id",
+  "cnic issue date", "cnic expiry date",
   "religion", "sect", "cast",
-  "designation", "salary", "police station", "blood group", "ex service",
+  "designation", "ex service",
   "other", "registration no", "rank", "group", "service period",
   "service years", "service months", "date of enrolment", "date of discharge",
-  "remarks", "current address", "current address number", "permanent address",
-  "permanent address number", "education level", "education passing year",
+  "remarks", "education level", "education passing year",
   "education name of institution", "introducer name", "introducer cnic",
   "introducer number", "introducer address", "height", "weight", "eye color",
   "hair color", "disability", "mark of identification", "current status",
@@ -82,8 +101,6 @@ const OPTIONAL_HEADERS = [
   "second judicial case investigation result", "second judicial case court result",
   "third judicial case no", "third judicial case date", "third judicial case police station",
   "third judicial case investigation result", "third judicial case court result",
-  // Misc
-  "marital_status",
 ] as const
 
 /* ────────────────────────────────────────────────────────────────────── */
@@ -180,10 +197,54 @@ for (const ord of ["first", "second", "third"] as const) {
 
 const rowSchema = z
   .object({
-    name: requiredString("name", 200),
+    // ── Required identity / personal (parity with single-create) ──
+    name: requiredImportString("Name", 200),
     cnic: cnicField(),
+    fatherName: requiredImportString("Father name", 200),
+    motherName: requiredImportString("Mother name", 200),
+    dateOfBirth: requiredImportString("Date of birth", 50),
+    maritalStatus: requiredImportString("Marital status", 50),
+    bloodGroup: requiredImportString("Blood group", 50),
+    policeStation: requiredImportString("Police station", 200),
+    nextOfKin: requiredImportString("Next of kin", 200),
+    salary: requiredNonNegativeAmount("Salary"),
+    // ── Required addresses + contacts (PHONE_REGEX for the phone cells) ──
+    addressPermanent: requiredImportString("Permanent address", 500),
+    addressCurrent: requiredImportString("Current address", 500),
+    permanentAddressContact: requiredPhoneField("Permanent address contact"),
+    currentAddressContact: requiredPhoneField("Current address contact"),
+    phone: requiredPhoneField("Contact no"),
+    // ── Required regional office. The engine resolves the "regional office"
+    // series-code cell into RegionalOffice.id under THIS SAME key
+    // (regionalOfficeSeries) before the schema runs. When the cell is blank,
+    // the resolver is skipped entirely (engine: `if (!raw) continue`) and no
+    // RO.id is set — so without a required check here a blank regional office
+    // would silently slip through. Requiring it as a non-empty string makes a
+    // missing/unresolvable regional office a hard row error. ──
+    regionalOfficeSeries: requiredImportString("Regional office", 50),
+    // ── Optional, format-checked only when present (parity: form validates
+    // emergency contact + email only when supplied). These have no import
+    // column today, so these are effectively no-ops until a column is added —
+    // but wired now so the rule travels with the schema and can't drift. ──
+    emergencyContact: optionalPhoneField("Emergency contact"),
+    email: optionalEmailField("Email"),
   })
   .passthrough()
+  // Date/age validation shared with single-create (POST /api/guards) via
+  // validateGuardDates — keeps both enrollment paths on one rule set. Cells
+  // are coerced with the import's own coerceDate so day-first / Excel-serial
+  // / sentinel formats are interpreted exactly as persist will store them.
+  .superRefine((row, ctx) => {
+    const r = row as Record<string, unknown>
+    const message = validateGuardDates({
+      dateOfBirth: coerceDate(r.dateOfBirth),
+      cnicIssueDate: coerceDate(r.cnicIssueDate),
+      cnicExpiryDate: coerceDate(r.cnicExpiryDate),
+    })
+    if (message) {
+      ctx.addIssue({ code: "custom", message })
+    }
+  })
 
 /* ────────────────────────────────────────────────────────────────────── */
 /* RegionalOffice resolver — input is the series-code letter (e.g. "K")   */
@@ -205,9 +266,34 @@ const regionalOfficeResolver = memoizedResolver<string>(
     if (!code) return null
     const ro = await prisma.regionalOffice.findUnique({
       where: { seriesCode: code },
-      select: { id: true },
+      select: { id: true, regionId: true },
     })
-    if (ro) return ro.id
+    if (ro) {
+      // Region / manager scope gate (parity with single-create's
+      // managerScopeDenied). Enforced here — during validation — so the
+      // violation surfaces in the dry-run / draft editor too, not only at
+      // persist time. ctx.scope = { regionId?, regionalOfficeIds?: string[] };
+      // null/empty means unrestricted (SuperAdmin / global).
+      const ctxScope = ctx.scope
+      if (ctxScope && (ctxScope.regionId || (ctxScope.regionalOfficeIds?.length ?? 0) > 0)) {
+        const adaptedScope: ManagerScope = {
+          role: "",
+          regionId: ctxScope.regionId ?? null,
+          regionalOfficeIds: ctxScope.regionalOfficeIds ?? [],
+        }
+        if (
+          managerScopeDenied(adaptedScope, {
+            regionId: ro.regionId,
+            regionalOfficeId: ro.id,
+          })
+        ) {
+          throw new Error(
+            `Regional office "${code}" is outside your permitted scope — you cannot enrol guards there.`,
+          )
+        }
+      }
+      return ro.id
+    }
 
     // Miss — enrich the failure with the set of valid codes.
     const AVAILABLE_KEY = "guard.regionalOffice.availableCodes"
@@ -470,14 +556,45 @@ registerImport({
     {
       fields: ["cnic"],
       scope: "both",
-      message: "CNIC already exists",
+      message:
+        "This guard is already enrolled and active. You cannot enroll the same CNIC again unless the previous profile is marked as Resigned or Terminated.",
       existsInDb: async (values) => {
         const cnic = coerceCnic(values.cnic) ?? values.cnic
-        const found = await prisma.guard.findUnique({
-          where: { cnic },
+        // Only a NON-terminated existing guard blocks the row. A TERMINATED
+        // match falls through so persist() can create a BRAND-NEW profile (the
+        // DB partial-unique index permits multiple rows per CNIC as long as at
+        // most one is non-terminated). No reactivation of the old record.
+        const found = await prisma.guard.findFirst({
+          where: { cnic, lifecycleStatus: { not: "TERMINATED" } },
           select: { id: true },
         })
         return Boolean(found)
+      },
+    },
+    {
+      // CNIC blacklist gate — parity with single-create (POST /api/guards),
+      // which blocks blacklisted CNICs via prisma.blacklistedCnic.findUnique.
+      // The import previously had NO blacklist check, so a blacklisted person
+      // could be enrolled in bulk. We reuse the engine's async per-row DB-check
+      // path (`scope: "db"`) — DB lookups can't live in the SYNC row schema.
+      fields: ["cnic"],
+      scope: "db",
+      message: "This CNIC is blacklisted and cannot be enrolled.",
+      existsInDb: async (values) => {
+        const cnic = coerceCnic(values.cnic) ?? values.cnic
+        try {
+          const blocked = await prisma.blacklistedCnic.findUnique({
+            where: { cnic },
+            select: { id: true },
+          })
+          return Boolean(blocked)
+        } catch (error) {
+          // Tolerate the table being absent (parity with the route, which
+          // swallows missing-schema errors). Any other error re-throws so the
+          // row is failed rather than silently enrolled.
+          if (isPrismaMissingSchemaError(error)) return false
+          throw error
+        }
       },
     },
   ],
@@ -506,6 +623,31 @@ registerImport({
       officeSeriesCode = ro.seriesCode
       regionName = ro.region?.name ?? null
       officeName = ro.name
+    }
+
+    // ── Region / manager scope gate ──────────────────────────────────────
+    // Parity with single-create (POST /api/guards), which calls
+    // managerScopeDenied(managerScope, { regionId, regionalOfficeId }) and
+    // refuses to create a guard outside the actor's permitted region/office.
+    // The import engine exposes the actor's scope as
+    // `ctx.scope = { regionId?, regionalOfficeIds?: string[] }`. That shape is
+    // NOT directly assignable to ManagerScope (which also carries `role` and a
+    // non-optional `regionId`), so we adapt it into a ManagerScope and reuse
+    // the shared `managerScopeDenied` helper rather than re-implementing the
+    // comparison — keeping the two paths on one rule. A null/empty scope means
+    // "unrestricted" (SuperAdmin / global), so we only enforce when set.
+    const ctxScope = ctx.scope
+    if (ctxScope && (ctxScope.regionId || (ctxScope.regionalOfficeIds?.length ?? 0) > 0)) {
+      const adaptedScope: ManagerScope = {
+        role: "",
+        regionId: ctxScope.regionId ?? null,
+        regionalOfficeIds: ctxScope.regionalOfficeIds ?? [],
+      }
+      if (managerScopeDenied(adaptedScope, { regionId, regionalOfficeId })) {
+        throw new Error(
+          "Regional office is outside your permitted scope — you cannot enrol guards there.",
+        )
+      }
     }
 
     // ── parwestId: honour template value when valid, else generate ──
@@ -580,6 +722,10 @@ registerImport({
     payload.lifecycleStatus = lifecycle.lifecycleStatus
 
     // ── Write Guard + judicial cases atomically per row ──
+    // New-profile model: a TERMINATED CNIC match falls through the existsInDb
+    // duplicate rule above and is created as a BRAND-NEW row here (the DB
+    // partial-unique index permits multiple rows per CNIC as long as at most
+    // one is non-terminated). No reactivation of any prior record.
     const created = await ctx.tx.guard.create({
       data: {
         ...(payload as Prisma.GuardCreateInput),
