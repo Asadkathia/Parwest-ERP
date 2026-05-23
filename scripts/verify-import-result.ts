@@ -14,8 +14,9 @@ async function main() {
   const prisma = new PrismaClient({ adapter: new PrismaPg(new pg.Pool({ connectionString: url })) })
 
   // 1. Guard scalar + region info
-  const guard = await prisma.guard.findUnique({
+  const guard = await prisma.guard.findFirst({
     where: { cnic: TARGET_CNIC },
+    orderBy: { createdAt: "desc" },
     include: {
       region: { select: { name: true } },
       regionalOffice: { select: { name: true, seriesCode: true } },

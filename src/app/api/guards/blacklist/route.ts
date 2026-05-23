@@ -177,8 +177,9 @@ export async function POST(request: NextRequest) {
         })
 
         // Fetch guard snapshot for audit event
-        const guardSnap = await prisma.guard.findUnique({
+        const guardSnap = await prisma.guard.findFirst({
             where: { cnic },
+            orderBy: { createdAt: "desc" },
             select: {
                 id: true, parwestId: true, name: true, status: true,
                 region: { select: { name: true } },
@@ -280,8 +281,9 @@ export async function DELETE(request: NextRequest) {
         }
 
         // Snapshot for audit only — DELETE no longer touches Guard rows.
-        const guardSnapDel = await prisma.guard.findUnique({
+        const guardSnapDel = await prisma.guard.findFirst({
             where: { cnic: record.cnic },
+            orderBy: { createdAt: "desc" },
             select: {
                 id: true, parwestId: true, name: true, status: true,
                 region: { select: { name: true } },
