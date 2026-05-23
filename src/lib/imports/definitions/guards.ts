@@ -29,7 +29,7 @@ import {
   optionalPhoneField,
   optionalEmailField,
   requiredImportString,
-  requiredNonNegativeAmount,
+  optionalNonNegativeAmount,
   requiredPhoneField,
 } from "@/lib/imports/rules"
 import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
@@ -56,14 +56,14 @@ const REQUIRED_HEADERS = [
   "name", "cnic", "regional office", "father name", "mother name", "date of birth",
   "marital_status", "blood group", "police station", "next of kin",
   "permanent address", "permanent address number", "current address", "current address number",
-  "contact no", "salary",
+  "contact no",
 ] as const
 
 const OPTIONAL_HEADERS = [
   "parwest id",
   "cnic issue date", "cnic expiry date",
   "religion", "sect", "cast",
-  "designation", "ex service",
+  "designation", "salary", "ex service",
   "other", "registration no", "rank", "group", "service period",
   "service years", "service months", "date of enrolment", "date of discharge",
   "remarks", "education level", "education passing year",
@@ -207,7 +207,7 @@ const rowSchema = z
     bloodGroup: requiredImportString("Blood group", 50),
     policeStation: requiredImportString("Police station", 200),
     nextOfKin: requiredImportString("Next of kin", 200),
-    salary: requiredNonNegativeAmount("Salary"),
+    salary: optionalNonNegativeAmount("Salary"),
     // ── Required addresses + contacts (PHONE_REGEX for the phone cells) ──
     addressPermanent: requiredImportString("Permanent address", 500),
     addressCurrent: requiredImportString("Current address", 500),

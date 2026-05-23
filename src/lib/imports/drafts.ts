@@ -18,6 +18,11 @@ import {
   validateHeaders,
 } from "@/lib/imports/engine"
 import { getImportDefinition } from "@/lib/imports/registry"
+// Register every import definition in this module's graph. In serverless each
+// route bundles independently, so the registry singleton is only populated if
+// the barrel is imported here; without it getImportDefinition() returns null
+// and the draft flow throws "Unknown import: <module>/".
+import "@/lib/imports/definitions"
 import type { BulkImportDefinition, ImportRowError, ImportRunContext } from "@/lib/imports/types"
 
 // Re-export so callers don't need to import from excel.ts directly.

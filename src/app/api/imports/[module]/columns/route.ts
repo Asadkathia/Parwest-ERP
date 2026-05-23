@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
 import { getImportDefinition } from "@/lib/imports/registry"
+import "@/lib/imports/definitions" // register all import definitions (serverless module graph)
 import { deriveManagerScope } from "@/lib/access/scope"
 
 /**

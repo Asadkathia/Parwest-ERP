@@ -41,6 +41,8 @@ export function listImportSummaries(module?: ImportModuleKey): BulkImportSummary
       subModule: d.subModule,
       label: d.label,
       description: d.description,
+      requiredHeaders: d.requiredHeaders,
+      optionalHeaders: d.optionalHeaders,
     }))
     .sort((a, b) => {
       if (a.module !== b.module) return a.module.localeCompare(b.module)

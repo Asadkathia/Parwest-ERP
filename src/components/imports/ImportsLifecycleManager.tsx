@@ -69,6 +69,16 @@ function parseCsv(text: string): PreviewRow[] {
   })
 }
 
+/** Header row of a CSV string (first non-empty line). The draft/validate
+ *  routes require an explicit `headers[]` alongside `rows[]`. */
+function parseCsvHeaders(text: string): string[] {
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  return firstLine ? firstLine.split(",").map((h) => h.trim()) : []
+}
+
 function sampleCsv(moduleName: ImportModule) {
   if (moduleName === "users") {
     return "name,email,role,regionalOfficeSeries,contactNumber\nAli Khan,ali@example.com,Manager,L,03001234567\nSara Malik,sara@example.com,Supervisor,K,03007654321"
@@ -85,7 +95,14 @@ function sampleCsv(moduleName: ImportModule) {
   return "sku,name,storeCode,quantityOnHand,brand,status\nWT-001,Walkie Talkie,RO-L,12,Motorola,ACTIVE\nUF-001,Uniform Set,RO-L,50,Parwest,ACTIVE"
 }
 
-type RegistryEntry = { module: string; subModule?: string; label: string; description?: string }
+type RegistryEntry = {
+  module: string
+  subModule?: string
+  label: string
+  description?: string
+  requiredHeaders?: string[]
+  optionalHeaders?: string[]
+}
 
 type JobHistoryEntry = {
   id: string
@@ -121,6 +138,16 @@ export default function ImportsLifecycleManager({ initialModule = "users", draft
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const previewRows = useMemo(() => parseCsv(csvInput).slice(0, 50), [csvInput])
+
+  // The registry entry for the currently-selected (module, sub-import). Drives
+  // the "expected columns" panel so users know which headers are required.
+  const selectedImport = useMemo(
+    () =>
+      registry.find((r) => (r.subModule ?? "") === subModule) ??
+      registry.find((r) => !r.subModule) ??
+      null,
+    [registry, subModule],
+  )
 
   // Load registry once + whenever the module changes (server is the
   // source of truth — clients should not hardcode the sub-import list).
@@ -173,7 +200,7 @@ export default function ImportsLifecycleManager({ initialModule = "users", draft
       return { body: formData, headers: undefined as HeadersInit | undefined }
     }
     return {
-      body: JSON.stringify({ rows: parseCsv(csvInput) }),
+      body: JSON.stringify({ rows: parseCsv(csvInput), headers: parseCsvHeaders(csvInput) }),
       headers: { "Content-Type": "application/json" },
     }
   }
@@ -415,6 +442,47 @@ export default function ImportsLifecycleManager({ initialModule = "users", draft
             )}
           </div>
         </div>
+        {selectedImport &&
+        ((selectedImport.requiredHeaders?.length ?? 0) > 0 ||
+          (selectedImport.optionalHeaders?.length ?? 0) > 0) ? (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
+            <div className="text-sm font-medium text-[var(--text)]">
+              Expected columns — {selectedImport.label}
+            </div>
+            <div>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Required ({selectedImport.requiredHeaders?.length ?? 0})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(selectedImport.requiredHeaders ?? []).map((h) => (
+                  <span
+                    key={h}
+                    className="rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {(selectedImport.optionalHeaders?.length ?? 0) > 0 ? (
+              <details>
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Optional ({selectedImport.optionalHeaders?.length ?? 0})
+                </summary>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {(selectedImport.optionalHeaders ?? []).map((h) => (
+                    <span
+                      key={h}
+                      className="rounded border border-[var(--border)] bg-card px-2 py-0.5 text-xs text-[var(--text-muted)]"
+                    >
+                      {h}
+                    </span>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
         <div>
           <label className="block text-sm text-[var(--text-muted)] mb-1">CSV Content (used when no file is selected)</label>
           <textarea

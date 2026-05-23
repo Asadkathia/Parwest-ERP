@@ -123,6 +123,23 @@ export const requiredNonNegativeAmount = (label: string) =>
       .nonnegative(`${label} must be ≥ 0`),
   )
 
+/**
+ * Optional non-negative amount: empty / sentinel cells are allowed (→ undefined);
+ * when a value is present it must be numeric and ≥ 0.
+ */
+export const optionalNonNegativeAmount = (label: string) =>
+  z.preprocess(
+    (v) => {
+      if (isSentinel(v)) return undefined
+      const n = typeof v === "number" ? v : Number(String(v).trim())
+      return Number.isFinite(n) ? n : NaN
+    },
+    z
+      .number({ message: `${label} must be a number` })
+      .nonnegative(`${label} must be ≥ 0`)
+      .optional(),
+  )
+
 /** Zod helper for a CNIC field with format check. */
 export const cnicField = (label = "CNIC") =>
   requiredString(label, 15).regex(CNIC_REGEX, `${label} must be in the format XXXXX-XXXXXXX-X`)

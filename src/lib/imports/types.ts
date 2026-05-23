@@ -236,4 +236,8 @@ export type BulkImportSummary = {
   subModule?: string
   label: string
   description?: string
+  /** Headers that must be present in the uploaded file. */
+  requiredHeaders: string[]
+  /** Additional headers the import recognizes (not mandatory). */
+  optionalHeaders?: string[]
 }
