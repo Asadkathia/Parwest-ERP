@@ -11,7 +11,8 @@ import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 import type { GuardBankAccount } from "@/lib/guards/bank-accounts"
 import PhoneInput from "@/components/ui/PhoneInput"
 import CnicInput from "@/components/ui/CnicInput"
-import { isValidGuardAge } from "@/lib/validation/formats"
+import { isValidGuardAge, CNIC_REGEX, PHONE_REGEX } from "@/lib/validation/formats"
+import { validateEducationPassingYear } from "@/lib/validation/guard-dates"
 
 type RegionalOffice = {
   id: string
@@ -439,13 +440,37 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
       return
     }
 
-    // Validate nearest relative contact numbers format
+    // Validate nearest relative contact + CNIC formats (when supplied)
     for (const idx of nearestRows) {
       const contact = String(data[`nearest_${idx}_contact`] || "").trim()
-      if (contact && !/^\+92-\d{3}-\d{7}$/.test(contact)) {
+      if (contact && !PHONE_REGEX.test(contact)) {
         fail("Nearest Relative Contact # format must be +92-300-1234567")
         return
       }
+      const relativeCnic = String(data[`nearest_${idx}_cnic`] || "").trim()
+      if (relativeCnic && !CNIC_REGEX.test(relativeCnic)) {
+        fail("Nearest Relative CNIC format must be XXXXX-XXXXXXX-X")
+        return
+      }
+    }
+
+    // Validate introducer CNIC + contact formats (optional, checked when supplied)
+    const introducerCnicValue = String(data.introducerCnic || "").trim()
+    if (introducerCnicValue && !CNIC_REGEX.test(introducerCnicValue)) {
+      fail("Introducer CNIC format must be XXXXX-XXXXXXX-X")
+      return
+    }
+    const introducerContactValue = String(data.introducerContact || "").trim()
+    if (introducerContactValue && !PHONE_REGEX.test(introducerContactValue)) {
+      fail("Introducer Contact format must be +92-300-1234567")
+      return
+    }
+
+    // Education passing year must be after the date of birth (shared rule)
+    const educationYearError = validateEducationPassingYear(dobForAge, String(data.passingYear || ""))
+    if (educationYearError) {
+      fail(educationYearError)
+      return
     }
 
     // Validate bank accounts
@@ -1080,7 +1105,10 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
               <CnicInput name="introducerCnic" placeholder="Introducer's CNIC" />
             </div>
             <Field label="Introducer's Address" name="introducerAddress" placeholder="Introducer's Address" />
-            <Field label="Introducer's Contact" name="introducerContact" placeholder="Introducer's Contact #" />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Introducer&apos;s Contact</label>
+              <PhoneInput name="introducerContact" />
+            </div>
           </div>
         </CollapsibleSection>
       ) : null}

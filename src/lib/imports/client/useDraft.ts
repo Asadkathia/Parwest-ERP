@@ -14,7 +14,7 @@ export type DraftColumn = {
   key: string
   header: string
   label: string
-  kind: "text" | "cnic" | "date" | "number" | "enum" | "fk"
+  kind: "text" | "cnic" | "phone" | "date" | "number" | "enum" | "fk"
   required: boolean
   enumValues?: string[]
   fkOptions?: Array<{ value: string; label: string }>

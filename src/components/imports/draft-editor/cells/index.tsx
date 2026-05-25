@@ -1,5 +1,6 @@
 import { TextCell, type CellProps } from "./TextCell"
 import { CnicCell } from "./CnicCell"
+import { PhoneCell } from "./PhoneCell"
 import { DateCell } from "./DateCell"
 import { EnumCell } from "./EnumCell"
 import { FkCell } from "./FkCell"
@@ -20,6 +21,8 @@ export function CellEditor({ column, ...rest }: CellEditorProps) {
       return <FkCell {...rest} fkOptions={column.fkOptions ?? []} />
     case "cnic":
       return <CnicCell {...rest} />
+    case "phone":
+      return <PhoneCell {...rest} />
     case "number":
     case "text":
     default:
@@ -27,4 +30,4 @@ export function CellEditor({ column, ...rest }: CellEditorProps) {
   }
 }
 
-export { TextCell, CnicCell, DateCell, EnumCell, FkCell, ReadOnlyCell }
+export { TextCell, CnicCell, PhoneCell, DateCell, EnumCell, FkCell, ReadOnlyCell }

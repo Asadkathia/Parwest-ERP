@@ -110,7 +110,7 @@ export type DuplicateRule = {
   message?: string
 }
 
-export type ColumnKind = "text" | "cnic" | "date" | "number" | "enum" | "fk"
+export type ColumnKind = "text" | "cnic" | "phone" | "date" | "number" | "enum" | "fk"
 
 /**
  * Per-column editor metadata, used by the draft editor to pick the

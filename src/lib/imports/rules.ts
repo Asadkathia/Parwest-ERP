@@ -144,6 +144,24 @@ export const optionalNonNegativeAmount = (label: string) =>
 export const cnicField = (label = "CNIC") =>
   requiredString(label, 15).regex(CNIC_REGEX, `${label} must be in the format XXXXX-XXXXXXX-X`)
 
+/**
+ * Zod helper for an OPTIONAL CNIC cell — empty / sentinel passes through, but a
+ * present value must match CNIC_REGEX. Used for relative + introducer CNICs:
+ * optional, but must be well-formed when supplied (parity with the single-create
+ * form, which masks every CNIC input to XXXXX-XXXXXXX-X).
+ */
+export const optionalCnicField = (label = "CNIC") =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z
+      .union([z.string(), z.number(), z.null(), z.undefined()])
+      .optional()
+      .refine(
+        (v) => isSentinel(v) || CNIC_REGEX.test(String(v)),
+        `${label} must be in the format XXXXX-XXXXXXX-X`,
+      ),
+  )
+
 /** Zod helper for an enum-like select with a fixed value list. */
 export const enumField = <T extends [string, ...string[]]>(label: string, values: T) =>
   z.preprocess(

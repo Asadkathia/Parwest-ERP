@@ -116,3 +116,33 @@ export function validateGuardDates(input: GuardDateInput): GuardDateError | null
 
   return null
 }
+
+/**
+ * Education passing year cross-check. The passing year must come AFTER the
+ * date of birth — a guard can't graduate before (or in the same year as) their
+ * birth — and must be a plausible year (1900..current year, never in the
+ * future). Empty values pass (optional field). Shared by single-create and
+ * bulk import so both paths enforce the same rule.
+ *
+ * Returns an error message, or `null` when valid/empty.
+ */
+export function validateEducationPassingYear(
+  dateOfBirth: string | Date | null | undefined,
+  passingYear: string | number | null | undefined,
+): string | null {
+  const raw = passingYear == null ? "" : typeof passingYear === "number" ? String(passingYear) : passingYear.trim()
+  if (!raw) return null
+
+  const year = Number(raw)
+  const currentYear = new Date().getFullYear()
+  if (!Number.isInteger(year) || year < 1900 || year > currentYear) {
+    return `Education passing year must be a valid year between 1900 and ${currentYear}.`
+  }
+
+  const dobRaw = asInput(dateOfBirth)
+  const dob = dobRaw ? toDate(dobRaw) : null
+  if (dob && year <= dob.getFullYear()) {
+    return "Education passing year must be after the date of birth."
+  }
+  return null
+}

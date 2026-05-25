@@ -25,6 +25,7 @@ import { prisma } from "@/lib/db"
 import { registerImport } from "@/lib/imports/registry"
 import {
   cnicField,
+  optionalCnicField,
   memoizedResolver,
   optionalPhoneField,
   optionalEmailField,
@@ -36,7 +37,7 @@ import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
 import { coerceCnic, coerceDate, coerceString } from "@/lib/imports/coerce"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { buildManagerScopeWhere, managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
-import { validateGuardDates } from "@/lib/validation/guard-dates"
+import { validateGuardDates, validateEducationPassingYear } from "@/lib/validation/guard-dates"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { generateNextParwestId } from "@/lib/guards/parwest-id"
@@ -253,6 +254,18 @@ const rowSchema = z
     // but wired now so the rule travels with the schema and can't drift. ──
     emergencyContact: optionalPhoneField("Emergency contact"),
     email: optionalEmailField("Email"),
+    // ── Optional CNIC + phone cells — format-checked only when supplied.
+    // Relatives + introducer aren't mandatory, but a present value must be a
+    // well-formed CNIC / +92 phone (parity with the form, which masks them so
+    // a malformed number can't be entered). ──
+    introducerCnic: optionalCnicField("Introducer CNIC"),
+    introducerContact: optionalPhoneField("Introducer contact"),
+    nearest_1_cnic: optionalCnicField("First nearest relative CNIC"),
+    nearest_2_cnic: optionalCnicField("Second nearest relative CNIC"),
+    nearest_3_cnic: optionalCnicField("Third nearest relative CNIC"),
+    nearest_1_contact: optionalPhoneField("First nearest relative contact"),
+    nearest_2_contact: optionalPhoneField("Second nearest relative contact"),
+    nearest_3_contact: optionalPhoneField("Third nearest relative contact"),
   })
   .passthrough()
   // Date/age validation shared with single-create (POST /api/guards) via
@@ -269,6 +282,14 @@ const rowSchema = z
     if (dateError) {
       // Attach to the offending field's key so the editor highlights that cell.
       ctx.addIssue({ code: "custom", message: dateError.message, path: [dateError.field] })
+    }
+    // Education passing year must be after DOB (and a plausible past year).
+    const eduError = validateEducationPassingYear(
+      coerceDate(r.dateOfBirth),
+      r.passingYear as string | number | null | undefined,
+    )
+    if (eduError) {
+      ctx.addIssue({ code: "custom", message: eduError, path: ["passingYear"] })
     }
   })
 
@@ -492,7 +513,7 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "cnicIssueDate", header: "cnic issue date", label: "CNIC Issue Date", kind: "date", required: false },
   { key: "cnicExpiryDate", header: "cnic expiry date", label: "CNIC Expiry Date", kind: "date", required: false },
   { key: "nextOfKin", header: "next of kin", label: "Next of Kin", kind: "text", required: false },
-  { key: "phone", header: "contact no", label: "Contact No", kind: "text", required: false },
+  { key: "phone", header: "contact no", label: "Contact No", kind: "phone", required: false },
   { key: "religion", header: "religion", label: "Religion", kind: "text", required: false },
   { key: "sect", header: "sect", label: "Sect", kind: "text", required: false },
   { key: "cast", header: "cast", label: "Cast", kind: "text", required: false },
@@ -512,15 +533,15 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "dateOfDischarge", header: "date of discharge", label: "Date of Discharge", kind: "date", required: false },
   { key: "exServiceRemarks", header: "remarks", label: "Remarks", kind: "text", required: false },
   { key: "addressCurrent", header: "current address", label: "Current Address", kind: "text", required: false },
-  { key: "currentAddressContact", header: "current address number", label: "Current Address Contact", kind: "text", required: false },
+  { key: "currentAddressContact", header: "current address number", label: "Current Address Contact", kind: "phone", required: false },
   { key: "addressPermanent", header: "permanent address", label: "Permanent Address", kind: "text", required: false },
-  { key: "permanentAddressContact", header: "permanent address number", label: "Permanent Address Contact", kind: "text", required: false },
+  { key: "permanentAddressContact", header: "permanent address number", label: "Permanent Address Contact", kind: "phone", required: false },
   { key: "education", header: "education level", label: "Education Level", kind: "text", required: false },
   { key: "passingYear", header: "education passing year", label: "Education Passing Year", kind: "number", required: false },
   { key: "educationInstitute", header: "education name of institution", label: "Education Institution", kind: "text", required: false },
   { key: "introducerName", header: "introducer name", label: "Introducer Name", kind: "text", required: false },
   { key: "introducerCnic", header: "introducer cnic", label: "Introducer CNIC", kind: "cnic", required: false },
-  { key: "introducerContact", header: "introducer number", label: "Introducer Contact", kind: "text", required: false },
+  { key: "introducerContact", header: "introducer number", label: "Introducer Contact", kind: "phone", required: false },
   { key: "introducerAddress", header: "introducer address", label: "Introducer Address", kind: "text", required: false },
   { key: "height", header: "height", label: "Height", kind: "number", required: false },
   { key: "weight", header: "weight", label: "Weight", kind: "number", required: false },
@@ -555,7 +576,7 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "nearest_1_cnic", header: "first nearest relative cnic number", label: "First Nearest Relative CNIC", kind: "cnic", required: false },
   { key: "nearest_1_cnicIssueDate", header: "first nearest relative cnic issue date", label: "First Nearest Relative CNIC Issue Date", kind: "date", required: false },
   { key: "nearest_1_profession", header: "first nearest relative profession", label: "First Nearest Relative Profession", kind: "text", required: false },
-  { key: "nearest_1_contact", header: "first nearest relative contact number", label: "First Nearest Relative Contact", kind: "text", required: false },
+  { key: "nearest_1_contact", header: "first nearest relative contact number", label: "First Nearest Relative Contact", kind: "phone", required: false },
   { key: "nearest_1_address", header: "first nearest relative address", label: "First Nearest Relative Address", kind: "text", required: false },
   { key: "nearest_2_name", header: "second nearest relative", label: "Second Nearest Relative", kind: "text", required: false },
   { key: "nearest_2_fatherName", header: "second nearest relative father name", label: "Second Nearest Relative Father", kind: "text", required: false },
@@ -563,7 +584,7 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "nearest_2_cnic", header: "second nearest relative cnic number", label: "Second Nearest Relative CNIC", kind: "cnic", required: false },
   { key: "nearest_2_cnicIssueDate", header: "second nearest relative cnic issue date", label: "Second Nearest Relative CNIC Issue Date", kind: "date", required: false },
   { key: "nearest_2_profession", header: "second nearest relative profession", label: "Second Nearest Relative Profession", kind: "text", required: false },
-  { key: "nearest_2_contact", header: "second nearest relative contact number", label: "Second Nearest Relative Contact", kind: "text", required: false },
+  { key: "nearest_2_contact", header: "second nearest relative contact number", label: "Second Nearest Relative Contact", kind: "phone", required: false },
   { key: "nearest_2_address", header: "second nearest relative address", label: "Second Nearest Relative Address", kind: "text", required: false },
   { key: "nearest_3_name", header: "third nearest relative", label: "Third Nearest Relative", kind: "text", required: false },
   { key: "nearest_3_fatherName", header: "third nearest relative father name", label: "Third Nearest Relative Father", kind: "text", required: false },
@@ -571,7 +592,7 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "nearest_3_cnic", header: "third nearest relative cnic number", label: "Third Nearest Relative CNIC", kind: "cnic", required: false },
   { key: "nearest_3_cnicIssueDate", header: "third nearest relative cnic issue date", label: "Third Nearest Relative CNIC Issue Date", kind: "date", required: false },
   { key: "nearest_3_profession", header: "third nearest relative profession", label: "Third Nearest Relative Profession", kind: "text", required: false },
-  { key: "nearest_3_contact", header: "third nearest relative contact number", label: "Third Nearest Relative Contact", kind: "text", required: false },
+  { key: "nearest_3_contact", header: "third nearest relative contact number", label: "Third Nearest Relative Contact", kind: "phone", required: false },
   { key: "nearest_3_address", header: "third nearest relative address", label: "Third Nearest Relative Address", kind: "text", required: false },
 
   // First / second / third family member (5 cols each)
