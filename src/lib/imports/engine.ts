@@ -219,17 +219,21 @@ export async function validateRow(
     return { row: refResult.row, errors: earlyErrors.map((e) => ({ ...e, values: originalRow })) }
   }
   const parsed = definition.rowSchema.safeParse(refResult.row)
+  const errors: ImportRowError[] = []
   if (!parsed.success) {
-    const errors: ImportRowError[] = (parsed.error as z.ZodError).issues.map((issue) => ({
-      row: rowNumber,
-      field: issue.path.join(".") || "__row__",
-      message: issue.message,
-      values: originalRow,
-    }))
-    return { row: refResult.row, errors }
+    for (const issue of (parsed.error as z.ZodError).issues) {
+      errors.push({
+        row: rowNumber,
+        field: issue.path.join(".") || "__row__",
+        message: issue.message,
+        values: originalRow,
+      })
+    }
   }
-  // Per-row DB-duplicate checks
-  const dbErrors: ImportRowError[] = []
+  // Per-row DB-duplicate checks. Run these REGARDLESS of schema validity, so
+  // errors like "CNIC already exists" surface alongside other row errors
+  // instead of being hidden until every other field is fixed. They only need
+  // the raw field value, not a fully-valid row.
   for (const rule of definition.duplicates ?? []) {
     if (rule.scope !== "db" && rule.scope !== "both") continue
     if (!rule.existsInDb) continue
@@ -241,20 +245,27 @@ export async function validateRow(
       values[f] = v
     }
     if (!hasAny) continue
-    const exists = await rule.existsInDb(values, ctx)
-    if (exists) {
-      dbErrors.push({
-        row: rowNumber,
-        field: rule.fields.join("+"),
-        message:
-          rule.message ??
-          `Already exists in the database (${rule.fields.join(", ")} = ${rule.fields.map((f) => values[f]).join(", ")})`,
-        values: originalRow,
-      })
+    try {
+      const exists = await rule.existsInDb(values, ctx)
+      if (exists) {
+        errors.push({
+          row: rowNumber,
+          field: rule.fields.join("+"),
+          message:
+            rule.message ??
+            `Already exists in the database (${rule.fields.join(", ")} = ${rule.fields.map((f) => values[f]).join(", ")})`,
+          values: originalRow,
+          code: "DB_DUPLICATE",
+        })
+      }
+    } catch (err) {
+      // A failed duplicate probe must not break row validation, but log it —
+      // a DB connection/logic failure here would otherwise be silently hidden.
+      console.warn(`[validateRow] duplicate probe failed for row ${rowNumber}:`, err)
     }
   }
-  if (dbErrors.length > 0) return { row: refResult.row, errors: dbErrors }
-  return { row: refResult.row, data: parsed.data, errors: [] }
+  if (errors.length > 0) return { row: refResult.row, errors }
+  return { row: refResult.row, data: parsed.success ? parsed.data : undefined, errors: [] }
 }
 
 export type EngineResult = {

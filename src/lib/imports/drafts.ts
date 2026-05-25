@@ -148,17 +148,19 @@ export async function revalidateAllRows(
   })
   const perRowErrors = new Map<number, ImportRowError[]>()
   for (const r of rows) {
-    if (r.skipped) {
-      perRowErrors.set(r.rowNumber, [])
-      continue
-    }
     const result = await validateRow(
       definition,
       r.data as Record<string, unknown>,
       ctx,
       r.rowNumber,
     )
-    perRowErrors.set(r.rowNumber, result.errors)
+    // Skipped rows are excluded from import, but a DB-duplicate (CNIC already
+    // enrolled / blacklisted) is a hard conflict skipping doesn't resolve — keep
+    // those visible; drop the fixable errors.
+    perRowErrors.set(
+      r.rowNumber,
+      r.skipped ? result.errors.filter((e) => e.code === "DB_DUPLICATE") : result.errors,
+    )
   }
   const view = rows.map((r) => ({
     rowNumber: r.rowNumber,
@@ -167,6 +169,7 @@ export async function revalidateAllRows(
   }))
   const dupMap = recomputePayloadDuplicates(definition, view)
   for (const [rowNumber, errs] of dupMap) {
+    if (rows.find((r) => r.rowNumber === rowNumber)?.skipped) continue
     const existing = perRowErrors.get(rowNumber) ?? []
     perRowErrors.set(rowNumber, [...existing, ...errs])
   }
@@ -220,9 +223,20 @@ export async function patchDraftRow(opts: {
     for (const r of allRows) {
       const dupErrors = dupMap.get(r.rowNumber) ?? []
       if (r.rowNumber === opts.rowNumber) {
-        nextErrorsByRow.set(r.rowNumber, [...result.errors, ...dupErrors])
+        // Freshly validated edited row. If it's skipped, keep only the hard
+        // DB-duplicate error (CNIC already enrolled / blacklisted).
+        const full = [...result.errors, ...dupErrors]
+        nextErrorsByRow.set(
+          r.rowNumber,
+          target.skipped ? full.filter((e) => e.code === "DB_DUPLICATE") : full,
+        )
       } else if (r.skipped) {
-        nextErrorsByRow.set(r.rowNumber, [])
+        // Skipped sibling: drop fixable errors but keep DB-duplicate ones —
+        // skipping doesn't resolve an already-enrolled/blacklisted CNIC.
+        nextErrorsByRow.set(
+          r.rowNumber,
+          (previousErrorsByRow.get(r.rowNumber) ?? []).filter((e) => e.code === "DB_DUPLICATE"),
+        )
       } else {
         const ownErrors =
           previousErrorsByRow.get(r.rowNumber)?.filter((e) => !e.field.includes("+")) ?? []
@@ -297,19 +311,34 @@ export async function setRowSkipped(opts: {
     const previousErrorsByRow = new Map<number, ImportRowError[]>(
       allRows.map((r) => [r.rowNumber, (r.errors as unknown as ImportRowError[]) ?? []]),
     )
+    const ctx = buildCtx(opts.jobId, opts.scope)
     const affected: Array<{ rowNumber: number; errors: ImportRowError[] }> = []
     for (const r of allRows) {
-      if (r.rowNumber === opts.rowNumber) continue
+      const isTarget = r.rowNumber === opts.rowNumber
+      const skipped = isTarget ? opts.skipped : r.skipped
       const before = previousErrorsByRow.get(r.rowNumber) ?? []
-      const ownErrors = before.filter((e) => !e.field.includes("+"))
       const dupErrors = dupMap.get(r.rowNumber) ?? []
-      const after = r.skipped ? [] : [...ownErrors, ...dupErrors]
+      let after: ImportRowError[]
+      if (isTarget) {
+        // Recompute the toggled row: skipping keeps only the hard DB-duplicate
+        // error (CNIC already enrolled / blacklisted); un-skipping restores the
+        // full validation result.
+        const result = await validateRow(definition, r.data as Record<string, unknown>, ctx, r.rowNumber)
+        after = skipped
+          ? result.errors.filter((e) => e.code === "DB_DUPLICATE")
+          : [...result.errors, ...dupErrors]
+      } else if (skipped) {
+        after = before.filter((e) => e.code === "DB_DUPLICATE")
+      } else {
+        const ownErrors = before.filter((e) => !e.field.includes("+"))
+        after = [...ownErrors, ...dupErrors]
+      }
       if (!errorsEqual(before, after)) {
         await tx.bulkImportJobRow.update({
           where: { id: r.id },
           data: { errors: after as unknown as Prisma.InputJsonValue },
         })
-        affected.push({ rowNumber: r.rowNumber, errors: after })
+        if (!isTarget) affected.push({ rowNumber: r.rowNumber, errors: after })
       }
     }
     const updated = await tx.bulkImportJobRow.findUnique({ where: { id: target.id } })

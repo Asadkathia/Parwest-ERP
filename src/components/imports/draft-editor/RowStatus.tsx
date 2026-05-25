@@ -10,6 +10,14 @@ export function RowStatus({ row, onToggleSkip }: { row: DraftRow; onToggleSkip: 
         <span className="inline-flex items-center gap-1 text-muted-foreground">
           <CircleOff className="h-3.5 w-3.5" /> Skipped
         </span>
+        {row.errors.length > 0 ? (
+          <span
+            className="inline-flex items-center gap-1 text-destructive"
+            title={row.errors.map((e) => e.message).join("; ")}
+          >
+            <AlertCircle className="h-3.5 w-3.5" /> {row.errors.length} error{row.errors.length === 1 ? "" : "s"}
+          </span>
+        ) : null}
         <Button type="button" variant="ghost" size="sm" className="h-6 px-2" onClick={() => onToggleSkip(false)} aria-pressed="true">
           Unskip
         </Button>

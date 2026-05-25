@@ -23,6 +23,10 @@ export type ImportRowError = {
   message: string
   /** Original row values (best-effort) so QA can reproduce. */
   values?: Record<string, unknown>
+  /** Error kind. `"DB_DUPLICATE"` marks an existing-record conflict (CNIC already
+   *  enrolled / blacklisted) — a hard error that skipping does NOT resolve, so it
+   *  stays visible on skipped rows. */
+  code?: string
 }
 
 /** Header validation outcome. Hard-stops the import when `valid === false`. */
