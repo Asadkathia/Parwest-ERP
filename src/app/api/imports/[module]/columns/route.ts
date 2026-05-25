@@ -38,6 +38,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ modu
       required: col.required,
       enumValues: col.enumValues,
       fkOptions: col.fkOptionsLoader ? await col.fkOptionsLoader(ctx) : undefined,
+      readOnly: col.readOnly,
+      bulkApply: col.bulkApply,
     })),
   )
   return ok({ columns })

@@ -282,6 +282,75 @@ function errorsEqual(a: ImportRowError[], b: ImportRowError[]): boolean {
   return sa.every((k, i) => k === sb[i])
 }
 
+/**
+ * Set the same field value on EVERY row of a draft in one transaction, then
+ * re-validate all rows. Backs the editor's "set for all rows" bulk control
+ * (e.g. assign one supervisor to the whole batch). Uses the same skip /
+ * DB-duplicate error semantics as patchDraftRow + revalidateAllRows. Returns
+ * every row so the client can replace its view in one shot.
+ */
+export async function bulkPatchDraftRows(opts: {
+  jobId: string
+  data: Record<string, unknown>
+  scope: DraftScope
+}): Promise<{ rows: BulkImportJobRow[] }> {
+  const definition = await loadDefinitionForJob(opts.jobId)
+  return prisma.$transaction(async (tx) => {
+    const allRows = await tx.bulkImportJobRow.findMany({
+      where: { jobId: opts.jobId },
+      orderBy: { rowNumber: "asc" },
+    })
+    const ctx = buildCtx(opts.jobId, opts.scope)
+
+    // Merge the patch into every row's data (skipped rows included — harmless,
+    // and keeps them correct if later un-skipped).
+    const mergedByRow = new Map<number, Record<string, unknown>>()
+    for (const r of allRows) {
+      mergedByRow.set(r.rowNumber, { ...(r.data as Record<string, unknown>), ...opts.data })
+    }
+
+    // Re-validate each merged row.
+    const perRowErrors = new Map<number, ImportRowError[]>()
+    for (const r of allRows) {
+      const result = await validateRow(definition, mergedByRow.get(r.rowNumber)!, ctx, r.rowNumber)
+      perRowErrors.set(
+        r.rowNumber,
+        r.skipped ? result.errors.filter((e) => e.code === "DB_DUPLICATE") : result.errors,
+      )
+    }
+
+    // Cross-row payload duplicates over the merged view.
+    const view = allRows.map((r) => ({
+      rowNumber: r.rowNumber,
+      data: mergedByRow.get(r.rowNumber)!,
+      skipped: r.skipped,
+    }))
+    const dupMap = recomputePayloadDuplicates(definition, view)
+    for (const [rowNumber, errs] of dupMap) {
+      if (allRows.find((r) => r.rowNumber === rowNumber)?.skipped) continue
+      const existing = perRowErrors.get(rowNumber) ?? []
+      perRowErrors.set(rowNumber, [...existing, ...errs])
+    }
+
+    // Persist data + errors for every row.
+    const updated: BulkImportJobRow[] = []
+    for (const r of allRows) {
+      const row = await tx.bulkImportJobRow.update({
+        where: { id: r.id },
+        data: {
+          data: mergedByRow.get(r.rowNumber)! as Prisma.InputJsonValue,
+          errors: (perRowErrors.get(r.rowNumber) ?? []) as unknown as Prisma.InputJsonValue,
+          dirty: false,
+          lastEditedById: opts.scope.actorUserId,
+          lastEditedAt: new Date(),
+        },
+      })
+      updated.push(row)
+    }
+    return { rows: updated }
+  })
+}
+
 export async function setRowSkipped(opts: {
   jobId: string
   rowNumber: number

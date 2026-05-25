@@ -5,12 +5,13 @@ import { toast } from "sonner"
 import { useDraft } from "@/lib/imports/client/useDraft"
 import { DraftHeader } from "./DraftHeader"
 import { DraftGrid } from "./DraftGrid"
+import { BulkApplyBar } from "./BulkApplyBar"
 import { FinalizeDialog } from "./FinalizeDialog"
 import { DiscardDialog } from "./DiscardDialog"
 
 export function DraftEditor({ draftId }: { draftId: string }) {
   const router = useRouter()
-  const { loading, error, job, columns, totals, rowsByNumber, patchRow, setSkipped, finalize, discard } = useDraft(draftId)
+  const { loading, error, job, columns, totals, rowsByNumber, patchRow, bulkPatch, setSkipped, finalize, discard } = useDraft(draftId)
   const [showFinalize, setShowFinalize] = useState(false)
   const [showDiscard, setShowDiscard] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
@@ -32,6 +33,18 @@ export function DraftEditor({ draftId }: { draftId: string }) {
         onDiscard={() => setShowDiscard(true)}
         onFinalize={() => setShowFinalize(true)}
         finalizing={finalizing}
+      />
+      <BulkApplyBar
+        columns={columns}
+        rowCount={sortedRows.length}
+        onApply={async (header, value) => {
+          try {
+            await bulkPatch({ [header]: value })
+            toast.success("Applied to all rows.")
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Bulk apply failed")
+          }
+        }}
       />
       <DraftGrid
         rows={sortedRows}

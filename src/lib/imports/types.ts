@@ -135,6 +135,19 @@ export type ColumnDescriptor = {
    * per draft open, not per-cell.
    */
   fkOptionsLoader?: (ctx: ImportRunContext) => Promise<Array<{ value: string; label: string }>>
+  /**
+   * Display-only column the editor renders non-editable. Used for values the
+   * persist layer computes itself (e.g. joining date = date of import), shown
+   * so the user can see what will be stored without being able to change it.
+   */
+  readOnly?: boolean
+  /**
+   * Offer a "set for all rows" bulk control above the grid for this column.
+   * Intended for fields that are typically the same across an import batch
+   * (e.g. supervisor). The control's value source is the column's `fkOptions`
+   * for `kind === "fk"`, else a free-text input.
+   */
+  bulkApply?: boolean
 }
 
 export type ConditionalRule = {

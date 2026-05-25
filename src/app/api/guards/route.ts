@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
             cnicExpiryDate: body?.cnicExpiryDate ? String(body.cnicExpiryDate) : null,
         })
         if (dateError) {
-            return badRequest(dateError)
+            return badRequest(dateError.message)
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null

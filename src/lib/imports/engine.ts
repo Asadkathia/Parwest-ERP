@@ -75,10 +75,19 @@ function applyHeaderAliases(
 ): Record<string, unknown> {
   const aliases = definition.headerAliases
   if (!aliases) return row
+  const isEmpty = (x: unknown) => x === undefined || x === null || x === ""
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(row)) {
     const canonical = aliases[k] ?? k
-    if (canonical in out && (v === undefined || v === null || v === "")) continue
+    if (canonical in out) {
+      // Deterministic conflict resolution (row data is JSONB, so key insertion
+      // order is NOT reliable): never overwrite with an empty value; a key that
+      // is already canonical (k === canonical, e.g. a direct/edited value) wins
+      // over a header-aliased value; otherwise keep the first non-empty value.
+      if (isEmpty(v)) continue
+      const incomingIsDirectCanonical = k === canonical
+      if (!incomingIsDirectCanonical && !isEmpty(out[canonical])) continue
+    }
     out[canonical] = v
   }
   return out

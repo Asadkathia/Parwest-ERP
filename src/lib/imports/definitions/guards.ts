@@ -35,13 +35,13 @@ import {
 import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
 import { coerceCnic, coerceDate, coerceString } from "@/lib/imports/coerce"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
+import { buildManagerScopeWhere, managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
 import { validateGuardDates } from "@/lib/validation/guard-dates"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { generateNextParwestId } from "@/lib/guards/parwest-id"
 import type { Prisma } from "@prisma/client"
-import type { ColumnDescriptor } from "@/lib/imports/types"
+import type { ColumnDescriptor, ImportRunContext } from "@/lib/imports/types"
 
 /* ────────────────────────────────────────────────────────────────────── */
 /* Header strings — exact match to the ERP team's Guard_Basic_Details.xlsx */
@@ -61,6 +61,13 @@ const REQUIRED_HEADERS = [
 
 const OPTIONAL_HEADERS = [
   "parwest id",
+  // Supervisor — recognized so a sheet WITHOUT it still uploads; the
+  // assignment is mandatory at finalize (enforced via rowSchema, not here),
+  // and is normally picked per-row in the draft editor's FK combobox.
+  "supervisor",
+  // Nationality (optional) + bank details (optional) — parity with single-create.
+  "nationality",
+  "bank name", "account number", "account type", "iban", "branch code",
   "cnic issue date", "cnic expiry date",
   "religion", "sect", "cast",
   "designation", "salary", "ex service",
@@ -109,6 +116,17 @@ const OPTIONAL_HEADERS = [
 
 const HEADER_ALIASES: Record<string, string> = {
   "parwest id": "parwestIdInput",
+  // Supervisor sheet header → canonical FK key (User.id chosen in editor).
+  supervisor: "supervisorId",
+  // Bank details — space-separated sheet headers → camelCase Guard flat columns.
+  "bank name": "bankName",
+  "account number": "bankAccountNumber",
+  "account type": "bankAccountType",
+  iban: "bankIban",
+  "branch code": "bankBranchCode",
+  // Nationality header already equals its canonical key; included for symmetry
+  // with the other self-mapping entries below (religion/sect/cast/…).
+  nationality: "nationality",
   "regional office": "regionalOfficeSeries",
   "father name": "fatherName",
   "mother name": "motherName",
@@ -222,6 +240,13 @@ const rowSchema = z
     // would silently slip through. Requiring it as a non-empty string makes a
     // missing/unresolvable regional office a hard row error. ──
     regionalOfficeSeries: requiredImportString("Regional office", 50),
+    // ── Supervisor — MANDATORY at finalize (parity with single-create, which
+    // requires a supervisorId before guard creation). Deliberately NOT in
+    // REQUIRED_HEADERS: a sheet without a "supervisor" column still uploads,
+    // but every row errors here until a Supervisor is chosen in the draft
+    // editor's FK combobox, so finalize is blocked until all are set. The FK
+    // resolver/combobox commits the chosen User.id under this key. ──
+    supervisorId: requiredImportString("Supervisor", 50),
     // ── Optional, format-checked only when present (parity: form validates
     // emergency contact + email only when supplied). These have no import
     // column today, so these are effectively no-ops until a column is added —
@@ -236,13 +261,14 @@ const rowSchema = z
   // / sentinel formats are interpreted exactly as persist will store them.
   .superRefine((row, ctx) => {
     const r = row as Record<string, unknown>
-    const message = validateGuardDates({
+    const dateError = validateGuardDates({
       dateOfBirth: coerceDate(r.dateOfBirth),
       cnicIssueDate: coerceDate(r.cnicIssueDate),
       cnicExpiryDate: coerceDate(r.cnicExpiryDate),
     })
-    if (message) {
-      ctx.addIssue({ code: "custom", message })
+    if (dateError) {
+      // Attach to the offending field's key so the editor highlights that cell.
+      ctx.addIssue({ code: "custom", message: dateError.message, path: [dateError.field] })
     }
   })
 
@@ -377,6 +403,29 @@ function mapCurrentStatus(raw: string | null): { status: string; lifecycleStatus
   return { status: "PENDING", lifecycleStatus: "PENDING" }
 }
 
+/**
+ * Active-Supervisor `where` filter narrowed to the actor's manager scope.
+ * Mirrors GET /api/users/supervisors so the supervisor dropdown AND the
+ * persist-time re-check apply the SAME region/office restriction. The import's
+ * `ctx.scope` ({ regionId?, regionalOfficeIds?: string[] }) is adapted into a
+ * ManagerScope; a null/empty scope means unrestricted (SuperAdmin / global).
+ */
+function scopedSupervisorWhere(scope: ImportRunContext["scope"]): Prisma.UserWhereInput {
+  const where: Prisma.UserWhereInput = { status: "ACTIVE", role: { name: "Supervisor" } }
+  if (scope && (scope.regionId || (scope.regionalOfficeIds?.length ?? 0) > 0)) {
+    const adaptedScope: ManagerScope = {
+      role: "",
+      regionId: scope.regionId ?? null,
+      regionalOfficeIds: scope.regionalOfficeIds ?? [],
+    }
+    Object.assign(
+      where,
+      buildManagerScopeWhere(adaptedScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
+    )
+  }
+  return where
+}
+
 /* ────────────────────────────────────────────────────────────────────── */
 /* Column descriptors — drives the draft editor's per-cell editor choice  */
 /* ────────────────────────────────────────────────────────────────────── */
@@ -404,6 +453,39 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
         .map((r) => ({ value: r.seriesCode, label: `${r.seriesCode} — ${r.name}` }))
     },
   },
+  // Supervisor — FK combobox over active Users whose role is "Supervisor".
+  // Required at finalize (rowSchema enforces it); persist creates the
+  // GuardSupervisorAssignment exactly as single-create does. `bulkApply` adds a
+  // "set supervisor for all rows" control so a batch sharing one supervisor
+  // doesn't have to be set cell-by-cell.
+  {
+    key: "supervisorId",
+    header: "supervisor",
+    label: "Supervisor",
+    kind: "fk",
+    required: true,
+    bulkApply: true,
+    fkOptionsLoader: async (ctx) => {
+      // Scoped to the actor's region/office (parity with GET
+      // /api/users/supervisors) so a regional admin can't pick a supervisor
+      // outside their scope. User→role is a required to-one relation, so the
+      // filter is `role: { name }`, NOT `role.is`.
+      const us = await ctx.prisma.user.findMany({
+        where: scopedSupervisorWhere(ctx.scope),
+        select: { id: true, name: true, email: true },
+        orderBy: { name: "asc" },
+        take: 300,
+      })
+      return us.map((u) => ({
+        value: u.id,
+        label: u.email ? `${u.name} (${u.email})` : u.name,
+      }))
+    },
+  },
+  { key: "nationality", header: "nationality", label: "Nationality", kind: "text", required: false },
+  // Joining date — display-only. persist stamps it to the import date; this
+  // read-only cell shows that to the user. No sheet header (not user-entered).
+  { key: "joiningDate", header: "joining date", label: "Joining Date", kind: "date", required: false, readOnly: true },
   { key: "fatherName", header: "father name", label: "Father Name", kind: "text", required: false },
   { key: "motherName", header: "mother name", label: "Mother Name", kind: "text", required: false },
   { key: "dateOfBirth", header: "date of birth", label: "Date of Birth", kind: "date", required: false },
@@ -525,6 +607,13 @@ const GUARDS_COLUMNS: ColumnDescriptor[] = [
   { key: "judicial_3_policeStation", header: "third judicial case police station", label: "Third Judicial Police Station", kind: "text", required: false },
   { key: "judicial_3_investigationResult", header: "third judicial case investigation result", label: "Third Judicial Investigation Result", kind: "text", required: false },
   { key: "judicial_3_courtResult", header: "third judicial case court result", label: "Third Judicial Court Result", kind: "text", required: false },
+
+  // Bank details (optional) — flat Guard columns read by buildGuardCreatePayload.
+  { key: "bankName", header: "bank name", label: "Bank Name", kind: "text", required: false },
+  { key: "bankAccountNumber", header: "account number", label: "Account Number", kind: "text", required: false },
+  { key: "bankAccountType", header: "account type", label: "Account Type", kind: "text", required: false },
+  { key: "bankIban", header: "iban", label: "IBAN", kind: "text", required: false },
+  { key: "bankBranchCode", header: "branch code", label: "Branch Code", kind: "text", required: false },
 
   // Misc
   {
@@ -704,7 +793,14 @@ registerImport({
     const lifecycle = mapCurrentStatus(coerceString(r.currentStatusRaw))
 
     // ── Compose the create payload via the shared builder ──
-    const flat: Record<string, unknown> = { ...r, status: lifecycle.status }
+    // joiningDate is auto-set to the date of import (today) — there is no
+    // joining-date column/header; we override whatever the row carried so
+    // build-payload's coerceDate(f.joiningDate) stores today's date.
+    const flat: Record<string, unknown> = {
+      ...r,
+      status: lifecycle.status,
+      joiningDate: new Date(),
+    }
     const payload = buildGuardCreatePayload({
       parwestId,
       name: coerceString(r.name) ?? "",
@@ -734,6 +830,39 @@ registerImport({
           : {}),
       },
     })
+
+    // ── Supervisor assignment ──
+    // Parity with single-create (POST /api/guards ~lines 340-348): when a
+    // supervisor is set, create the active assignment with the same fields
+    // (guardId, supervisorId, status: "ACTIVE"; assignedAt defaults to now()).
+    // rowSchema requires supervisorId, so this is effectively always present.
+    const supervisorId = coerceString(r.supervisorId)
+    if (supervisorId) {
+      // Trust-boundary re-check: the draft's supervisorId is client-editable,
+      // so re-verify it is a real, active Supervisor within the actor's scope
+      // (same filter as the dropdown). The allow-set is loaded once per run and
+      // cached, so this is one query for the whole import, not one per row.
+      const ALLOWED_KEY = "guard.supervisor.allowedIds"
+      let allowed = ctx.cache.get(ALLOWED_KEY) as Set<string> | undefined
+      if (!allowed) {
+        const rows = await ctx.tx.user.findMany({
+          where: scopedSupervisorWhere(ctx.scope),
+          select: { id: true },
+        })
+        allowed = new Set(rows.map((u) => u.id))
+        ctx.cache.set(ALLOWED_KEY, allowed)
+      }
+      if (!allowed.has(supervisorId)) {
+        throw new Error("Selected supervisor is invalid or outside your permitted scope.")
+      }
+      await ctx.tx.guardSupervisorAssignment.create({
+        data: {
+          guardId: created.id,
+          supervisorId,
+          status: "ACTIVE",
+        },
+      })
+    }
 
     // ── Side effects: service-history + status-history (fire-and-forget) ──
     void recordGuardServiceEvent({

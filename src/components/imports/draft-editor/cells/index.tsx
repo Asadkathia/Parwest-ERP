@@ -3,11 +3,14 @@ import { CnicCell } from "./CnicCell"
 import { DateCell } from "./DateCell"
 import { EnumCell } from "./EnumCell"
 import { FkCell } from "./FkCell"
+import { ReadOnlyCell } from "./ReadOnlyCell"
 import type { DraftColumn } from "@/lib/imports/client/useDraft"
 
 type CellEditorProps = CellProps & { column: DraftColumn }
 
 export function CellEditor({ column, ...rest }: CellEditorProps) {
+  // Display-only columns (e.g. joining date) are never editable, regardless of kind.
+  if (column.readOnly) return <ReadOnlyCell {...rest} kind={column.kind} />
   switch (column.kind) {
     case "date":
       return <DateCell {...rest} />
@@ -24,4 +27,4 @@ export function CellEditor({ column, ...rest }: CellEditorProps) {
   }
 }
 
-export { TextCell, CnicCell, DateCell, EnumCell, FkCell }
+export { TextCell, CnicCell, DateCell, EnumCell, FkCell, ReadOnlyCell }

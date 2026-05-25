@@ -85,11 +85,15 @@ function Cell({
     e.field === col.key || e.field === col.header || e.field.split("+").includes(col.key) || e.field.split("+").includes(col.header)
   )
   const invalid = Boolean(cellError)
-  const onCommit = (next: string | null) => onPatchRow(row.rowNumber, { [col.key]: next })
+  // Edit/read under the SHEET HEADER key — the key the parsed row data actually
+  // uses. Writing under col.key (the canonical key) created a parallel key, and
+  // header-alias collapsing could then let the original value clobber the edit
+  // (row data is JSONB, which drops insertion order) — silently losing edits.
+  const onCommit = (next: string | null) => onPatchRow(row.rowNumber, { [col.header]: next })
   const editor = (
     <CellEditor
       column={col}
-      value={row.data[col.key] ?? row.data[col.header]}
+      value={row.data[col.header] ?? row.data[col.key]}
       onCommit={onCommit}
       invalid={invalid}
     />

@@ -18,6 +18,10 @@ export type DraftColumn = {
   required: boolean
   enumValues?: string[]
   fkOptions?: Array<{ value: string; label: string }>
+  /** Display-only — editor renders this cell non-editable (e.g. joining date). */
+  readOnly?: boolean
+  /** Editor offers a "set for all rows" bulk control for this column (e.g. supervisor). */
+  bulkApply?: boolean
 }
 
 export type DraftJobInfo = {
@@ -133,6 +137,18 @@ export function useDraft(draftId: string) {
     return json.data
   }, [draftId])
 
+  const bulkPatch = useCallback(async (data: Record<string, unknown>) => {
+    const res = await fetch(`/api/imports/drafts/${draftId}/rows`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data }),
+    })
+    const json = await res.json()
+    if (!json.success) throw new Error(json.message)
+    // The endpoint returns every row; replace the whole view in one dispatch.
+    dispatch({ type: "ROWS_LOADED", rows: json.data.rows })
+  }, [draftId])
+
   const setSkipped = useCallback(async (rowNumber: number, skipped: boolean) => {
     const res = await fetch(`/api/imports/drafts/${draftId}/rows/${rowNumber}/skip`, {
       method: "PATCH",
@@ -155,5 +171,5 @@ export function useDraft(draftId: string) {
     return res.ok
   }, [draftId])
 
-  return { ...state, patchRow, setSkipped, finalize, discard }
+  return { ...state, patchRow, bulkPatch, setSkipped, finalize, discard }
 }
