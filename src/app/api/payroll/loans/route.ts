@@ -6,6 +6,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { parseMonthRange, parseMonthStart } from "@/lib/payroll/date-helpers"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 const ALLOWED_LOAN_STATUSES = new Set(["PENDING", "FINALIZED"])
 
@@ -159,7 +160,20 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(created, { status: 201 })
+    // Recompute the affected payroll month so Payroll.loans/netSalary reflect
+    // this loan. Locked months are surfaced as warnings, not mutated.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings = await recalcAffectedMonths(
+      guard.id,
+      affectedMonthStarts(month, month),
+      actorUserId,
+    )
+
+    return NextResponse.json(
+      warnings.length > 0 ? { ...created, warnings } : created,
+      { status: 201 },
+    )
   } catch (error: unknown) {
     if (String((error as { code?: string }).code) === "P2003") {
       return badRequest("Invalid relation provided.")

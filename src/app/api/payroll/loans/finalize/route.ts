@@ -7,6 +7,7 @@ import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/
 import { hasAction } from "@/lib/api/permissions"
 
 import { parseMonthRange as parseMonth } from "@/lib/payroll/date-helpers"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const pending = await prisma.loan.findMany({
       where,
-      select: { id: true, amount: true, regionId: true, guard: { select: { regionId: true, region: { select: { name: true } } } } },
+      select: { id: true, guardId: true, amount: true, regionId: true, guard: { select: { regionId: true, region: { select: { name: true } } } } },
     })
 
     if (pending.length === 0) {
@@ -80,11 +81,24 @@ export async function POST(request: NextRequest) {
       }),
     ])
 
+    // Finalizing a loan makes it count toward Payroll.loans. Recompute each
+    // affected guard's payroll for this month so net pay reflects the change.
+    // Locked months are surfaced as warnings rather than mutated.
+    const actorUserId = session.user?.id ?? null
+    const monthStarts = affectedMonthStarts(month.start, month.start)
+    const guardIds = Array.from(new Set(pending.map((l) => l.guardId)))
+    const warnings: string[] = []
+    for (const guardId of guardIds) {
+      const w = await recalcAffectedMonths(guardId, monthStarts, actorUserId)
+      warnings.push(...w)
+    }
+
     return NextResponse.json({
       finalized: ids.length,
       totalAmount,
       month: month.start.toISOString(),
       regionId: resolvedRegionId,
+      ...(warnings.length > 0 ? { warnings } : {}),
     })
   } catch (error) {
     console.error("Error finalizing loans:", error)

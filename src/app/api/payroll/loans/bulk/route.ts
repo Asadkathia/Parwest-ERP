@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 type BulkLoanInput = {
   guardId: string
@@ -27,6 +28,9 @@ export async function POST(request: NextRequest) {
     }
 
     const results: { guardId: string; success: boolean; loanId?: string; error?: string }[] = []
+    // Track (guardId -> set of affected month-starts) so we can recompute each
+    // affected payroll month once after the bulk insert completes.
+    const affected = new Map<string, Map<string, Date>>()
 
     for (const row of rows) {
       if (!row.guardId || row.amount == null || !row.loanDate) {
@@ -56,23 +60,54 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // NOTE: the Loan model has no free-text notes column. Bulk-imported
+        // `notes` were previously stuffed into the `manager` field (a person
+        // reference), corrupting that column — they are dropped here. If a
+        // notes column is added later, write `row.notes` to it instead.
         const loan = await prisma.loan.create({
           data: {
             guardId: guard.id,
             month,
             amount: Number(row.amount),
             status: "PENDING",
-            ...(row.notes ? { manager: row.notes } : {}),
           },
         })
         results.push({ guardId: row.guardId, success: true, loanId: loan.id })
+        // Record the affected payroll month for this guard so the persisted
+        // Payroll.loans/netSalary is recomputed below.
+        const monthStarts = affectedMonthStarts(month, month)
+        let monthsForGuard = affected.get(guard.id)
+        if (!monthsForGuard) {
+          monthsForGuard = new Map<string, Date>()
+          affected.set(guard.id, monthsForGuard)
+        }
+        for (const m of monthStarts) monthsForGuard.set(m.toISOString(), m)
       } catch {
         results.push({ guardId: row.guardId, success: false, error: "Failed to create loan." })
       }
     }
 
+    // Recompute every affected (guard, month) payroll so loan totals reflect the
+    // import. Locked months are surfaced as warnings rather than mutated.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings: string[] = []
+    for (const [guardId, monthsForGuard] of affected) {
+      const w = await recalcAffectedMonths(
+        guardId,
+        Array.from(monthsForGuard.values()),
+        actorUserId,
+      )
+      warnings.push(...w)
+    }
+
     const successCount = results.filter((r) => r.success).length
-    return NextResponse.json({ committed: successCount, total: rows.length, results }, { status: 201 })
+    return NextResponse.json(
+      warnings.length > 0
+        ? { committed: successCount, total: rows.length, results, warnings }
+        : { committed: successCount, total: rows.length, results },
+      { status: 201 },
+    )
   } catch (error) {
     console.error("Error committing bulk loans:", error)
     return internalServerError("Failed to commit bulk loans.")

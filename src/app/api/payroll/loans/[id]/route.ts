@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { affectedMonthStarts, recalcAffectedMonths } from "@/lib/payroll/special-duty-recalc"
 
 export async function PATCH(
   request: NextRequest,
@@ -24,6 +25,8 @@ export async function PATCH(
       where: { id },
       select: {
         id: true,
+        guardId: true,
+        month: true,
         guard: {
           select: {
             regionId: true,
@@ -69,7 +72,17 @@ export async function PATCH(
       },
     })
 
-    return NextResponse.json(updated)
+    // Recompute the affected payroll month so Payroll.loans/netSalary reflect
+    // the edited amount. Locked months are surfaced as warnings, not mutated.
+    const actorUserId =
+      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const warnings = await recalcAffectedMonths(
+      existing.guardId,
+      affectedMonthStarts(existing.month, existing.month),
+      actorUserId,
+    )
+
+    return NextResponse.json(warnings.length > 0 ? { ...updated, warnings } : updated)
   } catch (error) {
     console.error("Error updating payroll loan:", error)
     return internalServerError("Failed to update payroll loan")

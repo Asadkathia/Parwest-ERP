@@ -1,7 +1,7 @@
 /**
  * Parwest ERP — Invoice Print Document (v1.1 design template)
  * ────────────────────────────────────────────────────────────────
- * Sister component to {@link ../payroll/PayrollSlipPdfDocument}. Renders an
+ * Renders an
  * A4 invoice for the popup-window `window.print()` flow used elsewhere in
  * the app — `renderToString` the component, write the HTML + the exported
  * stylesheet into a `window.open(...)` document, then call `print()`.

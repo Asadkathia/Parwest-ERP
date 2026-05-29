@@ -58,7 +58,6 @@ import {
 } from "@/components/shadcn/select"
 
 import {
-  PAYROLL_UNPAID_SALARY_STATUSES,
   payrollUnpaidSalaryUpdateSchema,
   type PayrollUnpaidSalaryUpdateInput,
 } from "@/lib/schemas/payroll-unpaid-salary"
@@ -86,6 +85,12 @@ type PayrollUnpaidSalariesManagerProps = {
 }
 
 const STATUS_FILTER_ALL = "all"
+const PAYMENT_METHODS = ["BANK", "CASH", "MOBILE"] as const
+const PAYABLE_STATE_OPTIONS = [
+  "REGIONAL_LOCKED",
+  "GLOBAL_FINALIZED",
+  "EMERGENCY_RELEASED",
+] as const
 
 export default function PayrollUnpaidSalariesManager({
   canUpdate = false,
@@ -100,17 +105,30 @@ export default function PayrollUnpaidSalariesManager({
   const [parwestIdInput, setParwestIdInput] = useState("")
   const [selectedRow, setSelectedRow] = useState<Row | null>(null)
   const [saving, setSaving] = useState(false)
+  // F-2: marking PAID now goes through the state machine
+  // (POST /api/payroll/state/mark-paid), which REQUIRES a payment method.
+  // The shared zod schema (out of this lane) doesn't model paymentMethod, so
+  // it's kept as local state.
+  const [paymentMethod, setPaymentMethod] = useState<string>("")
 
   const form = useForm<PayrollUnpaidSalaryUpdateInput>({
     resolver: zodResolver(payrollUnpaidSalaryUpdateSchema),
     defaultValues: {
       payrollId: "",
       date: "",
-      paymentStatus: undefined as unknown as PayrollUnpaidSalaryUpdateInput["paymentStatus"],
+      paymentStatus: "PAID",
       paymentRemarks: "",
     },
     mode: "onChange",
   })
+
+  // A row is markable as PAID only from a payable state (mirrors
+  // /api/payroll/state/mark-paid and /api/payroll/unpaid).
+  const PAYABLE_STATES = useMemo(
+    () => new Set(["REGIONAL_LOCKED", "GLOBAL_FINALIZED", "EMERGENCY_RELEASED"]),
+    []
+  )
+  const selectedIsPayable = !!selectedRow?.state && PAYABLE_STATES.has(selectedRow.state)
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -143,7 +161,14 @@ export default function PayrollUnpaidSalariesManager({
     const res = await fetch(`/api/payroll/salary?${params}`)
     if (res.ok) {
       const all: Row[] = await res.json()
-      const row = all.find((r) => r.paymentStatus !== "PAID") ?? all[0] ?? null
+      // Prefer a payable, not-yet-paid row; fall back to first non-paid, then first.
+      const row =
+        all.find(
+          (r) => r.paymentStatus !== "PAID" && !!r.state && PAYABLE_STATES.has(r.state)
+        ) ??
+        all.find((r) => r.paymentStatus !== "PAID") ??
+        all[0] ??
+        null
       setSelectedRow(row)
       if (row) form.setValue("payrollId", row.id)
     }
@@ -151,33 +176,48 @@ export default function PayrollUnpaidSalariesManager({
 
   const onSubmit = async (values: PayrollUnpaidSalaryUpdateInput) => {
     if (!selectedRow) {
-      toast.error("Select a guard with an unpaid salary first.")
+      toast.error("Select a guard with a payable salary first.")
+      return
+    }
+    if (!selectedIsPayable) {
+      toast.error(
+        `Cannot mark PAID from state ${selectedRow.state ?? "unknown"}. Lock or finalize the payroll first.`
+      )
+      return
+    }
+    if (!paymentMethod) {
+      toast.error("Select a payment method.")
       return
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/payroll/salary/${selectedRow.id}`, {
-        method: "PATCH",
+      // F-2: route through the state machine so `state` and `paymentStatus`
+      // stay in lock-step. This rejects (409) if the row left a payable state.
+      const res = await fetch(`/api/payroll/state/mark-paid`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paymentStatus: values.paymentStatus,
+          payrollId: selectedRow.id,
+          paymentMethod,
           paymentRemarks: values.paymentRemarks,
         }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success(`Updated salary for ${selectedRow.guard.name}.`)
+        toast.success(`Marked salary PAID for ${selectedRow.guard.name}.`)
         setParwestIdInput("")
         setSelectedRow(null)
+        setPaymentMethod("")
         form.reset({
           payrollId: "",
           date: "",
-          paymentStatus: undefined as unknown as PayrollUnpaidSalaryUpdateInput["paymentStatus"],
+          paymentStatus: "PAID",
           paymentRemarks: "",
         })
         loadRows()
       } else {
-        toast.error(data?.message ?? "Failed to update salary.")
+        // Surface the precise 400/409 from the close workflow.
+        toast.error(data?.message ?? "Failed to mark salary as PAID.")
       }
     } catch {
       toast.error("Network error. Please try again.")
@@ -186,9 +226,12 @@ export default function PayrollUnpaidSalariesManager({
     }
   }
 
+  // The list only returns PENDING + payable rows now, so filtering by
+  // paymentStatus is meaningless. Filter by `state` (the meaningful dimension)
+  // instead.
   const filteredRows = useMemo(() => {
     if (statusFilter === STATUS_FILTER_ALL) return rows
-    return rows.filter((r) => r.paymentStatus === statusFilter)
+    return rows.filter((r) => r.state === statusFilter)
   }, [rows, statusFilter])
 
   const columns = useMemo<ColumnDef<Row>[]>(
@@ -291,7 +334,7 @@ export default function PayrollUnpaidSalariesManager({
   return (
     <PayrollPageShell
       title="Payroll — Unpaid Salaries"
-      subtitle="Update unpaid salary status for a guard and record remarks."
+      subtitle="Mark payable salaries (locked/finalized/emergency-released) as PAID and record the payment method and remarks."
     >
       <Card>
         <CardContent className="space-y-4 p-4">
@@ -332,10 +375,10 @@ export default function PayrollUnpaidSalariesManager({
                 </div>
                 <div>
                   <Label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                    Salary Status
+                    Payroll State
                   </Label>
                   <Input
-                    value={selectedRow?.paymentStatus ?? ""}
+                    value={selectedRow?.state ?? selectedRow?.paymentStatus ?? ""}
                     readOnly
                     className="bg-muted"
                   />
@@ -356,33 +399,31 @@ export default function PayrollUnpaidSalariesManager({
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="paymentStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Change Status *</FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value ?? ""}
-                          onValueChange={(v) => field.onChange(v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PAYROLL_UNPAID_SALARY_STATUSES.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/*
+                 * F-2: payment is a state-machine action now. The only
+                 * operation this page performs is "mark PAID" via
+                 * POST /api/payroll/state/mark-paid, which requires a payment
+                 * method (BANK/CASH/MOBILE). The old PAID/UNPAID status select
+                 * was removed — UNPAID is no longer producible by the pipeline
+                 * (F-10) and PAID must go through the close workflow.
+                 */}
+                <FormItem>
+                  <FormLabel>Payment Method *</FormLabel>
+                  <FormControl>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHODS.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                </FormItem>
                 <FormField
                   control={form.control}
                   name="paymentRemarks"
@@ -398,11 +439,23 @@ export default function PayrollUnpaidSalariesManager({
                 />
               </div>
 
+              {selectedRow && !selectedIsPayable && (
+                <p className="text-xs text-destructive">
+                  This payroll is in state{" "}
+                  <span className="font-mono">{selectedRow.state ?? "unknown"}</span> and
+                  cannot be marked PAID. It must reach REGIONAL_LOCKED,
+                  GLOBAL_FINALIZED, or EMERGENCY_RELEASED via the close workflow first.
+                </p>
+              )}
+
               <div className="flex items-center justify-end">
                 {canUpdate && (
                   <PermissionGate module="PAYROLL" action="UPDATE" mode="hide">
-                    <Button type="submit" disabled={!selectedRow || saving}>
-                      {saving ? "Updating…" : "Update"}
+                    <Button
+                      type="submit"
+                      disabled={!selectedRow || !selectedIsPayable || saving}
+                    >
+                      {saving ? "Marking Paid…" : "Mark Paid"}
                     </Button>
                   </PermissionGate>
                 )}
@@ -437,7 +490,7 @@ export default function PayrollUnpaidSalariesManager({
             </div>
             <div>
               <Label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                Status
+                State
               </Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -445,7 +498,7 @@ export default function PayrollUnpaidSalariesManager({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={STATUS_FILTER_ALL}>All</SelectItem>
-                  {PAYROLL_UNPAID_SALARY_STATUSES.map((s) => (
+                  {PAYABLE_STATE_OPTIONS.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s}
                     </SelectItem>
@@ -465,10 +518,12 @@ export default function PayrollUnpaidSalariesManager({
             <Card>
               <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
                 <div className="text-base font-semibold">
-                  No unpaid salaries
+                  No payable salaries
                 </div>
                 <p className="max-w-md text-sm text-muted-foreground">
-                  No unpaid salary records for this month/region.
+                  No locked/finalized salaries awaiting payment for this
+                  month/region. Lock or finalize a region to make its salaries
+                  payable.
                 </p>
               </CardContent>
             </Card>

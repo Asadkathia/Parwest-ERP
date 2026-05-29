@@ -2,23 +2,22 @@
  * Shared permission helpers for the payroll state machine.
  *
  * SuperAdmin convention (from CLAUDE.md):
+ *   role === "Super User"                          ⇒ always unrestricted SuperAdmin.
  *   role === "Admin" AND permissions.length === 0  ⇒ unrestricted SuperAdmin.
  * An Admin *with* permissions is a regional admin restricted to those modules.
  *
- * The Session typings (`src/types/next-auth.d.ts`) do not declare
- * `permissions` on `session.user`, but `src/lib/auth.ts` writes it via
- * `session.user.permissions = ...`. We read it through a typed cast.
+ * F-1 (payroll audit): this module previously shipped a *divergent* local
+ * `isSuperAdmin` that dropped the `"Super User"` branch, locking the highest-
+ * privilege role out of every SuperAdmin-gated payroll-state action (and the
+ * tickets routes that import the same symbol). The canonical implementation
+ * lives in `@/lib/api/permissions`; we re-export it here so every importer
+ * (7 payroll-state routes + 3 tickets routes) inherits the fix without edits.
+ * The re-export name and signature are unchanged.
  */
 
 import type { Session } from "next-auth"
 
-export function isSuperAdmin(session: Session | null | undefined): boolean {
-  if (!session?.user) return false
-  const role = (session.user as { role?: string }).role
-  if (role !== "Admin") return false
-  const perms = (session.user as { permissions?: string[] }).permissions ?? []
-  return perms.length === 0
-}
+export { isSuperAdmin } from "@/lib/api/permissions"
 
 export function getActorIdentity(session: Session): { id: string; name: string } {
   const id = (session.user as { id?: string })?.id ?? "unknown"

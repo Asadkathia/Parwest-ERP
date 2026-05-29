@@ -340,6 +340,17 @@ function AddLoansTab({
 
   const payableAmount = useMemo(() => context?.currentUnpaidLoan ?? 0, [context])
 
+  // Prefer the canonical `lifecycleStatus` for the displayed status, falling
+  // back to the legacy `status` shadow when absent. Additive + safe: the
+  // legacy field is preserved on the underlying context object.
+  const displayContext = useMemo<GuardCurrentContext | null>(
+    () =>
+      context
+        ? { ...context, status: context.lifecycleStatus ?? context.status }
+        : null,
+    [context]
+  )
+
   const onSubmit = async (values: PayrollLoanCreateInput) => {
     if (!context) {
       toast.error("Select a guard first.")
@@ -826,7 +837,7 @@ function AddLoansTab({
       </div>
 
       <div>
-        <GuardInfoCard context={context} />
+        <GuardInfoCard context={displayContext} />
       </div>
     </div>
   )

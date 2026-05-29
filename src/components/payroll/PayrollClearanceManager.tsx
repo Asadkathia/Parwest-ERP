@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/shadcn/button"
 import PayrollPageShell from "@/components/payroll/shared/PayrollPageShell"
 import GuardAutocomplete from "@/components/payroll/shared/GuardAutocomplete"
@@ -33,6 +33,16 @@ export default function PayrollClearanceManager({
   const [busy, setBusy] = useState(false)
   const [steps, setSteps] = useState<ClearanceStep[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Prefer the canonical `lifecycleStatus` for the displayed Status field,
+  // falling back to the legacy `status` shadow when absent. Additive + safe.
+  const displayContext = useMemo<GuardCurrentContext | null>(
+    () =>
+      context
+        ? { ...context, status: context.lifecycleStatus ?? context.status }
+        : null,
+    [context]
+  )
 
   const handleGuardSelect = async (opt: { id: string; parwestId: string }) => {
     setParwestIdInput(opt.parwestId)
@@ -107,7 +117,7 @@ export default function PayrollClearanceManager({
         </div>
 
         <GuardContextFields
-          context={context}
+          context={displayContext}
           showRows={["name", "status", "type", "location", "loan"]}
         />
 

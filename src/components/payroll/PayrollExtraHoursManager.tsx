@@ -122,6 +122,16 @@ export default function PayrollExtraHoursManager({
 
   const selectClientId = form.watch("selectClientId") ?? ""
 
+  // Prefer the canonical `lifecycleStatus` for the displayed Status field,
+  // falling back to the legacy `status` shadow when absent. Additive + safe.
+  const displayContext = useMemo<GuardCurrentContext | null>(
+    () =>
+      context
+        ? { ...context, status: context.lifecycleStatus ?? context.status }
+        : null,
+    [context]
+  )
+
   const loadRows = useCallback(async () => {
     setLoading(true)
     setFetchError(null)
@@ -467,7 +477,7 @@ export default function PayrollExtraHoursManager({
               </div>
 
               <GuardContextFields
-                context={context}
+                context={displayContext}
                 showRows={["name", "status", "type", "location"]}
               />
 

@@ -150,6 +150,17 @@ export default function PayrollSpecialDutyManager({
   const watchedHours = form.watch("hours")
   const watchedRate = form.watch("hourRate")
 
+  // Prefer the canonical `lifecycleStatus` for the displayed Status field,
+  // falling back to the legacy `status` shadow when absent. Additive + safe:
+  // the legacy field is preserved on the underlying context object.
+  const displayContext = useMemo<GuardCurrentContext | null>(
+    () =>
+      context
+        ? { ...context, status: context.lifecycleStatus ?? context.status }
+        : null,
+    [context]
+  )
+
   const loadRows = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
@@ -549,7 +560,7 @@ export default function PayrollSpecialDutyManager({
               </div>
 
               <GuardContextFields
-                context={context}
+                context={displayContext}
                 showRows={["name", "type", "status"]}
               />
 
