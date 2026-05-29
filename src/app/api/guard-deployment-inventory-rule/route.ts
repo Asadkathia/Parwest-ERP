@@ -18,16 +18,19 @@ export async function GET() {
     if (!session) return unauthorized()
     if (!hasAction(session, "INVENTORY", "VIEW")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
 
+    // GET is read-only: never write the default row on read. The row is
+    // created/seeded by PUT. If it doesn't exist yet, return the default shape
+    // in-memory.
     const ruleDelegate = (prisma as unknown as {
       guardDeploymentInventoryRule?: {
-        upsert: (args: unknown) => Promise<{
+        findUnique: (args: unknown) => Promise<{
           id: string
           ruleKey: string
           isActive: boolean
           minimumAssignedItems: number
           allowedCategoryIds: unknown
           updatedAt: Date
-        }>
+        } | null>
       }
     }).guardDeploymentInventoryRule
 
@@ -43,15 +46,19 @@ export async function GET() {
       })
     }
 
-    const rule = await ruleDelegate.upsert({
+    const rule = await ruleDelegate.findUnique({
       where: { ruleKey: "default" },
-      create: {
+    })
+
+    if (!rule) {
+      return NextResponse.json({
+        id: "default",
         ruleKey: "default",
         isActive: false,
         minimumAssignedItems: 1,
-      },
-      update: {},
-    })
+        allowedCategoryIds: [],
+      })
+    }
 
     return NextResponse.json({
       id: rule.id,

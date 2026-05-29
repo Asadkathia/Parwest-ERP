@@ -40,6 +40,7 @@ export async function POST(
             return forbidden("Forbidden: deployment is outside your scope.")
         }
 
+        // "Already ended" guard — same rule as DELETE /[id] (single source of truth).
         if (existingDeployment.status === "INACTIVE") {
             return conflict("Deployment is already ended.")
         }
@@ -71,7 +72,11 @@ export async function POST(
 
         const revokedByName = (session.user as { name?: string })?.name ?? null
 
-        // End the deployment + recompute guard status atomically
+        // End the deployment + recompute the legacy guard-status shadow atomically.
+        // NOTE: syncLegacyStatus is the deployment→legacy-status projection — it
+        // recomputes Guard.status from live deployment state. Ending a deployment
+        // is NOT a guard lifecycle transition (the guard stays ACTIVE/undeployed),
+        // so this deliberately does NOT route through applyTransition.
         const { deployment, guardStatusChanged, prevGuardStatus, newGuardStatus } = await prisma.$transaction(async (tx) => {
             const updated = await tx.deployment.update({
                 where: { id },

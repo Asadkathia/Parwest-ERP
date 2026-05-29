@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { internalServerError, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 
 export async function GET(request: NextRequest) {
     try {
         const session = await auth()
-        if (!session) {
-            return unauthorized()
-        }
+        if (!session) return unauthorized()
+        if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
+        const managerScope = deriveManagerScope(session)
 
         const { searchParams } = new URL(request.url)
         const regionId = searchParams.get("regionId") || undefined
@@ -19,6 +21,11 @@ export async function GET(request: NextRequest) {
         const shiftType = searchParams.get("shiftType") || undefined
         const latest = searchParams.get("latest") === "true"
 
+        // Regional users cannot read rate rows outside their region.
+        if (managerScopeDenied(managerScope, { regionId })) {
+            return forbidden("Forbidden: region is outside your scope.")
+        }
+
         const rates = await prisma.deploymentRate.findMany({
             where: {
                 ...(regionId ? { regionId } : {}),
@@ -27,6 +34,7 @@ export async function GET(request: NextRequest) {
                 ...(deployAs ? { deployAs } : {}),
                 ...(guardType ? { guardType } : {}),
                 ...(shiftType ? { shiftType } : {}),
+                ...buildManagerScopeWhere(managerScope, { regionId: "regionId" }),
             },
             orderBy: { createdAt: "desc" },
             include: {
@@ -47,11 +55,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const session = await auth()
-        if (!session) {
-            return unauthorized()
-        }
+        if (!session) return unauthorized()
+        if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
+        const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
+
+        if (managerScopeDenied(managerScope, { regionId: body.regionId || undefined })) {
+            return forbidden("Forbidden: region is outside your scope.")
+        }
 
         const rate = await prisma.deploymentRate.create({
             data: {
@@ -73,7 +85,7 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        return NextResponse.json(rate, { status: 201 })
+        return ok(rate, 201)
     } catch (error: unknown) {
         console.error("Error creating deployment rate:", error)
         return internalServerError("Failed to create deployment rate")

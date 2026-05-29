@@ -480,8 +480,7 @@ export default function RevokeDeploymentForm({ deployment }: Props) {
                     <AlertDialogTitle>End deployment?</AlertDialogTitle>
                     <AlertDialogDescription>
                       {deployment.guard.name} will be released from{" "}
-                      {deployment.client.name}. This cannot be reverted while
-                      the lock-after-end rule is on.
+                      {deployment.client.name}.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
 

@@ -34,7 +34,6 @@ import { Badge } from "@/components/shadcn/badge"
 import { Button } from "@/components/shadcn/button"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { DataTable } from "@/components/shadcn/data-table"
-import { GuardStatusBadge, type GuardStatus } from "@/components/shadcn/guard-status-badge"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
 import {
   Select,
@@ -78,12 +77,24 @@ type Props = {
 
 const ALL_VALUE = "__ALL__"
 
+// Deployment rows are only ever ACTIVE | PENDING | INACTIVE. PAUSED/ENDED are
+// never produced by any code path — do not re-add them (always returns zero rows).
 const STATUS_OPTIONS = [
   { value: "ACTIVE", label: "Active" },
+  { value: "PENDING", label: "Pending" },
   { value: "INACTIVE", label: "Inactive" },
-  { value: "PAUSED", label: "Paused" },
-  { value: "ENDED", label: "Ended" },
 ]
+
+// Deployment-status badge variants + labels (a11y: label text is always shown,
+// color is never the sole signal). Distinct from GuardStatusBadge's guard vocab.
+const DEPLOYMENT_STATUS_META: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  ACTIVE: { label: "Active", variant: "default" },
+  PENDING: { label: "Pending", variant: "secondary" },
+  INACTIVE: { label: "Inactive", variant: "outline" },
+}
 
 const SHIFT_OPTIONS = [
   { value: "DAY", label: "Day" },
@@ -335,9 +346,18 @@ export default function DeploymentsListClient({
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => (
-          <GuardStatusBadge status={row.original.status as GuardStatus} />
-        ),
+        cell: ({ row }) => {
+          const meta =
+            DEPLOYMENT_STATUS_META[row.original.status] ?? {
+              label: row.original.status,
+              variant: "outline" as const,
+            }
+          return (
+            <Badge variant={meta.variant} className="font-medium">
+              {meta.label}
+            </Badge>
+          )
+        },
       },
       {
         id: "actions",

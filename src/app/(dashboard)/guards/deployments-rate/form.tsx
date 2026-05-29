@@ -9,25 +9,6 @@ type Region = { id: string; name: string }
 type Client = { id: string; name: string }
 type Branch = { id: string; name: string }
 
-const LEGACY_REGIONS: Region[] = [
-  { id: "legacy-region-punjab", name: "Punjab" },
-  { id: "legacy-region-sindh", name: "Sindh" },
-  { id: "legacy-region-kpk", name: "KPK" },
-  { id: "legacy-region-balochistan", name: "Balochistan" },
-]
-
-const LEGACY_CLIENTS: Client[] = [
-  { id: "legacy-client-nbp", name: "National Bank of Pakistan" },
-  { id: "legacy-client-scb", name: "Standard Chartered Bank Limited Pakistan" },
-  { id: "legacy-client-ubl", name: "United Bank Limited" },
-  { id: "legacy-client-mcb", name: "MCB Bank Ltd" },
-  { id: "legacy-client-fbl", name: "Faysal Bank Limited" },
-  { id: "legacy-client-summit", name: "Summit Bank Limited" },
-  { id: "legacy-client-meezan", name: "Meezan Bank Limited" },
-  { id: "legacy-client-bahl", name: "Bank Al Habib Limited" },
-  { id: "legacy-client-samba", name: "Samba Bank Limited" },
-]
-
 type DeploymentRate = {
   id: string
   region: { id: string; name: string } | null
@@ -54,7 +35,6 @@ export default function DeploymentRatesForm() {
   const [deployAs, setDeployAs] = useState("")
   const [guardType, setGuardType] = useState("")
   const [shiftType, setShiftType] = useState("DAY")
-  const [exService, setExService] = useState("")
 
   const [salary, setSalary] = useState("")
   const [overtime, setOvertime] = useState("")
@@ -74,19 +54,19 @@ export default function DeploymentRatesForm() {
       const [regionsRes, clientsRes] = await Promise.all([fetch("/api/regions"), fetch("/api/clients?status=ACTIVE")])
       if (regionsRes.ok) {
         const regionData = await regionsRes.json()
-        setRegions(Array.isArray(regionData) && regionData.length > 0 ? regionData : LEGACY_REGIONS)
+        setRegions(Array.isArray(regionData) ? regionData : [])
       } else {
-        setRegions(LEGACY_REGIONS)
+        setRegions([])
       }
       if (clientsRes.ok) {
         const clientData = await clientsRes.json()
-        setClients(Array.isArray(clientData) && clientData.length > 0 ? clientData : LEGACY_CLIENTS)
+        setClients(Array.isArray(clientData) ? clientData : [])
       } else {
-        setClients(LEGACY_CLIENTS)
+        setClients([])
       }
     } catch {
-      setRegions(LEGACY_REGIONS)
-      setClients(LEGACY_CLIENTS)
+      setRegions([])
+      setClients([])
     }
   }
 
@@ -140,7 +120,6 @@ export default function DeploymentRatesForm() {
       if (branchId) params.set("branchId", branchId)
       if (deployAs) params.set("deployAs", deployAs)
       if (guardType) params.set("guardType", guardType)
-      if (exService) params.set("exService", exService)
       if (shiftType) params.set("shiftType", shiftType)
       params.set("latest", "true")
 
@@ -181,7 +160,6 @@ export default function DeploymentRatesForm() {
           branchId: branchId || null,
           deployAs,
           guardType,
-          exService,
           shiftType,
           salary,
           overtime,
@@ -277,17 +255,6 @@ export default function DeploymentRatesForm() {
                 <span>Both</span>
               </label>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Ex Service</label>
-            <select name="exService" value={exService} onChange={(e) => setExService(e.target.value)} className="ui-select">
-              <option value="">Nothing selected</option>
-              <option value="other">other</option>
-              <option value="mujahid">mujahid</option>
-              <option value="rangers">rangers</option>
-              <option value="police">police</option>
-              <option value="army">army</option>
-            </select>
           </div>
         </div>
 

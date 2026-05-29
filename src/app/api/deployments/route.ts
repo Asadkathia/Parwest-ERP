@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
         const regionIdParam = searchParams.get("regionId")?.trim() || null
         const regionalOfficeIdParam = searchParams.get("regionalOfficeId")?.trim() || null
         const statusParam = searchParams.get("status")?.trim().toUpperCase() || null
-        const allowedStatuses = new Set(["ACTIVE", "INACTIVE", "PAUSED", "ENDED"])
+        // Deployment rows are only ever ACTIVE | PENDING | INACTIVE (see POST create
+        // + the end/DELETE paths). PAUSED/ENDED are never written — do not re-add them.
+        const allowedStatuses = new Set(["ACTIVE", "PENDING", "INACTIVE"])
         const statusFilter = statusParam && allowedStatuses.has(statusParam) ? statusParam : null
 
         // Reject cross-scope requests early so a regional user can't request
