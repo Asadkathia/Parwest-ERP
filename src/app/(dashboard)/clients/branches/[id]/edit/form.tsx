@@ -19,7 +19,6 @@ import { toast } from "sonner"
 import { ArrowLeft, Save } from "lucide-react"
 
 import PhoneInput from "@/components/ui/PhoneInput"
-import { deriveBranchModel } from "@/lib/branches/model"
 import {
     BRANCH_CAPACITY_FIELDS,
     branchEditSchema,
@@ -71,6 +70,11 @@ type Branch = {
     contactPerson: string | null
     contactPhone: string | null
     contactEmail: string | null
+    // Free-text on-site branch manager (a person, NOT a system user — that is
+    // assignedManagerId). Persisted to Branch columns by the PATCH handler.
+    branchManagerName?: string | null
+    branchManagerContact?: string | null
+    branchManagerEmail?: string | null
     assignedManagerId?: string | null
     operationsManagerId?: string | null
     // Capacity fields (all optional / nullable on the model)
@@ -152,7 +156,6 @@ export default function BranchEditForm({
     initialUsers = [],
 }: Props) {
     const router = useRouter()
-    const branchType = deriveBranchModel(branch.client?.type)
     const [submitting, setSubmitting] = useState(false)
     const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
     // Seed both lists with the pre-resolved currently-assigned users so the
@@ -175,7 +178,6 @@ export default function BranchEditForm({
         defaultValues: {
             name: branch.name ?? "",
             code: branch.code ?? "",
-            branchType: branchType === "ISLAMIC" ? "ISLAMIC" : "CONVENTIONAL",
             isHeadOffice: branch.isHeadOffice ?? false,
             status: branch.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
             address: branch.address ?? "",
@@ -184,6 +186,9 @@ export default function BranchEditForm({
             contactPerson: branch.contactPerson ?? "",
             contactPhone: branch.contactPhone ?? "",
             contactEmail: branch.contactEmail ?? "",
+            branchManagerName: branch.branchManagerName ?? "",
+            branchManagerContact: branch.branchManagerContact ?? "",
+            branchManagerEmail: branch.branchManagerEmail ?? "",
             assignedManagerId: branch.assignedManagerId ?? "",
             operationsManagerId: branch.operationsManagerId ?? "",
             assignedSupervisorId: currentSupervisorId ?? "",
@@ -285,6 +290,19 @@ export default function BranchEditForm({
         }
     }
 
+    // Surface the first validation error so a blocked submit is never silent.
+    const onInvalid = (errors: Record<string, unknown>) => {
+        const first = Object.values(errors).find(
+            (e): e is { message?: unknown } =>
+                Boolean(e) && typeof e === "object" && "message" in (e as object),
+        )
+        const message =
+            first && typeof first.message === "string" && first.message
+                ? first.message
+                : "Please fix the highlighted fields before saving."
+        toast.error(message)
+    }
+
     const handleCancel = () => {
         if (form.formState.isDirty) {
             setConfirmDiscardOpen(true)
@@ -295,7 +313,7 @@ export default function BranchEditForm({
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
                 {/* Basic Information */}
                 <Card>
                     <CardHeader>
@@ -336,31 +354,6 @@ export default function BranchEditForm({
                                                 value={field.value ?? ""}
                                             />
                                         </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="branchType"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel>Branch Model</FormLabel>
-                                        <Select
-                                            value={field.value ?? "CONVENTIONAL"}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="CONVENTIONAL">Conventional</SelectItem>
-                                                <SelectItem value="ISLAMIC">Islamic</SelectItem>
-                                            </SelectContent>
-                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -649,7 +642,7 @@ export default function BranchEditForm({
                                 name="assignedManagerId"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Branch Manager</FormLabel>
+                                        <FormLabel>Assigned Manager</FormLabel>
                                         <Select
                                             value={field.value ? String(field.value) : UNASSIGNED}
                                             onValueChange={(v) => field.onChange(v === UNASSIGNED ? "" : v)}
@@ -726,6 +719,87 @@ export default function BranchEditForm({
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Branch Manager (free-text on-site person — NOT a system user) */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Branch Manager</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            The on-site branch manager (a person). This is separate from the
+                            Assigned Manager above, who is a Parwest system user.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="branchManagerName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Manager's full name"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="branchManagerContact"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contact Number</FormLabel>
+                                        <FormControl>
+                                            <div
+                                                onBlur={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "branchManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                                onChangeCapture={(e) => {
+                                                    const target = e.target as HTMLInputElement
+                                                    if (target?.name === "branchManagerContact") {
+                                                        field.onChange(target.value)
+                                                    }
+                                                }}
+                                            >
+                                                <PhoneInput
+                                                    name="branchManagerContact"
+                                                    defaultValue={field.value ?? ""}
+                                                />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="branchManagerEmail"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="email"
+                                                placeholder="manager@example.com"
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}

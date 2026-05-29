@@ -5,6 +5,17 @@ import { CheckCircle2, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Button } from "@/components/shadcn/button"
 import { Card, CardContent } from "@/components/shadcn/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { useCanAccess } from "@/components/shadcn/permission-gate"
 import DataTable from "@/components/shared/DataTable"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 
@@ -32,6 +43,8 @@ export default function ClientBlacklistManager({
   regions?: RegionOption[]
   locked?: boolean
 } = {}) {
+  const canCreate = useCanAccess("CLIENTS", "CREATE")
+  const canDelete = useCanAccess("CLIENTS", "DELETE")
   const [rows, setRows] = useState<Row[]>([])
   const [email, setEmail] = useState("")
   const [entries, setEntries] = useState("10")
@@ -165,7 +178,7 @@ export default function ClientBlacklistManager({
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={onAdd}>Add</Button>
+          {canCreate ? <Button onClick={onAdd}>Add</Button> : null}
           <Button variant="secondary" onClick={() => setConfirmAction("reset")}>Reset</Button>
           <Button variant="secondary" onClick={() => setConfirmAction("submit")}>Submit</Button>
         </div>
@@ -200,11 +213,14 @@ export default function ClientBlacklistManager({
           {
             key: "action",
             header: "Action",
-            render: (row) => (
-              <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
-                Delete
-              </button>
-            ),
+            render: (row) =>
+              canDelete ? (
+                <button className="text-red-600 hover:underline" onClick={() => setConfirmDeleteId(row.id)}>
+                  Delete
+                </button>
+              ) : (
+                <span className="text-[var(--text-muted)]">—</span>
+              ),
           },
         ]}
         getRowKey={(row) => row.id}
@@ -212,58 +228,67 @@ export default function ClientBlacklistManager({
         searchable={false}
       />
 
-      {confirmAction ? (
-        <ConfirmDialog
-          title={confirmAction === "reset" ? "Reset Blacklist Form" : "Submit Blacklist Form"}
-          message={confirmAction === "reset" ? "Reset all current fields?" : "Submit current blacklist data?"}
-          onNo={() => setConfirmAction(null)}
-          onYes={() => {
-            if (confirmAction === "reset") {
-              resetForm()
-            } else {
-              setNotice("Blacklist data submitted.")
-            }
-            setConfirmAction(null)
-          }}
-        />
-      ) : null}
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === "reset" ? "Reset Blacklist Form" : "Submit Blacklist Form"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction === "reset" ? "Reset all current fields?" : "Submit current blacklist data?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmAction === "reset") {
+                  resetForm()
+                } else {
+                  setNotice("Blacklist data submitted.")
+                }
+                setConfirmAction(null)
+              }}
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {confirmDeleteId ? (
-        <ConfirmDialog
-          title="Remove Blacklisted Client"
-          message="Are you sure you want to remove this client from blacklist?"
-          onNo={() => setConfirmDeleteId(null)}
-          onYes={() => {
-            onDelete(confirmDeleteId)
-            setConfirmDeleteId(null)
-          }}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-function ConfirmDialog({
-  title,
-  message,
-  onYes,
-  onNo,
-}: {
-  title: string
-  message: string
-  onYes: () => void
-  onNo: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
-        <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onNo}>No</Button>
-          <Button onClick={onYes}>Yes</Button>
-        </div>
-      </div>
+      <AlertDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Blacklisted Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this client from blacklist?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const id = confirmDeleteId
+                setConfirmDeleteId(null)
+                if (id) void onDelete(id)
+              }}
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

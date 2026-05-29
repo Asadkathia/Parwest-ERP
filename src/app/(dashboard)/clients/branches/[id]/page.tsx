@@ -4,6 +4,7 @@ import { Badge } from "@/components/shadcn/badge"
 import { redirect, notFound } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
 import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
 import { deriveBranchModel } from "@/lib/branches/model"
@@ -13,6 +14,8 @@ import { CAPACITY_USAGE_RULES, countDeploymentsForRule } from "@/lib/branches/ca
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session) redirect("/login")
+  const canUpdate = hasAction(session, "CLIENTS", "UPDATE")
+  const canCreateDeployment = hasAction(session, "DEPLOYMENTS", "CREATE")
 
   const { id } = await params
 
@@ -67,16 +70,20 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               <ArrowLeft className="h-4 w-4" />
               Back
             </Link>
-            <Link href={`/clients/branches/${branch.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
-              <Edit className="h-4 w-4" />
-              Edit Branch
-            </Link>
-            <BranchDeleteButton
-              branchId={branch.id}
-              clientId={branch.clientId}
-              branchName={branch.name}
-              activeDeploymentCount={activeDeployments.length}
-            />
+            {canUpdate ? (
+              <Link href={`/clients/branches/${branch.id}/edit`} className="ui-btn ui-btn-primary inline-flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit Branch
+              </Link>
+            ) : null}
+            {canUpdate ? (
+              <BranchDeleteButton
+                branchId={branch.id}
+                clientId={branch.clientId}
+                branchName={branch.name}
+                activeDeploymentCount={activeDeployments.length}
+              />
+            ) : null}
           </div>)}</div></div>
 
       <Card>
@@ -179,18 +186,53 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
           </Card>
 
           <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Branch Management
+              </h3>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Branch Manager</p>
+                <p className="text-sm font-medium text-[var(--text)]">{branch.branchManagerName || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Contact</p>
+                <p className="text-sm font-medium text-[var(--text)] inline-flex items-center gap-2">
+                  {branch.branchManagerContact ? <Phone className="h-4 w-4 text-[var(--text-muted)]" /> : null}
+                  {branch.branchManagerContact || "—"}
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Email</p>
+                {branch.branchManagerEmail ? (
+                  <a href={`mailto:${branch.branchManagerEmail}`} className="text-sm font-medium text-[var(--brand)] inline-flex items-center gap-2 hover:underline">
+                    <Mail className="h-4 w-4" />
+                    {branch.branchManagerEmail}
+                  </a>
+                ) : (
+                  <p className="text-sm font-medium text-[var(--text)]">—</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
                 <Building className="h-4 w-4" />
                 Capacity
               </h3>
-              <Link
-                href={`/clients/branches/${branch.id}/edit#capacity`}
-                className="text-sm text-[var(--brand)] hover:underline inline-flex items-center gap-1"
-              >
-                <Edit className="h-3.5 w-3.5" />
-                Edit Capacity
-              </Link>
+              {canUpdate ? (
+                <Link
+                  href={`/clients/branches/${branch.id}/edit#capacity`}
+                  className="text-sm text-[var(--brand)] hover:underline inline-flex items-center gap-1"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit Capacity
+                </Link>
+              ) : null}
             </CardHeader>
             <CardContent>
               {capacityRows.length === 0 ? (
@@ -240,9 +282,11 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
           <Card>
             <CardHeader className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-[var(--text)]">Deployments ({deployments.length})</h3>
-              <Link href={`/deployments/new?clientId=${branch.clientId}&branchId=${branch.id}`} className="text-sm text-[var(--brand)] hover:underline">
-                + Add Deployment
-              </Link>
+              {canCreateDeployment ? (
+                <Link href={`/deployments/new?clientId=${branch.clientId}&branchId=${branch.id}`} className="text-sm text-[var(--brand)] hover:underline">
+                  + Add Deployment
+                </Link>
+              ) : null}
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">

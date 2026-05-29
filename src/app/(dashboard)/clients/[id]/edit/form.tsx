@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, useWatch } from "react-hook-form"
+import type { FieldErrors } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { ArrowLeft, Save, Plus, X } from "lucide-react"
@@ -101,17 +102,6 @@ type Client = {
     introducerCnic: string | null
     operationalProvinces: string | null
     assignedManagerId: string | null
-    contractStart: Date | string | null
-    contractEnd: Date | string | null
-    contractRateStart: Date | string | null
-    contractRateEnd: Date | string | null
-    contractDayGuardDesignation: string | null
-    contractDayGuardExService: string | null
-    contractNightGuardDesignation: string | null
-    contractNightGuardExService: string | null
-    contractAdditionalDayGuards: number | null
-    contractAdditionalNightGuards: number | null
-    contractPrice: number | null
     reservePct: number | null
 }
 
@@ -136,6 +126,8 @@ function fmtDate(d: Date | string | null | undefined): string {
 
 function initContactNumbers(raw: unknown): string[] {
     if (Array.isArray(raw) && (raw as string[]).length > 0) return raw as string[]
+    // At least one visible (empty) row so the user has somewhere to type.
+    // RHF is seeded separately with the stored numbers (or []) — never [""].
     return [""]
 }
 
@@ -161,8 +153,6 @@ export default function ClientEditForm({
     const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
     const [supervisorUsers, setSupervisorUsers] = useState<{ id: string; name: string }[]>([])
     const [clientTypes, setClientTypes] = useState<{ value: string; label: string }[]>([])
-    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
-    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
 
     // Reserve % is stored as decimal (0..1) in DB; edited as % (0..100) in UI
     const initialReservePct =
@@ -187,7 +177,12 @@ export default function ClientEditForm({
 
             contactPerson: client.contactPerson ?? "",
             contactPersonDesignation: client.contactPersonDesignation ?? "",
-            contactNumbers: initContactNumbers(client.contactNumbers),
+            // RHF source of truth: the client's stored numbers, or [] — never [""].
+            // The visible multi-input UI is kept in `contactNumbers` local state
+            // and synced into this field on every mutation (see updateContactNumbers).
+            contactNumbers: Array.isArray(client.contactNumbers)
+                ? (client.contactNumbers as string[]).filter((n) => typeof n === "string" && n.trim())
+                : [],
             clientLocation: client.city ?? "",
             clientPostalCode: client.postalCode ?? "",
             headOfficeAddress: client.headOfficeAddress ?? "",
@@ -208,30 +203,28 @@ export default function ClientEditForm({
             strn: client.strn ?? "",
             logoUrl: client.logoUrl ?? "",
             reservePctInput: initialReservePct,
-
-            contractStart: fmtDate(client.contractStart),
-            contractEnd: fmtDate(client.contractEnd),
-            contractRateStart: fmtDate(client.contractRateStart),
-            contractRateEnd: fmtDate(client.contractRateEnd),
-            contractDayGuardDesignation: client.contractDayGuardDesignation ?? "",
-            contractDayGuardExService: client.contractDayGuardExService ?? "",
-            contractNightGuardDesignation: client.contractNightGuardDesignation ?? "",
-            contractNightGuardExService: client.contractNightGuardExService ?? "",
-            contractAdditionalDayGuards:
-                client.contractAdditionalDayGuards != null ? String(client.contractAdditionalDayGuards) : "",
-            contractAdditionalNightGuards:
-                client.contractAdditionalNightGuards != null ? String(client.contractAdditionalNightGuards) : "",
-            contractPrice: client.contractPrice != null ? String(client.contractPrice) : "",
         },
     })
+
+    // Keep the visible multi-input UI and RHF in lockstep: every add/remove/edit
+    // of a contact-number row updates both local state and the validated RHF field,
+    // so the value zod sees always matches what the user sees.
+    const updateContactNumbers = (next: string[]) => {
+        setContactNumbers(next)
+        form.setValue("contactNumbers", next, { shouldDirty: true, shouldValidate: true })
+    }
 
     const watchedRegionId = useWatch({ control: form.control, name: "regionId" })
     const isBranchless = useWatch({ control: form.control, name: "isBranchless" }) ?? true
 
-    // Derive: city always mirrors the selected region's name
+    // Derive: city always mirrors the selected region's name.
+    // Only write when the value actually changes, and never mark the form dirty
+    // on mount — otherwise the discard guard and save gate fire spuriously.
     useEffect(() => {
         const regionName = regions.find((r) => r.id === watchedRegionId)?.name ?? ""
-        form.setValue("clientLocation", regionName, { shouldDirty: true })
+        if (form.getValues("clientLocation") !== regionName) {
+            form.setValue("clientLocation", regionName, { shouldDirty: false })
+        }
     }, [watchedRegionId, regions, form])
 
     // Cascade: regional offices
@@ -285,26 +278,6 @@ export default function ClientEditForm({
                 }
             })
             .catch(() => {})
-        fetch("/api/guard-designation-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setDesignationOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-                }
-            })
-            .catch(() => {})
-        fetch("/api/guard-ex-service-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setExServiceOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-                }
-            })
-            .catch(() => {})
     }, [])
 
     // OCR autofill — bridges legacy form-field-name based panel into RHF setValue.
@@ -340,8 +313,9 @@ export default function ClientEditForm({
             )
             return
         }
-        // Multi-contact phone format check (mirrors legacy)
-        const filled = contactNumbers.filter((n) => n.trim())
+        // Multi-contact phone format check (mirrors legacy). RHF is the source
+        // of truth and is kept in sync with the visible inputs.
+        const filled = (values.contactNumbers ?? []).map((n) => n.trim()).filter(Boolean)
         for (const num of filled) {
             if (!isValidPhone(num)) {
                 toast.error(`Contact number "${num}" must be in format +92-XXX-XXXXXXX.`)
@@ -401,6 +375,17 @@ export default function ClientEditForm({
         }
     }
 
+    // Surface zod validation failures so the Save button never appears inert.
+    const onInvalid = (errors: FieldErrors<ClientEditForm>) => {
+        const firstMessage = Object.values(errors).flatMap((e) => {
+            if (!e) return []
+            if (typeof e === "object" && "message" in e && typeof e.message === "string") return [e.message]
+            return []
+        })[0]
+        toast.error(firstMessage ?? "Please fix the highlighted fields and try again.")
+        console.warn("Client edit form validation errors", errors)
+    }
+
     const handleCancel = () => {
         if (form.formState.isDirty) {
             setConfirmDiscardOpen(true)
@@ -413,7 +398,7 @@ export default function ClientEditForm({
         <Form {...form}>
             <form
                 ref={formRef}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
                 className="space-y-6"
             >
                 <Card>
@@ -665,7 +650,7 @@ export default function ClientEditForm({
                                                         onChange={(e) => {
                                                             const updated = [...contactNumbers]
                                                             updated[idx] = e.target.value
-                                                            setContactNumbers(updated)
+                                                            updateContactNumbers(updated)
                                                         }}
                                                         className={invalid ? "border-destructive" : ""}
                                                         placeholder={
@@ -682,7 +667,7 @@ export default function ClientEditForm({
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            setContactNumbers(contactNumbers.filter((_, i) => i !== idx))
+                                                            updateContactNumbers(contactNumbers.filter((_, i) => i !== idx))
                                                         }
                                                         className="flex-shrink-0 mt-2 text-[var(--text-muted)] hover:text-destructive"
                                                     >
@@ -694,7 +679,7 @@ export default function ClientEditForm({
                                     })}
                                     <button
                                         type="button"
-                                        onClick={() => setContactNumbers([...contactNumbers, ""])}
+                                        onClick={() => updateContactNumbers([...contactNumbers, ""])}
                                         className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:underline mt-1"
                                     >
                                         <Plus size={13} /> Add another number
@@ -1112,241 +1097,6 @@ export default function ClientEditForm({
                                             Optional. % of net pay withheld monthly as reserve balance. Leave blank to
                                             use the regional office or global default (30%).
                                         </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Contract Details */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Contract Details</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField
-                                control={form.control}
-                                name="contractStart"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Start</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="contractEnd"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract End</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="contractRateStart"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Rate Start</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="contractRateEnd"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Rate End</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="md:col-span-2">
-                                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="contractDayGuardDesignation"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Guard Designation</FormLabel>
-                                                <FormControl>
-                                                    <div>
-                                                        <SearchSelect
-                                                            name="contractDayGuardDesignation"
-                                                            options={designationOptions}
-                                                            defaultValue={field.value || ""}
-                                                            placeholder={
-                                                                designationOptions.length === 0
-                                                                    ? "Loading…"
-                                                                    : "Select designation"
-                                                            }
-                                                            onChange={(v) => field.onChange(v)}
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="contractDayGuardExService"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Guard Ex Service</FormLabel>
-                                                <FormControl>
-                                                    <div>
-                                                        <SearchSelect
-                                                            name="contractDayGuardExService"
-                                                            options={exServiceOptions}
-                                                            defaultValue={field.value || ""}
-                                                            placeholder={
-                                                                exServiceOptions.length === 0 ? "Loading…" : "Select"
-                                                            }
-                                                            onChange={(v) => field.onChange(v)}
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="contractNightGuardDesignation"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Guard Designation</FormLabel>
-                                                <FormControl>
-                                                    <div>
-                                                        <SearchSelect
-                                                            name="contractNightGuardDesignation"
-                                                            options={designationOptions}
-                                                            defaultValue={field.value || ""}
-                                                            placeholder={
-                                                                designationOptions.length === 0
-                                                                    ? "Loading…"
-                                                                    : "Select designation"
-                                                            }
-                                                            onChange={(v) => field.onChange(v)}
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="contractNightGuardExService"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Guard Ex Service</FormLabel>
-                                                <FormControl>
-                                                    <div>
-                                                        <SearchSelect
-                                                            name="contractNightGuardExService"
-                                                            options={exServiceOptions}
-                                                            defaultValue={field.value || ""}
-                                                            placeholder={
-                                                                exServiceOptions.length === 0 ? "Loading…" : "Select"
-                                                            }
-                                                            onChange={(v) => field.onChange(v)}
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
-
-                            <FormField
-                                control={form.control}
-                                name="contractAdditionalDayGuards"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Additional Day Guards</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="0"
-                                                {...field}
-                                                value={field.value ?? ""}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="contractAdditionalNightGuards"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Additional Night Guards</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="0"
-                                                {...field}
-                                                value={field.value ?? ""}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="contractPrice"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Price</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                placeholder="Price"
-                                                {...field}
-                                                value={field.value ?? ""}
-                                            />
-                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}

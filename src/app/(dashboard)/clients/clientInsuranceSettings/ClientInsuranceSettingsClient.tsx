@@ -4,6 +4,17 @@ import { useEffect, useState, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Shield, Plus, Pencil, Trash2, X, Check, Loader2 } from "lucide-react"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { useCanAccess } from "@/components/shadcn/permission-gate"
 
 type RegionOption = { id: string; name: string }
 
@@ -41,6 +52,9 @@ export default function ClientInsuranceSettingsClient({
 } = {}) {
   const searchParams = useSearchParams()
   const urlRegionId = searchParams?.get("regionId") || ""
+  const canCreate = useCanAccess("CLIENTS", "CREATE")
+  const canUpdate = useCanAccess("CLIENTS", "UPDATE")
+  const canDelete = useCanAccess("CLIENTS", "DELETE")
   const [allRegionalOffices, setAllRegionalOffices] = useState<RegionalOffice[]>([])
   const [insurances, setInsurances] = useState<ClientInsurance[]>([])
 
@@ -72,6 +86,7 @@ export default function ClientInsuranceSettingsClient({
   const [editStart, setEditStart] = useState("")
   const [editEnd, setEditEnd] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   // Load regional offices, narrowed by the URL regionId when present so a
   // SuperAdmin's region selection scopes the dropdown. REGIONAL users are
@@ -147,7 +162,7 @@ export default function ClientInsuranceSettingsClient({
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        setError((d as { error?: string })?.error || "Failed to save.")
+        setError((d as { message?: string })?.message || "Failed to save.")
       } else {
         setSuccess("Insurance added successfully.")
         setFormInsuranceName(""); setFormStartDate(""); setFormEndDate("")
@@ -170,7 +185,7 @@ export default function ClientInsuranceSettingsClient({
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        setError((d as { error?: string })?.error || "Failed to update.")
+        setError((d as { message?: string })?.message || "Failed to update.")
       } else {
         setSuccess("Updated successfully.")
         setEditingId(null)
@@ -181,12 +196,11 @@ export default function ClientInsuranceSettingsClient({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this insurance record?")) return
     setError(""); setSuccess("")
     setDeletingId(id)
     try {
       const res = await fetch(`/api/client-insurances/${id}`, { method: "DELETE" })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError((d as { error?: string })?.error || "Failed to delete.") }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError((d as { message?: string })?.message || "Failed to delete.") }
       else { setSuccess("Deleted successfully."); fetchInsurances() }
     } catch { setError("Network error.") }
     setDeletingId(null)
@@ -271,10 +285,12 @@ export default function ClientInsuranceSettingsClient({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button type="submit" className="ui-btn ui-btn-primary flex items-center gap-2 px-5" disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Submit
-            </button>
+            {canCreate ? (
+              <button type="submit" className="ui-btn ui-btn-primary flex items-center gap-2 px-5" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Submit
+              </button>
+            ) : null}
             {error && <span className="text-red-500 text-sm">{error}</span>}
             {success && <span className="text-green-600 text-sm">{success}</span>}
           </div>
@@ -384,28 +400,33 @@ export default function ClientInsuranceSettingsClient({
                           </>
                         ) : (
                           <>
-                            <button
-                              title="Edit"
-                              onClick={() => {
-                                setEditingId(ins.id)
-                                setEditName(ins.insuranceName)
-                                setEditStatus(ins.status)
-                                setEditStart(ins.startDate ? ins.startDate.slice(0, 10) : "")
-                                setEditEnd(ins.endDate ? ins.endDate.slice(0, 10) : "")
-                                setError(""); setSuccess("")
-                              }}
-                              className="p-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              title="Delete"
-                              onClick={() => handleDelete(ins.id)}
-                              disabled={deletingId === ins.id}
-                              className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
-                            >
-                              {deletingId === ins.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            </button>
+                            {canUpdate ? (
+                              <button
+                                title="Edit"
+                                onClick={() => {
+                                  setEditingId(ins.id)
+                                  setEditName(ins.insuranceName)
+                                  setEditStatus(ins.status)
+                                  setEditStart(ins.startDate ? ins.startDate.slice(0, 10) : "")
+                                  setEditEnd(ins.endDate ? ins.endDate.slice(0, 10) : "")
+                                  setError(""); setSuccess("")
+                                }}
+                                className="p-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null}
+                            {canDelete ? (
+                              <button
+                                title="Delete"
+                                onClick={() => setPendingDeleteId(ins.id)}
+                                disabled={deletingId === ins.id}
+                                className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                              >
+                                {deletingId === ins.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </button>
+                            ) : null}
+                            {!canUpdate && !canDelete ? <span className="text-[var(--text-muted)]">—</span> : null}
                           </>
                         )}
                       </div>
@@ -420,6 +441,35 @@ export default function ClientInsuranceSettingsClient({
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete insurance record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const id = pendingDeleteId
+                setPendingDeleteId(null)
+                if (id) void handleDelete(id)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -58,9 +58,15 @@ const branchPatchSchema = z
         assignedManagerId: z.string().nullable().optional(),
         operationsManagerId: z.string().nullable().optional(),
         assignedSupervisorId: z.string().nullable().optional(),
+        // Free-text branch manager fields sent by the edit form.
+        branchManagerName: z.string().nullable().optional(),
+        branchManagerContact: z.string().nullable().optional(),
+        branchManagerEmail: z.string().nullable().optional(),
         ...capacityShape,
     })
-    .passthrough()
+    // No .passthrough(): unknown keys are stripped. Every field with a real
+    // Branch column is mapped explicitly below; anything else is harmless to drop.
+    // (Not .strict() — the form may still send extra keys we don't persist.)
 
 type BranchPatchPayload = z.infer<typeof branchPatchSchema>
 
@@ -142,7 +148,7 @@ export async function PATCH(
         // (no limit) is always allowed.
         const capacityChanges: Array<{ rule: (typeof CAPACITY_USAGE_RULES)[number]; nextValue: number }> = []
         for (const rule of CAPACITY_USAGE_RULES) {
-            const proposed = body[rule.field]
+            const proposed = (body as Record<string, unknown>)[rule.field]
             if (proposed === undefined || proposed === null) continue
             // proposed is a parsed integer at this point
             const nextValue = proposed as number
@@ -153,16 +159,20 @@ export async function PATCH(
         }
 
         if (capacityChanges.length > 0) {
-            // Aggregate per-bucket usage in a single query.
+            // Aggregate per-bucket usage in a single query. Mirrors the canonical
+            // count in src/lib/branches/capacity.ts (countDeploymentsForRule):
+            // only ACTIVE, non-ended deployments count, and EXTRA deployments are
+            // excluded (they exist *because* the cap was full).
             const usageByBucket = await prisma.deployment.groupBy({
-                by: ["designation", "shiftType"],
-                where: { branchId: id, status: "ACTIVE" },
+                by: ["designation", "shiftType", "deploymentType"],
+                where: { branchId: id, status: "ACTIVE", endDate: null },
                 _count: { _all: true },
             })
 
             for (const { rule, nextValue } of capacityChanges) {
                 const used = usageByBucket
                     .filter((row) => {
+                        if (row.deploymentType === "EXTRA") return false
                         const desig = (row.designation || "").trim().toLowerCase()
                         if (!rule.designations.includes(desig)) return false
                         const shift = (row.shiftType || "").toUpperCase() as "DAY" | "NIGHT" | "BOTH"
@@ -199,9 +209,18 @@ export async function PATCH(
             const v = body.operationsManagerId ? String(body.operationsManagerId).trim() : ""
             updateData.operationsManagerId = v || null
         }
+        if (body.branchManagerName !== undefined) {
+            updateData.branchManagerName = body.branchManagerName ? String(body.branchManagerName).trim() : null
+        }
+        if (body.branchManagerContact !== undefined) {
+            updateData.branchManagerContact = body.branchManagerContact ? String(body.branchManagerContact).trim() : null
+        }
+        if (body.branchManagerEmail !== undefined) {
+            updateData.branchManagerEmail = body.branchManagerEmail ? String(body.branchManagerEmail).trim() : null
+        }
 
         for (const key of BRANCH_CAPACITY_FIELDS) {
-            const v = body[key]
+            const v = (body as Record<string, unknown>)[key]
             if (v !== undefined) updateData[key] = v
         }
 

@@ -7,9 +7,7 @@ import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { cityForRegionId } from "@/lib/geo/regionCity"
-
-const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
-const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
+import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 /** Build a human-readable diff of changed fields for audit logs. */
 function buildChangeSummary(
@@ -59,10 +57,6 @@ export async function PUT(
             return forbidden("Forbidden: cannot move client outside your scope.")
         }
 
-        // Derive city from the region — Region.name IS the operating city.
-        // Ignore any client-sent city/clientLocation to prevent region/city drift.
-        const city = await cityForRegionId(prisma, body.regionId || null)
-
         // Reserve % override — accept null/blank or a decimal between 0 and 1.
         let reservePctValue: number | null | undefined = undefined
         if (Object.prototype.hasOwnProperty.call(body, "reservePct")) {
@@ -97,65 +91,63 @@ export async function PUT(
             }
         }
 
-        const newData = {
-            name:                        body.name,
-            type:                        body.type,
-            email:                       body.email                       || null,
-            enrollmentDate:              body.enrollmentDate ? new Date(body.enrollmentDate) : existingClient.enrollmentDate,
-            regionId:                    body.regionId                    || null,
-            regionalOfficeId:            body.regionalOfficeId            || null,
-            city,
-            status:                      body.status                      || "ACTIVE",
-            isBranchless:                body.isBranchless === true || body.isBranchless === "true",
-            headOfficeAddress:           body.headOfficeAddress           || null,
-            ntn:                         body.ntn                         || null,
-            strn:                        body.strn                        || null,
-            logoUrl:                     body.logoUrl                     || null,
-            // Contact
-            contactPerson:               body.contactPerson               || null,
-            contactPersonDesignation:    body.contactPersonDesignation    || null,
-            phone:                       body.contactNumber               || null,
-            contactNumbers:              Array.isArray(body.contactNumbers) && body.contactNumbers.length > 0
-                                             ? body.contactNumbers : undefined,
-            postalCode:                  body.clientPostalCode            || null,
-            // Introducer
-            introducerName:              body.introducerName              || null,
-            introducerContactNumber:     body.introducerContactNumber     || null,
-            introducerAddress:           body.introducerAddress           || null,
-            introducerCnic:              body.introducerCnicNumber        || null,
-            // Operational
-            operationalProvinces:        body.operationalProvinces        || null,
-            // Assigned
-            assignedManagerId:           body.assignedManagerId           || null,
-            // Contract
-            contractStart:               body.contractStart      ? new Date(body.contractStart)      : null,
-            contractEnd:                 body.contractEnd        ? new Date(body.contractEnd)        : null,
-            contractRateStart:           body.contractRateStart  ? new Date(body.contractRateStart)  : null,
-            contractRateEnd:             body.contractRateEnd    ? new Date(body.contractRateEnd)    : null,
-            contractDayGuardDesignation:   body.contractDayGuardDesignation   || null,
-            contractDayGuardExService:     body.contractDayGuardExService     || null,
-            contractNightGuardDesignation: body.contractNightGuardDesignation || null,
-            contractNightGuardExService:   body.contractNightGuardExService   || null,
-            contractAdditionalDayGuards:   toInt(body.contractAdditionalDayGuards),
-            contractAdditionalNightGuards: toInt(body.contractAdditionalNightGuards),
-            contractPrice:               toFloat(body.contractPrice),
-            ...(reservePctValue !== undefined ? { reservePct: reservePctValue } : {}),
+        // Build a partial update: only include a column when its key is present in
+        // `body`. This prevents a partial PUT from nulling fields the caller never
+        // sent. (NOTE: flat contract* columns are intentionally never written —
+        // contracts are canonical via the ClientContract model. contractUrl /
+        // contractAttachments are handled elsewhere, not here.)
+        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
+        const newData: Record<string, unknown> = {}
+
+        if (has("name")) newData.name = body.name
+        if (has("type")) newData.type = body.type
+        if (has("email")) newData.email = body.email || null
+        if (has("enrollmentDate")) {
+            newData.enrollmentDate = body.enrollmentDate ? new Date(body.enrollmentDate) : existingClient.enrollmentDate
         }
+        // Region drives city — Region.name IS the operating city. Derive city only
+        // when regionId is sent, and never trust a client-sent city (drift guard).
+        if (has("regionId")) {
+            const nextRegionId = body.regionId || null
+            newData.regionId = nextRegionId
+            newData.city = await cityForRegionId(prisma, nextRegionId)
+        }
+        if (has("regionalOfficeId")) newData.regionalOfficeId = body.regionalOfficeId || null
+        if (has("status")) newData.status = body.status || "ACTIVE"
+        if (has("isBranchless")) newData.isBranchless = body.isBranchless === true || body.isBranchless === "true"
+        if (has("headOfficeAddress")) newData.headOfficeAddress = body.headOfficeAddress || null
+        if (has("ntn")) newData.ntn = body.ntn || null
+        if (has("strn")) newData.strn = body.strn || null
+        if (has("logoUrl")) newData.logoUrl = body.logoUrl || null
+        // Contact
+        if (has("contactPerson")) newData.contactPerson = body.contactPerson || null
+        if (has("contactPersonDesignation")) newData.contactPersonDesignation = body.contactPersonDesignation || null
+        if (has("contactNumber")) newData.phone = body.contactNumber || null
+        if (has("contactNumbers")) {
+            newData.contactNumbers = Array.isArray(body.contactNumbers) && body.contactNumbers.length > 0
+                ? body.contactNumbers : undefined
+        }
+        if (has("clientPostalCode")) newData.postalCode = body.clientPostalCode || null
+        // Introducer
+        if (has("introducerName")) newData.introducerName = body.introducerName || null
+        if (has("introducerContactNumber")) newData.introducerContactNumber = body.introducerContactNumber || null
+        if (has("introducerAddress")) newData.introducerAddress = body.introducerAddress || null
+        if (has("introducerCnicNumber")) newData.introducerCnic = body.introducerCnicNumber || null
+        // Operational
+        if (has("operationalProvinces")) newData.operationalProvinces = body.operationalProvinces || null
+        // Assigned
+        if (has("assignedManagerId")) newData.assignedManagerId = body.assignedManagerId || null
+        // Reserve %
+        if (reservePctValue !== undefined) newData.reservePct = reservePctValue
 
         const client = await prisma.$transaction(async (tx) => {
             const updated = await tx.client.update({ where: { id }, data: newData })
 
-            // Update supervisor assignment if changed
+            // Update client-level supervisor assignment if one was sent
+            // (validates the user, dedups prior ACTIVE — see assignSupervisor).
             const newSupervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
             if (newSupervisorId) {
-                // Deactivate existing active assignments at client level (no branch)
-                await tx.clientSupervisorAssignment.updateMany({
-                    where: { clientId: id, branchId: null, status: "ACTIVE" },
-                    data: { status: "INACTIVE" },
-                })
-                await tx.clientSupervisorAssignment.create({
-                    data: { clientId: id, supervisorId: newSupervisorId },
-                }).catch(() => { /* ignore if user not found */ })
+                await assignSupervisor(tx, { clientId: id, supervisorId: newSupervisorId })
             }
 
             return updated
@@ -175,6 +167,10 @@ export async function PUT(
 
         return NextResponse.json(client, { status: 200 })
     } catch (error: unknown) {
+        // A bad supervisorId surfaces from assignSupervisor as a "not found" error.
+        if (error instanceof Error && error.message.startsWith("Supervisor user not found")) {
+            return badRequest("Assigned supervisor not found.")
+        }
         console.error("Error updating client:", error)
         return internalServerError("Failed to update client")
     }

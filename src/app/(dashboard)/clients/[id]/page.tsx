@@ -144,9 +144,6 @@ export default async function ClientDetailPage({
         include: { supervisor: { select: { name: true, email: true } } },
         take: 1,
       },
-      pricingConfigs: {
-        orderBy: { guardType: "asc" },
-      },
       invoices: {
         orderBy: { createdAt: "desc" },
       },
@@ -356,7 +353,6 @@ export default async function ClientDetailPage({
                       PHOTO NOT AVAILABLE
                     </div>
                   )}
-                  <Button type="button" size="sm" className="w-full">Upload Picture</Button>
                 </div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                   <InfoCell label="BRANCHES" value={String(client.branches.length)} />
@@ -438,63 +434,6 @@ export default async function ClientDetailPage({
             </Card>
           ) : null}
 
-          {/* ── Guard Capacity (conditional) ── */}
-          {(client.dayGuardCapacity != null || client.nightGuardCapacity != null || client.daySupervisorCapacity != null || client.nightSupervisorCapacity != null || client.cpoCapacity != null) ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Guard Capacity (Configured)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                  <InfoCell label="DAY GUARDS" value={client.dayGuardCapacity != null ? String(client.dayGuardCapacity) : "—"} />
-                  <InfoCell label="NIGHT GUARDS" value={client.nightGuardCapacity != null ? String(client.nightGuardCapacity) : "—"} />
-                  <InfoCell label="DAY SUPERVISORS" value={client.daySupervisorCapacity != null ? String(client.daySupervisorCapacity) : "—"} />
-                  <InfoCell label="NIGHT SUPERVISORS" value={client.nightSupervisorCapacity != null ? String(client.nightSupervisorCapacity) : "—"} />
-                  <InfoCell label="CPO CAPACITY" value={client.cpoCapacity != null ? String(client.cpoCapacity) : "—"} />
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {/* ── Contract Details (conditional) ── */}
-          {(() => {
-            const c = client as unknown as {
-              contractDayGuardDesignation?: string | null
-              contractDayGuardExService?: string | null
-              contractNightGuardDesignation?: string | null
-              contractNightGuardExService?: string | null
-              contractAdditionalDayGuards?: number | null
-              contractAdditionalNightGuards?: number | null
-            }
-            const hasContract = client.contractStart || client.contractEnd || client.contractPrice != null ||
-              client.contractGuardDesignation || c.contractDayGuardDesignation || c.contractNightGuardDesignation
-            if (!hasContract) return null
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Contract Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <InfoCell label="CONTRACT START" value={formatDate(client.contractStart)} />
-                    <InfoCell label="CONTRACT END" value={formatDate(client.contractEnd)} />
-                    <InfoCell label="RATE PERIOD START" value={formatDate(client.contractRateStart)} />
-                    <InfoCell label="RATE PERIOD END" value={formatDate(client.contractRateEnd)} />
-                    <InfoCell
-                      label="CONTRACT PRICE"
-                      value={client.contractPrice != null ? `PKR ${client.contractPrice.toLocaleString()}` : "—"}
-                    />
-                    <InfoCell label="DAY GUARD DESIGNATION" value={c.contractDayGuardDesignation || client.contractGuardDesignation || "—"} />
-                    <InfoCell label="DAY GUARD EX-SERVICE" value={c.contractDayGuardExService || client.contractGuardExService || "—"} />
-                    <InfoCell label="ADDITIONAL DAY GUARDS" value={c.contractAdditionalDayGuards != null ? String(c.contractAdditionalDayGuards) : (client.contractAdditionalGuards != null ? String(client.contractAdditionalGuards) : "—")} />
-                    <InfoCell label="NIGHT GUARD DESIGNATION" value={c.contractNightGuardDesignation || "—"} />
-                    <InfoCell label="NIGHT GUARD EX-SERVICE" value={c.contractNightGuardExService || "—"} />
-                    <InfoCell label="ADDITIONAL NIGHT GUARDS" value={c.contractAdditionalNightGuards != null ? String(c.contractAdditionalNightGuards) : "—"} />
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })()}
         </div>
       ) : null}
 
@@ -838,32 +777,16 @@ export default async function ClientDetailPage({
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <FieldDisplay label="Client Provinces" value={client.region?.name || "Punjab"} />
-              <FieldDisplay label="Client Cities" value={client.city || "Lahore"} />
-              <FieldDisplay label="Guard Types" value="Guard" />
-              <FieldDisplay label="Invoice Month *" value={new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" })} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FieldDisplay label="Effective Rate" value="35,000" />
-              <FieldDisplay label="Guard Ex-Services" value="Other" />
-              <FieldDisplay label="Extra Hours Rate / Hour" value="500" />
-              <FieldDisplay label="Criteria" value="Branch-wise" />
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm">Reset</Button>
-              <Button type="button" variant="outline" size="sm">Submit</Button>
-              <Button type="button" variant="outline" size="sm">Export In Excel File</Button>
-              <Button type="button" variant="outline" size="sm">Dismiss</Button>
-              <Button type="button" size="sm">Save</Button>
-              <Button type="button" variant="outline" size="sm">Close</Button>
-              <Button type="button" size="sm">Generate Invoice</Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Invoice history for {client.name}. To generate, export, or edit invoices, use the{" "}
+              <Link href="/clients/invoicing" className="font-medium text-primary hover:underline">
+                invoicing module
+              </Link>
+              .
+            </p>
 
             {client.invoices.length === 0 ? (
-              <EmptyTableMessage message="No records found." />
+              <EmptyTableMessage message="No invoices have been generated for this client yet." />
             ) : (
               <div className="rounded-md border">
                 <Table>
@@ -1049,7 +972,6 @@ function LegacyFilterForm({
         <Button asChild variant="outline" size="sm">
           <Link href={`/clients/${clientId}?tab=${tab}`}>Reset</Link>
         </Button>
-        <Button type="button" variant="outline" size="sm">Export In Excel File</Button>
       </div>
     </form>
   )

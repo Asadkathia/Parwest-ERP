@@ -5,6 +5,7 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { cityForBranch } from "@/lib/geo/regionCity"
 
 export async function GET(
     request: NextRequest,
@@ -96,6 +97,14 @@ export async function POST(
             return forbidden("Forbidden: client is outside your scope.")
         }
 
+        // Derive city from the region (branch regional office → branch region → owning
+        // client's region) — never trust a client-sent city, to avoid region/city drift.
+        const city = await cityForBranch(prisma, {
+            regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
+            regionId: body?.regionId ? String(body.regionId) : null,
+            clientId: id,
+        })
+
         const branch = await prisma.$transaction(async (tx) => {
             const created = await tx.branch.create({
                 data: {
@@ -103,7 +112,7 @@ export async function POST(
                     name,
                     code: body?.code ? String(body.code).trim() : null,
                     address: body?.address ? String(body.address) : null,
-                    city: body?.city ? String(body.city) : null,
+                    city,
                     province: body?.province ? String(body.province) : null,
                     contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
                     contactPhone: body?.contactPhone ? String(body.contactPhone) : null,

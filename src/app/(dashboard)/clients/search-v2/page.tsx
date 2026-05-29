@@ -19,9 +19,8 @@ export default async function ClientSearchV2Page() {
   return (
     <div className="space-y-6">
       <ClientSearchManager
-        title="Search Clients V2"
-        subtitle="Legacy V2 search behavior and controls."
-        variant="v2"
+        title="Search Clients"
+        subtitle="Search and filter clients, then view, edit, or update their status."
         regions={pickerRegions}
         locked={Boolean(scope?.regionId)}
       />

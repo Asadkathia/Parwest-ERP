@@ -4,16 +4,15 @@
  * RHF + zod + shadcn primitives. Reskin only — same fields, same validation
  * rules, same `POST /api/branches` payload as the legacy form.
  *
- * The capacity / contract / attachment sections still submit through the
- * native `<form>` FormData path (a deep RHF migration of every CapField is
- * out of scope for the reskin — the server is the source of truth and
- * already accepts the legacy payload shape).
+ * The capacity / attachment sections still submit through the native
+ * `<form>` FormData path (a deep RHF migration of every CapField is out of
+ * scope for the reskin — the server is the source of truth and already
+ * accepts the legacy payload shape).
  *
  * Aux widgets that are NOT migrated (legacy preserved):
  *   - <PhoneInput>          — uncontrolled +92-XXX-XXXXXXX formatter
  *   - <CnicInput>           — uncontrolled XXXXX-XXXXXXX-X formatter
  *   - <SearchSelect>        — searchable native select
- *   - <MultiSearchSelect>   — multi-select chip picker
  *   - <LocationPickerMap>   — Leaflet picker (wrapped in shadcn Card)
  */
 
@@ -27,7 +26,6 @@ import { toast } from "sonner"
 import { ArrowLeft, Save, X, Plus } from "lucide-react"
 
 import SearchSelect from "@/components/ui/SearchSelect"
-import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
@@ -137,10 +135,6 @@ export default function BranchForm({
     // Multiple contact phones
     const [contactPhones, setContactPhones] = useState<string[]>([""])
 
-    // Dynamic designation + ex-service options from prerequisites config
-    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
-    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
-
     // Additional file attachments (multi)
     const [attachments, setAttachments] = useState<{ name: string; dataUrl: string }[]>([])
     const fileRef = useRef<HTMLInputElement>(null)
@@ -175,36 +169,8 @@ export default function BranchForm({
             branchManagerEmail: "",
             operationsManagerContact: "",
             supervisorContact: "",
-            contractStart: "",
-            contractEnd: "",
-            contractRateStart: "",
-            contractRateEnd: "",
-            contractAdditionalDayGuards: "",
-            contractAdditionalNightGuards: "",
         },
     })
-
-    // Fetch designation types and ex-service types once on mount
-    useEffect(() => {
-        fetch("/api/guard-designation-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data))
-                    setDesignationOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-            })
-            .catch(() => {})
-        fetch("/api/guard-ex-service-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data))
-                    setExServiceOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-            })
-            .catch(() => {})
-    }, [])
 
     // Mirror city from selected region (Region.name IS the operating city).
     useEffect(() => {
@@ -269,8 +235,8 @@ export default function BranchForm({
     const removeAttachment = (idx: number) =>
         setAttachments((prev) => prev.filter((_, i) => i !== idx))
 
-    // RHF submit. The capacity / contract grids submit via FormData; we read
-    // those fields off the underlying <form> element for the API payload.
+    // RHF submit. The capacity grid submits via FormData; we read those fields
+    // off the underlying <form> element for the API payload.
     const onSubmit = async (values: BranchCreateForm) => {
         if (!formRef.current) return
 
@@ -288,7 +254,7 @@ export default function BranchForm({
         }
 
         // Build the legacy payload from FormData for fields that still live in
-        // native <input> elements (capacity grid, contract designations, etc.)
+        // native <input> elements (the capacity grid).
         const formData = new FormData(formRef.current)
         const payload: Record<string, unknown> = {
             ...Object.fromEntries(formData.entries()),
@@ -343,9 +309,22 @@ export default function BranchForm({
         }
     }
 
+    // Surface the first validation error so a blocked submit is never silent.
+    const onInvalid = (errors: Record<string, unknown>) => {
+        const first = Object.values(errors).find(
+            (e): e is { message?: unknown } =>
+                Boolean(e) && typeof e === "object" && "message" in (e as object),
+        )
+        const message =
+            first && typeof first.message === "string" && first.message
+                ? first.message
+                : "Please fix the highlighted fields before creating the branch."
+        toast.error(message)
+    }
+
     return (
         <Form {...form}>
-            <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form ref={formRef} onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
                 {/* ── Add Client's New Branch ── */}
                 <Card>
                     <CardHeader>
@@ -656,6 +635,7 @@ export default function BranchForm({
                                         options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
                                         defaultValue={defaultManagerId ?? ""}
                                         placeholder={selectedRegionId ? "— Select Manager —" : "— Select Region First —"}
+                                        onChange={(v) => form.setValue("assignedManagerId", v, { shouldDirty: true })}
                                     />
                                 </div>
                             </div>
@@ -1046,6 +1026,7 @@ export default function BranchForm({
                                         placeholder={
                                             selectedRegionId ? "— Select Supervisor —" : "— Select Region First —"
                                         }
+                                        onChange={(v) => form.setValue("assignedSupervisorId", v, { shouldDirty: true })}
                                     />
                                 </div>
                             </div>
@@ -1074,162 +1055,6 @@ export default function BranchForm({
                                             >
                                                 <PhoneInput name="supervisorContact" />
                                             </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* ── Branch Contract ── */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Branch Contract</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField
-                                control={form.control}
-                                name="contractStart"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Start</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="contractEnd"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract End</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="contractRateStart"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Rate Start</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="contractRateEnd"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Contract Rate End</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} value={field.value ?? ""} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {/* Day Guards */}
-                            <div className="md:col-span-2">
-                                <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Day Guards</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <Label>Guard Designation</Label>
-                                        <div className="mt-2">
-                                            <MultiSearchSelect
-                                                name="contractDayGuardDesignation"
-                                                options={designationOptions}
-                                                placeholder="Select designations"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>Guard Ex Service</Label>
-                                        <div className="mt-2">
-                                            <MultiSearchSelect
-                                                name="contractDayGuardExService"
-                                                options={exServiceOptions}
-                                                placeholder="Select"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Night Guards */}
-                            <div className="md:col-span-2">
-                                <h3 className="text-sm font-semibold text-foreground mb-3 mt-1">Night Guards</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <Label>Guard Designation</Label>
-                                        <div className="mt-2">
-                                            <MultiSearchSelect
-                                                name="contractNightGuardDesignation"
-                                                options={designationOptions}
-                                                placeholder="Select designations"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>Guard Ex Service</Label>
-                                        <div className="mt-2">
-                                            <MultiSearchSelect
-                                                name="contractNightGuardExService"
-                                                options={exServiceOptions}
-                                                placeholder="Select"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <FormField
-                                control={form.control}
-                                name="contractAdditionalDayGuards"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Additional Day Guards</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="0"
-                                                {...field}
-                                                value={field.value ?? ""}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="contractAdditionalNightGuards"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Additional Night Guards</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                placeholder="0"
-                                                {...field}
-                                                value={field.value ?? ""}
-                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -1319,6 +1144,8 @@ export default function BranchForm({
 }
 
 // Helper component for capacity number inputs (uses shadcn Input).
+// Defaults to BLANK (not 0): an empty value means "no limit", matching the
+// branch edit form. A hard 0 would cap deployments at zero for that role/shift.
 function CapField({ label, name, required }: { label: string; name: string; required?: boolean }) {
     return (
         <div>
@@ -1326,7 +1153,7 @@ function CapField({ label, name, required }: { label: string; name: string; requ
                 {label}
                 {required && <span className="text-destructive ml-0.5">*</span>}
             </label>
-            <Input type="number" name={name} placeholder="0" min={0} defaultValue={0} />
+            <Input type="number" name={name} placeholder="—" min={0} defaultValue="" />
         </div>
     )
 }

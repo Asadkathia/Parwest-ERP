@@ -131,17 +131,9 @@ export async function POST(request: NextRequest) {
                     contractAttachments: Array.isArray(body?.contractAttachments) && body.contractAttachments.length > 0 ? body.contractAttachments : undefined,
                     assignedManagerId: body?.assignedManagerId ? String(body.assignedManagerId) : null,
                     regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
-                    // Contract details
-                    contractStart:    toDate(body?.contractStart),
-                    contractEnd:      toDate(body?.contractEnd),
-                    contractRateStart: toDate(body?.contractRateStart),
-                    contractRateEnd:   toDate(body?.contractRateEnd),
-                    contractDayGuardDesignation:   body?.contractDayGuardDesignation   ? String(body.contractDayGuardDesignation)   : null,
-                    contractDayGuardExService:     body?.contractDayGuardExService     ? String(body.contractDayGuardExService)     : null,
-                    contractNightGuardDesignation: body?.contractNightGuardDesignation ? String(body.contractNightGuardDesignation) : null,
-                    contractNightGuardExService:   body?.contractNightGuardExService   ? String(body.contractNightGuardExService)   : null,
-                    contractAdditionalDayGuards:   toInt(body?.contractAdditionalDayGuards),
-                    contractAdditionalNightGuards: toInt(body?.contractAdditionalNightGuards),
+                    // Contract attachments only — flat contract pricing/designation
+                    // columns are dead (write-only, read by nothing). Branch pricing
+                    // is canonical via ClientContract with branchId.
                     // Location
                     latitude:  toFloat(body?.latitude  ?? body?.latitudeManual),
                     longitude: toFloat(body?.longitude ?? body?.longitudeManual),

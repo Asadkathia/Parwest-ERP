@@ -12,8 +12,8 @@
  * Reskin only — server is the source of truth. The schema stays tolerant
  * (most fields optional + empty-string default) to match the legacy multi-
  * section branch form, where only `name` and at least one contact phone
- * are strictly required client-side. The deeper capacity / contract
- * sections fall through to the API as-is.
+ * are strictly required client-side. The deeper capacity section falls
+ * through to the API as-is.
  */
 
 import { z } from "zod"
@@ -66,7 +66,9 @@ const capacityShape = BRANCH_CAPACITY_FIELDS.reduce<
 export const branchEditSchema = z.object({
     name: z.string().trim().min(1, "Branch name is required."),
     code: z.string().trim().optional().default(""),
-    branchType: z.enum(["CONVENTIONAL", "ISLAMIC"]).optional().default("CONVENTIONAL"),
+    // Branch model (CONVENTIONAL / ISLAMIC) is DERIVED from the client type
+    // (`deriveBranchModel`) and is not editable here — the PATCH handler ignores
+    // any `branchType` sent, so the schema deliberately omits it.
     isHeadOffice: z.boolean().optional().default(false),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional().default("ACTIVE"),
 
@@ -94,6 +96,29 @@ export const branchEditSchema = z.object({
             "Enter a valid email address.",
         ),
 
+    // ── Branch Manager (free-text, on-site person — NOT a system user) ───────
+    // Distinct from `assignedManagerId` (a Parwest User FK). These mirror the
+    // create form's branch-manager fields and persist to Branch columns.
+    branchManagerName: z.string().trim().optional().default(""),
+    branchManagerContact: z
+        .string()
+        .trim()
+        .optional()
+        .default("")
+        .refine(
+            (v) => !v || v === "+92-" || PHONE_REGEX.test(v),
+            "Branch Manager Contact must be in format +92-XXX-XXXXXXX.",
+        ),
+    branchManagerEmail: z
+        .string()
+        .trim()
+        .optional()
+        .default("")
+        .refine(
+            (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+            "Enter a valid email address.",
+        ),
+
     // Assignment (Branch.assignedManagerId / operationsManagerId are direct
     // FK columns; assignedSupervisorId is materialised through the
     // ClientSupervisorAssignment join model — see PATCH handler).
@@ -108,9 +133,9 @@ export type BranchEditForm = z.input<typeof branchEditSchema>
 export type BranchEditFormParsed = z.output<typeof branchEditSchema>
 
 // ─── Create schema (covers the broad legacy create form — permissive) ───────
-// The legacy create form has many optional fields (capacity, contract,
-// attachments, manager assignments). The server validates strictly; here we
-// only enforce the same client-side rules the legacy form did:
+// The legacy create form has many optional fields (capacity, attachments,
+// manager assignments). The server validates strictly; here we only enforce
+// the same client-side rules the legacy form did:
 //   - `name` required
 //   - at least one valid `contactPhone`
 //   - optional CNIC + single-field phones must match formats when present
@@ -198,14 +223,6 @@ export const branchCreateSchema = z.object({
             (v) => !v || v === "+92-" || PHONE_REGEX.test(v),
             "Supervisor Contact must be in format +92-XXX-XXXXXXX.",
         ),
-
-    // ── Contract dates + meta ───────────────────────────────────────────────
-    contractStart: z.string().trim().optional().default(""),
-    contractEnd: z.string().trim().optional().default(""),
-    contractRateStart: z.string().trim().optional().default(""),
-    contractRateEnd: z.string().trim().optional().default(""),
-    contractAdditionalDayGuards: z.string().trim().optional().default(""),
-    contractAdditionalNightGuards: z.string().trim().optional().default(""),
 })
 
 export type BranchCreateForm = z.input<typeof branchCreateSchema>

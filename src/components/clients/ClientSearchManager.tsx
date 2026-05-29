@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { Button } from "@/components/shadcn/button"
 import { Badge } from "@/components/shadcn/badge"
-import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { AlertCircle, Search, RotateCcw } from "lucide-react"
@@ -24,6 +23,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import DataTable from "@/components/shared/DataTable"
 import RegionUrlPicker from "@/components/access/RegionUrlPicker"
+import { useCanAccess } from "@/components/shadcn/permission-gate"
 
 type RegionOption = { id: string; name: string }
 
@@ -34,25 +34,24 @@ type ClientRow = {
   city: string | null
   isBranchless: boolean
   status: string
-  logoUrl: string | null
   regionId?: string | null
   contactPerson?: string | null
   contactNumber?: string | null
   createdAt?: string
 }
 
-const LEGACY_CLIENT_TYPE_OPTIONS = ["bank", "manufacturer", "other"]
+const CLIENT_TYPE_OPTIONS = ["bank", "manufacturer", "other"]
 
 type Props = {
   title: string
   subtitle: string
-  variant?: "legacy" | "v2"
   regions?: RegionOption[]
   locked?: boolean
 }
 
-export default function ClientSearchManager({ title, subtitle, variant = "legacy", regions = [], locked = false }: Props) {
+export default function ClientSearchManager({ title, subtitle, regions = [], locked = false }: Props) {
   const searchParams = useSearchParams()
+  const canUpdate = useCanAccess("CLIENTS", "UPDATE")
   const urlRegionId = searchParams?.get("regionId") || ""
   const [rows, setRows] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -180,7 +179,7 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             <label className="block text-sm text-[var(--text-muted)] mb-1">Select Client Type</label>
             <select name="Select Client Type" value={clientType} onChange={(e) => setClientType(e.target.value)} className="ui-select">
               <option value="">--Select Client Type--</option>
-              {LEGACY_CLIENT_TYPE_OPTIONS.map((option) => (
+              {CLIENT_TYPE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -199,23 +198,19 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
             </select>
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">
-              {variant === "v2" ? "Show 102550100 entries per page" : "Show 102550100200 entries"}
-            </label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Show entries per page</label>
             <select
-              name={variant === "v2" ? "Show 102550100 entries per page" : "Show 102550100200 entries"}
+              name="Show entries per page"
               value={rowsPerPage}
               onChange={(e) => setRowsPerPage(e.target.value)}
               className="ui-select"
             >
-              {(variant === "v2" ? ["10", "25", "50", "100"] : ["10", "25", "50", "100", "200"]).map((v) => (
+              {["10", "25", "50", "100"].map((v) => (
                 <option key={v} value={v}>
                   {v}
                 </option>
               ))}
             </select>
-            <input type="hidden" name="Show 102550100200 entries" value={rowsPerPage} />
-            <input type="hidden" name="Show 102550100 entries per page" value={rowsPerPage} />
           </div>
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Search:</label>
@@ -248,16 +243,8 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
               setSelectDate("")
             }}>
             <RotateCcw className="h-4 w-4" />
-            {variant === "v2" ? "Clear" : "Reset"}
+            Clear
           </Button>
-          {variant === "legacy" ? <Button variant="secondary">Export In Excel</Button> : null}
-        </div>
-        <div className="hidden" aria-hidden="true">
-          <select name="legacy_client_type_options">
-            <option>bank</option>
-            <option>manufacturer</option>
-            <option>other</option>
-          </select>
         </div>
         </CardContent>
       </Card>
@@ -273,23 +260,6 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
         rows={loading ? [] : filtered}
         columns={[
           { key: "id", header: "ID" },
-          {
-            key: "logoUrl",
-            header: "Logo",
-            render: (row) =>
-              row.logoUrl ? (
-                <Image
-                  src={row.logoUrl}
-                  alt={row.name}
-                  width={32}
-                  height={32}
-                  unoptimized
-                  className="h-8 w-8 rounded-md object-cover border border-[var(--border)]"
-                />
-              ) : (
-                <span className="text-[var(--text-muted)]">—</span>
-              ),
-          },
           {
             key: "name",
             header: "Name",
@@ -318,10 +288,12 @@ export default function ClientSearchManager({ title, subtitle, variant = "legacy
                 <Link href={`/clients/${row.id}`} className="text-[var(--brand)] hover:underline">
                   View
                 </Link>
-                <Link href={`/clients/${row.id}/edit`} className="text-emerald-700 hover:underline">
-                  Edit
-                </Link>
-                {variant === "v2" ? (
+                {canUpdate ? (
+                  <Link href={`/clients/${row.id}/edit`} className="text-emerald-700 hover:underline">
+                    Edit
+                  </Link>
+                ) : null}
+                {canUpdate ? (
                   <button
                     type="button"
                     disabled={statusUpdating === row.id}

@@ -4,10 +4,11 @@ import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockClientsList } from "@/lib/mockData/clients"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { cityForBranch, cityForRegionId } from "@/lib/geo/regionCity"
+import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 export async function GET(request: NextRequest) {
     try {
@@ -49,11 +50,27 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(clients)
         }
 
+        // Explicit select: list consumers only need these fields. Excludes heavy
+        // base64 blobs (logoUrl) and legacy contract* columns / contractAttachments
+        // / contractUrl so the list payload stays small.
         const clients = await prisma.client.findMany({
             where,
             orderBy: { name: "asc" },
-            include: {
-                region: true,
+            select: {
+                id: true,
+                name: true,
+                type: true,
+                email: true,
+                city: true,
+                status: true,
+                isBranchless: true,
+                regionId: true,
+                regionalOfficeId: true,
+                contactPerson: true,
+                phone: true,
+                enrollmentDate: true,
+                createdAt: true,
+                region: { select: { id: true, name: true } },
             },
         })
 
@@ -123,7 +140,6 @@ export async function POST(request: NextRequest) {
 
         // Parse numeric capacities
         const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
-        const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? "")); return isNaN(n) ? null : n }
 
         // Derive the default branch's city from its own region (may differ from the client's region).
         const branchCity = await cityForBranch(prisma, {
@@ -132,7 +148,15 @@ export async function POST(request: NextRequest) {
             clientId: null,
         })
 
-        const client = await prisma.client.create({
+        // Supervisor assignments are created atomically with the client below.
+        const supervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
+        const branchSupervisorId = body.branchAssignedSupervisorId ? String(body.branchAssignedSupervisorId).trim() : ""
+
+        // Create the client (+ nested default/full branch) and any supervisor
+        // assignments in a single transaction so a bad supervisorId rolls the
+        // whole thing back instead of leaving an orphaned client.
+        const client = await prisma.$transaction(async (tx) => {
+          const created = await tx.client.create({
             data: {
                 // Core
                 name:             body.name,
@@ -183,21 +207,10 @@ export async function POST(request: NextRequest) {
                 nightSupervisorCapacity: toInt(body.nightSupervisorCapacity),
                 cpoCapacity:             toInt(body.cpoCapacity),
 
-                // Contract details
-                contractStart:            body.contractStart      ? new Date(body.contractStart)      : null,
-                contractEnd:              body.contractEnd        ? new Date(body.contractEnd)        : null,
-                contractRateStart:        body.contractRateStart  ? new Date(body.contractRateStart)  : null,
-                contractRateEnd:          body.contractRateEnd    ? new Date(body.contractRateEnd)    : null,
-                contractGuardDesignation: body.contractGuardDesignation  || null,
-                contractAdditionalGuards: toInt(body.contractAdditionalGuards),
-                contractDayGuardDesignation:   body.contractDayGuardDesignation   || null,
-                contractDayGuardExService:     body.contractDayGuardExService     || null,
-                contractNightGuardDesignation: body.contractNightGuardDesignation || null,
-                contractNightGuardExService:   body.contractNightGuardExService   || null,
-                contractAdditionalDayGuards:   toInt(body.contractAdditionalDayGuards),
-                contractAdditionalNightGuards: toInt(body.contractAdditionalNightGuards),
-                contractGuardExService:   body.contractGuardExService    || null,
-                contractPrice:            toFloat(body.contractPrice),
+                // NOTE: Flat contract* columns are intentionally NOT written here.
+                // Contracts are canonical via the ClientContract model; these legacy
+                // columns are read by nothing. contractUrl/contractAttachments are
+                // still written above.
 
                 // Auto-create a branch: full branch for branch clients, default branch for branchless clients
                 ...(defaultBranchName ? {
@@ -250,27 +263,28 @@ export async function POST(request: NextRequest) {
                 } : {}),
             },
             include: { branches: true },
+          })
+
+          // Client-level supervisor assignment (validates user, dedups prior ACTIVE).
+          if (supervisorId) {
+            await assignSupervisor(tx, { clientId: created.id, supervisorId })
+          }
+
+          // Branch-level supervisor assignment for the auto-created branch.
+          const createdBranchId = created.branches?.[0]?.id
+          if (branchSupervisorId && createdBranchId) {
+            await assignSupervisor(tx, { clientId: created.id, branchId: createdBranchId, supervisorId: branchSupervisorId })
+          }
+
+          return created
         })
-
-        // Create client-level supervisor assignment
-        const supervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
-        if (supervisorId) {
-            await prisma.clientSupervisorAssignment.create({
-                data: { clientId: client.id, supervisorId },
-            }).catch(() => { /* ignore if user not found */ })
-        }
-
-        // Create branch-level supervisor assignment
-        const branchSupervisorId = body.branchAssignedSupervisorId ? String(body.branchAssignedSupervisorId).trim() : ""
-        const createdBranchId = client.branches?.[0]?.id
-        if (branchSupervisorId && createdBranchId) {
-            await prisma.clientSupervisorAssignment.create({
-                data: { clientId: client.id, branchId: createdBranchId, supervisorId: branchSupervisorId },
-            }).catch(() => { /* ignore if user not found */ })
-        }
 
         return NextResponse.json(client, { status: 201 })
     } catch (error: unknown) {
+        // A bad supervisorId surfaces from assignSupervisor as a "not found" error.
+        if (error instanceof Error && error.message.startsWith("Supervisor user not found")) {
+            return badRequest("Assigned supervisor not found.")
+        }
         console.error("Error creating client:", error)
         return internalServerError("Failed to create client")
     }

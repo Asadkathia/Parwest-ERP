@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { CheckCircle2, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Button } from "@/components/shadcn/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
+import { useCanAccess } from "@/components/shadcn/permission-gate"
 import DataTable from "@/components/shared/DataTable"
 type ClientTypeRow = { id: string; serial: number; name: string; label: string; addedBy: string }
 type DocumentTypeRow = { id: string; name: string; uniqueKey: string; createdAt: string; status: "ACTIVE" | "INACTIVE" }
@@ -25,6 +36,10 @@ const initialLocations: LocationRow[] = [
 ]
 
 export default function ClientTypesLocationsManager() {
+  const canCreate = useCanAccess("CLIENTS", "CREATE")
+  const canUpdate = useCanAccess("CLIENTS", "UPDATE")
+  const canDelete = useCanAccess("CLIENTS", "DELETE")
+
   const [clientTypes, setClientTypes] = useState<ClientTypeRow[]>([])
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeRow[]>(initialDocumentTypes)
   const [locations, setLocations] = useState<LocationRow[]>(initialLocations)
@@ -38,6 +53,21 @@ export default function ClientTypesLocationsManager() {
   const [addMode, setAddMode] = useState<AddMode | null>(null)
   const [nameInput, setNameInput] = useState("")
   const [uniqueKeyInput, setUniqueKeyInput] = useState("")
+  const [pendingDeleteType, setPendingDeleteType] = useState<ClientTypeRow | null>(null)
+
+  const deleteClientType = async (row: ClientTypeRow) => {
+    setNotice("")
+    setError("")
+    try {
+      const res = await fetch(`/api/client-types/${row.id}`, { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.message || "Failed to delete.")
+      setNotice(`"${row.label}" deleted.`)
+      await loadClientTypes()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete.")
+    }
+  }
 
   // ── Load client types from DB ──────────────────────────────────────────────
   const loadClientTypes = async () => {
@@ -194,7 +224,7 @@ export default function ClientTypesLocationsManager() {
       {error ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {notice ? <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-300"><CheckCircle2 className="h-4 w-4" /><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
-      <MasterSection title="All Client Types" onAdd={() => setAddMode("clientType")}>
+      <MasterSection title="All Client Types" canAdd={canCreate} onAdd={() => setAddMode("clientType")}>
         <DataTable
           rows={filteredClientTypes}
           columns={[
@@ -205,20 +235,18 @@ export default function ClientTypesLocationsManager() {
             {
               key: "action",
               header: "Action",
-              render: (row) => (
-                <button
-                  type="button"
-                  className="text-xs text-red-600 hover:underline"
-                  onClick={async () => {
-                    if (!confirm(`Delete "${row.label}"?`)) return
-                    const res = await fetch(`/api/client-types/${row.id}`, { method: "DELETE" })
-                    if (res.ok) { setNotice(`"${row.label}" deleted.`); await loadClientTypes() }
-                    else setError("Failed to delete.")
-                  }}
-                >
-                  Delete
-                </button>
-              ),
+              render: (row) =>
+                canDelete ? (
+                  <button
+                    type="button"
+                    className="text-xs text-red-600 hover:underline"
+                    onClick={() => setPendingDeleteType(row)}
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--text-muted)]">—</span>
+                ),
             },
           ]}
           getRowKey={(row) => row.id}
@@ -227,7 +255,7 @@ export default function ClientTypesLocationsManager() {
         />
       </MasterSection>
 
-      <MasterSection title="Client's Document Types" onAdd={() => setAddMode("documentType")}>
+      <MasterSection title="Client's Document Types" canAdd={canCreate} onAdd={() => setAddMode("documentType")}>
         <DataTable
           rows={filteredDocumentTypes}
           columns={[
@@ -237,18 +265,21 @@ export default function ClientTypesLocationsManager() {
             {
               key: "action",
               header: "Action",
-              render: (row) => (
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-emerald-700 hover:underline"
-                  onClick={() => {
-                    setDocumentTypes((prev) => prev.map((item) => (item.id === row.id ? { ...item, status: item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : item)))
-                    setNotice("Document status updated.")
-                  }}
-                >
-                  {row.status === "ACTIVE" ? "DEACTIVATE" : "ACTIVATE"}
-                </button>
-              ),
+              render: (row) =>
+                canUpdate ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-emerald-700 hover:underline"
+                    onClick={() => {
+                      setDocumentTypes((prev) => prev.map((item) => (item.id === row.id ? { ...item, status: item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : item)))
+                      setNotice("Document status updated.")
+                    }}
+                  >
+                    {row.status === "ACTIVE" ? "DEACTIVATE" : "ACTIVATE"}
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--text-muted)]">—</span>
+                ),
             },
           ]}
           getRowKey={(row) => row.id}
@@ -257,14 +288,23 @@ export default function ClientTypesLocationsManager() {
         />
       </MasterSection>
 
-      <MasterSection title="Client Locations" onAdd={() => setAddMode("location")}>
+      <MasterSection title="Client Locations" canAdd={canCreate} onAdd={() => setAddMode("location")}>
         <DataTable
           rows={filteredLocations}
           columns={[
             { key: "locationName", header: "Location Name", sortable: true },
             { key: "createdBy", header: "Created By", sortable: true },
             { key: "createdOn", header: "Created On", sortable: true },
-            { key: "action", header: "Action", render: () => <span className="text-[var(--brand)]">EDIT</span> },
+            {
+              key: "action",
+              header: "Action",
+              render: () =>
+                canUpdate ? (
+                  <span className="text-[var(--brand)]">EDIT</span>
+                ) : (
+                  <span className="text-[var(--text-muted)]">—</span>
+                ),
+            },
           ]}
           getRowKey={(row) => row.id}
           searchable={false}
@@ -274,7 +314,7 @@ export default function ClientTypesLocationsManager() {
 
       {addMode ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-md)]">
+          <div className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border)] bg-card p-5 shadow-[var(--shadow-md)]">
             <h3 className="text-base font-semibold text-[var(--text)]">
               {addMode === "clientType"
                 ? "Add Client Type"
@@ -301,6 +341,37 @@ export default function ClientTypesLocationsManager() {
           </div>
         </div>
       ) : null}
+
+      <AlertDialog
+        open={pendingDeleteType !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteType(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete client type?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteType
+                ? `You are about to delete "${pendingDeleteType.label}". This action cannot be undone.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                const row = pendingDeleteType
+                setPendingDeleteType(null)
+                if (row) await deleteClientType(row)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -309,23 +380,27 @@ function MasterSection({
   title,
   children,
   onAdd,
+  canAdd = true,
 }: {
   title: string
   children: ReactNode
   onAdd: () => void
+  canAdd?: boolean
 }) {
   return (
-    <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white">
+    <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-card">
       <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
         <h2 className="text-sm font-semibold tracking-wide text-[var(--text)] uppercase">{title}</h2>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex h-7 w-7 items-center justify-center rounded bg-emerald-500 text-white hover:bg-emerald-600"
-          aria-label={`Add ${title}`}
-        >
-          +
-        </button>
+        {canAdd ? (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="inline-flex h-7 w-7 items-center justify-center rounded bg-emerald-500 text-white hover:bg-emerald-600"
+            aria-label={`Add ${title}`}
+          >
+            +
+          </button>
+        ) : null}
       </header>
       <div className="p-4">{children}</div>
     </section>

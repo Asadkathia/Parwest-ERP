@@ -50,13 +50,15 @@ export const clientSchema = z.object({
         .min(1, "Primary contact number is required.")
         .regex(PHONE_REGEX, "Contact number must be in format +92-XXX-XXXXXXX."),
     // Additional contact numbers — same format rule when present.
+    // Empty strings are tolerated so blank rows in the multi-input UI don't
+    // fail validation (the form filters them out before submit).
     contactNumbers: z
         .array(
             z
                 .string()
                 .trim()
-                .regex(
-                    PHONE_REGEX,
+                .refine(
+                    (v) => !v || PHONE_REGEX.test(v),
                     "Contact number must be in format +92-XXX-XXXXXXX.",
                 ),
         )
@@ -107,31 +109,10 @@ export const clientSchema = z.object({
     // ── Status (settings/status toggle) ──────────────────────────────────────
     status: z.enum(["ACTIVE", "INACTIVE"]).optional().default("ACTIVE"),
 
-    // ── Contract dates + meta (cross-field validation) ──────────────────────
-    contractStart: z.string().trim().optional().default(""),
-    contractEnd: z.string().trim().optional().default(""),
-    contractRateStart: z.string().trim().optional().default(""),
-    contractRateEnd: z.string().trim().optional().default(""),
-    contractPrice: z.string().trim().optional().default(""),
-    contractAdditionalDayGuards: z.string().trim().optional().default(""),
-    contractAdditionalNightGuards: z.string().trim().optional().default(""),
-
     // ── Attachments (data URLs handled out-of-band) ─────────────────────────
+    // Contracts themselves are managed via the Pricing panel; only the
+    // document storage URL remains here.
     contractUrl: z.string().optional().default(""),
-}).superRefine((data, ctx) => {
-    // Mirrors the legacy form's post-submit cross-field check:
-    // contract end must be after contract start (when both present).
-    if (data.contractStart && data.contractEnd) {
-        const start = new Date(data.contractStart).getTime()
-        const end = new Date(data.contractEnd).getTime()
-        if (Number.isFinite(start) && Number.isFinite(end) && end <= start) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ["contractEnd"],
-                message: "Contract end date must be after the contract start date.",
-            })
-        }
-    }
 })
 
 export type ClientInput = z.infer<typeof clientSchema>
@@ -160,13 +141,15 @@ export const clientEditSchema = z.object({
 
     contactPerson: z.string().trim().optional().default(""),
     contactPersonDesignation: z.string().trim().optional().default(""),
+    // Empty strings are tolerated so blank rows in the multi-input UI don't
+    // fail validation (the form filters them out before submit).
     contactNumbers: z
         .array(
             z
                 .string()
                 .trim()
-                .regex(
-                    PHONE_REGEX,
+                .refine(
+                    (v) => !v || PHONE_REGEX.test(v),
                     "Contact number must be in format +92-XXX-XXXXXXX.",
                 ),
         )
@@ -208,30 +191,7 @@ export const clientEditSchema = z.object({
     strn: z.string().trim().optional().default(""),
     logoUrl: z.string().trim().optional().default(""),
     reservePctInput: z.string().trim().optional().default(""),
-
-    contractStart: z.string().trim().optional().default(""),
-    contractEnd: z.string().trim().optional().default(""),
-    contractRateStart: z.string().trim().optional().default(""),
-    contractRateEnd: z.string().trim().optional().default(""),
-    contractDayGuardDesignation: z.string().trim().optional().default(""),
-    contractDayGuardExService: z.string().trim().optional().default(""),
-    contractNightGuardDesignation: z.string().trim().optional().default(""),
-    contractNightGuardExService: z.string().trim().optional().default(""),
-    contractAdditionalDayGuards: z.string().trim().optional().default(""),
-    contractAdditionalNightGuards: z.string().trim().optional().default(""),
-    contractPrice: z.string().trim().optional().default(""),
 }).superRefine((data, ctx) => {
-    if (data.contractStart && data.contractEnd) {
-        const start = new Date(data.contractStart).getTime()
-        const end = new Date(data.contractEnd).getTime()
-        if (Number.isFinite(start) && Number.isFinite(end) && end <= start) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ["contractEnd"],
-                message: "Contract end date must be after the contract start date.",
-            })
-        }
-    }
     if (data.reservePctInput) {
         const pct = parseFloat(data.reservePctInput)
         if (Number.isNaN(pct) || pct < 0 || pct > 100) {

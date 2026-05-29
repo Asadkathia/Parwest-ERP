@@ -10,7 +10,7 @@
  *   - Contract PDF + extra attachments upload
  *   - OCR autofill (legacy `OcrUploadPanel`)
  *   - Legacy widgets: <PhoneInput>, <CnicInput>, <SearchSelect>,
- *     <MultiSearchSelect>, <LocationPickerMap>
+ *     <LocationPickerMap>
  *
  * Legacy-widget bridge: the same pattern Phase 3b's guard form established
  * for CnicInput — wrap in <FormControl> and bubble onChange via capture.
@@ -38,7 +38,6 @@ import Link from "next/link"
 
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
-import MultiSearchSelect from "@/components/ui/MultiSearchSelect"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
@@ -172,14 +171,8 @@ export default function ClientEnrollmentForm({
 
             status: "ACTIVE",
 
-            contractStart: "",
-            contractEnd: "",
-            contractRateStart: "",
-            contractRateEnd: "",
-            contractPrice: "",
-            contractAdditionalDayGuards: "",
-            contractAdditionalNightGuards: "",
-
+            // Contracts are managed via the Pricing panel now; only the uploaded
+            // contract document URL remains on the client.
             contractUrl: "",
         },
     })
@@ -194,8 +187,6 @@ export default function ClientEnrollmentForm({
     const [managerUsers, setManagerUsers] = useState<{ id: string; name: string }[]>([])
     const [regionalOffices, setRegionalOffices] = useState<{ id: string; name: string }[]>([])
     const [clientTypes, setClientTypes] = useState<{ value: string; label: string }[]>([])
-    const [designationOptions, setDesignationOptions] = useState<{ value: string; label: string }[]>([])
-    const [exServiceOptions, setExServiceOptions] = useState<{ value: string; label: string }[]>([])
 
     // Default branch state (rendered when isBranchless=true; NOT in scope for migration)
     const [defaultBranchName, setDefaultBranchName] = useState("")
@@ -235,32 +226,16 @@ export default function ClientEnrollmentForm({
                 }
             })
             .catch(() => {})
-        fetch("/api/guard-designation-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setDesignationOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-                }
-            })
-            .catch(() => {})
-        fetch("/api/guard-ex-service-types")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data: unknown) => {
-                if (Array.isArray(data)) {
-                    setExServiceOptions(
-                        (data as { name: string }[]).map((d) => ({ value: d.name, label: d.name })),
-                    )
-                }
-            })
-            .catch(() => {})
     }, [])
 
     // ── Derive: client city always mirrors region name ─────────────────────────
+    // Only write when the value actually changes, and never mark the form dirty
+    // on mount — otherwise dirty-based gating fires spuriously.
     useEffect(() => {
         const regionName = regions.find((r) => r.id === watchedRegionId)?.name ?? ""
-        form.setValue("clientLocation", regionName, { shouldDirty: true })
+        if (form.getValues("clientLocation") !== regionName) {
+            form.setValue("clientLocation", regionName, { shouldDirty: false })
+        }
     }, [watchedRegionId, regions, form])
 
     // ── Cascade: client-level region → regional offices + managers ────────────
@@ -459,20 +434,6 @@ export default function ClientEnrollmentForm({
         for (const num of branchFilled) {
             if (!isValidPhone(num)) {
                 toast.error(`Branch phone "${num}" must be in format +92-XXX-XXXXXXX.`)
-                return
-            }
-        }
-
-        // Contract file requires contract dates (if file uploaded)
-        if (contractFile) {
-            const cStart = (values.contractStart ?? "").trim()
-            const cEnd = (values.contractEnd ?? "").trim()
-            if (!cStart || !cEnd) {
-                toast.error("Contract start and end dates are required when uploading a contract.")
-                return
-            }
-            if (new Date(cEnd).getTime() <= new Date(cStart).getTime()) {
-                toast.error("Contract end date must be after the contract start date.")
                 return
             }
         }
@@ -1674,23 +1635,6 @@ export default function ClientEnrollmentForm({
                     </Card>
                 )}
 
-                {/* Branchless contract */}
-                {isBranchless && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Branchless Client Contract</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ContractFields
-                                form={form}
-                                regions={regions}
-                                designationOptions={designationOptions}
-                                exServiceOptions={exServiceOptions}
-                            />
-                        </CardContent>
-                    </Card>
-                )}
-
                 {/* Contract PDF */}
                 <Card>
                     <CardHeader>
@@ -1820,178 +1764,6 @@ export default function ClientEnrollmentForm({
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────────────
-
-function ContractFields({
-    form,
-    regions,
-    designationOptions,
-    exServiceOptions,
-}: {
-    form: ReturnType<typeof useForm<ClientCreateForm>>
-    regions: Region[]
-    designationOptions: { value: string; label: string }[]
-    exServiceOptions: { value: string; label: string }[]
-}) {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-                control={form.control}
-                name="contractStart"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Contract Start</FormLabel>
-                        <FormControl>
-                            <Input type="date" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="contractEnd"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Contract End</FormLabel>
-                        <FormControl>
-                            <Input type="date" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="contractRateStart"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Contract Rate Start</FormLabel>
-                        <FormControl>
-                            <Input type="date" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="contractRateEnd"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Contract Rate End</FormLabel>
-                        <FormControl>
-                            <Input type="date" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-
-            <div>
-                <Label>Regional Office</Label>
-                <div>
-                    <SearchSelect
-                        name="contractRegionalOffice"
-                        options={regions.map((r) => ({ value: r.id, label: r.name }))}
-                        placeholder="— Select Regional Office —"
-                    />
-                </div>
-            </div>
-            <div />
-
-            <div className="md:col-span-2">
-                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Day Guards</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <Label>Guard Designation</Label>
-                        <div>
-                            <MultiSearchSelect
-                                name="contractDayGuardDesignation"
-                                options={designationOptions}
-                                placeholder="Select designations"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <Label>Guard Ex Service</Label>
-                        <div>
-                            <MultiSearchSelect
-                                name="contractDayGuardExService"
-                                options={exServiceOptions}
-                                placeholder="Select"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="md:col-span-2">
-                <h3 className="text-sm font-semibold text-[var(--text)] mb-3 mt-1">Night Guards</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <Label>Guard Designation</Label>
-                        <div>
-                            <MultiSearchSelect
-                                name="contractNightGuardDesignation"
-                                options={designationOptions}
-                                placeholder="Select designations"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <Label>Guard Ex Service</Label>
-                        <div>
-                            <MultiSearchSelect
-                                name="contractNightGuardExService"
-                                options={exServiceOptions}
-                                placeholder="Select"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <FormField
-                control={form.control}
-                name="contractAdditionalDayGuards"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Additional Day Guards</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="number"
-                                min={0}
-                                placeholder="0"
-                                {...field}
-                                value={field.value ?? ""}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="contractAdditionalNightGuards"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Additional Night Guards</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="number"
-                                min={0}
-                                placeholder="0"
-                                {...field}
-                                value={field.value ?? ""}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </div>
-    )
-}
 
 function BCapField({ label, name }: { label: string; name: string }) {
     return (
