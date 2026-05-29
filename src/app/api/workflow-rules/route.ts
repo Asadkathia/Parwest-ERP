@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
-import { badRequest, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 import {
   ENV_OVERRIDE_KEYS,
   getDefaultWorkflowRules,
@@ -10,6 +11,12 @@ import {
   getWorkflowRuleSnapshot,
   resolveWorkflowPresetId,
 } from "@/lib/workflows/policy"
+// TODO(durability): workflow-rule persistence currently goes through the
+// flat-file store in `src/lib/workflows/store.ts` (writes to
+// `process.cwd()/data/workflow-rules.json`). On Vercel serverless this is
+// non-durable across deploys/cold starts. Migrate to a Prisma-backed
+// settings table during the schema-migration pass — see audit
+// `docs/audits/settings-dead-legacy-conflict-audit.md` section C.
 import { readWorkflowRuleOverrides, writeWorkflowRuleOverrides } from "@/lib/workflows/store"
 import type { WorkflowRuleKey } from "@/lib/workflows/policy"
 
@@ -35,10 +42,11 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasAction(session, "SETTINGS", "VIEW")) return forbidden()
 
     const overrides = await readWorkflowRuleOverrides()
     const snapshot = getWorkflowRuleSnapshot()
-    return NextResponse.json({
+    return ok({
       rules: buildRows(),
       overrides,
       presets: getWorkflowPresets().map((preset) => ({
@@ -58,6 +66,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasAction(session, "SETTINGS", "UPDATE")) return forbidden()
 
     const body = await request.json().catch(() => null)
     const presetIdRaw = typeof body?.presetId === "string" ? body.presetId : null
@@ -95,8 +104,7 @@ export async function PATCH(request: NextRequest) {
     await writeWorkflowRuleOverrides(nextOverrides)
     const snapshot = getWorkflowRuleSnapshot()
 
-    return NextResponse.json({
-      success: true,
+    return ok({
       rules: buildRows(),
       overrides: nextOverrides,
       presets: getWorkflowPresets().map((preset) => ({

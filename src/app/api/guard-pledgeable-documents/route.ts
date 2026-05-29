@@ -1,9 +1,18 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, conflict, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  internalServerError,
+  ok,
+  serviceUnavailable,
+  unauthorized,
+} from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 
 const MOCK_ROWS = [
   {
@@ -24,12 +33,12 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
+    if (isRuntimeMockEnabled()) return ok(MOCK_ROWS)
 
     const rows = await prisma.guardPledgeableDocument.findMany({
       orderBy: { name: "asc" },
     })
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
     console.error("Error fetching guard pledgeable documents:", error)
@@ -41,22 +50,23 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasAction(session, "SETTINGS", "CREATE")) return forbidden()
     const body = await request.json()
     const name = String(body?.name || "").trim()
     const description = body?.description ? String(body.description) : null
     if (!name) return badRequest("Name is required.")
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
+      return ok(
         { id: `mock-doc-${Date.now()}`, name, description, createdAt: new Date().toISOString() },
-        { status: 201 }
+        201
       )
     }
 
     const created = await prisma.guardPledgeableDocument.create({
       data: { name, description },
     })
-    return NextResponse.json(created, { status: 201 })
+    return ok(created, 201)
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
     if (String((error as { code?: string }).code) === "P2002") return conflict("Document type already exists.")

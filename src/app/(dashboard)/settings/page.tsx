@@ -9,7 +9,6 @@ import {
   MapPin,
   Receipt,
   ScrollText,
-  Settings as SettingsIcon,
   Users,
 } from "lucide-react"
 
@@ -69,12 +68,6 @@ const links = [
     href: "/settings/workflow-rules",
     description: "Toggle deployment and inventory validation strictness.",
     icon: Cog,
-  },
-  {
-    title: "System Settings",
-    href: "/settings/system",
-    description: "Application-wide preferences and runtime flags.",
-    icon: SettingsIcon,
   },
   {
     title: "Insights Configuration",

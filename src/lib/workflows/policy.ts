@@ -3,7 +3,6 @@ import { readWorkflowRuleOverridesSync } from "@/lib/workflows/store"
 export type WorkflowRuleKey =
   | "deployments.singleActivePerGuard"
   | "deployments.blockInactiveUpdate"
-  | "deployments.lockAfterEnd"
   | "deployments.requireActiveGuardStatus"
   | "deployments.requireGuardOfficeConsistency"
   | "deployments.requireEndDate"
@@ -56,7 +55,6 @@ export type WorkflowPreset = {
 const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   "deployments.singleActivePerGuard": true,
   "deployments.blockInactiveUpdate": true,
-  "deployments.lockAfterEnd": true,
   "deployments.requireActiveGuardStatus": true,
   "deployments.requireGuardOfficeConsistency": false,
   "deployments.requireEndDate": true,
@@ -124,7 +122,6 @@ export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
       ...BASE_WORKFLOW_RULES,
       "deployments.singleActivePerGuard": false,
       "deployments.blockInactiveUpdate": false,
-      "deployments.lockAfterEnd": false,
       "deployments.requireActiveGuardStatus": false,
       "deployments.requireGuardOfficeConsistency": false,
       "deployments.requireEndDate": false,
@@ -167,7 +164,6 @@ export const WORKFLOW_PRESET_ENV_KEY = "WORKFLOW_RULE_PRESET"
 export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
   "deployments.singleActivePerGuard": "WORKFLOW_RULE_DEPLOYMENTS_SINGLE_ACTIVE_PER_GUARD",
   "deployments.blockInactiveUpdate": "WORKFLOW_RULE_DEPLOYMENTS_BLOCK_INACTIVE_UPDATE",
-  "deployments.lockAfterEnd": "WORKFLOW_RULE_DEPLOYMENTS_LOCK_AFTER_END",
   "deployments.requireActiveGuardStatus": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_ACTIVE_GUARD_STATUS",
   "deployments.requireGuardOfficeConsistency": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_GUARD_OFFICE_CONSISTENCY",
   "deployments.requireEndDate": "WORKFLOW_RULE_DEPLOYMENTS_REQUIRE_END_DATE",

@@ -70,7 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     { label: "Reports", href: "/reports", icon: FileText, module: "REPORTS" },
     { label: "Audit", href: "/audit", icon: History, module: "AUDIT" },
     { label: "RBAC", href: "/users/roles", icon: ShieldAlert, module: "USERS" },
-    { label: "Settings", href: "/settings/system", icon: Settings, module: "SETTINGS" },
+    { label: "Settings", href: "/settings", icon: Settings, module: "SETTINGS" },
 ]
 
 type ActionItem = {
@@ -90,7 +90,7 @@ type ActionItem = {
 const ACTION_ITEMS: ActionItem[] = [
     { label: "Create guard", href: "/guards/new", icon: Plus, module: "GUARDS", action: "CREATE" },
     { label: "Create deployment", href: "/guards/deploy", icon: Plus, module: "GUARDS", action: "CREATE" },
-    { label: "Open settings", href: "/settings/system", icon: Settings, module: "SETTINGS" },
+    { label: "Open settings", href: "/settings", icon: Settings, module: "SETTINGS" },
 ]
 
 export interface CommandPaletteProps {

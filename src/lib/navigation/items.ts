@@ -114,7 +114,6 @@ export const NAV_ITEMS: NavItem[] = [
             { title: "Black Listed", href: "/clients/blacklist", icon: Building2 },
             { title: "Export Branches", href: "/clients/export-branches", icon: FileText },
             { title: "Invoicing", href: "/clients/invoicing", icon: DollarSign },
-            { title: "Invoice Prerequisites", href: "/clients/invoice-prerequisites", icon: Settings },
             { title: "Branches", href: "/clients/branches", icon: MapPin },
             { title: "Pricing", href: "/clients/pricing", icon: DollarSign },
             { title: "Insurance by Clients", href: "/clients/clientInsuranceSettings", icon: ShieldAlert },
@@ -249,12 +248,11 @@ export const NAV_ITEMS: NavItem[] = [
             { title: "Regions", href: "/settings/regions", icon: MapPin },
             { title: "Regional Offices", href: "/settings/offices", icon: Building2 },
             { title: "Guard Documents", href: "/settings/guard-pledgeable-documents", icon: FileText },
-            { title: "User Types", href: "/settings/user-types", icon: Users },
             { title: "Guard Bank Names", href: "/settings/guard-bank-names", icon: DollarSign },
             { title: "Training Categories", href: "/settings/training-categories", icon: GraduationCap },
             { title: "Fingerprint Device", href: "/settings/fingerprint-device", icon: Settings },
             { title: "Workflow Rules", href: "/settings/workflow-rules", icon: Settings },
-            { title: "System Settings", href: "/settings/system", icon: Settings },
+            // "System Settings" removed — was a placeholder route with no backing API.
         ],
     },
     {

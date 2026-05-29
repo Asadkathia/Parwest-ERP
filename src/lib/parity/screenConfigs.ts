@@ -427,15 +427,6 @@ export const userScreens: Record<string, ScreenConfig> = {
   },
 }
 
-export const userLinks = [
-  { label: "Add New", href: "/users/new" },
-  { label: "Search", href: "/users/search" },
-  { label: "Permissions", href: "/users/permissions" },
-  { label: "M/S Relationship", href: "/users/ms-relationship" },
-  { label: "Switch Supervisor", href: "/users/switch-supervisor" },
-  { label: "C/S Relationship", href: "/users/cs-relationship" },
-]
-
 export const ticketScreens: Record<string, ScreenConfig> = {
   listing: {
     title: "Ticketing Listing",
@@ -596,24 +587,5 @@ export const moduleHubScreens: Record<string, ScreenConfig> = {
     ],
     actions: ["Submit", "Reset"],
     table: { columns: ["Subject", "Category", "Priority", "Assign To", "Status"] },
-  },
-  systemSettings: {
-    title: "System Settings",
-    description: "Frontend placeholder for global system settings.",
-    sections: [
-      {
-        title: "General",
-        fields: [
-          { label: "Application Name" },
-          { label: "Timezone", type: "select" },
-          { label: "Default Currency", type: "select" },
-          { label: "Show", type: "select", options: ["10", "25", "50", "100", "200"] },
-          { label: "Search:" },
-          { label: "Select Date", type: "date" },
-        ],
-      },
-    ],
-    actions: ["Reset", "Submit", "Save Settings", "Export In Excel File"],
-    table: { columns: ["Setting", "Value", "Updated At"] },
   },
 }

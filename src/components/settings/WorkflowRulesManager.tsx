@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/shadcn/alert-dialog"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
+import type { WorkflowRuleKey } from "@/lib/workflows/policy"
 
 type WorkflowRule = {
   key: string
@@ -50,13 +51,14 @@ type ApiPayload = {
 }
 
 // Humanized descriptions per v1.1 design reference (Parwest /workflow-rules.html).
-const RULE_DESCRIPTIONS: Record<string, string> = {
+// Typed as `Record<WorkflowRuleKey, string>` so adding a new rule key to
+// `policy.ts` fails compilation until a description is supplied here — no more
+// silent fallback to the generic "Workflow validation rule." copy.
+const RULE_DESCRIPTIONS: Record<WorkflowRuleKey, string> = {
   "deployments.singleActivePerGuard":
     "One active deployment per guard at a time. Prevents overlapping assignments.",
   "deployments.blockInactiveUpdate":
     "Prevent editing ended deployments. Protects audit integrity.",
-  "deployments.lockAfterEnd":
-    "Lock deployment records once the end date has passed. Disabling allows back-editing of historical deployments.",
   "deployments.requireActiveGuardStatus":
     "Guard lifecycle must be ACTIVE before deployment is allowed.",
   "deployments.requireGuardOfficeConsistency":
@@ -73,6 +75,12 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
     "Client must have at least one branch before deployment is allowed.",
   "deployments.requireVerifiedPrerequisites":
     "Guard must have all required prerequisites verified before deployment.",
+  "deployments.allowExtraType":
+    "Allow creating deployments of type EXTRA. Disable to restrict deployments to the standard types only.",
+  "branches.requireInactiveBranchesBeforeClientInactive":
+    "A client cannot be marked INACTIVE while any of its branches are still ACTIVE — deactivate branches first.",
+  "branches.blockInactiveWithActiveDeployment":
+    "A branch cannot be marked INACTIVE while it still has ACTIVE deployments — revoke deployments first.",
   "inventoryDemand.requirePendingInitialStatus":
     "New inventory demands always start in PENDING status.",
   "inventoryDemand.enforceTransitionMap":
@@ -81,6 +89,10 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
     "Core demand fields cannot be edited after a terminal status. Disabling allows data tampering on closed records.",
   "inventoryDemand.requireSufficientStockForFulfillment":
     "Store must have sufficient stock before a demand can be fulfilled.",
+  "invoicing.autoAccrualEnabled":
+    "Run the daily auto-accrual cron that posts invoice accruals for active deployments. Disable to pause automatic accrual.",
+  "invoicing.draftReminderEnabled":
+    "Run the cron that sends reminders for pending draft invoices. Disable to silence draft-invoice nudges.",
   // Deductions policy
   "deductions.applyApsaaBranchRate":
     "Auto-apply APSAA at the client branch–wise approved rate every month.",
@@ -112,11 +124,12 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
     "Block backdated effectiveFrom on rate rows unless the user has DEDUCTIONS:RATE_RETROACTIVE.",
   "deductions.allowOverrideOnFinalized":
     "Allow per-payroll deduction line overrides even on finalized payrolls. Disabling forces unfinalize first.",
+  "imports.draftEditor":
+    "Enable the bulk-import draft editor UI so operators can review and correct rows before commit.",
 }
 
 // Rules whose disable transition is destructive / non-reversible in effect.
 const DESTRUCTIVE_RULES = new Set<string>([
-  "deployments.lockAfterEnd",
   "deployments.blockInactiveUpdate",
   "inventoryDemand.blockCoreEditsAfterTerminal",
   "deductions.requireRateApprovalSeparation",
@@ -126,8 +139,6 @@ const DESTRUCTIVE_RULES = new Set<string>([
 ])
 
 const DESTRUCTIVE_CONSEQUENCES: Record<string, string> = {
-  "deployments.lockAfterEnd":
-    "Disabling lockAfterEnd will allow editing of ended deployments. This may break audit trails on historical records.",
   "deployments.blockInactiveUpdate":
     "Disabling blockInactiveUpdate will allow modifications to ended/inactive deployments. This may compromise audit integrity.",
   "inventoryDemand.blockCoreEditsAfterTerminal":
@@ -144,8 +155,11 @@ const DESTRUCTIVE_CONSEQUENCES: Record<string, string> = {
 
 const MODULE_LABELS: Record<string, string> = {
   deployments: "Deployments",
+  branches: "Branches",
   inventoryDemand: "Inventory Demand",
+  invoicing: "Invoicing",
   deductions: "Deductions Policy",
+  imports: "Imports",
 }
 
 function moduleOf(ruleKey: string): string {
@@ -153,7 +167,9 @@ function moduleOf(ruleKey: string): string {
 }
 
 function humanizeDescription(ruleKey: string): string {
-  return RULE_DESCRIPTIONS[ruleKey] || "Workflow validation rule."
+  // RULE_DESCRIPTIONS is now exhaustively typed by WorkflowRuleKey; widen the lookup
+  // here so a runtime key (e.g. from older server payloads) can still fall back gracefully.
+  return (RULE_DESCRIPTIONS as Record<string, string>)[ruleKey] || "Workflow validation rule."
 }
 
 export default function WorkflowRulesManager() {
@@ -172,7 +188,10 @@ export default function WorkflowRulesManager() {
     setLoading(true)
     try {
       const response = await fetch("/api/workflow-rules", { cache: "no-store" })
-      const payload = (await response.json().catch(() => ({}))) as ApiPayload
+      // /api/workflow-rules now wraps success in the `ok()` envelope `{success, data: {...}}`;
+      // errors still carry `{success:false, message, code}` at top level. Unwrap either shape.
+      const raw = (await response.json().catch(() => ({}))) as { data?: ApiPayload } & ApiPayload
+      const payload = (raw.data ?? raw) as ApiPayload
       if (!response.ok) {
         throw new Error(payload?.message || "Failed to load workflow rules.")
       }
@@ -202,7 +221,10 @@ export default function WorkflowRulesManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates: { [rule.key]: nextValue } }),
       })
-      const payload = (await response.json().catch(() => ({}))) as ApiPayload
+      // /api/workflow-rules now wraps success in the `ok()` envelope `{success, data: {...}}`;
+      // errors still carry `{success:false, message, code}` at top level. Unwrap either shape.
+      const raw = (await response.json().catch(() => ({}))) as { data?: ApiPayload } & ApiPayload
+      const payload = (raw.data ?? raw) as ApiPayload
       if (!response.ok) {
         throw new Error(payload?.message || "Failed to update workflow rule.")
       }
@@ -247,7 +269,10 @@ export default function WorkflowRulesManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates }),
       })
-      const payload = (await response.json().catch(() => ({}))) as ApiPayload
+      // /api/workflow-rules now wraps success in the `ok()` envelope `{success, data: {...}}`;
+      // errors still carry `{success:false, message, code}` at top level. Unwrap either shape.
+      const raw = (await response.json().catch(() => ({}))) as { data?: ApiPayload } & ApiPayload
+      const payload = (raw.data ?? raw) as ApiPayload
       if (!response.ok) {
         throw new Error(payload?.message || "Failed to reset workflow rules.")
       }
@@ -269,7 +294,10 @@ export default function WorkflowRulesManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ presetId: selectedPresetId }),
       })
-      const payload = (await response.json().catch(() => ({}))) as ApiPayload
+      // /api/workflow-rules now wraps success in the `ok()` envelope `{success, data: {...}}`;
+      // errors still carry `{success:false, message, code}` at top level. Unwrap either shape.
+      const raw = (await response.json().catch(() => ({}))) as { data?: ApiPayload } & ApiPayload
+      const payload = (raw.data ?? raw) as ApiPayload
       if (!response.ok) {
         throw new Error(payload?.message || "Failed to apply workflow preset.")
       }

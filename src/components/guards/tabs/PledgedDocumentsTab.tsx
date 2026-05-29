@@ -163,9 +163,14 @@ export default function PledgedDocumentsTab({ guardId, canCreate = false, canUpd
     setAddFileData(null)
     setAddError("")
     setDocTypesLoading(true)
+    // /api/guard-pledgeable-documents GET now wraps success as `ok(rows)`.
+    // Accept either envelope (`raw.data`) or legacy bare array.
     fetch("/api/guard-pledgeable-documents")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setDocTypes)
+      .then((r) => r.ok ? r.json() : null)
+      .then((raw) => {
+        const next = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : []
+        setDocTypes(next)
+      })
       .finally(() => setDocTypesLoading(false))
   }
 

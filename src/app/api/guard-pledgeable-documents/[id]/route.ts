@@ -1,9 +1,19 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, conflict, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  internalServerError,
+  notFound,
+  ok,
+  serviceUnavailable,
+  unauthorized,
+} from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 
 export async function PATCH(
   request: NextRequest,
@@ -12,6 +22,7 @@ export async function PATCH(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasAction(session, "SETTINGS", "UPDATE")) return forbidden()
     const { id } = await context.params
     const body = await request.json()
     const data: { name?: string; description?: string | null } = {}
@@ -26,13 +37,13 @@ export async function PATCH(
     }
     if (Object.keys(data).length === 0) return badRequest("No fields provided.")
 
-    if (isRuntimeMockEnabled()) return NextResponse.json({ id, ...data })
+    if (isRuntimeMockEnabled()) return ok({ id, ...data })
 
     const updated = await prisma.guardPledgeableDocument.update({
       where: { id },
       data,
     })
-    return NextResponse.json(updated)
+    return ok(updated)
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
     if (String((error as { code?: string }).code) === "P2025") return notFound("Document type not found.")
@@ -49,14 +60,15 @@ export async function DELETE(
   try {
     const session = await auth()
     if (!session) return unauthorized()
+    if (!hasAction(session, "SETTINGS", "DELETE")) return forbidden()
     const { id } = await context.params
 
-    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true, id })
+    if (isRuntimeMockEnabled()) return ok({ id })
 
     await prisma.guardPledgeableDocument.delete({
       where: { id },
     })
-    return NextResponse.json({ success: true })
+    return ok({ id })
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) return serviceUnavailable("Schema not migrated for guard pledgeable documents yet.")
     if (String((error as { code?: string }).code) === "P2025") return notFound("Document type not found.")

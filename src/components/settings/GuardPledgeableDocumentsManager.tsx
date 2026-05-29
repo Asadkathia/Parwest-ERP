@@ -30,9 +30,12 @@ export default function GuardPledgeableDocumentsManager() {
     setNotice(null)
     try {
       const response = await fetch("/api/guard-pledgeable-documents", { cache: "no-store" })
-      const payload = await response.json().catch(() => [])
-      if (!response.ok) throw new Error(payload?.message || "Failed to load document types.")
-      setRows(Array.isArray(payload) ? payload : [])
+      // /api/guard-pledgeable-documents GET now wraps success as `ok(rows)` → `{success, data: [...]}`.
+      // Errors still carry `{success:false, message}` at top level. Accept either shape.
+      const raw = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(raw?.message || "Failed to load document types.")
+      const next = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : []
+      setRows(next)
     } catch (error: unknown) {
       setRows([])
       setNotice({ type: "error", message: getErrorMessage(error, "Failed to load document types.") })
