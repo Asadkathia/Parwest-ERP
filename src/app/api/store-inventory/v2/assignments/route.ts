@@ -10,6 +10,7 @@ import { badRequest, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureClientInScope, ensureGuardInScope, ensureStoreInScope, ensureUserInScope, parsePositiveInt, readScopedRegionParams, rejectCrossOffice, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { isWeaponCategoryName, normalizeCategoryScope } from "@/lib/inventory/store-v2-validators"
+import { applyStockMovement, availableQty } from "@/lib/inventory/stock-movement"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const assignmentInclude: any = {
@@ -291,28 +292,17 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        const onHand = balance?.quantityOnHand ?? 0
-        if (onHand < line.quantity) {
+        // Availability excludes held + already-issued stock — held inventory is
+        // reserved and must not be assignable.
+        if (availableQty(balance) < line.quantity) {
           throw new Error(`INSUFFICIENT_STOCK:${line.productId}`)
         }
 
-        await tx.storeInventoryBalance.upsert({
-          where: {
-            storeId_productId: {
-              storeId,
-              productId: line.productId,
-            },
-          },
-          create: {
-            storeId,
-            productId: line.productId,
-            quantityOnHand: 0,
-            quantityIssued: line.quantity,
-          },
-          update: {
-            quantityOnHand: { decrement: line.quantity },
-            quantityIssued: { increment: line.quantity },
-          },
+        await applyStockMovement(tx, {
+          storeId,
+          productId: line.productId,
+          onHandDelta: -line.quantity,
+          issuedDelta: line.quantity,
         })
 
         const assignmentData = {

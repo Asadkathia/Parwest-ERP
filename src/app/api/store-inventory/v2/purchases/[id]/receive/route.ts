@@ -5,6 +5,7 @@ import { badRequest, internalServerError, notFound, ok } from "@/lib/api/respons
 import { prisma } from "@/lib/db"
 import { emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parsePurchaseNotes, serializePurchaseNotes } from "@/lib/inventory/purchase-workflow-meta"
+import { applyStockMovement } from "@/lib/inventory/stock-movement"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -87,23 +88,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         const acceptedQty = line.receivedNewQty + line.reusableQty
         if (acceptedQty <= 0) continue
 
-        await tx.storeInventoryBalance.upsert({
-          where: {
-            storeId_productId: {
-              storeId: purchase.storeId,
-              productId: purchaseLine.productId,
-            },
-          },
-          create: {
-            storeId: purchase.storeId,
-            productId: purchaseLine.productId,
-            quantityOnHand: acceptedQty,
-            quantityHeld: line.reusableQty,
-          },
-          update: {
-            quantityOnHand: { increment: acceptedQty },
-            quantityHeld: { increment: line.reusableQty },
-          },
+        await applyStockMovement(tx, {
+          storeId: purchase.storeId,
+          productId: purchaseLine.productId,
+          onHandDelta: acceptedQty,
+          heldDelta: line.reusableQty,
+          unitCost: purchaseLine.unitCost,
+          qtyForAvg: acceptedQty,
         })
 
         await tx.storeInventoryMovement.create({

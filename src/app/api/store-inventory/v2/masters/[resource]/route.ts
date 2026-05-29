@@ -97,33 +97,11 @@ export async function GET(request: NextRequest) {
       if (storeWhere) where = storeWhere as Record<string, unknown>
     }
 
-    let rows: unknown
-    try {
-      rows = await config.delegate.findMany({
-        ...(where ? { where } : {}),
-        include: config.include,
-        orderBy: config.orderBy,
-      })
-    } catch (error) {
-      const code = getPrismaCode(error)
-      const message = error instanceof Error ? error.message : ""
-      if (resource === "categories" && (code === "P2021" || code === "P2022")) {
-        rows = await prisma.inventoryCategory.findMany({
-          orderBy: { name: "asc" },
-        })
-      } else if (resource === "statuses" && (code === "P2021" || code === "P2022")) {
-        rows = await prisma.storeInventoryStatus.findMany({
-          select: { id: true, name: true, createdAt: true, updatedAt: true },
-          orderBy: { name: "asc" },
-        })
-      } else if (message.includes("Unknown field")) {
-        rows = await config.delegate.findMany({
-          orderBy: config.orderBy,
-        })
-      } else {
-        throw error
-      }
-    }
+    const rows = await config.delegate.findMany({
+      ...(where ? { where } : {}),
+      include: config.include,
+      orderBy: config.orderBy,
+    })
 
     return ok(rows)
   } catch (error) {

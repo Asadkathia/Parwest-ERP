@@ -5,6 +5,7 @@ import { badRequest, internalServerError, notFound, ok } from "@/lib/api/respons
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
+import { applyStockMovement, availableQty } from "@/lib/inventory/stock-movement"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -133,21 +134,15 @@ export async function POST(request: NextRequest, { params }: Params) {
               },
             })
 
-            const onHand = balance?.quantityOnHand ?? 0
-            if (onHand < line.quantity) {
+            // Held/issued stock is not freely allocatable — use availability.
+            if (availableQty(balance) < line.quantity) {
               throw new Error(`INSUFFICIENT_STOCK:${line.productId}`)
             }
 
-            await tx.storeInventoryBalance.update({
-              where: {
-                storeId_productId: {
-                  storeId: responderStoreId,
-                  productId: line.productId,
-                },
-              },
-              data: {
-                quantityOnHand: { decrement: line.quantity },
-              },
+            await applyStockMovement(tx, {
+              storeId: responderStoreId,
+              productId: line.productId,
+              onHandDelta: -line.quantity,
             })
 
             await tx.storeInventoryMovement.create({

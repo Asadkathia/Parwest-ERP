@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { Prisma, StoreInventoryMovementType, StoreInventoryPurchaseStatus } from "@prisma/client"
+import { Prisma, StoreInventoryPurchaseStatus } from "@prisma/client"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
@@ -51,11 +51,18 @@ type PurchaseLineInput = {
   notes: string | null
 }
 
-function normalizeStatus(raw: unknown): StoreInventoryPurchaseStatus {
+/**
+ * Purchases may only be CREATED in a non-stock state (DRAFT/CANCELLED). All
+ * stock entry flows through `purchases/[id]/receive` — the single path that
+ * records receive history and increments balances. Creating a purchase already
+ * in RECEIVED is rejected to eliminate the double-count (a RECEIVED-on-create
+ * purchase has no receive history, so a later receive would re-add stock).
+ */
+function normalizeStatus(raw: unknown): StoreInventoryPurchaseStatus | "RECEIVED_REJECTED" {
   const value = String(raw ?? "DRAFT").trim().toUpperCase()
-  if (value === "DRAFT") return StoreInventoryPurchaseStatus.DRAFT
   if (value === "CANCELLED") return StoreInventoryPurchaseStatus.CANCELLED
-  return StoreInventoryPurchaseStatus.RECEIVED
+  if (value === "RECEIVED") return "RECEIVED_REJECTED"
+  return StoreInventoryPurchaseStatus.DRAFT
 }
 
 function normalizeLines(input: unknown): PurchaseLineInput[] | null {
@@ -199,6 +206,12 @@ export async function POST(request: NextRequest) {
     const status = normalizeStatus(body.status)
     const categoryScope = normalizeCategoryScope(body.categoryScope)
 
+    if (status === "RECEIVED_REJECTED") {
+      return badRequest(
+        "Purchases cannot be created in RECEIVED state. Create the purchase, then receive stock via the receive flow.",
+      )
+    }
+
     const note = asText(body.note ?? body.notes)
     const poMeta = {
       approvalReference: asText(body.approvalReference),
@@ -245,14 +258,14 @@ export async function POST(request: NextRequest) {
         vendorId: asText(body.vendorId),
         status,
         purchasedAt: body.purchasedAt ? new Date(String(body.purchasedAt)) : undefined,
-        receivedAt: status === StoreInventoryPurchaseStatus.RECEIVED ? new Date() : null,
+        receivedAt: null,
         notes: serializePurchaseNotes({
           note,
           purchaseOrder: poMeta,
           workflow: {
             history: [
               {
-                status: status === StoreInventoryPurchaseStatus.RECEIVED ? "RECEIVED" : "PENDING",
+                status: "PENDING",
                 changedByUserId: session.userId,
                 changedByName: null,
                 changedAt: new Date().toISOString(),
@@ -299,61 +312,9 @@ export async function POST(request: NextRequest) {
         })) as unknown as CreatedPurchase
       }
 
-      if (status === StoreInventoryPurchaseStatus.RECEIVED) {
-        for (const line of createdPurchase.lines) {
-          const delta = line.quantity
-
-          const currentBalance = await tx.storeInventoryBalance.findUnique({
-            where: {
-              storeId_productId: {
-                storeId,
-                productId: line.productId,
-              },
-            },
-          })
-
-          const nextOnHand = (currentBalance?.quantityOnHand ?? 0) + delta
-          const nextAvg =
-            line.unitCost == null
-              ? currentBalance?.avgUnitCost ?? null
-              : currentBalance?.avgUnitCost == null
-                ? line.unitCost
-                : Number((((currentBalance.avgUnitCost + line.unitCost) / 2).toFixed(2)))
-
-          await tx.storeInventoryBalance.upsert({
-            where: {
-              storeId_productId: {
-                storeId,
-                productId: line.productId,
-              },
-            },
-            create: {
-              storeId,
-              productId: line.productId,
-              quantityOnHand: nextOnHand,
-              avgUnitCost: nextAvg,
-            },
-            update: {
-              quantityOnHand: nextOnHand,
-              avgUnitCost: nextAvg,
-            },
-          })
-
-          await tx.storeInventoryMovement.create({
-            data: {
-              movementType: StoreInventoryMovementType.PURCHASE,
-              quantity: delta,
-              storeId,
-              productId: line.productId,
-              performedById: session.userId,
-              referenceType: "PURCHASE",
-              referenceId: createdPurchase.id,
-              notes: `Purchase inflow: ${createdPurchase.referenceNo ?? createdPurchase.id}`,
-            },
-          })
-        }
-      }
-
+      // Stock is NEVER incremented on purchase create. All stock entry flows
+      // through purchases/[id]/receive (the single receive-history + stock-write
+      // path), which eliminates the create-vs-receive double-count.
       return createdPurchase
     }, {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

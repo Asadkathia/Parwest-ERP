@@ -4,6 +4,9 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureStoreInScope, parsePositiveInt, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { isWeaponCategoryName } from "@/lib/inventory/store-v2-validators"
+import { isInitialDemandStatus, normalizeDemandStatus } from "@/lib/inventory/demand-status-machine"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 const demandInclude = {
   fromStore: true,
@@ -30,11 +33,6 @@ type DemandLineInput = {
   notes: string | null
 }
 
-function isWeaponCategoryName(value: string | null | undefined): boolean {
-  const text = String(value ?? "").trim().toLowerCase()
-  return text.includes("weapon") || text.includes("ammo")
-}
-
 function normalizeLines(input: unknown): DemandLineInput[] | null {
   if (!Array.isArray(input) || input.length === 0) return null
   const lines: DemandLineInput[] = []
@@ -56,17 +54,6 @@ function normalizeLines(input: unknown): DemandLineInput[] | null {
   return lines
 }
 
-function normalizeDemandStatus(raw: unknown): StoreInventoryDemandStatus {
-  const value = String(raw ?? "SENT").trim().toUpperCase()
-  if (value === "DRAFT") return StoreInventoryDemandStatus.DRAFT
-  if (value === "APPROVED") return StoreInventoryDemandStatus.APPROVED
-  if (value === "REJECTED") return StoreInventoryDemandStatus.REJECTED
-  if (value === "PARTIALLY_FULFILLED") return StoreInventoryDemandStatus.PARTIALLY_FULFILLED
-  if (value === "FULFILLED") return StoreInventoryDemandStatus.FULFILLED
-  if (value === "CANCELLED") return StoreInventoryDemandStatus.CANCELLED
-  return StoreInventoryDemandStatus.SENT
-}
-
 function normalizeStoreKind(raw: unknown): "STORE" | "WAREHOUSE" | "UNKNOWN" {
   const value = String(raw ?? "").trim().toUpperCase()
   if (value === "STORE") return "STORE"
@@ -84,7 +71,11 @@ export async function GET(request: NextRequest) {
   if (scopeParams instanceof Response) return scopeParams
 
   const { searchParams } = new URL(request.url)
-  const status = searchParams.get("status")?.trim() || undefined
+  const rawStatus = searchParams.get("status")?.trim()
+  const status = rawStatus ? normalizeDemandStatus(rawStatus) : null
+  if (rawStatus && !status) {
+    return badRequest("Invalid demand status filter.")
+  }
   const fromStoreId = searchParams.get("fromStoreId")?.trim() || undefined
   const toStoreId = searchParams.get("toStoreId")?.trim() || undefined
 
@@ -93,7 +84,7 @@ export async function GET(request: NextRequest) {
   try {
     const rows = await prisma.storeInventoryDemand.findMany({
       where: {
-        status: status ? (status as StoreInventoryDemandStatus) : undefined,
+        status: status ?? undefined,
         fromStoreId,
         toStoreId,
         ...(storeOfficeFilter
@@ -127,7 +118,25 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>
     const lines = normalizeLines(body.lines)
-    const status = normalizeDemandStatus(body.status)
+    // Workflow rule `inventoryDemand.requirePendingInitialStatus`:
+    //   ENABLED  → restrict create to an initial state (DRAFT or SENT, per
+    //              INITIAL_DEMAND_STATUSES). Any later state must be reached
+    //              through the PATCH transition gate, never set directly on
+    //              create. This is the documented "pending" meaning.
+    //   DISABLED → allow any normalized status on create (still reject
+    //              unrecognized values).
+    // Default status when none supplied remains SENT for backward compat.
+    const status =
+      body.status == null ? StoreInventoryDemandStatus.SENT : normalizeDemandStatus(body.status)
+    if (status == null) {
+      return badRequest("Invalid demand status.")
+    }
+    if (
+      isWorkflowRuleEnabled("inventoryDemand.requirePendingInitialStatus") &&
+      !isInitialDemandStatus(status)
+    ) {
+      return badRequest("New demands may only be created as DRAFT or SENT.")
+    }
     const fromStoreId = asText(body.fromStoreId)
     const toStoreId = asText(body.toStoreId)
 

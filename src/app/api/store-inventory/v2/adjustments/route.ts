@@ -4,6 +4,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, buildStoreScopeWhere, emitInventoryV2Audit, ensureStoreInScope, parseNumberOrNull, parsePositiveInt, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { applyStockMovement } from "@/lib/inventory/stock-movement"
 
 const adjustmentInclude = {
   store: true,
@@ -230,23 +231,16 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        await tx.storeInventoryBalance.upsert({
-          where: {
-            storeId_productId: {
-              storeId,
-              productId: line.productId,
-            },
-          },
-          create: {
-            storeId,
-            productId: line.productId,
-            quantityOnHand: after,
-            avgUnitCost: line.unitCost,
-          },
-          update: {
-            quantityOnHand: after,
-            avgUnitCost: line.unitCost ?? current?.avgUnitCost ?? null,
-          },
+        // Apply the computed delta atomically (never an absolute set) so a
+        // concurrent receive/assignment increment within the same window cannot
+        // be clobbered. Avg-cost is weighted only on positive (inflow) deltas.
+        await applyStockMovement(tx, {
+          storeId,
+          productId: line.productId,
+          onHandDelta: delta,
+          ...(delta > 0 && line.unitCost != null
+            ? { unitCost: line.unitCost, qtyForAvg: delta }
+            : {}),
         })
 
         await tx.storeInventoryMovement.create({

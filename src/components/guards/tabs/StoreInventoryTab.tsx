@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ShoppingCart } from "lucide-react"
 import Link from "next/link"
+import { apiGet } from "@/components/store-inventory-v2/api"
 
 type StoreInventoryRow = {
   id: string
@@ -58,9 +59,8 @@ export default function StoreInventoryTab({ guardId, canCreate = false }: StoreI
     if (!guardId) return
     setLoading(true)
     setError(null)
-    fetch(`/api/guards/${encodeURIComponent(guardId)}/store-inventory`)
-      .then((res) => res.json())
-      .then((data: StoreInventoryRow[]) => {
+    apiGet<StoreInventoryRow[]>(`/api/guards/${encodeURIComponent(guardId)}/store-inventory`)
+      .then((data) => {
         setRows(data)
         setLoading(false)
       })

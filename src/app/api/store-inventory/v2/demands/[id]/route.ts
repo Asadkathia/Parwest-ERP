@@ -4,6 +4,33 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, ensureStoreInScope, parseNonNegativeInt, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { canTransitionDemand, normalizeDemandStatus } from "@/lib/inventory/demand-status-machine"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
+
+/**
+ * Terminal demand statuses — once a demand reaches one of these, its core
+ * fields (lines/quantities, reason) are frozen when
+ * `inventoryDemand.blockCoreEditsAfterTerminal` is enabled.
+ */
+const TERMINAL_DEMAND_STATUSES = new Set<StoreInventoryDemandStatus>([
+  StoreInventoryDemandStatus.FULFILLED,
+  StoreInventoryDemandStatus.REJECTED,
+  StoreInventoryDemandStatus.CANCELLED,
+])
+
+/**
+ * Predicate: does this PATCH body attempt to mutate any "core" demand field?
+ *
+ * Core = fields that change what was requested or how much
+ * (`lines` for qty/items and `reason` for the originating justification).
+ * Non-core (metadata) = `notes`, `status`. Status transitions are governed by
+ * the transition-map rule, not by the terminal-edit-block rule.
+ */
+function patchTouchesCoreFields(body: Record<string, unknown>): boolean {
+  if (Array.isArray(body.lines) && body.lines.length > 0) return true
+  if (body.reason !== undefined) return true
+  return false
+}
 
 const demandInclude = {
   fromStore: true,
@@ -24,29 +51,7 @@ const demandInclude = {
   },
 }
 
-const allowedTransitions: Record<StoreInventoryDemandStatus, StoreInventoryDemandStatus[]> = {
-  DRAFT: ["SENT", "CANCELLED"],
-  SENT: ["APPROVED", "REJECTED", "CANCELLED"],
-  APPROVED: ["PARTIALLY_FULFILLED", "FULFILLED", "CANCELLED"],
-  REJECTED: [],
-  PARTIALLY_FULFILLED: ["FULFILLED", "CANCELLED"],
-  FULFILLED: [],
-  CANCELLED: [],
-}
-
 type Params = { params: Promise<{ id: string }> }
-
-function normalizeStatus(raw: unknown): StoreInventoryDemandStatus | null {
-  const value = String(raw ?? "").trim().toUpperCase()
-  if (value === "DRAFT") return StoreInventoryDemandStatus.DRAFT
-  if (value === "SENT") return StoreInventoryDemandStatus.SENT
-  if (value === "APPROVED") return StoreInventoryDemandStatus.APPROVED
-  if (value === "REJECTED") return StoreInventoryDemandStatus.REJECTED
-  if (value === "PARTIALLY_FULFILLED") return StoreInventoryDemandStatus.PARTIALLY_FULFILLED
-  if (value === "FULFILLED") return StoreInventoryDemandStatus.FULFILLED
-  if (value === "CANCELLED") return StoreInventoryDemandStatus.CANCELLED
-  return null
-}
 
 export async function GET(_request: NextRequest, { params }: Params) {
   const session = await requireInventorySession()
@@ -105,16 +110,40 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       : null
     if (fromDenied && toDenied) return fromDenied
 
-    const nextStatus = body.status != null ? normalizeStatus(body.status) : null
+    const nextStatus = body.status != null ? normalizeDemandStatus(body.status) : null
     if (body.status != null && !nextStatus) {
       return badRequest("Invalid demand status.")
     }
 
-    if (nextStatus && nextStatus !== current.status) {
-      const allowed = allowedTransitions[current.status]
-      if (!allowed.includes(nextStatus)) {
-        return badRequest(`Invalid status transition from ${current.status} to ${nextStatus}.`)
-      }
+    // Workflow rule `inventoryDemand.enforceTransitionMap`:
+    //   ENABLED  → enforce the canonical demand transition map
+    //              (canTransitionDemand from the shared state machine).
+    //   DISABLED → allow any normalized status transition. Unknown statuses
+    //              are still rejected above by normalizeDemandStatus.
+    if (
+      nextStatus &&
+      nextStatus !== current.status &&
+      isWorkflowRuleEnabled("inventoryDemand.enforceTransitionMap") &&
+      !canTransitionDemand(current.status, nextStatus)
+    ) {
+      return badRequest(`Invalid status transition from ${current.status} to ${nextStatus}.`)
+    }
+
+    // Workflow rule `inventoryDemand.blockCoreEditsAfterTerminal`:
+    //   ENABLED  → reject core-field edits (lines/qty, reason) on demands
+    //              already in a terminal state (FULFILLED/REJECTED/CANCELLED).
+    //              Metadata-only edits (notes, status) remain allowed; status
+    //              transitions are independently governed by the transition
+    //              map above.
+    //   DISABLED → allow core-field edits on terminal demands.
+    if (
+      isWorkflowRuleEnabled("inventoryDemand.blockCoreEditsAfterTerminal") &&
+      TERMINAL_DEMAND_STATUSES.has(current.status) &&
+      patchTouchesCoreFields(body)
+    ) {
+      return badRequest(
+        `Demand is in terminal status ${current.status}; core fields (lines, reason) cannot be edited.`,
+      )
     }
 
     const updated = await prisma.$transaction(async (tx) => {

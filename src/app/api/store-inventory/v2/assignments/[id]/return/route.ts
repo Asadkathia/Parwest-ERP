@@ -4,6 +4,7 @@ import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, internalServerError, notFound, ok } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
+import { applyStockMovement } from "@/lib/inventory/stock-movement"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -59,23 +60,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       })
 
       if (nextStatus === StoreInventoryAssignmentStatus.RETURNED) {
-        await tx.storeInventoryBalance.upsert({
-          where: {
-            storeId_productId: {
-              storeId: current.storeId,
-              productId: current.productId,
-            },
-          },
-          create: {
-            storeId: current.storeId,
-            productId: current.productId,
-            quantityOnHand: current.quantity,
-            quantityIssued: 0,
-          },
-          update: {
-            quantityOnHand: { increment: current.quantity },
-            quantityIssued: { decrement: current.quantity },
-          },
+        await applyStockMovement(tx, {
+          storeId: current.storeId,
+          productId: current.productId,
+          onHandDelta: current.quantity,
+          issuedDelta: -current.quantity,
         })
 
         await tx.storeInventoryMovement.create({

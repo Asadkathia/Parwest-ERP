@@ -1,10 +1,7 @@
 import { NextRequest } from "next/server"
-import { auth } from "@/lib/auth"
-import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
-import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { buildStoreScopeWhere } from "@/lib/inventory/store-v2-api"
+import { internalServerError, ok } from "@/lib/api/response"
+import { buildStoreScopeWhere, readScopedRegionParams, requireInventorySession } from "@/lib/inventory/store-v2-api"
 
 const MAX_MATRIX_ROWS = 5000
 
@@ -18,12 +15,13 @@ function normalizeCategoryScope(value: string | null): CategoryScope {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await auth()
-    if (!session) return unauthorized()
-    if (!hasAction(session, "INVENTORY", "VIEW")) return forbidden()
+  const session = await requireInventorySession()
+  if (session instanceof Response) return session
 
-    const scope = deriveManagerScope(session)
+  const scopeParams = readScopedRegionParams(request, session.scope)
+  if (scopeParams instanceof Response) return scopeParams
+
+  try {
     const { searchParams } = new URL(request.url)
     const storeId = searchParams.get("storeId")?.trim() || undefined
     const productId = searchParams.get("productId")?.trim() || undefined
@@ -31,14 +29,12 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim() || undefined
     const includeZero = searchParams.get("includeZero") !== "false"
     const categoryScope = normalizeCategoryScope(searchParams.get("categoryScope"))
-    const regionId = searchParams.get("regionId")
-    const regionalOfficeId = searchParams.get("regionalOfficeId")
 
-    if (managerScopeDenied(scope, { regionId, regionalOfficeId })) {
-      return forbidden("Forbidden: requested scope is outside your assigned region.")
-    }
-
-    const storeOfficeFilter = buildStoreScopeWhere(scope, regionalOfficeId, regionId)
+    const storeOfficeFilter = buildStoreScopeWhere(
+      session.scope,
+      scopeParams.regionalOfficeId,
+      scopeParams.regionId,
+    )
 
     const weaponCategoryFilter = { category: { is: { name: { contains: "weapon", mode: "insensitive" as const } } } }
     const ammoCategoryFilter = { category: { is: { name: { contains: "ammo", mode: "insensitive" as const } } } }

@@ -5,6 +5,8 @@ import { badRequest, internalServerError, notFound, ok } from "@/lib/api/respons
 import { prisma } from "@/lib/db"
 import { asText, parseNonNegativeInt, emitInventoryV2Audit, ensureStoreInScope, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
 import { parseDemandResponseMeta, serializeDemandResponseMeta } from "@/lib/inventory/demand-response-meta"
+import { applyStockMovement, availableQty } from "@/lib/inventory/stock-movement"
+import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 
 type Params = { params: Promise<{ id: string; responseId: string }> }
 
@@ -112,28 +114,43 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           }
         }
 
+        // Workflow rule `inventoryDemand.requireSufficientStockForFulfillment`:
+        //   ENABLED  → Defense-in-depth check at the fulfillment trigger:
+        //              verify the responder warehouse (where the allocation
+        //              was debited) still has non-negative available stock
+        //              for every product being received. This guards against
+        //              out-of-band balance drift between allocation and
+        //              receive (e.g. external corrections, double-allocation).
+        //              Balance writes still go through applyStockMovement
+        //              below — this is gating only.
+        //   DISABLED → skip the check and trust the allocation-time gate.
+        if (isWorkflowRuleEnabled("inventoryDemand.requireSufficientStockForFulfillment")) {
+          const productIds = Array.from(new Set(lines.map((line) => line.productId)))
+          for (const productId of productIds) {
+            const responderBalance = await tx.storeInventoryBalance.findUnique({
+              where: {
+                storeId_productId: {
+                  storeId: response.responderStoreId,
+                  productId,
+                },
+              },
+              select: { quantityOnHand: true, quantityHeld: true, quantityIssued: true },
+            })
+            if (availableQty(responderBalance) < 0) {
+              throw new Error(`INSUFFICIENT_FULFILLMENT_STOCK:${productId}`)
+            }
+          }
+        }
+
         for (const line of lines) {
           const receivedTotal = line.receivedNewQty + line.receivedReusableQty
           if (receivedTotal <= 0) continue
 
-          await tx.storeInventoryBalance.upsert({
-            where: {
-              storeId_productId: {
-                storeId: demand.fromStoreId,
-                productId: line.productId,
-              },
-            },
-            create: {
-              storeId: demand.fromStoreId,
-              productId: line.productId,
-              quantityOnHand: receivedTotal,
-              quantityHeld: line.receivedReusableQty,
-              quantityIssued: 0,
-            },
-            update: {
-              quantityOnHand: { increment: receivedTotal },
-              quantityHeld: { increment: line.receivedReusableQty },
-            },
+          await applyStockMovement(tx, {
+            storeId: demand.fromStoreId,
+            productId: line.productId,
+            onHandDelta: receivedTotal,
+            heldDelta: line.receivedReusableQty,
           })
 
           await tx.storeInventoryMovement.create({
@@ -250,6 +267,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
       if (error.message.startsWith("RECEIVED_EXCEEDS_ALLOCATED:")) {
         return badRequest("Received quantity cannot exceed allocated quantity.")
+      }
+      if (error.message.startsWith("INSUFFICIENT_FULFILLMENT_STOCK:")) {
+        return badRequest(
+          "Responder warehouse has insufficient stock to cover the fulfillment quantity.",
+        )
       }
     }
 

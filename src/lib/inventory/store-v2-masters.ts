@@ -1,6 +1,4 @@
 import { prisma } from "@/lib/db"
-const prismaAny = prisma as unknown as Record<string, unknown>
-const hasStoreInventoryCategoryModel = Boolean(prismaAny.storeInventoryCategory)
 
 export type StoreV2MasterResource =
   | "stores"
@@ -131,23 +129,17 @@ const masters: Record<StoreV2MasterResource, MasterResourceConfig> = {
     },
   },
   categories: {
-    delegate: (hasStoreInventoryCategoryModel
-      ? prismaAny.storeInventoryCategory
-      : prismaAny.inventoryCategory) as MasterResourceConfig["delegate"],
+    delegate: prisma.storeInventoryCategory as unknown as MasterResourceConfig["delegate"],
     orderBy: { name: "asc" },
-    include: hasStoreInventoryCategoryModel ? { parent: true } : undefined,
-    buildCreateData: (body) =>
-      hasStoreInventoryCategoryModel
-        ? {
-            name: String(body.name ?? "").trim(),
-            parentId: body.parentId ? String(body.parentId).trim() : null,
-            canAssignGuard: body.canAssignGuard === true,
-            canAssignEmployee: body.canAssignEmployee === true,
-            canAssignClient: body.canAssignClient === true,
-          }
-        : baseNameCreate(body),
+    include: { parent: true },
+    buildCreateData: (body) => ({
+      name: String(body.name ?? "").trim(),
+      parentId: body.parentId ? String(body.parentId).trim() : null,
+      canAssignGuard: body.canAssignGuard === true,
+      canAssignEmployee: body.canAssignEmployee === true,
+      canAssignClient: body.canAssignClient === true,
+    }),
     buildUpdateData: (body) => {
-      if (!hasStoreInventoryCategoryModel) return baseNameUpdate(body)
       const next: Record<string, unknown> = {}
       if (body.name != null) next.name = String(body.name).trim()
       if (body.parentId != null) next.parentId = body.parentId ? String(body.parentId).trim() : null
@@ -180,16 +172,12 @@ const masters: Record<StoreV2MasterResource, MasterResourceConfig> = {
   statuses: {
     delegate: prisma.storeInventoryStatus as unknown as MasterResourceConfig["delegate"],
     orderBy: { name: "asc" },
-    include: hasStoreInventoryCategoryModel ? { category: true } : undefined,
-    buildCreateData: (body) =>
-      hasStoreInventoryCategoryModel
-        ? {
-            name: String(body.name ?? "").trim(),
-            categoryId: body.categoryId ? String(body.categoryId).trim() : null,
-          }
-        : baseNameCreate(body),
+    include: { category: true },
+    buildCreateData: (body) => ({
+      name: String(body.name ?? "").trim(),
+      categoryId: body.categoryId ? String(body.categoryId).trim() : null,
+    }),
     buildUpdateData: (body) => {
-      if (!hasStoreInventoryCategoryModel) return baseNameUpdate(body)
       const next: Record<string, unknown> = {}
       if (body.name != null) next.name = String(body.name).trim()
       if (body.categoryId != null) next.categoryId = body.categoryId ? String(body.categoryId).trim() : null

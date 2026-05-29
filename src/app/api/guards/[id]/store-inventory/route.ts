@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { forbidden, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
 type Params = { params: Promise<{ id: string }> }
@@ -48,9 +47,9 @@ export async function GET(_req: Request, { params }: Params) {
       status: a.status,
     }))
 
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     console.error(`[GET /api/guards/${id}/store-inventory] failed:`, error)
-    return NextResponse.json([], { status: 200 })
+    return internalServerError("Failed to load store inventory records.")
   }
 }
