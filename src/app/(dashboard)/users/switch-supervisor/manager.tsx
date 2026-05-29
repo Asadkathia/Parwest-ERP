@@ -115,7 +115,9 @@ export default function SwitchSupervisorManager() {
       const response = await fetch(`/api/users/switch-supervisor?${params.toString()}`, { cache: "no-store" })
       const payload = await response.json().catch(() => [])
       if (!response.ok) throw new Error(payload?.message || "Failed to preview switch.")
-      setImpacted(Array.isArray(payload) ? payload : [])
+      // GET now wraps as `ok(rows)` → `{success, data:[...]}`. Accept either envelope or legacy raw.
+      const impactedRows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []
+      setImpacted(impactedRows)
       setResult("previewed")
     } catch (previewError) {
       setError(previewError instanceof Error ? previewError.message : "Failed to preview switch.")
@@ -138,7 +140,9 @@ export default function SwitchSupervisorManager() {
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.message || "Failed to apply switch.")
-      setNotice(`Supervisor switched for ${payload.switchedCount ?? 0} guards.`)
+      // POST now wraps the result as `ok({switchedCount, ...})`. Unwrap; fall back to raw for safety.
+      const result = (payload?.data ?? payload) as { switchedCount?: number }
+      setNotice(`Supervisor switched for ${result.switchedCount ?? 0} guards.`)
       setResult("switched")
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to apply switch.")

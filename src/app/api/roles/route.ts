@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { badRequest, conflict, internalServerError, unauthorized } from "@/lib/api/response"
+import { badRequest, conflict, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
+import { hasAction } from "@/lib/api/permissions"
 
 const MOCK_ROLES = [
   { id: "mock-role-admin", name: "Admin", description: "System administrator", scopeType: "REGIONAL" },
@@ -22,8 +23,10 @@ export async function GET() {
     if (!session) {
       return unauthorized()
     }
+    if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
 
     if (isRuntimeMockEnabled()) {
+      // TODO(consumer-unwrap): roles list is consumed by RolesManager / UserTypesManager / role pickers as raw array.
       return NextResponse.json(MOCK_ROLES)
     }
 
@@ -31,6 +34,7 @@ export async function GET() {
       orderBy: { name: "asc" },
     })
 
+    // TODO(consumer-unwrap): roles list is consumed by RolesManager / UserTypesManager / role pickers as raw array.
     return NextResponse.json(roles)
   } catch (error) {
     console.error("Error fetching roles:", error)
@@ -44,6 +48,7 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return unauthorized()
     }
+    if (!hasAction(session, "USERS", "CREATE")) return forbidden("Access denied.")
 
     const body = await request.json()
     const name = String(body?.name || "").trim()
@@ -55,9 +60,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
+      return ok(
         { id: `mock-role-${Date.now()}`, name, description, scopeType, createdAt: new Date().toISOString() },
-        { status: 201 }
+        201
       )
     }
 
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
       data: { name, description, scopeType },
     })
 
-    return NextResponse.json(role, { status: 201 })
+    return ok(role, 201)
   } catch (error: unknown) {
     if (String((error as { code?: string }).code) === "P2002") {
       return conflict("Role name already exists.")

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 
 type PermissionPayload = {
     module?: unknown
@@ -16,6 +17,9 @@ export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session) return unauthorized()
+        // 🔒 Read-gate: previously open, exposing the full permission matrix
+        // for any role to any logged-in user.
+        if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
 
         const { searchParams } = new URL(request.url)
         const roleId = searchParams.get("roleId")
@@ -27,6 +31,7 @@ export async function GET(request: NextRequest) {
             orderBy: { module: "asc" },
         })
 
+        // TODO(consumer-unwrap): RolePermissionsManager reads raw array; switch to ok(rows) once consumers unwrap.
         return NextResponse.json(rows)
     } catch (error) {
         console.error("Error fetching role permissions:", error)
@@ -39,10 +44,11 @@ export async function PUT(request: NextRequest) {
         const session = await auth()
         if (!session) return unauthorized()
 
-        // Only admins can configure role permissions
-        const userRole = (session.user as { role?: string })?.role ?? ""
-        if (userRole.toLowerCase() !== "admin") {
-            return forbidden("Only admins can configure role permissions.")
+        // 🔒 Only SuperAdmin can configure role permissions. The previous
+        // case-insensitive "admin" check let any regional Admin rewrite the
+        // permission matrix for any role (including their own).
+        if (!isSuperAdmin(session)) {
+            return forbidden("Only SuperAdmin can configure role permissions.")
         }
 
         const body = await request.json()
@@ -83,6 +89,7 @@ export async function PUT(request: NextRequest) {
             orderBy: { module: "asc" },
         })
 
+        // TODO(consumer-unwrap): RolePermissionsManager reads raw array on PUT response; switch to ok(rows) once consumers unwrap.
         return NextResponse.json(rows)
     } catch (error) {
         console.error("Error saving role permissions:", error)

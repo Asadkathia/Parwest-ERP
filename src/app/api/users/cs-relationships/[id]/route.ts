@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { forbidden, internalServerError, notFound, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
@@ -19,7 +19,7 @@ export async function DELETE(
     const { id } = (await context.params) as { id: string }
     const managerScope = deriveManagerScope(session)
 
-    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true })
+    if (isRuntimeMockEnabled()) return ok({ deleted: true })
 
     const actorId = session.user?.id || null
     const existing = await prisma.clientSupervisorAssignment.findUnique({
@@ -53,7 +53,7 @@ export async function DELETE(
       description: `Removed client/supervisor relationship ${id} (client ${existing.clientId}, supervisor ${existing.supervisorId}${existing.branchId ? `, branch ${existing.branchId}` : ""})`,
     })
 
-    return NextResponse.json({ success: true })
+    return ok({ deleted: true })
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "REL_NOT_FOUND") return notFound("Relationship not found.")
     if (error instanceof Error && error.message === "SCOPE_FORBIDDEN") return forbidden("Forbidden: relationship is outside your scope.")

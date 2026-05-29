@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 const MOCK_ROWS = [
   {
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
         if (supervisorId && row.supervisor.id !== supervisorId) return false
         return true
       })
-      return NextResponse.json(rows)
+      return ok(rows)
     }
 
     if (managerScope && clientId) {
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 300,
     })
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for client/supervisor assignments yet.")
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
+      return ok(
         {
           id: `mock-cs-${Date.now()}`,
           client: { id: clientId, name: "Client" },
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
           status: "ACTIVE",
           notes,
         },
-        { status: 201 }
+        201
       )
     }
 
@@ -145,33 +146,54 @@ export async function POST(request: NextRequest) {
     }
 
     const actorId = session.user?.id || null
-    const created = await prisma.clientSupervisorAssignment.create({
-      data: {
-        clientId,
-        branchId,
-        supervisorId,
-        effectiveDate,
-        notes,
-        status: "ACTIVE",
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-        branch: { select: { id: true, name: true } },
-        supervisor: { select: { id: true, name: true } },
-      },
+
+    // Route through the ClientSupervisorAssignment SoT so supervisor-existence
+    // is validated and any prior ACTIVE row for the same (client, branch)
+    // scope is deactivated atomically. The SoT creates the new ACTIVE row
+    // with just (clientId, branchId, supervisorId); we then patch the
+    // optional effectiveDate/notes fields in the same transaction.
+    const created = await prisma.$transaction(async (tx) => {
+      await assignSupervisor(tx, { clientId, branchId, supervisorId })
+
+      const newActive = await tx.clientSupervisorAssignment.findFirst({
+        where: { clientId, branchId: branchId ?? null, status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
+      })
+      if (!newActive) {
+        throw new Error("Failed to locate just-created assignment row.")
+      }
+
+      if (effectiveDate || notes !== null) {
+        await tx.clientSupervisorAssignment.update({
+          where: { id: newActive.id },
+          data: { effectiveDate, notes },
+        })
+      }
+
+      return tx.clientSupervisorAssignment.findUnique({
+        where: { id: newActive.id },
+        include: {
+          client: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
+          supervisor: { select: { id: true, name: true } },
+        },
+      })
     })
 
     await safeAuditLog({
       userId: actorId,
       event: "CLIENT_SUPERVISOR_ASSIGNED",
       module: "USERS",
-      description: `Assigned supervisor ${supervisorId} to client ${clientId}${branchId ? ` branch ${branchId}` : ""} (relationship ${created.id})`,
+      description: `Assigned supervisor ${supervisorId} to client ${clientId}${branchId ? ` branch ${branchId}` : ""} (relationship ${created?.id ?? "?"})`,
     })
 
-    return NextResponse.json(created, { status: 201 })
+    return ok(created, 201)
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for client/supervisor assignments yet.")
+    }
+    if (error instanceof Error && error.message.startsWith("Supervisor user not found")) {
+      return badRequest("Supervisor user does not exist.")
     }
     if (getPrismaCode(error) === "P2003") {
       return badRequest("Invalid client/branch/supervisor reference.")

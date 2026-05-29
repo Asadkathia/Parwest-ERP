@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         if (supervisorId && row.supervisor.id !== supervisorId) return false
         return true
       })
-      return NextResponse.json(rows)
+      return ok(rows)
     }
 
     if (managerScope && managerId) {
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 300,
     })
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for manager/supervisor assignments yet.")
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
+      return ok(
         {
           id: `mock-ms-${Date.now()}`,
           manager: { id: managerId, name: "Manager" },
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
           status: "ACTIVE",
           notes,
         },
-        { status: 201 }
+        201
       )
     }
 
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       description: `Assigned supervisor ${supervisorId} to manager ${managerId} (relationship ${created.id})`,
     })
 
-    return NextResponse.json(created, { status: 201 })
+    return ok(created, 201)
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for manager/supervisor assignments yet.")

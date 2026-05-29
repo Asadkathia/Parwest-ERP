@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { assignGuardSupervisor } from "@/lib/guards/supervisorAssignment"
 
 type PreviewRow = {
   id: string
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
           status: "PENDING",
         },
       ]
-      return NextResponse.json(rows)
+      return ok(rows)
     }
 
     if (managerScope) {
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
       status: "PENDING",
     }))
 
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for supervisor switching yet.")
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ switchedCount: 2, reason, switchedBy: session.user.id })
+      return ok({ switchedCount: 2, reason, switchedBy: session.user.id })
     }
 
     if (managerScope) {
@@ -183,23 +184,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (activeAssignments.length === 0) {
-      return NextResponse.json({ switchedCount: 0, reason, switchedBy: session.user.id })
+      return ok({ switchedCount: 0, reason, switchedBy: session.user.id })
     }
 
+    // Route the bulk switch through the GuardSupervisorAssignment SoT so the
+    // canonical terminal-status flip ("ENDED" + endedAt), the supervisor-user
+    // validation, and the prior-ACTIVE dedup are all enforced exactly once.
     await prisma.$transaction(async (tx) => {
-      await tx.guardSupervisorAssignment.updateMany({
-        where: { id: { in: activeAssignments.map((item) => item.id) } },
-        data: { status: "INACTIVE", endedAt: new Date() },
-      })
-
-      await tx.guardSupervisorAssignment.createMany({
-        data: activeAssignments.map((item) => ({
-          guardId: item.guardId,
-          supervisorId: toSupervisorId,
-          status: "ACTIVE",
-          assignedAt: new Date(),
-        })),
-      })
+      for (const item of activeAssignments) {
+        await assignGuardSupervisor(tx, { guardId: item.guardId, supervisorId: toSupervisorId })
+      }
     })
 
     await safeAuditLog({
@@ -209,10 +203,13 @@ export async function POST(request: NextRequest) {
       description: `Switched ${activeAssignments.length} guards from ${fromSupervisorId} to ${toSupervisorId}${reason ? ` (${reason})` : ""}`,
     })
 
-    return NextResponse.json({ switchedCount: activeAssignments.length, reason, switchedBy: session.user.id })
+    return ok({ switchedCount: activeAssignments.length, reason, switchedBy: session.user.id })
   } catch (error: unknown) {
     if (isPrismaMissingSchemaError(error)) {
       return serviceUnavailable("Schema not migrated for supervisor switching yet.")
+    }
+    if (error instanceof Error && error.message.startsWith("Supervisor user not found")) {
+      return badRequest("Target supervisor does not exist.")
     }
     if (typeof error === "object" && error !== null && "code" in error && String((error as { code?: unknown }).code) === "P2003") {
       return badRequest("Invalid supervisor reference.")

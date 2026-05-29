@@ -164,7 +164,8 @@ export default function MsRelationshipManager() {
       }
       setRoles(Array.isArray(rolesJson) ? rolesJson : [])
       setUsers(Array.isArray(usersJson) ? usersJson : [])
-      setRows(Array.isArray(relJson) ? relJson : [])
+      // /api/users/ms-relationships GET now wraps as `ok(rows)` → `{success, data:[...]}`. Accept either envelope or legacy raw.
+      setRows(Array.isArray(relJson?.data) ? relJson.data : Array.isArray(relJson) ? relJson : [])
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load M/S data.")
       setRows([])

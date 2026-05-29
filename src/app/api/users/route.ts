@@ -6,8 +6,8 @@ import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
-import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { badRequest, conflict, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { checkPasswordStrength } from "@/lib/validation/formats"
 
@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         }
         return true
       })
+      // TODO(consumer-unwrap): callers currently read raw array; switch to ok(rows) once consumers unwrap.
       return NextResponse.json(rows)
     }
 
@@ -91,6 +92,7 @@ export async function GET(request: NextRequest) {
       take: 300,
     })
 
+    // TODO(consumer-unwrap): many callers (clients, payroll/loans, tickets, guards, settings) read raw array; switch to ok(users) once consumers unwrap.
     return NextResponse.json(users)
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -139,6 +141,10 @@ export async function POST(request: NextRequest) {
         select: { scopeType: true, name: true },
       })
       if (!role) return badRequest("Invalid roleId.")
+      // 🔒 Privilege-escalation guard: only SuperAdmin may assign a GLOBAL-scoped role.
+      if (role.scopeType === "GLOBAL" && !isSuperAdmin(session)) {
+        return forbidden("Only SuperAdmin may assign a GLOBAL-scoped role.")
+      }
       if (role.scopeType === "REGIONAL") {
         if (!regionId || !regionalOfficeId) {
           return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
@@ -151,7 +157,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
+      return ok(
         {
           id: `mock-user-${Date.now()}`,
           name,
@@ -163,7 +169,7 @@ export async function POST(request: NextRequest) {
           regionalOffice: regionalOfficeId ? { id: regionalOfficeId, name: "Office" } : null,
           createdAt: new Date().toISOString(),
         },
-        { status: 201 }
+        201
       )
     }
 
@@ -195,7 +201,7 @@ export async function POST(request: NextRequest) {
       description: `Created user ${created.id} (${created.email})`,
     })
 
-    return NextResponse.json(created, { status: 201 })
+    return ok(created, 201)
   } catch (error: unknown) {
     if (getPrismaCode(error) === "P2002") {
       return conflict("Email already exists.")

@@ -78,7 +78,8 @@ export default function CsRelationshipManager() {
       setUsers(Array.isArray(usersJson) ? usersJson : [])
       setClients(Array.isArray(clientsJson) ? clientsJson : [])
       setBranches(Array.isArray(branchesJson) ? branchesJson : [])
-      setRows(Array.isArray(relJson) ? relJson : [])
+      // /api/users/cs-relationships GET now wraps as `ok(rows)` → `{success, data:[...]}`. Accept either envelope or legacy raw array.
+      setRows(Array.isArray(relJson?.data) ? relJson.data : Array.isArray(relJson) ? relJson : [])
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load C/S data.")
       setRows([])

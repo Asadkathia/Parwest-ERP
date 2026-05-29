@@ -6,56 +6,26 @@ import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { authConfig } from "@/auth.config"
-import { permissionKey } from "@/lib/constants/permissions"
-
-/**
- * A permission row shape common to RolePermission and UserPermission.
- * We only need the per-action booleans + module name.
- */
-type ActionRow = {
-    module: string
-    canCreate?: boolean | null
-    canView?: boolean | null
-    canUpdate?: boolean | null
-    canDelete?: boolean | null
-    canRequisition?: boolean | null
-}
-
-/**
- * Collapse a merged row (role OR user override) into the set of permission
- * strings to emit. Emits BOTH the legacy module-only key AND the per-action
- * keys (e.g. `"GUARDS"`, `"GUARDS:VIEW"`, `"GUARDS:CREATE"`).
- */
-function addRowPermissions(set: Set<string>, row: ActionRow): void {
-    const moduleName = row.module
-    const any =
-        row.canCreate || row.canView || row.canUpdate || row.canDelete || row.canRequisition
-    if (!any) return
-    set.add(moduleName)
-    if (row.canCreate) set.add(permissionKey(moduleName, "CREATE"))
-    if (row.canView) set.add(permissionKey(moduleName, "VIEW"))
-    if (row.canUpdate) set.add(permissionKey(moduleName, "UPDATE"))
-    if (row.canDelete) set.add(permissionKey(moduleName, "DELETE"))
-    if (row.canRequisition) set.add(permissionKey(moduleName, "REQUISITIONS"))
-}
+import {
+    resolveEffectivePermissions,
+    type ActionRow,
+} from "@/lib/permissions/resolve"
 
 /**
  * Build the effective permission string set for a user.
- * User-level overrides replace role-level rows per [userId, module] — matching
- * the existing convention in the user-permissions UI and API.
+ *
+ * Delegates to the shared `resolveEffectivePermissions` resolver so that the
+ * ENFORCED set (this function, stamped into the JWT) and the DISPLAYED set
+ * (`api/user-permissions` GET, shown in the UI) use identical UNION logic
+ * and cannot drift again. See `src/lib/permissions/resolve.ts`.
+ *
+ * Semantic: role + user override are merged per action via OR. A user
+ * override row is ADDITIVE — it cannot strip a role-granted action. (The
+ * UserPermissionsManager UI already disables role-granted checkboxes, so
+ * saved overrides are structurally additive.)
  */
 function buildPermissionSet(userRows: ActionRow[], roleRows: ActionRow[]): string[] {
-    const userModules = new Set(userRows.map((r) => r.module))
-    const set = new Set<string>()
-    // Role rows first, but skip modules that have a user-level override.
-    for (const row of roleRows) {
-        if (userModules.has(row.module)) continue
-        addRowPermissions(set, row)
-    }
-    for (const row of userRows) {
-        addRowPermissions(set, row)
-    }
-    return Array.from(set)
+    return resolveEffectivePermissions({ roleRows, userRows })
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -102,7 +72,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 // Load effective permissions.
                 // Emits BOTH legacy module-only keys ("GUARDS") AND per-action keys
                 // ("GUARDS:VIEW", "GUARDS:CREATE", ...) for backward compatibility.
-                // User-level rows override role-level rows per [userId, module].
+                // Role + user-override rows are UNIONed per action via
+                // resolveEffectivePermissions (a user override ADDS to role grants,
+                // it does not replace them) — see src/lib/permissions/resolve.ts.
                 let permissions: string[] = []
                 try {
                     const anyEnabled = [

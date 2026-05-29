@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 
 export async function PATCH(
@@ -24,6 +24,8 @@ export async function PATCH(
     const body = await request.json()
     const data: Prisma.UserUncheckedUpdateInput = {}
     const managerScope = deriveManagerScope(session)
+    const callerIsSuperAdmin = isSuperAdmin(session)
+    const callerId = (session.user as { id?: string } | undefined)?.id
 
     if (body.name != null) data.name = String(body.name)
     if (body.status != null) data.status = String(body.status)
@@ -36,8 +38,13 @@ export async function PATCH(
       return badRequest("No valid fields provided for update.")
     }
 
+    // 🔒 Self-role-change guard: a non-SuperAdmin cannot mutate their own roleId.
+    if (data.roleId !== undefined && callerId && id === callerId && !callerIsSuperAdmin) {
+      return forbidden("Cannot change your own role.")
+    }
+
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, ...data })
+      return ok({ id, ...data })
     }
 
     // Enforce role scope ↔ region consistency when role/region is being changed.
@@ -57,6 +64,11 @@ export async function PATCH(
         select: { scopeType: true, name: true },
       })
       if (!role) return badRequest("Invalid roleId.")
+      // 🔒 Privilege-escalation guard: only SuperAdmin may (re)assign a GLOBAL-scoped role.
+      // Trigger when roleId is being changed AND the resolved target role is GLOBAL.
+      if (data.roleId !== undefined && role.scopeType === "GLOBAL" && !callerIsSuperAdmin) {
+        return forbidden("Only SuperAdmin may assign a GLOBAL-scoped role.")
+      }
       if (role.scopeType === "REGIONAL") {
         if (!targetRegionId || !targetOfficeId) {
           return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
@@ -109,7 +121,7 @@ export async function PATCH(
       description: `Updated user ${id}; fields: ${Object.keys(data).join(", ")}`,
     })
 
-    return NextResponse.json(updated)
+    return ok(updated)
   } catch (error: unknown) {
     if (getPrismaCode(error) === "P2025") {
       return notFound("User not found.")
@@ -155,7 +167,7 @@ export async function DELETE(
       description: `Deleted user ${user.id} (${user.email} — ${user.name})`,
     })
 
-    return NextResponse.json({ success: true })
+    return ok({ deleted: true })
   } catch (error) {
     console.error("DELETE /api/users/[id]:", error)
     return internalServerError("Failed to delete user.")

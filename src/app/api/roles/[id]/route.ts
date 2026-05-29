@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
+import { isSuperAdmin } from "@/lib/api/permissions"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -11,17 +12,17 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     const session = await auth()
     if (!session) return unauthorized()
 
-    // Only Admin role can delete roles
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userRole = (session.user as any)?.role as string | undefined
-    if (userRole !== "Admin") {
-      return forbidden("Only Admin users can delete roles.")
+    // 🔒 Only SuperAdmin can delete roles. The previous `role !== "Admin"` check
+    // blocked real Super Users (role = "Super User") while allowing regional
+    // Admins (role = "Admin" + permissions) to delete global roles.
+    if (!isSuperAdmin(session)) {
+      return forbidden("Only SuperAdmin can delete roles.")
     }
 
     const { id } = await params
 
     if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ success: true, message: "Role deleted (mock)." })
+      return ok({ deleted: true, message: "Role deleted (mock)." })
     }
 
     // Check the role exists
@@ -31,19 +32,12 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     // Check no users are assigned to this role
     const usersWithRole = await prisma.user.count({ where: { roleId: id } })
     if (usersWithRole > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Cannot delete: ${usersWithRole} user(s) are assigned to this role. Reassign them first.`,
-          code: "ROLE_IN_USE",
-        },
-        { status: 409 }
-      )
+      return conflict(`Cannot delete: ${usersWithRole} user(s) are assigned to this role. Reassign them first.`)
     }
 
     await prisma.role.delete({ where: { id } })
 
-    return NextResponse.json({ success: true, message: `Role "${role.name}" deleted.` })
+    return ok({ deleted: true, message: `Role "${role.name}" deleted.` })
   } catch (error) {
     console.error("Error deleting role:", error)
     return internalServerError("Failed to delete role.")
