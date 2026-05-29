@@ -9,6 +9,7 @@ import Link from "next/link"
 import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
 import { deriveBranchModel } from "@/lib/branches/model"
 import BranchDeleteButton from "@/components/clients/BranchDeleteButton"
+import BranchDeactivateDialog from "@/components/clients/BranchDeactivateDialog"
 import { CAPACITY_USAGE_RULES, countDeploymentsForRule } from "@/lib/branches/capacity"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,6 +76,9 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
                 <Edit className="h-4 w-4" />
                 Edit Branch
               </Link>
+            ) : null}
+            {canUpdate && branch.status === "ACTIVE" ? (
+              <BranchDeactivateDialog branchId={branch.id} branchName={branch.name} />
             ) : null}
             {canUpdate ? (
               <BranchDeleteButton

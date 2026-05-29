@@ -14,6 +14,7 @@ export type WorkflowRuleKey =
   | "deployments.allowExtraType"
   | "branches.requireInactiveBranchesBeforeClientInactive"
   | "branches.blockInactiveWithActiveDeployment"
+  | "branches.cascadeOnDeactivate"
   | "inventoryDemand.requirePendingInitialStatus"
   | "inventoryDemand.enforceTransitionMap"
   | "inventoryDemand.blockCoreEditsAfterTerminal"
@@ -70,6 +71,11 @@ const BASE_WORKFLOW_RULES: WorkflowRuleConfig = {
   // with `requireInactiveBranchesBeforeClientInactive` this enforces the full
   // cascade: revoke deployments → INACTIVE branch → INACTIVE client.
   "branches.blockInactiveWithActiveDeployment": true,
+  // Branch deactivation cascade: deactivating a branch ends its active
+  // deployments and flags the assigned inventory of the affected guards for
+  // return, in one transaction (with mandatory reason + effective date + audit).
+  // Disabling this still ends deployments but skips the inventory-reclaim step.
+  "branches.cascadeOnDeactivate": true,
   "inventoryDemand.requirePendingInitialStatus": true,
   "inventoryDemand.enforceTransitionMap": true,
   "inventoryDemand.blockCoreEditsAfterTerminal": true,
@@ -133,6 +139,7 @@ export const WORKFLOW_PRESETS: Record<WorkflowPresetId, WorkflowPreset> = {
       "deployments.allowExtraType": true,
       "branches.requireInactiveBranchesBeforeClientInactive": false,
       "branches.blockInactiveWithActiveDeployment": false,
+      "branches.cascadeOnDeactivate": false,
       "inventoryDemand.requirePendingInitialStatus": false,
       "inventoryDemand.enforceTransitionMap": false,
       "inventoryDemand.blockCoreEditsAfterTerminal": false,
@@ -178,6 +185,8 @@ export const ENV_OVERRIDE_KEYS: Record<WorkflowRuleKey, string> = {
     "WORKFLOW_RULE_BRANCHES_REQUIRE_INACTIVE_BRANCHES_BEFORE_CLIENT_INACTIVE",
   "branches.blockInactiveWithActiveDeployment":
     "WORKFLOW_RULE_BRANCHES_BLOCK_INACTIVE_WITH_ACTIVE_DEPLOYMENT",
+  "branches.cascadeOnDeactivate":
+    "WORKFLOW_RULE_BRANCHES_CASCADE_ON_DEACTIVATE",
   "inventoryDemand.requirePendingInitialStatus": "WORKFLOW_RULE_INVENTORY_DEMAND_REQUIRE_PENDING_INITIAL_STATUS",
   "inventoryDemand.enforceTransitionMap": "WORKFLOW_RULE_INVENTORY_DEMAND_ENFORCE_TRANSITION_MAP",
   "inventoryDemand.blockCoreEditsAfterTerminal":

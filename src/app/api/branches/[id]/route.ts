@@ -292,6 +292,9 @@ export async function PATCH(
             event: "BRANCH_UPDATED",
             module: "CLIENTS",
             description: `Updated branch ${id}`,
+            targetEntityType: "Branch",
+            targetEntityId: id,
+            targetRegionId: existing.client?.regionId ?? null,
         })
 
         return NextResponse.json(branch, { status: 200 })
@@ -349,6 +352,9 @@ export async function DELETE(
             event: "BRANCH_DELETED",
             module: "CLIENTS",
             description: `Deleted branch ${id}`,
+            targetEntityType: "Branch",
+            targetEntityId: id,
+            targetRegionId: branch.client?.regionId ?? null,
         })
 
         return ok({ message: "Branch deleted successfully" })

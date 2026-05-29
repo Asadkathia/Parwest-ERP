@@ -81,6 +81,8 @@ const RULE_DESCRIPTIONS: Record<WorkflowRuleKey, string> = {
     "A client cannot be marked INACTIVE while any of its branches are still ACTIVE — deactivate branches first.",
   "branches.blockInactiveWithActiveDeployment":
     "A branch cannot be marked INACTIVE while it still has ACTIVE deployments — revoke deployments first.",
+  "branches.cascadeOnDeactivate":
+    "Deactivating a branch ends its active deployments and flags the assigned inventory of the affected guards for return, in one transaction. Disabling still ends deployments but skips the inventory-reclaim step.",
   "inventoryDemand.requirePendingInitialStatus":
     "New inventory demands always start in PENDING status.",
   "inventoryDemand.enforceTransitionMap":

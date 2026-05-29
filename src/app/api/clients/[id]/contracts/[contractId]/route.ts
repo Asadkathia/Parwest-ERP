@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { checkClientScope } from "@/lib/clients/access"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function PATCH(
     request: NextRequest,
@@ -15,17 +16,9 @@ export async function PATCH(
         if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden("Access denied.")
         const { id: clientId, contractId } = await params
 
-        const managerScope = deriveManagerScope(session)
-        if (managerScope) {
-            const client = await prisma.client.findUnique({
-                where: { id: clientId },
-                select: { regionId: true, regionalOfficeId: true },
-            })
-            if (!client) return notFound("Client not found.")
-            if (managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
-                return forbidden("Access denied.")
-            }
-        }
+        const scope = await checkClientScope(clientId, session)
+        if (scope === "not_found") return notFound("Client not found.")
+        if (scope === "forbidden") return forbidden("Access denied.")
 
         const rawActorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
@@ -44,13 +37,63 @@ export async function PATCH(
         const name = body?.name ? String(body.name).trim() : contract.name
         if (!name) return badRequest("Contract name is required.")
 
+        // Resolve the effective window after this edit (fall back to existing
+        // values when a date isn't supplied in the payload).
+        const startDate = body?.startDate ? new Date(body.startDate) : contract.startDate
+        const endDate = body?.endDate ? new Date(body.endDate) : contract.endDate
+        if (body?.startDate && startDate && isNaN(startDate.getTime())) return badRequest("startDate is not a valid date.")
+        if (body?.endDate && endDate && isNaN(endDate.getTime())) return badRequest("endDate is not a valid date.")
+
+        // BILLING INTEGRITY: when both dates are present, the contract window
+        // must remain valid — end at least one day after start (legacy rule).
+        if (startDate && endDate) {
+            const oneDayMs = 24 * 60 * 60 * 1000
+            if (endDate.getTime() - startDate.getTime() < oneDayMs) {
+                return badRequest("Contract end date must be at least one day after the start date.")
+            }
+        }
+
+        // BILLING INTEGRITY: reject shrinking the contract window such that any
+        // existing rate's window would fall outside it. Only relevant when the
+        // window is actually changing and the contract has dated rates.
+        const datesChanging =
+            (body?.startDate !== undefined && startDate?.getTime() !== contract.startDate?.getTime()) ||
+            (body?.endDate !== undefined && endDate?.getTime() !== contract.endDate?.getTime())
+        if (datesChanging && (startDate || endDate)) {
+            const rates = await prisma.clientContractRate.findMany({
+                where: {
+                    contractId,
+                    OR: [{ rateStartDate: { not: null } }, { rateEndDate: { not: null } }],
+                },
+                select: { rateStartDate: true, rateEndDate: true },
+            })
+            for (const r of rates) {
+                if (startDate && r.rateStartDate && r.rateStartDate.getTime() < startDate.getTime()) {
+                    return badRequest(
+                        "Cannot move the contract start date later than an existing rate's start date. Adjust the affected rate windows first."
+                    )
+                }
+                if (endDate && r.rateEndDate && r.rateEndDate.getTime() > endDate.getTime()) {
+                    return badRequest(
+                        "Cannot move the contract end date earlier than an existing rate's end date. Adjust the affected rate windows first."
+                    )
+                }
+                // An open-ended rate (start only) cannot start after a shrunk contract end.
+                if (endDate && r.rateStartDate && r.rateStartDate.getTime() > endDate.getTime()) {
+                    return badRequest(
+                        "Cannot move the contract end date earlier than an existing rate's start date. Adjust the affected rate windows first."
+                    )
+                }
+            }
+        }
+
         const updated = await prisma.clientContract.update({
             where: { id: contractId },
             data: {
                 name,
                 type: body?.type ? String(body.type).toUpperCase() : contract.type,
-                startDate: body?.startDate ? new Date(body.startDate) : contract.startDate,
-                endDate: body?.endDate ? new Date(body.endDate) : contract.endDate,
+                startDate,
+                endDate,
                 isActive: body?.isActive !== undefined ? Boolean(body.isActive) : contract.isActive,
             },
             include: {
@@ -59,16 +102,14 @@ export async function PATCH(
             },
         })
 
-        await prisma.auditLog
-            .create({
-                data: {
-                    userId: actorId,
-                    event: "CONTRACT_UPDATED",
-                    module: "CLIENTS",
-                    description: `Contract "${name}" (${contractId}) updated for client ${clientId}. By: ${actorName}`,
-                },
-            })
-            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
+        await safeAuditLog({
+            userId: actorId,
+            event: "CONTRACT_UPDATED",
+            module: "CLIENTS",
+            description: `Contract "${name}" (${contractId}) updated for client ${clientId}. By: ${actorName}`,
+            targetEntityType: "Client",
+            targetEntityId: clientId,
+        })
 
         return NextResponse.json(updated)
     } catch (error) {

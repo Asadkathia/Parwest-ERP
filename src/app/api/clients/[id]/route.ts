@@ -163,6 +163,10 @@ export async function PUT(
             event: "CLIENT_UPDATED",
             module: "CLIENTS",
             description: `Client ${id} updated by ${actorName}. Changes: ${changeSummary}`,
+            targetEntityType: "Client",
+            targetEntityId: id,
+            targetRegionId: client.regionId ?? existingClient.regionId ?? null,
+            targetRegionalOfficeId: client.regionalOfficeId ?? existingClient.regionalOfficeId ?? null,
         })
 
         return NextResponse.json(client, { status: 200 })
@@ -228,6 +232,10 @@ export async function PATCH(
             event: "CLIENT_STATUS_UPDATED",
             module: "CLIENTS",
             description: `Client ${id} status changed to ${status} by ${actorName}.`,
+            targetEntityType: "Client",
+            targetEntityId: id,
+            targetRegionId: existingClient.regionId ?? null,
+            targetRegionalOfficeId: existingClient.regionalOfficeId ?? null,
         })
 
         return NextResponse.json(updated)

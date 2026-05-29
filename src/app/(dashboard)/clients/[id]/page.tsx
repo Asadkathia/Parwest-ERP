@@ -7,6 +7,8 @@ import Image from "next/image"
 import { prisma } from "@/lib/db"
 import PricingManager from "@/components/clients/PricingManager"
 import ClientStatusToggle from "@/components/clients/ClientStatusToggle"
+import ClientAuditHistory from "@/components/clients/ClientAuditHistory"
+import { ClientExportButton } from "@/components/clients/ClientExportButton"
 import Link from "next/link"
 import { ArrowLeft, Edit, FileText, Plus, Paperclip, Building2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card"
@@ -190,9 +192,14 @@ export default async function ClientDetailPage({
       const branchName = deploymentBranch.name?.toLowerCase() || ""
       if (normalizedSearch && !guardName.includes(normalizedSearch) && !branchName.includes(normalizedSearch)) return false
       if (normalizedBranch && !branchName.includes(normalizedBranch)) return false
-      if (startDate && !deployment.deploymentDate) return false
-      if (endDate && !deployment.deploymentDate) return false
-      if (selectDate && toIsoDate(deployment.deploymentDate) !== selectDate) return false
+      // Inclusive date range on deploymentDate (startDate ≤ date ≤ endDate, each
+      // bound optional). Must match the extra-guards export semantics exactly (C2)
+      // so the tab and CSV return the identical set for the same params. Rows with
+      // a missing date are dropped whenever either bound is set.
+      const iso = toIsoDate(deployment.deploymentDate)
+      if (startDate && (!iso || iso < startDate)) return false
+      if (endDate && (!iso || iso > endDate)) return false
+      if (selectDate && iso !== selectDate) return false
       return true
     })
     .slice(0, showCount)
@@ -434,6 +441,16 @@ export default async function ClientDetailPage({
             </Card>
           ) : null}
 
+          {/* ── Activity & Change History ── */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Activity &amp; Change History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ClientAuditHistory clientId={client.id} />
+            </CardContent>
+          </Card>
+
         </div>
       ) : null}
 
@@ -444,7 +461,7 @@ export default async function ClientDetailPage({
               <CardTitle className="text-base">Assigned Guards</CardTitle>
               <p className="text-xs text-muted-foreground">Full deployment history — current &amp; previous</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <TabStatusBadge
                 label={`Active: ${(client.deployments || []).filter((d) => d.status === "ACTIVE").length}`}
                 variant="success"
@@ -452,6 +469,11 @@ export default async function ClientDetailPage({
               <TabStatusBadge
                 label={`Previous: ${(client.deployments || []).filter((d) => d.status !== "ACTIVE").length}`}
                 variant="muted"
+              />
+              <ClientExportButton
+                clientId={client.id}
+                kind="assigned-guards"
+                params={{ guardStatus, selectDate, search: listSearch }}
               />
             </div>
           </CardHeader>
@@ -507,8 +529,13 @@ export default async function ClientDetailPage({
 
       {activeTab === "extra-guards" ? (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Extra Guards</CardTitle>
+            <ClientExportButton
+              clientId={client.id}
+              kind="extra-guards"
+              params={{ branch, startDate, endDate, search: listSearch }}
+            />
           </CardHeader>
           <CardContent className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="extra-guards">
@@ -555,14 +582,21 @@ export default async function ClientDetailPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Branches</CardTitle>
-            {canCreateClient ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/clients/${client.id}/branches/new`}>
-                  <Plus className="h-4 w-4" />
-                  Add Branch
-                </Link>
-              </Button>
-            ) : null}
+            <div className="flex items-center gap-2">
+              <ClientExportButton
+                clientId={client.id}
+                kind="branches"
+                params={{ search: listSearch }}
+              />
+              {canCreateClient ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/clients/${client.id}/branches/new`}>
+                    <Plus className="h-4 w-4" />
+                    Add Branch
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <LegacyFilterForm clientId={client.id} tab="branches">

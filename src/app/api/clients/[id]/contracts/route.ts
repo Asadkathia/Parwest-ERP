@@ -3,20 +3,8 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import type { Session } from "next-auth"
-
-async function checkClientScope(clientId: string, session: Session) {
-    const managerScope = deriveManagerScope(session)
-    if (!managerScope) return null
-    const client = await prisma.client.findUnique({
-        where: { id: clientId },
-        select: { regionId: true, regionalOfficeId: true },
-    })
-    if (!client) return "not_found"
-    if (managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) return "forbidden"
-    return null
-}
+import { checkClientScope } from "@/lib/clients/access"
+import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 
 export async function GET(
     _req: NextRequest,
@@ -73,6 +61,21 @@ export async function POST(
         const name = String(body?.name || "").trim()
         if (!name) return badRequest("Contract name is required.")
 
+        // BILLING INTEGRITY: when both dates are supplied, the contract window
+        // must be valid — the end date has to be at least one day after the
+        // start date (legacy rule). Open-ended contracts (missing either date)
+        // are still allowed.
+        const startDate = body?.startDate ? new Date(body.startDate) : null
+        const endDate = body?.endDate ? new Date(body.endDate) : null
+        if (startDate && isNaN(startDate.getTime())) return badRequest("startDate is not a valid date.")
+        if (endDate && isNaN(endDate.getTime())) return badRequest("endDate is not a valid date.")
+        if (startDate && endDate) {
+            const oneDayMs = 24 * 60 * 60 * 1000
+            if (endDate.getTime() - startDate.getTime() < oneDayMs) {
+                return badRequest("Contract end date must be at least one day after the start date.")
+            }
+        }
+
         // SECURITY: when branchId is supplied, verify the branch belongs to this
         // client to prevent attaching a client-level contract to another client's
         // branch (mirrors advance-payments POST guard).
@@ -93,8 +96,8 @@ export async function POST(
                 branchId,
                 name,
                 type: body?.type ? String(body.type).toUpperCase() : "GENERAL",
-                startDate: body?.startDate ? new Date(body.startDate) : null,
-                endDate: body?.endDate ? new Date(body.endDate) : null,
+                startDate,
+                endDate,
                 isActive: true,
             },
             include: {
@@ -104,16 +107,14 @@ export async function POST(
         })
 
         // Audit log is non-critical — never fail the main operation on log errors
-        await prisma.auditLog
-            .create({
-                data: {
-                    userId: actorId,
-                    event: "CONTRACT_CREATED",
-                    module: "CLIENTS",
-                    description: `Contract "${name}" created for client ${clientId}${branchId ? ` (branch ${branchId})` : ""}. By: ${actorName}`,
-                },
-            })
-            .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
+        await safeAuditLog({
+            userId: actorId,
+            event: "CONTRACT_CREATED",
+            module: "CLIENTS",
+            description: `Contract "${name}" created for client ${clientId}${branchId ? ` (branch ${branchId})` : ""}. By: ${actorName}`,
+            targetEntityType: "Client",
+            targetEntityId: clientId,
+        })
 
         return NextResponse.json(contract, { status: 201 })
     } catch (error) {

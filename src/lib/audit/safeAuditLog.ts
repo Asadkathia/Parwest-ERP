@@ -6,6 +6,13 @@ type SafeAuditArgs = {
   module: string
   description?: string
   ipAddress?: string
+  // Target-entity enrichment — lets the per-entity history views (e.g. the
+  // client audit panel) query by (targetEntityType, targetEntityId) instead of
+  // fragile description-substring matching. All optional for back-compat.
+  targetEntityType?: string | null
+  targetEntityId?: string | null
+  targetRegionId?: string | null
+  targetRegionalOfficeId?: string | null
 }
 
 /**
@@ -36,6 +43,10 @@ export async function safeAuditLog(args: SafeAuditArgs): Promise<void> {
         module: args.module,
         description: args.description ?? null,
         ipAddress: args.ipAddress ?? null,
+        targetEntityType: args.targetEntityType ?? null,
+        targetEntityId: args.targetEntityId ?? null,
+        targetRegionId: args.targetRegionId ?? null,
+        targetRegionalOfficeId: args.targetRegionalOfficeId ?? null,
       },
     })
   } catch (error) {
