@@ -6,11 +6,11 @@ import { mockGuardsList } from "@/lib/mockData/guards"
 import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
-import { validateGuardDates } from "@/lib/validation/guard-dates"
 import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
-import { recordGuardStatusChange } from "@/lib/guards/status-history"
-import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
+import { resolveExServiceType } from "@/lib/guards/employmentType"
+import { validateGuardPayload, normalizeGuardPhone } from "@/lib/guards/validate-payload"
+import { cnicAvailability, CNIC_ACTIVE_PROFILE_MESSAGE } from "@/lib/guards/cnic"
 import { buildGuardCreatePayload } from "@/lib/guards/build-payload"
 import { generateNextParwestId } from "@/lib/guards/parwest-id"
 import type { Prisma } from "@prisma/client"
@@ -121,15 +121,34 @@ export async function POST(request: NextRequest) {
         if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
         }
-        // Date/age validation is shared with the bulk-import path via
-        // validateGuardDates so the two enrollment paths cannot drift apart.
-        const dateError = validateGuardDates({
-            dateOfBirth: body?.dateOfBirth ? String(body.dateOfBirth) : null,
-            cnicIssueDate: body?.cnicIssueDate ? String(body.cnicIssueDate) : null,
-            cnicExpiryDate: body?.cnicExpiryDate ? String(body.cnicExpiryDate) : null,
-        })
-        if (dateError) {
-            return badRequest(dateError.message)
+        // Phone fields are normalised toward the canonical +92-XXX-XXXXXXX form
+        // BEFORE validation + storage so every write path persists one format.
+        const normalizedPhone = normalizeGuardPhone(body?.phone)
+        const normalizedPermanentContact = normalizeGuardPhone(body?.permanentAddressContact)
+        const normalizedCurrentContact = normalizeGuardPhone(body?.currentAddressContact)
+        const normalizedIntroducerContact = normalizeGuardPhone(body?.introducerContact)
+        // Unified guard-field validation (phone format, required core,
+        // education-year > DOB, and the shared date/age rules) — the SAME
+        // validator the edit API and bulk import delegate to, so the three
+        // write paths cannot drift on what they enforce.
+        const payloadError = validateGuardPayload(
+            {
+                name: body?.name ? String(body.name) : null,
+                cnic,
+                phone: normalizedPhone || (body?.phone ? String(body.phone) : null),
+                permanentAddressContact: normalizedPermanentContact || (body?.permanentAddressContact ? String(body.permanentAddressContact) : null),
+                currentAddressContact: normalizedCurrentContact || (body?.currentAddressContact ? String(body.currentAddressContact) : null),
+                introducerContact: normalizedIntroducerContact || (body?.introducerContact ? String(body.introducerContact) : null),
+                introducerCnic: body?.introducerCnic ? String(body.introducerCnic) : null,
+                dateOfBirth: body?.dateOfBirth ? String(body.dateOfBirth) : null,
+                cnicIssueDate: body?.cnicIssueDate ? String(body.cnicIssueDate) : null,
+                cnicExpiryDate: body?.cnicExpiryDate ? String(body.cnicExpiryDate) : null,
+                passingYear: body?.passingYear ?? null,
+            },
+            "create",
+        )
+        if (payloadError) {
+            return badRequest(payloadError.message)
         }
         const bodyRegionalOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
         let bodyRegionId = body?.regionId ? String(body.regionId) : null
@@ -183,20 +202,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(mock, { status: 201 })
         }
 
-        // CNIC re-enrollment gate (new-profile model). Guard.cnic is no longer
-        // @unique — a DB partial-unique index permits multiple rows per CNIC as
-        // long as at most one is non-terminated. We inspect the MOST RECENT
-        // profile for the CNIC: if it's non-terminated (ACTIVE / PENDING /
-        // INACTIVE) we block; otherwise (most recent is TERMINATED, or no
-        // profile exists at all) we fall through and create a BRAND-NEW row.
-        // No reactivation of the old record.
-        const latest = await prisma.guard.findFirst({
-            where: { cnic },
-            orderBy: { createdAt: "desc" },
-            select: { id: true, lifecycleStatus: true },
-        })
-        if (latest && latest.lifecycleStatus !== "TERMINATED") {
-            return badRequest("This guard is already enrolled and active. You cannot enroll the same CNIC again unless the previous profile is marked as Resigned or Terminated.")
+        // CNIC re-enrollment gate (new-profile model) — shared with PUT and
+        // check-cnic via cnicAvailability so the partial-unique / terminated-
+        // profile rule lives in one place. A non-terminated most-recent profile
+        // blocks; a terminated one (or none) falls through to a BRAND-NEW row.
+        const availability = await cnicAvailability(prisma, cnic)
+        if (availability.blockedByActiveProfile) {
+            return badRequest(CNIC_ACTIVE_PROFILE_MESSAGE)
         }
 
         // parwest id generation is shared with the bulk-import path via
@@ -252,23 +264,25 @@ export async function POST(request: NextRequest) {
             try { parsedPrevEmployments = JSON.parse(String(body.previousEmploymentsJson)) } catch { /* ignore */ }
         }
 
-        // Guard Employment Type — explicit body value is authoritative; row-derivation
-        // is a fallback for legacy clients that don't send the new field.
-        const explicitExServiceType = body.exServiceType ? String(body.exServiceType).trim() || null : null
-        let exServiceType: string
-        let isExService: boolean
-        if (explicitExServiceType) {
-            const v = await validateGuardEmploymentType(explicitExServiceType, parsedPrevEmployments)
-            if (!v.ok) return badRequest(v.message)
-            exServiceType = v.exServiceType
-            isExService = v.isExService
-        } else {
-            const derivedExService = parsedPrevEmployments.find((e) => e.isExService === true) ?? parsedPrevEmployments[0] ?? null
-            exServiceType = derivedExService?.type ?? "CIVILIAN"
-            isExService = parsedPrevEmployments.length > 0
-                ? parsedPrevEmployments.some((e) => e.isExService === true)
-                : ["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"].includes(exServiceType)
-        }
+        // Guard Employment Type — derivation (explicit + fallback branches) is
+        // shared with PUT via resolveExServiceType so null-vs-"CIVILIAN" can no
+        // longer diverge between create and edit.
+        const exService = await resolveExServiceType({
+            explicitType: body.exServiceType,
+            rows: parsedPrevEmployments,
+            legacyIsExService: body.isExService,
+        })
+        if (!exService.ok) return badRequest(exService.message)
+        const exServiceType = exService.exServiceType
+        const isExService = exService.isExService
+
+        // Overlay the canonical phone forms so the persisted columns match what
+        // was validated (build-payload reads these keys off `flat`).
+        const flatPayload: Record<string, unknown> = { ...(body as Record<string, unknown>) }
+        if (normalizedPhone) flatPayload.phone = normalizedPhone
+        if (normalizedPermanentContact) flatPayload.permanentAddressContact = normalizedPermanentContact
+        if (normalizedCurrentContact) flatPayload.currentAddressContact = normalizedCurrentContact
+        if (normalizedIntroducerContact) flatPayload.introducerContact = normalizedIntroducerContact
 
         const createGuardPayload = (parwestId: string) =>
             buildGuardCreatePayload({
@@ -277,7 +291,7 @@ export async function POST(request: NextRequest) {
                 cnic,
                 bodyRegionId,
                 bodyRegionalOfficeId,
-                flat: body as Record<string, unknown>,
+                flat: flatPayload,
                 nearestRelatives,
                 familyMembers,
                 previousEmployments: parsedPrevEmployments,
@@ -347,6 +361,28 @@ export async function POST(request: NextRequest) {
                         })
                     }
 
+                    // Seed the initial status-history row INSIDE the create
+                    // transaction (atomic, same durability guarantee as the
+                    // lifecycle-transition writes in applyTransition). This
+                    // replaces the previous fire-and-forget recordGuardStatusChange
+                    // for the initial enrollment row, which could silently lose
+                    // the audit row on failure.
+                    await tx.guardStatusHistory.create({
+                        data: {
+                            guardId: newGuard.id,
+                            cnic: newGuard.cnic,
+                            parwestId: newGuard.parwestId,
+                            guardName: newGuard.name,
+                            fromStatus: null,
+                            toStatus: newGuard.status,
+                            reason: "Guard enrolled in the system",
+                            changedByName: session.user?.name ?? session.user?.email ?? null,
+                            changedByType: "ENROLLMENT",
+                            regionName,
+                            officeName,
+                        },
+                    })
+
                     return newGuard
                 })
 
@@ -364,20 +400,8 @@ export async function POST(request: NextRequest) {
                     officeName,
                 })
 
-                // Record initial status in status history
-                void recordGuardStatusChange({
-                    guardId: guard.id,
-                    cnic: guard.cnic,
-                    parwestId: guard.parwestId,
-                    guardName: guard.name,
-                    fromStatus: null,
-                    toStatus: guard.status,
-                    reason: "Guard enrolled in the system",
-                    changedByName: session.user?.name ?? session.user?.email ?? null,
-                    changedByType: "ENROLLMENT",
-                    regionName,
-                    officeName,
-                })
+                // (Initial status-history row is now written atomically inside
+                // the create transaction above.)
 
                 return NextResponse.json(
                     { ...guard, ageApprovalRequired, ageApprovalReason },

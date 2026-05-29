@@ -3,11 +3,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  * Owner: Phase 3b' (guard create wizard)
  *
- * Mirrors the existing validation rules from the legacy enrollment form
- * (`src/app/(dashboard)/guards/new/form.tsx`) and from the API POST handler
- * (`src/app/api/guards/route.ts`). Reskin only — do NOT tighten or loosen
- * any rule. The server remains the source of truth; this schema is for
- * client-side per-step gating + nicer UX.
+ * Declarative client-side mirror of the guard-create rules. The SERVER source
+ * of truth is `validateGuardPayload` (`src/lib/guards/validate-payload.ts`),
+ * called from `POST /api/guards`. This schema deliberately delegates its
+ * field-level rules to the SAME shared primitives that validator uses
+ * (`isValidGuardPhone`, `isValidGuardAge`, `validateEducationPassingYear`,
+ * `CNIC_REGEX`) so the create form, the create API, the edit API, and bulk
+ * import cannot drift on what they enforce. Do NOT inline a divergent regex
+ * here — extend the shared primitive instead.
  *
  * Six sub-schemas (one per wizard step) are merged into `guardCreateSchema`.
  *
@@ -18,9 +21,10 @@
 import { z } from "zod"
 import {
   CNIC_REGEX,
-  PHONE_REGEX,
   isValidGuardAge,
 } from "@/lib/validation/formats"
+import { isValidGuardPhone } from "@/lib/guards/validate-payload"
+import { validateEducationPassingYear } from "@/lib/validation/guard-dates"
 
 // ─── Step 1: Personal Information ────────────────────────────────────────────
 // Mirrors the GENERAL INFORMATION block (subset visible in the new wizard)
@@ -85,7 +89,7 @@ export const addressSchema = z.object({
     .string()
     .trim()
     .min(1, "Permanent address contact number is required.")
-    .regex(PHONE_REGEX, "Contact format must be +92-300-1234567."),
+    .refine((v) => isValidGuardPhone(v), "Contact format must be +92-300-1234567."),
   addressCurrent: z
     .string()
     .trim()
@@ -94,12 +98,12 @@ export const addressSchema = z.object({
     .string()
     .trim()
     .min(1, "Current address contact number is required.")
-    .regex(PHONE_REGEX, "Contact format must be +92-300-1234567."),
+    .refine((v) => isValidGuardPhone(v), "Contact format must be +92-300-1234567."),
   phone: z
     .string()
     .trim()
     .min(1, "At least one contact number is required.")
-    .regex(PHONE_REGEX, "Contact format must be +92-300-1234567."),
+    .refine((v) => isValidGuardPhone(v), "Contact format must be +92-300-1234567."),
   // Optional emergency contact (kept simple — legacy form embeds this in nearest-relative)
   emergencyContactName: z.string().trim().optional().default(""),
   emergencyContactRelation: z.string().trim().optional().default(""),
@@ -109,7 +113,7 @@ export const addressSchema = z.object({
     .optional()
     .default("")
     .refine(
-      (v) => !v || PHONE_REGEX.test(v),
+      (v) => !v || isValidGuardPhone(v),
       "Contact format must be +92-300-1234567.",
     ),
   // Optional location pin (lat,lng) — surfaced only in design reference, not in API
@@ -158,11 +162,20 @@ export const documentsSchema = z.object({
 })
 
 // ─── Master schema ───────────────────────────────────────────────────────────
+// Education passing year must be after DOB — enforced via the SAME shared
+// primitive (`validateEducationPassingYear`) the server validator and bulk
+// import use, so the cross-field rule can't drift between paths.
 export const guardCreateSchema = personalSchema
   .merge(serviceSchema)
   .merge(addressSchema)
   .merge(bankSchema)
   .merge(documentsSchema)
+  .superRefine((data, ctx) => {
+    const eduError = validateEducationPassingYear(data.dateOfBirth, data.passingYear)
+    if (eduError) {
+      ctx.addIssue({ code: "custom", message: eduError, path: ["passingYear"] })
+    }
+  })
 
 /**
  * Output type — what the schema produces after parsing (post-defaults applied).

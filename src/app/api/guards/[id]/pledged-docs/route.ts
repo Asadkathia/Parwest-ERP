@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { requireGuardInScope } from "@/lib/guards/access"
 
 export async function GET(
   _request: NextRequest,
@@ -49,8 +50,8 @@ export async function POST(
 
     const { id } = await context.params
 
-    const guard = await prisma.guard.findUnique({ where: { id }, select: { id: true } })
-    if (!guard) return notFound("Guard not found.")
+    const denied = await requireGuardInScope(session, id)
+    if (denied) return denied
 
     const body = await request.json()
     const documentTypeName = String(body?.documentTypeName || "").trim()

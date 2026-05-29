@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-import { transitionGuard } from "@/lib/guards/lifecycle"
+import { requireGuardInScope } from "@/lib/guards/access"
+import { transitionGuard, ActiveDeploymentTransitionError } from "@/lib/guards/lifecycle"
 
 // GET /api/guards/[id]/prerequisites/[prereqId]
 // Returns the full attachment payload for a single prerequisite (lazy fetch).
@@ -48,6 +49,9 @@ export async function PATCH(
     if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
 
     const { id: guardId, prereqId } = await params
+    const denied = await requireGuardInScope(session, guardId)
+    if (denied) return denied
+
     const body = await request.json()
 
     const existing = await prisma.guardPrerequisite.findFirst({
@@ -132,6 +136,13 @@ export async function PATCH(
               },
             })
           } else if (!allVerified && guard.lifecycleStatus === "ACTIVE") {
+            // ACTIVE→PENDING is a non-revoking target, so applyTransition's
+            // centralized precondition will throw ActiveDeploymentTransitionError
+            // if the guard still holds an active deployment. We deliberately let
+            // it throw (caught below) rather than silently flipping a deployed
+            // guard into an inconsistent "deployed but PENDING" state.
+            // TODO: gate this auto-flip behind a future
+            // `guards.autoLifecycleOnVerification` workflow rule (Settings-owned).
             await transitionGuard({
               guardId,
               to: "PENDING",
@@ -143,8 +154,21 @@ export async function PATCH(
           }
         }
       }
-    } catch {
-      // Non-critical: don't fail the request if status update fails
+    } catch (flipError) {
+      // Non-critical: the prerequisite update itself succeeded. The lifecycle
+      // auto-flip is best-effort. When the guard is actively deployed the
+      // centralized precondition blocks the ACTIVE→PENDING flip — log and skip
+      // rather than failing the request or silently corrupting state.
+      if (flipError instanceof ActiveDeploymentTransitionError) {
+        console.warn(
+          `Skipped SYSTEM lifecycle auto-flip for guard ${guardId}: guard is actively deployed.`
+        )
+      } else {
+        console.error(
+          `SYSTEM lifecycle auto-flip failed for guard ${guardId}:`,
+          flipError
+        )
+      }
     }
 
     return NextResponse.json(updated)
@@ -166,6 +190,8 @@ export async function DELETE(
     if (!hasAction(session, "GUARDS", "DELETE")) return forbidden("Access denied.")
 
     const { id: guardId, prereqId } = await params
+    const denied = await requireGuardInScope(session, guardId)
+    if (denied) return denied
 
     const existing = await prisma.guardPrerequisite.findFirst({
       where: { id: prereqId, guardId },

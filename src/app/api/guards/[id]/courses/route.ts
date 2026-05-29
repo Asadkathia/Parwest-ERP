@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { requireGuardInScope } from "@/lib/guards/access"
 
 export async function GET(
   _request: NextRequest,
@@ -39,6 +40,10 @@ export async function POST(
     if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
     const { id: guardId } = await context.params
+
+    const denied = await requireGuardInScope(session, guardId)
+    if (denied) return denied
+
     const body = await request.json()
 
     const courseName = String(body?.courseName || "").trim()

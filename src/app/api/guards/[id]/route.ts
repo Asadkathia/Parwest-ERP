@@ -3,11 +3,12 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { calculateAgeYears, MIN_GUARD_AGE, MAX_GUARD_AGE } from "@/lib/validation/formats"
+import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-import { validateGuardEmploymentType } from "@/lib/guards/employmentType"
-import { applyTransition, canTransition, LIFECYCLE_STATUSES, type LifecycleStatus } from "@/lib/guards/lifecycle"
+import { resolveExServiceType } from "@/lib/guards/employmentType"
+import { validateGuardPayload, normalizeGuardPhone } from "@/lib/guards/validate-payload"
+import { cnicAvailability } from "@/lib/guards/cnic"
+import { applyTransition, canTransition, ActiveDeploymentTransitionError, LIFECYCLE_STATUSES, type LifecycleStatus } from "@/lib/guards/lifecycle"
 
 export async function PUT(
     request: NextRequest,
@@ -27,12 +28,27 @@ export async function PUT(
         if (nextCnic && !/^\d{5}-\d{7}-\d$/.test(nextCnic)) {
             return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
         }
-        const dobStr = body?.dateOfBirth ? String(body.dateOfBirth) : ""
-        if (dobStr) {
-            const computedAge = calculateAgeYears(dobStr)
-            if (computedAge == null || computedAge < MIN_GUARD_AGE || computedAge > MAX_GUARD_AGE) {
-                return badRequest("Guard age must be between 18 and 65.")
-            }
+        // Phone fields are normalised toward the canonical +92-XXX-XXXXXXX form
+        // BEFORE validation + storage so edits converge on one format with the
+        // create + import paths.
+        const normalizedPhone = normalizeGuardPhone(body?.phone)
+        // Unified guard-field validation — UPDATE mode (format checks only; an
+        // edit may legitimately touch a single field). Shares the same validator
+        // (and date/age + education-year primitives) with POST /api/guards and
+        // bulk import so the write paths cannot drift on what they enforce.
+        const payloadError = validateGuardPayload(
+            {
+                cnic: nextCnic || null,
+                phone: normalizedPhone || (body?.phone ? String(body.phone) : null),
+                dateOfBirth: body?.dateOfBirth ? String(body.dateOfBirth) : null,
+                cnicIssueDate: body?.cnicIssueDate ? String(body.cnicIssueDate) : null,
+                cnicExpiryDate: body?.cnicExpiryDate ? String(body.cnicExpiryDate) : null,
+                passingYear: body?.passingYear ?? null,
+            },
+            "update",
+        )
+        if (payloadError) {
+            return badRequest(payloadError.message)
         }
 
         // Check if guard exists
@@ -60,16 +76,15 @@ export async function PUT(
             return forbidden("Forbidden: cannot move guard outside your scope.")
         }
 
-        // Check CNIC uniqueness (excluding current guard)
+        // Check CNIC availability (excluding current guard). Shares the
+        // terminated-profile re-enrollment model with POST and check-cnic via
+        // cnicAvailability: a non-terminated OTHER profile blocks, but a CNIC
+        // belonging only to a terminated profile is available (PUT previously
+        // over-rejected those by blocking on ANY other row regardless of
+        // lifecycle).
         if (nextCnic && nextCnic !== existingGuard.cnic) {
-            const cnicExists = await prisma.guard.findFirst({
-                where: {
-                    cnic: nextCnic,
-                    id: { not: id },
-                },
-            })
-
-            if (cnicExists) {
+            const availability = await cnicAvailability(prisma, nextCnic, { excludeGuardId: id })
+            if (availability.blockedByActiveProfile) {
                 return badRequest("A guard with this CNIC already exists")
             }
 
@@ -95,24 +110,18 @@ export async function PUT(
             } catch { /* ignore */ }
         }
 
-        // Guard Employment Type — explicit body value is authoritative; fall back
-        // to row-derivation for legacy clients that don't send the new field.
-        const explicitExServiceType = body.exServiceType ? String(body.exServiceType).trim() : ""
-        let nextIsExService: boolean
-        let nextExServiceType: string | null
-        if (explicitExServiceType) {
-            const v = await validateGuardEmploymentType(explicitExServiceType, parsedPreviousEmployments)
-            if (!v.ok) return badRequest(v.message)
-            nextExServiceType = v.exServiceType
-            nextIsExService = v.isExService
-        } else {
-            const derivedIsExService = parsedPreviousEmployments.some((e) => e.isExService === true)
-            const primary = parsedPreviousEmployments.find((e) => e.isExService === true)
-            nextExServiceType = primary?.type ?? (derivedIsExService ? null : "CIVILIAN")
-            nextIsExService = parsedPreviousEmployments.length > 0
-                ? derivedIsExService
-                : (body.isExService === "true" || body.isExService === true)
-        }
+        // Guard Employment Type — derivation (explicit + fallback branches) is
+        // shared with POST via resolveExServiceType so null-vs-"CIVILIAN" can no
+        // longer diverge between create and edit. The fallback now ALWAYS lands
+        // on a concrete string (never null), matching create.
+        const exService = await resolveExServiceType({
+            explicitType: body.exServiceType,
+            rows: parsedPreviousEmployments,
+            legacyIsExService: body.isExService,
+        })
+        if (!exService.ok) return badRequest(exService.message)
+        const nextExServiceType: string = exService.exServiceType
+        const nextIsExService: boolean = exService.isExService
         const primaryExService = parsedPreviousEmployments.find((e) => e.type === nextExServiceType) ?? parsedPreviousEmployments.find((e) => e.isExService === true)
 
         // Parse bankAccounts JSON array if provided
@@ -166,7 +175,7 @@ export async function PUT(
             data: {
                 name: body.name,
                 cnic: nextCnic || existingGuard.cnic,
-                phone: body.phone || null,
+                phone: normalizedPhone || body.phone || null,
                 email: body.email || null,
                 dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
                 age: body.age ? parseInt(body.age) : null,
@@ -268,6 +277,12 @@ export async function PUT(
 
         return NextResponse.json(guard, { status: 200 })
     } catch (error: unknown) {
+        // A lifecycle transition for a guard who still holds an active deployment
+        // is a client error (409), not a server fault — the precondition is
+        // centralized in applyTransition (lifecycle.ts). Mirror the /status route.
+        if (error instanceof ActiveDeploymentTransitionError) {
+            return conflict("Cannot change guard status while the guard has an active deployment. End the deployment first.")
+        }
         console.error("Error updating guard:", error)
         return internalServerError("Failed to update guard")
     }

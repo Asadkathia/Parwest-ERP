@@ -11,8 +11,9 @@ import GuardAccountsEditor from "@/components/guards/GuardAccountsEditor"
 import type { GuardBankAccount } from "@/lib/guards/bank-accounts"
 import PhoneInput from "@/components/ui/PhoneInput"
 import CnicInput from "@/components/ui/CnicInput"
-import { isValidGuardAge, CNIC_REGEX, PHONE_REGEX } from "@/lib/validation/formats"
+import { isValidGuardAge, CNIC_REGEX } from "@/lib/validation/formats"
 import { validateEducationPassingYear } from "@/lib/validation/guard-dates"
+import { isValidGuardPhone } from "@/lib/guards/validate-payload"
 
 type RegionalOffice = {
   id: string
@@ -368,7 +369,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     }
 
     for (const number of contactNumbers) {
-      if (!/^\+92-\d{3}-\d{7}$/.test(number)) {
+      if (!isValidGuardPhone(number)) {
         fail("Contact format must be +92-300-1234567")
         return
       }
@@ -378,11 +379,11 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     if (sections.address) {
       const currentContact = String(data.currentAddressContact || "").trim()
       const permanentContact = String(data.permanentAddressContact || "").trim()
-      if (currentContact && !/^\+92-\d{3}-\d{7}$/.test(currentContact)) {
+      if (currentContact && !isValidGuardPhone(currentContact)) {
         fail("Current Address Contact No format must be +92-300-1234567")
         return
       }
-      if (permanentContact && !/^\+92-\d{3}-\d{7}$/.test(permanentContact)) {
+      if (permanentContact && !isValidGuardPhone(permanentContact)) {
         fail("Permanent Address Contact No format must be +92-300-1234567")
         return
       }
@@ -443,7 +444,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
     // Validate nearest relative contact + CNIC formats (when supplied)
     for (const idx of nearestRows) {
       const contact = String(data[`nearest_${idx}_contact`] || "").trim()
-      if (contact && !PHONE_REGEX.test(contact)) {
+      if (contact && !isValidGuardPhone(contact)) {
         fail("Nearest Relative Contact # format must be +92-300-1234567")
         return
       }
@@ -461,7 +462,7 @@ export default function GuardEnrollmentForm({ regionalOffices, currentUserName, 
       return
     }
     const introducerContactValue = String(data.introducerContact || "").trim()
-    if (introducerContactValue && !PHONE_REGEX.test(introducerContactValue)) {
+    if (introducerContactValue && !isValidGuardPhone(introducerContactValue)) {
       fail("Introducer Contact format must be +92-300-1234567")
       return
     }

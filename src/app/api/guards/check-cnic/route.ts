@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { CNIC_REGEX } from "@/lib/validation/formats"
 import { ok, badRequest, unauthorized } from "@/lib/api/response"
+import { cnicAvailability, CNIC_ACTIVE_PROFILE_MESSAGE } from "@/lib/guards/cnic"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -17,20 +18,13 @@ export async function GET(req: NextRequest) {
     return badRequest("CNIC format must be XXXXX-XXXXXXX-X.")
   }
 
-  // Existence check is intentionally unscoped: a CNIC enrolled in another
-  // region must still surface here. We inspect the MOST RECENT profile for the
-  // CNIC (Guard.cnic is no longer @unique — a DB partial-unique index allows
-  // multiple rows per CNIC as long as at most one is non-terminated, so the
-  // most-recent row determines availability).
-  const [guard, blacklisted] = await Promise.all([
-    prisma.guard.findFirst({
-      where: {
-        cnic,
-        ...(excludeId ? { NOT: { id: excludeId } } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, lifecycleStatus: true },
-    }),
+  // Availability check is intentionally unscoped (a CNIC enrolled in another
+  // region must still surface here) and shares the terminated-profile
+  // re-enrollment model with POST /api/guards and PUT /api/guards/[id] via
+  // cnicAvailability — the partial-unique / most-recent-profile rule lives in
+  // one place.
+  const [availability, blacklisted] = await Promise.all([
+    cnicAvailability(prisma, cnic, { excludeGuardId: excludeId ?? null }),
     prisma.blacklistedCnic.findUnique({ where: { cnic } }),
   ])
 
@@ -39,20 +33,20 @@ export async function GET(req: NextRequest) {
   // the CNIC is available for a brand-new profile (reEnrollable). `exists`
   // remains true whenever any profile is found so existing callers keep
   // working; new callers branch on `reEnrollable` to allow the submit.
-  const isTerminated = guard?.lifecycleStatus === "TERMINATED"
-  const blocked = Boolean(guard) && !isTerminated && !blacklisted
-  const reEnrollable = !blacklisted && (!guard || isTerminated)
+  const isTerminated = availability.status === "TERMINATED"
+  const blocked = availability.blockedByActiveProfile && !blacklisted
+  const reEnrollable = !blacklisted && availability.available
 
   return ok({
-    exists: Boolean(guard),
+    exists: availability.exists,
     blacklisted: Boolean(blacklisted),
-    status: guard?.lifecycleStatus ?? null,
+    status: availability.status,
     reEnrollable,
     message: blacklisted
       ? "This CNIC is blacklisted and cannot be enrolled"
       : blocked
-        ? "This guard is already enrolled and active. You cannot enroll the same CNIC again unless the previous profile is marked as Resigned or Terminated."
-        : guard
+        ? CNIC_ACTIVE_PROFILE_MESSAGE
+        : isTerminated
           ? "This CNIC belongs to a terminated guard and is available for a new profile"
           : undefined,
   })

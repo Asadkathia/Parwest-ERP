@@ -3,6 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Pencil } from "lucide-react"
 import SearchSelect, { type SearchSelectOption } from "@/components/ui/SearchSelect"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/shadcn/alert-dialog"
 
 // Settable lifecycle choices only. PRESENT / DEFAULT are derived from deployment
 // state server-side and ABSENT / BLACKLISTED are handled by other workflows.
@@ -69,8 +79,16 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
     const [statusError, setStatusError] = useState("")
     const [absconded, setAbsconded] = useState(false)
     const [terminationReason, setTerminationReason] = useState<string>("")
+    const [confirmTerminateOpen, setConfirmTerminateOpen] = useState(false)
 
     const isTerminal = newStatus === "TERMINATED"
+
+    const terminateConfirmMessage = () => {
+        const label = STATUS_OPTIONS.find((s) => s.value === newStatus)?.label ?? newStatus
+        return absconded
+            ? `Mark this guard as ${label} with ABSCONDED? Any assigned inventory will be written off as LOST. This cannot be undone.`
+            : `Mark this guard as ${label}? If the guard still has assigned kit or held documents, the server will block this — run clearance first.`
+    }
 
     // ── Supervisor modal state ──
     const [supOpen, setSupOpen] = useState(false)
@@ -116,12 +134,16 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
             return
         }
         if (isTerminal) {
-            const label = STATUS_OPTIONS.find((s) => s.value === newStatus)?.label ?? newStatus
-            const confirmMsg = absconded
-                ? `Mark this guard as ${label} with ABSCONDED? Any assigned inventory will be written off as LOST. This cannot be undone.`
-                : `Mark this guard as ${label}? If the guard still has assigned kit or held documents, the server will block this — run clearance first.`
-            if (!window.confirm(confirmMsg)) return
+            // Destructive: gate behind shadcn AlertDialog instead of running directly.
+            setStatusError("")
+            setConfirmTerminateOpen(true)
+            return
         }
+        await runStatusUpdate()
+    }
+
+    const runStatusUpdate = async () => {
+        setConfirmTerminateOpen(false)
         setStatusSaving(true)
         setStatusError("")
         try {
@@ -169,7 +191,9 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                 const d = await res.json().catch(() => ({}))
                 throw new Error(d.message || "Failed to update supervisor")
             }
-            const data = await res.json()
+            // PATCH now wraps as `ok({supervisorName, ...})`. Unwrap; fall back to raw for safety.
+            const raw = await res.json()
+            const data = (raw?.data ?? raw) as { supervisorName?: string | null }
             setSupervisorName(data.supervisorName ?? supervisorOptions.find((o) => o.value === selectedSupId)?.label ?? null)
             setSupOpen(false)
         } catch (e: unknown) {
@@ -318,6 +342,26 @@ export default function GuardStatusSupervisorEditor({ guardId, currentStatus, cu
                     </div>
                 </div>
             )}
+
+            {/* ── Destructive terminate/abscond confirmation ── */}
+            <AlertDialog open={confirmTerminateOpen} onOpenChange={setConfirmTerminateOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm status change</AlertDialogTitle>
+                        <AlertDialogDescription>{terminateConfirmMessage()}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={statusSaving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={runStatusUpdate}
+                            disabled={statusSaving}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {statusSaving ? "Saving..." : "Confirm"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* ── Supervisor Change Modal ── */}
             {supOpen && (

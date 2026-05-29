@@ -173,7 +173,10 @@ export default function PrerequisitesManager({ regions }: Props) {
     try {
       const res = await fetch("/api/guard-pledgeable-documents")
       if (!res.ok) throw new Error("Failed to load pledged document types")
-      setPledgeTypes(await res.json())
+      // GET now wraps success as `ok(rows)` → `{success, data: [...]}`. Accept either shape.
+      const raw = await res.json()
+      const rows = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : []
+      setPledgeTypes(rows)
     } catch {
       setPledgeTypesError("Failed to load pledged document types")
     } finally {
@@ -210,7 +213,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       })
-      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.message || "Failed"); return }
       setNewDesignationTypeName("")
       setShowAddDesignationType(false)
       await loadDesignationTypes()
@@ -232,7 +235,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       })
-      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setDesignationTypesError(d.message || "Failed"); return }
       setEditingDesignationType(null)
       setEditDesignationTypeName("")
       await loadDesignationTypes()
@@ -380,7 +383,7 @@ export default function PrerequisitesManager({ regions }: Props) {
       })
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}))
-        setInventoryRuleError(payload?.message || payload?.error || "Failed to save deployment inventory prerequisite settings")
+        setInventoryRuleError(payload?.message || "Failed to save deployment inventory prerequisite settings")
         return
       }
       await loadDeploymentInventoryRule()
@@ -403,7 +406,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description: newReturnCondDesc.trim() || null }),
       })
-      if (!res.ok) { const d = await res.json(); setReturnCondError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setReturnCondError(d.message || "Failed"); return }
       setShowAddReturnCond(false)
       setNewReturnCondName("")
       setNewReturnCondDesc("")
@@ -427,7 +430,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description: editReturnCondDesc.trim() || null }),
       })
-      if (!res.ok) { const d = await res.json(); setReturnCondError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setReturnCondError(d.message || "Failed"); return }
       setEditingReturnCond(null)
       await loadReturnConditions()
     } catch {
@@ -459,7 +462,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       })
-      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.message || "Failed"); return }
       setNewExServiceTypeName("")
       setShowAddExServiceType(false)
       await loadExServiceTypes()
@@ -481,7 +484,7 @@ export default function PrerequisitesManager({ regions }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       })
-      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.error || "Failed"); return }
+      if (!res.ok) { const d = await res.json(); setExServiceTypesError(d.message || "Failed"); return }
       setEditingExServiceType(null)
       setEditExServiceTypeName("")
       await loadExServiceTypes()
@@ -528,7 +531,7 @@ export default function PrerequisitesManager({ regions }: Props) {
       })
       if (!res.ok) {
         const d = await res.json()
-        setPledgeTypesError(d.error || "Failed to add pledged document type")
+        setPledgeTypesError(d.message || "Failed to add pledged document type")
         return
       }
       setNewPledgeTypeName("")
@@ -556,7 +559,7 @@ export default function PrerequisitesManager({ regions }: Props) {
       })
       if (!res.ok) {
         const d = await res.json()
-        setPledgeTypesError(d.error || "Failed to update pledged document type")
+        setPledgeTypesError(d.message || "Failed to update pledged document type")
         return
       }
       setEditingPledgeType(null)

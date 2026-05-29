@@ -39,7 +39,6 @@ import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { buildManagerScopeWhere, managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
 import { validateGuardDates, validateEducationPassingYear } from "@/lib/validation/guard-dates"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
-import { recordGuardStatusChange } from "@/lib/guards/status-history"
 import { generateNextParwestId } from "@/lib/guards/parwest-id"
 import type { Prisma } from "@prisma/client"
 import type { ColumnDescriptor, ImportRunContext } from "@/lib/imports/types"
@@ -885,7 +884,28 @@ registerImport({
       })
     }
 
-    // ── Side effects: service-history + status-history (fire-and-forget) ──
+    // ── Initial status-history row — written atomically inside the per-row
+    // import transaction (parity with POST /api/guards, which seeds the initial
+    // PENDING row inside its create tx). This replaces the prior fire-and-forget
+    // recordGuardStatusChange for the initial enrollment row, which could
+    // silently lose the audit row on a separate-connection failure.
+    await ctx.tx.guardStatusHistory.create({
+      data: {
+        guardId: created.id,
+        cnic: created.cnic,
+        parwestId: created.parwestId,
+        guardName: created.name,
+        fromStatus: null,
+        toStatus: created.status,
+        reason: `Guard enrolled via bulk import (job ${ctx.jobId})`,
+        changedByName: null,
+        changedByType: "ENROLLMENT",
+        regionName,
+        officeName,
+      },
+    })
+
+    // ── Side effect: service-history (fire-and-forget — separate audit stream) ──
     void recordGuardServiceEvent({
       cnic: created.cnic,
       guardId: created.id,
@@ -895,19 +915,6 @@ registerImport({
       toStatus: created.status,
       description: `Guard enrolled via bulk import (job ${ctx.jobId})`,
       changedByName: null,
-      regionName,
-      officeName,
-    })
-    void recordGuardStatusChange({
-      guardId: created.id,
-      cnic: created.cnic,
-      parwestId: created.parwestId,
-      guardName: created.name,
-      fromStatus: null,
-      toStatus: created.status,
-      reason: `Guard enrolled via bulk import (job ${ctx.jobId})`,
-      changedByName: null,
-      changedByType: "ENROLLMENT",
       regionName,
       officeName,
     })

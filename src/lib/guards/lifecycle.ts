@@ -48,12 +48,49 @@ const ALLOWED_TRANSITIONS: Record<LifecycleStatus, LifecycleStatus[]> = {
 
 export type TransitionCheck = { ok: true } | { ok: false; reason: string }
 
+/**
+ * Targets that revoke (or are allowed to revoke) a guard's active deployments
+ * as part of the transition. Transitions to these are permitted while the guard
+ * is actively deployed because the deployment is torn down in the same write.
+ * Every other target is a "non-revoking" target and is BLOCKED while the guard
+ * holds an active Deployment — see `transitionAllowedWhileDeployed`.
+ */
+const REVOKING_TARGETS: ReadonlySet<LifecycleStatus> = new Set<LifecycleStatus>([
+  "INACTIVE",
+  "TERMINATED",
+])
+
+/**
+ * The deployment precondition, decoupled from the DB lookup so callers can
+ * reuse the same rule. A guard with an active deployment may only transition to
+ * a revoking target (INACTIVE/TERMINATED). Moving to PENDING (or any other
+ * non-revoking target) while deployed would leave the guard in an inconsistent
+ * "deployed but not ACTIVE" state, so it is rejected.
+ */
+export function transitionAllowedWhileDeployed(to: LifecycleStatus): boolean {
+  return REVOKING_TARGETS.has(to)
+}
+
 export function canTransition(from: LifecycleStatus, to: LifecycleStatus): TransitionCheck {
   if (from === to) return { ok: false, reason: `Guard is already ${from}` }
   if (!ALLOWED_TRANSITIONS[from].includes(to)) {
     return { ok: false, reason: `Cannot transition guard from ${from} to ${to}` }
   }
   return { ok: true }
+}
+
+/**
+ * Sentinel error thrown by `applyTransition` when a transition is rejected
+ * because the guard holds an active deployment and the target does not revoke
+ * deployments. Callers (e.g. the /status route) can `instanceof`-check this to
+ * surface a 409 with a deployment-specific message instead of a generic 500.
+ */
+export class ActiveDeploymentTransitionError extends Error {
+  readonly code = "ACTIVE_DEPLOYMENT" as const
+  constructor(message = "Cannot change status of an actively deployed guard. Revoke the deployment first.") {
+    super(message)
+    this.name = "ActiveDeploymentTransitionError"
+  }
 }
 
 /**
@@ -151,6 +188,19 @@ export async function applyTransition(
 
     if (to === "TERMINATED" && !ctx.terminationReason) {
       throw new Error("terminationReason is required when transitioning to TERMINATED")
+    }
+
+    // Centralized deployment precondition (single source of truth for every
+    // caller: /status PATCH, PUT /api/guards/[id], and the SYSTEM auto-flip in
+    // prerequisites). A guard holding an ACTIVE deployment may only transition
+    // to a revoking target (INACTIVE/TERMINATED), which tears the deployment
+    // down in the same transaction. Any non-revoking target (e.g. PENDING)
+    // would strand the guard as "deployed but not ACTIVE" — reject it here so
+    // no caller can bypass the rule by writing its own precondition.
+    // TODO: gate auto-lifecycle behaviour behind a future
+    // `guards.autoLifecycleOnVerification` workflow rule (owned by Settings).
+    if (!transitionAllowedWhileDeployed(to) && (await isGuardDeployed(tx, guardId))) {
+      throw new ActiveDeploymentTransitionError()
     }
 
     const shouldRevoke =

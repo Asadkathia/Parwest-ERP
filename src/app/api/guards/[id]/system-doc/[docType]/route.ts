@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden } from "@/lib/api/response"
-import { hasModuleAccess } from "@/lib/api/permissions"
+import { hasAction } from "@/lib/api/permissions"
+import { requireGuardInScope } from "@/lib/guards/access"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -1627,16 +1628,19 @@ export async function GET(
 ) {
     const session = await auth()
     if (!session) return new NextResponse("Unauthorized", { status: 401 })
-    // Match the gate that lets the user reach /guards/[id] in the first place
-    // (module-level GUARDS access via middleware). The granular GUARDS:VIEW
-    // action key is not consistently granted to all roles that legitimately
-    // browse guard profiles, which 403'd the View/Download links and rendered
-    // the JSON envelope as text in a new tab (Ticket 29).
-    if (!hasModuleAccess(session, "GUARDS")) return forbidden("Access denied.")
+    // This endpoint renders the printable PII dossier (CNIC, salary, addresses,
+    // relatives). Enforce the granular GUARDS:VIEW action — not just module
+    // access — and confirm the guard is within the actor's region before
+    // emitting any data, so a regional admin can't pull a guard from another
+    // region's records.
+    if (!hasAction(session, "GUARDS", "VIEW")) return forbidden("Access denied.")
 
     const { id, docType } = await params
     const generator = DOC_GENERATORS[docType]
     if (!generator) return new NextResponse("Unknown document type", { status: 404 })
+
+    const denied = await requireGuardInScope(session, id)
+    if (denied) return denied
 
     const guard = await prisma.guard.findUnique({ where: { id } })
     if (!guard) return new NextResponse("Guard not found", { status: 404 })

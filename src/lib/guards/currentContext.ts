@@ -7,7 +7,17 @@ export type GuardCurrentContext = {
   fatherName: string | null
   phone: string | null
   cnic: string | null
+  /**
+   * Legacy `status` shadow (PENDING | ACTIVE | PRESENT | DEFAULT | INACTIVE |
+   * TERMINATED). Kept as a transitional display value for backward
+   * compatibility. Prefer `lifecycleStatus` for status labels/badges and
+   * `isDeployed` for deployment state — see src/lib/guards/lifecycle.ts.
+   */
   status: string
+  /** Canonical lifecycle state: PENDING | ACTIVE | INACTIVE | TERMINATED. */
+  lifecycleStatus: string
+  /** Derived: true when the guard holds an ACTIVE deployment. */
+  isDeployed: boolean
   guardType: string | null
   photoUrl: string | null
   guardSalary: number | null
@@ -55,6 +65,7 @@ export async function getCurrentGuardContext(
       phone: true,
       cnic: true,
       status: true,
+      lifecycleStatus: true,
       photoUrl: true,
       salary: true,
     },
@@ -141,6 +152,11 @@ export async function getCurrentGuardContext(
     phone: guard.phone,
     cnic: guard.cnic,
     status: guard.status,
+    // Generated Prisma type is `string | null`; the column is non-null with a
+    // default, but fall back to the legacy shadow to satisfy the `string`
+    // contract and stay safe if a row is somehow null.
+    lifecycleStatus: guard.lifecycleStatus ?? guard.status,
+    isDeployed: Boolean(activeDeployment),
     guardType: activeDeployment?.guardType ?? null,
     photoUrl: guard.photoUrl,
     guardSalary: guard.salary,

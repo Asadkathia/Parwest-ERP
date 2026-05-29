@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { requireGuardInScope } from "@/lib/guards/access"
+import { deriveManagerScope, buildManagerScopeWhere } from "@/lib/access/scope"
+import { assignGuardSupervisor } from "@/lib/guards/supervisorAssignment"
 
 export async function GET(
     _req: Request,
@@ -22,7 +25,7 @@ export async function GET(
     }).catch(() => null)
 
     if (directAssignment?.supervisor) {
-        return NextResponse.json({
+        return ok({
             supervisorName: directAssignment.supervisor.name,
             supervisorEmail: directAssignment.supervisor.email,
             source: "direct",
@@ -48,7 +51,7 @@ export async function GET(
         }).catch(() => null)
 
         if (clientSupervisor?.supervisor) {
-            return NextResponse.json({
+            return ok({
                 supervisorName: clientSupervisor.supervisor.name,
                 supervisorEmail: clientSupervisor.supervisor.email,
                 source: "deployment",
@@ -56,7 +59,7 @@ export async function GET(
         }
     }
 
-    return NextResponse.json({
+    return ok({
         supervisorName: null,
         supervisorEmail: null,
         source: null,
@@ -75,32 +78,43 @@ export async function PATCH(
     if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
 
         const { id: guardId } = await params
+
+        const denied = await requireGuardInScope(session, guardId)
+        if (denied) return denied
+
         const body = await request.json()
         const supervisorId = body?.supervisorId ? String(body.supervisorId).trim() : null
 
         if (!supervisorId) return badRequest("supervisorId is required")
 
-        const [guard, supervisor] = await Promise.all([
-            prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, name: true } }),
-            prisma.user.findUnique({ where: { id: supervisorId }, select: { id: true, name: true, email: true } }),
-        ])
+        const guard = await prisma.guard.findUnique({ where: { id: guardId }, select: { id: true, name: true } })
         if (!guard) return notFound("Guard not found")
-        if (!supervisor) return notFound("Supervisor user not found")
 
-        // End all active assignments and create new one atomically
+        // The chosen supervisor must be an ACTIVE user with the Supervisor role,
+        // restricted to the actor's region/office (mirrors the import's
+        // `scopedSupervisorWhere` + GET /api/users/supervisors) so a regional
+        // admin cannot assign a supervisor from outside their scope. Resolve via
+        // a scoped `findFirst` rather than a bare id lookup: an out-of-scope or
+        // non-Supervisor id simply yields no match.
+        const scope = deriveManagerScope(session)
+        const supervisor = await prisma.user.findFirst({
+            where: {
+                id: supervisorId,
+                status: "ACTIVE",
+                role: { name: "Supervisor" },
+                ...buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
+            },
+            select: { id: true, name: true, email: true },
+        })
+        if (!supervisor) {
+            return badRequest("Supervisor must be an active Supervisor-role user within your scope.")
+        }
+
+        // End all active assignments and create new one atomically via the
+        // GuardSupervisorAssignment SoT (canonical terminal status "ENDED",
+        // prior-ACTIVE dedup, and supervisor-existence validation).
         const assignment = await prisma.$transaction(async (tx) => {
-            await tx.guardSupervisorAssignment.updateMany({
-                where: { guardId, status: "ACTIVE" },
-                data: { status: "ENDED", endedAt: new Date() },
-            })
-            return tx.guardSupervisorAssignment.create({
-                data: {
-                    guardId,
-                    supervisorId,
-                    status: "ACTIVE",
-                    assignedAt: new Date(),
-                },
-            })
+            return assignGuardSupervisor(tx, { guardId, supervisorId })
         })
 
         // Audit log (non-critical)
@@ -114,8 +128,11 @@ export async function PATCH(
             },
         }).catch(() => { /* non-critical */ })
 
-        return NextResponse.json({ success: true, assignment, supervisorName: supervisor.name, supervisorEmail: supervisor.email })
+        return ok({ assignment, supervisorName: supervisor.name, supervisorEmail: supervisor.email })
     } catch (error) {
+        if (error instanceof Error && error.message.startsWith("Supervisor user not found")) {
+            return badRequest("Supervisor user does not exist.")
+        }
         console.error("PATCH /api/guards/[id]/supervisor:", error)
         return internalServerError("Failed to update supervisor")
     }

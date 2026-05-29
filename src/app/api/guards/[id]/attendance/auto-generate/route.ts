@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
+import { requireGuardInScope } from "@/lib/guards/access"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -21,6 +22,9 @@ export async function POST(_req: Request, { params }: Params) {
   if (!hasAction(session, "GUARDS", "CREATE")) return forbidden("Access denied.")
 
   const { id: guardId } = await params
+
+  const denied = await requireGuardInScope(session, guardId)
+  if (denied) return denied
 
   try {
     // Get all active deployments for this guard

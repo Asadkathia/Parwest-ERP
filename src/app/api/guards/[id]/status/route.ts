@@ -7,6 +7,7 @@ import { hasAction } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import {
     transitionGuard,
+    ActiveDeploymentTransitionError,
     TERMINATION_REASONS,
     type LifecycleStatus,
     type TerminationReason,
@@ -75,15 +76,6 @@ export async function PATCH(
         })
         if (!existingGuard) {
             return notFound("Guard not found")
-        }
-        const activeDeployment = await prisma.deployment.findFirst({
-            where: { guardId: id, status: "ACTIVE" },
-            select: { id: true, client: { select: { name: true } } },
-        })
-        if (activeDeployment) {
-            return conflict(
-                `Cannot change status of an actively deployed guard. Guard is currently deployed at ${activeDeployment.client.name}. Revoke the deployment first, then change the status.`
-            )
         }
         if (managerScope && managerScopeDenied(managerScope, { regionId: existingGuard.regionId, regionalOfficeId: existingGuard.regionalOfficeId })) {
             return forbidden("Forbidden: guard is outside your scope.")
@@ -203,6 +195,23 @@ export async function PATCH(
 
         return NextResponse.json(guard)
     } catch (error: unknown) {
+        // The active-deployment precondition is now enforced centrally inside
+        // applyTransition (lib/guards/lifecycle.ts) so every lifecycle writer
+        // shares one rule. Translate that sentinel into the same 409 the inline
+        // guard used to return, enriched with the deployment's client name.
+        if (error instanceof ActiveDeploymentTransitionError) {
+            const { id } = await params
+            const activeDeployment = await prisma.deployment.findFirst({
+                where: { guardId: id, status: "ACTIVE" },
+                select: { client: { select: { name: true } } },
+            })
+            const where = activeDeployment?.client?.name
+                ? ` Guard is currently deployed at ${activeDeployment.client.name}.`
+                : ""
+            return conflict(
+                `Cannot change status of an actively deployed guard.${where} Revoke the deployment first, then change the status.`
+            )
+        }
         console.error("Error updating guard status:", error)
         const message = error instanceof Error ? error.message : "Failed to update guard status"
         return internalServerError(message)
