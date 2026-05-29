@@ -41,7 +41,7 @@ Both produce **monthly** invoices. The contract carries a `billingMode = MANUAL 
 - **D1** — `exService` + `guardType` are **decorative labels** in MANUAL; not in the rate identity or the unique index.
 - **D2** — MANUAL uses **scoped standard rates** (branch/region/province/global, one current each). Per-guard rates live in **DYNAMIC** (one rate per enrolled guard).
 - **Billing period** — monthly for both. Payroll stays separate/dynamic (`project_rate_flows`).
-- **ASSUMPTION (confirm in review):** DYNAMIC's per-guard rate is a **daily** rate (× deployment days). MANUAL keeps today's day-based calc too — i.e. "manual" means *you set the rates/scope*, not that days are ignored. If MANUAL should be a **flat monthly amount with no day calc**, say so and MANUAL becomes `rate × 1` (optionally prorated).
+- **D3 — RESOLVED: both types are day-based.** Bill = `deployment days in month × rate` (+ overtime) for BOTH. Rates are **daily**. The difference is *only* where the rate comes from: MANUAL = scoped standard rate (branch/region/province/global, most-specific wins); DYNAMIC = that guard's own per-guard rate. "Manual" = you set the rates/scope, not that days are ignored.
 
 ## 4. Province introduction (enum on Region)
 
