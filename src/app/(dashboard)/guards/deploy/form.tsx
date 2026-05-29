@@ -8,6 +8,7 @@ import { FileText, MapPin, Users, Shield, Calendar, Clock, CheckCircle2, AlertCi
 import Link from "next/link"
 import { toast } from "sonner"
 import { isNotFutureDate } from "@/lib/validation/formats"
+import { GUARD_TYPES, DEFAULT_GUARD_TYPE } from "@/lib/constants/guardTypes"
 
 // Convert "HH:MM" to minutes-since-midnight. Returns NaN on invalid input.
 function timeToMinutes(t: string | null | undefined): number {
@@ -167,6 +168,12 @@ const SHIFT_OPTIONS = [
   { id: "NIGHT", name: "Night" },
 ]
 
+// Canonical guard-type options for the deploy form. Sourced from
+// `src/lib/constants/guardTypes.ts` (the single source of truth) — contract-
+// independent so the deployment can be created BEFORE the branch ClientContract
+// exists (per the workflow rule the product owner clarified).
+const GUARD_TYPE_OPTIONS = GUARD_TYPES.map((t) => ({ id: t, name: t }))
+
 const DEPLOYMENT_TYPE_OPTIONS = [
   { id: "REGULAR", name: "Regular" },
   { id: "OVERTIME", name: "Overtime" },
@@ -230,10 +237,12 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
   const [selectedRegionalOffice, setSelectedRegionalOffice] = useState(lockedRegionalOfficeId || "")
   const [guardSupervisor, setGuardSupervisor] = useState<string>("—")
 
-  const [clientGuardTypes, setClientGuardTypes] = useState<string[]>([])
-
   const [designation, setDesignation] = useState("")
-  const [guardType, setGuardType] = useState("")
+  // `guardType` is a categorical label on the Deployment (display-only per
+  // `src/lib/invoicing/rateSelection.ts`). Sourced from the canonical
+  // `GUARD_TYPES` vocabulary because a Deployment is created BEFORE its branch
+  // ClientContract exists, so we cannot derive it from `ClientContractRate`.
+  const [guardType, setGuardType] = useState<string>(DEFAULT_GUARD_TYPE)
   const [shiftType, setShiftType] = useState("DAY")
   const [dayShiftStart, setDayShiftStart] = useState("08:00")
   const [dayShiftEnd, setDayShiftEnd] = useState("20:00")
@@ -296,7 +305,11 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     }
     fetch(`/api/guards/${selectedGuard}/supervisor`)
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => setGuardSupervisor(data?.supervisorName ?? "—"))
+      .then((raw) => {
+        // GET now wraps as `ok({supervisorName, ...})`. Unwrap; fall back to raw.
+        const data = (raw?.data ?? raw) as { supervisorName?: string | null } | null
+        setGuardSupervisor(data?.supervisorName ?? "—")
+      })
       .catch(() => setGuardSupervisor("—"))
 
     // Fetch guard's deployments to auto-detect overtime
@@ -392,31 +405,18 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     }
   }
 
-  const loadClientGuardTypes = async (clientId: string) => {
-    try {
-      const res = await fetch(`/api/clients/${clientId}/pricing-configs`)
-      if (res.ok) {
-        const data = await res.json() as Array<{ id: string; guardType: string; rate: number }>
-        const types = [...new Set(data.map((c) => c.guardType).filter(Boolean))]
-        setClientGuardTypes(types)
-        setGuardType(types.length > 0 ? types[0] : "")
-      }
-    } catch {
-      setClientGuardTypes([])
-    }
-  }
-
   useEffect(() => {
     setBranches([])
     setBranchesLoaded(false)
     setSelectedBranch("")
     if (!selectedClient) {
-      setClientGuardTypes([])
-      setGuardType("")
+      // `guardType` is contract-independent; reset to the canonical default so
+      // the deployment POST always carries a valid value even before a client
+      // is picked.
+      setGuardType(DEFAULT_GUARD_TYPE)
       return
     }
     loadBranches(selectedClient)
-    loadClientGuardTypes(selectedClient)
   }, [selectedClient])
 
   const loadClients = async (regionalOfficeId: string) => {
@@ -791,12 +791,21 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
               options={DESIGNATION_OPTIONS}
               placeholder="Select deployment role..."
             />
+
+            <SearchableCombobox
+              label="Guard Type"
+              required
+              value={guardType}
+              onChange={setGuardType}
+              options={GUARD_TYPE_OPTIONS}
+              placeholder="Select guard type..."
+            />
           </div>
 
           {selectedBranchData && (
             <div className="mt-4 p-4 rounded-[var(--radius-md)] border border-blue-200 bg-blue-50">
               <h3 className="text-sm font-semibold text-blue-800 mb-2">Branch Info</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                 <div>
                   <span className="block text-xs text-blue-600">Supervisor</span>
                   <span className="font-medium text-blue-900">{selectedBranchData.supervisorName ?? "—"}</span>
@@ -808,12 +817,6 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
                 <div>
                   <span className="block text-xs text-blue-600">Total Deployments</span>
                   <span className="font-medium text-blue-900">{selectedBranchData.activeDeployments}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-blue-600">Guard Types (Client)</span>
-                  <span className="font-medium text-blue-900">
-                    {clientGuardTypes.length > 0 ? clientGuardTypes.join(", ") : "No types configured"}
-                  </span>
                 </div>
               </div>
             </div>

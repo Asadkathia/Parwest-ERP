@@ -1056,6 +1056,16 @@ model ClientContractRate {
   @@index([contractId])
 }
 
+// TODO(prisma-migration): drop this model — write-dead after 2026-05-26.
+// Background: PricingConfig had zero writers in code (see audit
+// `docs/audits/clients-dead-legacy-conflict-audit.md` finding #1). Its only
+// reader was `GET /api/clients/[id]/pricing-configs` (consumed by the deploy
+// form's `loadClientGuardTypes`); both have been removed. The canonical
+// invoicing pricing SoT is `ClientContractRate`; the canonical deploy-time
+// guard-type vocabulary is `src/lib/constants/guardTypes.ts`. Schema-side
+// removal deferred to its own migration so existing rows (if any in prod) can
+// be inspected / archived before the table is dropped. Also remove the
+// `Client.pricingConfigs PricingConfig[]` back-relation when this is migrated.
 model PricingConfig {
   id        String   @id @default(cuid())
   clientId  String

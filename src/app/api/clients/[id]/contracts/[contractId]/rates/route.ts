@@ -47,8 +47,12 @@ export async function POST(
         const exService = String(body?.exService || "").trim()
         if (!exService) return badRequest("Ex-service selection is required.")
 
-        const contract = await prisma.clientContract.findUnique({
-            where: { id: contractId },
+        // SECURITY: bind contract lookup to the path clientId to prevent cross-tenant
+        // rate writes (IDOR). The scope gate above validates clientId is in-scope;
+        // binding the contract to that clientId blocks adding rates to another
+        // client's contract via an in-scope client id in the URL.
+        const contract = await prisma.clientContract.findFirst({
+            where: { id: contractId, clientId },
             select: {
                 id: true,
                 name: true,
@@ -144,15 +148,20 @@ export async function PATCH(
         const rateId = body?.rateId ? String(body.rateId) : null
         if (!rateId) return badRequest("rateId is required.")
 
+        // SECURITY: resolve contract via {id, clientId} FIRST to prevent cross-tenant
+        // rate edits (IDOR). The scope gate above validates clientId is in-scope;
+        // binding the contract to that clientId blocks mark-current on another
+        // client's contract via an in-scope client id in the URL.
+        const contract = await prisma.clientContract.findFirst({
+            where: { id: contractId, clientId },
+            select: { name: true },
+        })
+        if (!contract) return notFound("Contract not found")
+
         const rate = await prisma.clientContractRate.findFirst({
             where: { id: rateId, contractId },
         })
         if (!rate) return notFound("Rate not found")
-
-        const contract = await prisma.clientContract.findUnique({
-            where: { id: contractId },
-            select: { name: true },
-        })
 
         await prisma.$transaction(async (tx) => {
             await tx.clientContractRate.updateMany({
@@ -177,7 +186,7 @@ export async function PATCH(
                     userId: actorId,
                     event: "CONTRACT_RATE_MARKED_CURRENT",
                     module: "CLIENTS",
-                    description: `Rate ${rateId} marked as current in contract "${contract?.name}" (${contractId}) for client ${clientId} — ${rate.guardType} / ${rate.exService || "any"} @ PKR ${rate.rate}. By: ${actorName}`,
+                    description: `Rate ${rateId} marked as current in contract "${contract.name}" (${contractId}) for client ${clientId} — ${rate.guardType} / ${rate.exService || "any"} @ PKR ${rate.rate}. By: ${actorName}`,
                 },
             })
             .catch((e) => console.warn("AuditLog create failed (non-critical):", e))

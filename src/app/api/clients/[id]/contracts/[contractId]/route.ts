@@ -34,7 +34,11 @@ export async function PATCH(
             : null
 
         const body = await request.json()
-        const contract = await prisma.clientContract.findUnique({ where: { id: contractId } })
+        // SECURITY: bind contract lookup to the path clientId to prevent cross-tenant
+        // edits (IDOR). The scope gate above validates clientId is in-scope; binding
+        // the contract to that clientId blocks editing another client's contract via
+        // an in-scope client id in the URL.
+        const contract = await prisma.clientContract.findFirst({ where: { id: contractId, clientId } })
         if (!contract) return notFound("Contract not found")
 
         const name = body?.name ? String(body.name).trim() : contract.name

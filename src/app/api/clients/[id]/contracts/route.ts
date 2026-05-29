@@ -73,10 +73,24 @@ export async function POST(
         const name = String(body?.name || "").trim()
         if (!name) return badRequest("Contract name is required.")
 
+        // SECURITY: when branchId is supplied, verify the branch belongs to this
+        // client to prevent attaching a client-level contract to another client's
+        // branch (mirrors advance-payments POST guard).
+        const branchId = body?.branchId ? String(body.branchId) : null
+        if (branchId) {
+            const branch = await prisma.branch.findUnique({
+                where: { id: branchId },
+                select: { id: true, clientId: true },
+            })
+            if (!branch || branch.clientId !== clientId) {
+                return badRequest("branchId does not belong to this client.")
+            }
+        }
+
         const contract = await prisma.clientContract.create({
             data: {
                 clientId,
-                branchId: body?.branchId ? String(body.branchId) : null,
+                branchId,
                 name,
                 type: body?.type ? String(body.type).toUpperCase() : "GENERAL",
                 startDate: body?.startDate ? new Date(body.startDate) : null,
@@ -96,7 +110,7 @@ export async function POST(
                     userId: actorId,
                     event: "CONTRACT_CREATED",
                     module: "CLIENTS",
-                    description: `Contract "${name}" created for client ${clientId}${body?.branchId ? ` (branch ${body.branchId})` : ""}. By: ${actorName}`,
+                    description: `Contract "${name}" created for client ${clientId}${branchId ? ` (branch ${branchId})` : ""}. By: ${actorName}`,
                 },
             })
             .catch((e) => console.warn("AuditLog create failed (non-critical):", e))
