@@ -26,10 +26,19 @@ The four scopes, most-specific wins:
 4. **Rates stay under `ClientContract`** — client-level contracts (created from the client page) carry Region/Province/Global rates; branch-specific contracts (`ClientContract.branchId` set, created from the branches page) carry Branch rates.
 5. **`guardType` is a decorative label** — already display-only in `selectContractRate`; this work aligns the DB index to match (drops `guardType` from the rate identity).
 
-### ⚠️ Decisions to CONFIRM in review
+### Decisions
 
-- **D1 — ex-service becomes decorative.** Your rule "labels do not determine the rate" implies **ex-service is also just a label**, so rate identity = scope only (no `exService` in the key). This **drops the ex-service premium** from billing (today an ex-service guard can resolve a different rate). Confirm this is intended. *(If ex-service should still affect price, it stays a selection key alongside scope and the identity becomes `{scope + exService}`.)*
-- **D2 — one current rate per scope target.** This spec assumes **exactly one current rate (+ extraHourRate) per scope target** (e.g. one current rate per branch). If a single scope can hold *multiple* distinct standard rows, we need a key to tell them apart at billing — tell me what distinguishes them. *(Absent that, multiple rows at one scope are ambiguous for a deployment-driven, label-less model.)*
+- **D1 — RESOLVED: ex-service is decorative.** Rate identity = **scope only**. `exService` (and `guardType`) are optional display labels, never selection keys, never in the unique index. The ex-service premium is intentionally gone from billing.
+- **D2 — RESOLVED: branch rates are per-guard; higher scopes are singular.** A branch can hold **multiple branch-level rows — one per guard** (each guard its own manually-entered rate). Region / Province / Global each hold a **single** standard rate, used as fallback for guards without their own branch row. This removes the ambiguity: a deployed guard maps to *their own* branch row, else falls back up the scope chain.
+
+### Resolution tiers (most-specific first)
+
+1. **Branch + this guard** — the guard's own per-guard branch rate (`scopeLevel=BRANCH`, `scopeBranchId` + `scopeGuardId` set).
+2. **Region** — `scopeRegionId` (singular per client).
+3. **Province** — `scopeProvince` (singular per client).
+4. **Global** — client only (singular per client).
+
+(If a generic branch-wide rate with no `scopeGuardId` is ever needed, it sits between tiers 1 and 2; not required by the current model.)
 
 ## 3. Province introduction (Approach A — enum on Region)
 
@@ -55,6 +64,7 @@ model ClientContractRate {
   // NEW — explicit scope (discriminated):
   scopeLevel    RateScopeLevel              // BRANCH | REGION | PROVINCE | GLOBAL
   scopeBranchId String?                     // set iff BRANCH
+  scopeGuardId  String?                     // set iff BRANCH and per-guard (the common case)
   scopeRegionId String?                     // set iff REGION
   scopeProvince Province?                   // set iff PROVINCE
   // GLOBAL → all scope targets null
@@ -87,9 +97,8 @@ DROP INDEX "ClientContractRate_current_combo_key";
 CREATE UNIQUE INDEX "ClientContractRate_current_scope_key"
   ON "ClientContractRate" (
     "contractId", "scopeLevel",
-    COALESCE("scopeBranchId",''), COALESCE("scopeRegionId",''),
-    COALESCE("scopeProvince"::text,'')
-    -- + COALESCE("exService",'') IFF D1 keeps ex-service in identity
+    COALESCE("scopeBranchId",''), COALESCE("scopeGuardId",''),
+    COALESCE("scopeRegionId",''), COALESCE("scopeProvince"::text,'')
   )
   WHERE "isCurrentRate" = true;
 ```
@@ -99,12 +108,12 @@ CREATE UNIQUE INDEX "ClientContractRate_current_scope_key"
 Replace latest-date selection with **most-specific scope** resolution. For a deployment, resolve the branch's `{branchId, regionId, province}`, then:
 
 ```
-for level in [BRANCH(branchId), REGION(regionId), PROVINCE(province), GLOBAL]:
-    candidates = currentRates(client) where scope matches level
-                 AND effective window covers asOf
-                 [AND exService matches  — iff D1]
+for tier in [ BRANCH+guard(branchId,guardId), REGION(regionId),
+              PROVINCE(province), GLOBAL ]:
+    candidates = currentRates(client) where scope matches tier
+                 AND effective window covers the invoice month
     if candidates: return the one (one-current invariant guarantees ≤1)
-return null  // no rate → skip with warning (unchanged behaviour)
+return null  // no rate → skip guard with warning (unchanged behaviour)
 ```
 
 - Resolution is **client-wide** across the client's contracts (branch contract + client contract), picking the most specific scope, not the latest date.
@@ -112,7 +121,9 @@ return null  // no rate → skip with warning (unchanged behaviour)
 
 ## 6. Invoicing integration
 
-`buildInvoiceLines` / `resolveContractRateContext` keep their structure; only the **rate-selection call** changes to the new scope resolver. `GUARD_SALARY` line = `days × resolvedRate.rate`; overtime = `extraHours × resolvedRate.extraHourRate`. No change to advance/tax/finalize logic. Dedup the `auto-fill` route's inline copy to use the shared builder (carried over from the prior review's open item).
+**Invoices are monthly** (period = one calendar month), generated/accrued monthly — *not* per-day like payroll. The **contract's scoped rates calculate the invoice**: for each guard deployed in the month, the resolver (§5) picks that guard's rate, and the line = `monthly quantity × rate` (+ overtime). `buildInvoiceLines` / `resolveContractRateContext` keep their structure; only the **rate-selection call** swaps to the new per-guard scope resolver, and resolution runs **per deployed guard** (because branch rates are per-guard). No change to advance/tax/finalize logic. Dedup the `auto-fill` route's inline copy to use the shared builder (carried from the prior review's open item).
+
+**ASSUMPTION (confirm in review):** the manual rate is applied against the guard's **monthly quantity** — i.e. days deployed in the month × a daily rate (current behaviour). If instead the manual rate is a **flat monthly charge per guard** (regardless of exact days), the line becomes `1 × rate` prorated by deployment days. Defaulting to days × rate to match today; flag if it should be flat-monthly.
 
 ## 7. UI / creation flows
 
