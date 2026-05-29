@@ -5,14 +5,32 @@
  * (manual ad-hoc deductions). The legacy `Payroll.otherDeductions` float
  * column was dropped in the deductions-policy cleanup; entries are now the
  * sole source of truth.
+ *
+ * Durability:
+ *   The OTHER resolver falls through to `index.ts`'s default branch, which
+ *   yields `computedAmount = type.defaultAmount` (= 0 for the seeded OTHER
+ *   type). On non-override entries, persist.ts re-applies that 0 on every
+ *   recompute — silently wiping the manually-typed amount. To keep the
+ *   operator-entered value durable across recompute we flag the entry as
+ *   `isOverride=true` (persist.ts:133-148 preserves `amount` for override
+ *   rows). This is a SoT durability hack, NOT a permission elevation —
+ *   the route remains gated by PAYROLL:CREATE (manual entry), not
+ *   PAYROLL:DEDUCTION_OVERRIDE.
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import {
+  badRequest,
+  forbidden,
+  internalServerError,
+  notFound,
+  ok,
+  unauthorized,
+} from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { calculateGuardPayroll } from "@/lib/payroll/calculate"
 import { persistGuardPayroll } from "@/lib/payroll/persist"
@@ -22,6 +40,20 @@ import { parseMonthStart as parseMonth } from "@/lib/payroll/date-helpers"
 const LOCK_MESSAGE_FRAGMENT = "Cannot recalculate payroll"
 // Canonical code; seeded as a policy-managed type by the deductions-policy migration.
 const OTHER_CODE = "OTHER"
+const OTHER_OVERRIDE_REASON = "Manual OTHER deduction (operator entry)"
+
+function actorIdentity(session: { user?: unknown } | null): {
+  id: string | null
+  name: string | null
+} {
+  const u = (session?.user ?? null) as
+    | { id?: string | null; name?: string | null; email?: string | null }
+    | null
+  return {
+    id: u?.id ?? null,
+    name: u?.name ?? u?.email ?? null,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,16 +98,16 @@ export async function GET(request: NextRequest) {
     if (regionalOfficeIdParam) guardFilter.regionalOfficeId = regionalOfficeIdParam
     if (Object.keys(guardFilter).length > 0) payrollWhere.guard = { is: guardFilter }
 
-    // Find MISC deduction type id (may not yet exist).
-    const miscType = await prisma.payrollDeductionType.findUnique({
+    // Find OTHER deduction type id (always seeded by the deductions-policy migration).
+    const otherType = await prisma.payrollDeductionType.findUnique({
       where: { code: OTHER_CODE },
       select: { id: true },
     })
 
-    const entries = miscType
+    const entries = otherType
       ? await prisma.payrollDeductionEntry.findMany({
           where: {
-            deductionTypeId: miscType.id,
+            deductionTypeId: otherType.id,
             payroll: payrollWhere,
           },
           include: {
@@ -90,14 +122,15 @@ export async function GET(request: NextRequest) {
         })
       : []
 
-    // Shape: array of { ...payroll fields, miscAmount, notes } for backward-ish compat.
+    // Shape: array of { ...payroll fields, otherDeductions, otherDeductionNotes }
+    // for backward-compat with the existing PayrollOtherDeductionsManager view.
     const rows = entries.map((e) => ({
       ...e.payroll,
       otherDeductions: e.amount,
       otherDeductionNotes: e.notes,
     }))
 
-    return NextResponse.json(rows)
+    return ok(rows)
   } catch (error) {
     console.error("Error fetching other deductions:", error)
     return internalServerError("Failed to fetch other deductions records.")
@@ -139,19 +172,19 @@ export async function POST(request: NextRequest) {
     }
 
     // OTHER is seeded by the deductions-policy migration.
-    const miscType = await prisma.payrollDeductionType.findUnique({
+    const otherType = await prisma.payrollDeductionType.findUnique({
       where: { code: OTHER_CODE },
       select: { id: true },
     })
-    if (!miscType) {
+    if (!otherType) {
       return internalServerError(
         "OTHER deduction type missing — run prisma migrate to apply deductions policy."
       )
     }
 
     const year = month.getUTCFullYear()
-    const actorUserId =
-      (session.user as { id?: string | null } | undefined)?.id ?? null
+    const actor = actorIdentity(session)
+    const overrideAt = new Date()
 
     let payrollId: string
     try {
@@ -168,23 +201,36 @@ export async function POST(request: NextRequest) {
               select: { id: true },
             })
 
-        // Upsert the MISC entry.
+        // Upsert the OTHER entry as an override so recompute does NOT zero
+        // the operator-entered amount. The OTHER resolver yields
+        // computedAmount=0 (default branch) and persist.ts preserves
+        // `amount` only on rows where isOverride=true.
         await tx.payrollDeductionEntry.upsert({
           where: {
             payrollId_deductionTypeId: {
               payrollId: row.id,
-              deductionTypeId: miscType.id,
+              deductionTypeId: otherType.id,
             },
           },
           create: {
             payrollId: row.id,
-            deductionTypeId: miscType.id,
+            deductionTypeId: otherType.id,
             amount,
             notes,
+            isOverride: true,
+            overrideById: actor.id,
+            overrideByName: actor.name,
+            overrideReason: OTHER_OVERRIDE_REASON,
+            overrideAt,
           },
           update: {
             amount,
             notes,
+            isOverride: true,
+            overrideById: actor.id,
+            overrideByName: actor.name,
+            overrideReason: OTHER_OVERRIDE_REASON,
+            overrideAt,
           },
         })
 
@@ -192,7 +238,7 @@ export async function POST(request: NextRequest) {
         const computation = await calculateGuardPayroll(guardId, month, { trx: tx })
         const persisted = await persistGuardPayroll(computation, {
           trx: tx,
-          actorUserId,
+          actorUserId: actor.id,
           setStateToCalculated: true,
         })
         return persisted.payrollId
@@ -208,10 +254,10 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: actorUserId,
+          userId: actor.id,
           event: "PAYROLL_OTHER_DEDUCTION_UPDATE",
           module: "PAYROLL",
-          description: `Updated MISC deduction for guard ${guardId} month ${monthInput}`,
+          description: `Updated OTHER deduction for guard ${guardId} month ${monthInput} (amount=${amount})`,
         },
       })
     } catch (auditErr) {
@@ -222,7 +268,7 @@ export async function POST(request: NextRequest) {
       where: { id: payrollId },
       include: { guard: { select: { id: true, name: true, parwestId: true } } },
     })
-    return NextResponse.json(saved)
+    return ok(saved)
   } catch (error) {
     console.error("Error saving other deductions:", error)
     return internalServerError("Failed to save other deductions.")

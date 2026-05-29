@@ -21,6 +21,7 @@
  */
 
 import { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import {
@@ -101,6 +102,22 @@ export async function POST(request: NextRequest) {
     const issuer = (session.user as { id?: string; name?: string }) ?? {}
 
     const result = await prisma.$transaction(async (trx) => {
+      // Idempotency precheck — natural key: (guardId, issuedOn, principal).
+      // AdvanceSalary has no plan/course reference; the same guard receiving
+      // the same principal amount on the same date is overwhelmingly likely
+      // to be a retried submission rather than a genuine second advance.
+      // A retried POST must return the existing advance, not spawn a parallel
+      // recovery schedule that double-charges the guard.
+      // TODO(hardening): replace with @@unique([guardId, issuedOn, principal])
+      // on AdvanceSalary per audit "Top #4 — Non-idempotent issuance triggers"
+      // (docs/audits/deductions-pipeline-dead-legacy-conflict-audit.md).
+      const existing = await trx.advanceSalary.findFirst({
+        where: { guardId, issuedOn, principal },
+      })
+      if (existing) {
+        return existing
+      }
+
       const advance = await trx.advanceSalary.create({
         data: {
           guardId,
@@ -124,7 +141,7 @@ export async function POST(request: NextRequest) {
         })
       }
       return advance
-    })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     return ok(result, 201)
   } catch (err) {

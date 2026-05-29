@@ -110,6 +110,16 @@ export default function PayrollOtherDeductionsManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month])
 
+  // Prefer the canonical `lifecycleStatus` for the displayed Status field,
+  // falling back to the legacy `status` shadow when absent. Additive + safe.
+  const displayContext = useMemo<GuardCurrentContext | null>(
+    () =>
+      context
+        ? { ...context, status: context.lifecycleStatus ?? context.status }
+        : null,
+    [context]
+  )
+
   const loadRows = useCallback(async () => {
     setLoading(true)
     try {
@@ -119,7 +129,9 @@ export default function PayrollOtherDeductionsManager({
       if (effectiveRegionId) params.set("regionId", effectiveRegionId)
       const res = await fetch(`/api/payroll/other-deductions?${params}`)
       if (res.ok) {
-        const data = await res.json()
+        const raw = await res.json()
+        // Envelope-aware: accept both ok({ success, data: [] }) and legacy raw array.
+        const data = Array.isArray(raw?.data) ? raw.data : raw
         setRows(Array.isArray(data) ? data : [])
       }
     } finally {
@@ -335,7 +347,7 @@ export default function PayrollOtherDeductionsManager({
               </div>
 
               <GuardContextFields
-                context={context}
+                context={displayContext}
                 showRows={["name", "status", "type", "location"]}
               />
 

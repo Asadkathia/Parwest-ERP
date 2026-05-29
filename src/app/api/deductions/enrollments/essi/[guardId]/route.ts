@@ -13,12 +13,12 @@ import {
   badRequest,
   forbidden,
   internalServerError,
-  notFound,
   ok,
   unauthorized,
 } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { upsertEssiEnrollment } from "@/lib/deductions/enrollments"
+import { requireGuardInScope } from "@/lib/guards/access"
 
 export async function GET(
   _request: NextRequest,
@@ -29,6 +29,10 @@ export async function GET(
     if (!session) return unauthorized()
     if (!hasAction(session, "DEDUCTIONS", "VIEW")) return forbidden("Access denied")
     const { guardId } = await ctx.params
+    // Regional scope: a regional Admin restricted to Region A must not be
+    // able to read ESSI enrollment for a guard in Region B by ID.
+    const denied = await requireGuardInScope(session, guardId)
+    if (denied) return denied
     const row = await prisma.essiEnrollment.findUnique({ where: { guardId } })
     return ok(row)
   } catch (err) {
@@ -46,11 +50,10 @@ export async function PUT(
     if (!session) return unauthorized()
     if (!hasAction(session, "DEDUCTIONS", "UPDATE")) return forbidden("Access denied")
     const { guardId } = await ctx.params
-    const guard = await prisma.guard.findUnique({
-      where: { id: guardId },
-      select: { id: true },
-    })
-    if (!guard) return notFound("Guard not found")
+    // Regional scope: blocks out-of-region writes (also handles 404 if the
+    // guard does not exist), replacing the prior bare existence check.
+    const denied = await requireGuardInScope(session, guardId)
+    if (denied) return denied
 
     const body = (await request.json()) as Record<string, unknown>
     const isActive = body.isActive === true

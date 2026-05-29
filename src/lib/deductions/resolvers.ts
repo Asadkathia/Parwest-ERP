@@ -55,12 +55,28 @@ function zero(
 // ─────────────────────────────────────────────────────────────────────────────
 // APSAA — sum of branch rates weighted by days deployed at each branch
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// rateSource label note: emitted as "BRANCH_RATE" (not "CLIENT_BRANCH_RATE").
+// The data comes from the dedicated `ApsaaBranchRate` table — a guard-payroll
+// deduction table scoped by branchId — NOT from client invoicing. The old
+// "CLIENT_BRANCH_RATE" label falsely implied an invoicing source.
+//
+// TODO(out-of-lane): the legacy "CLIENT_BRANCH_RATE" string still appears in
+//   - `src/lib/deductions/types.ts` (RATE_SOURCES const union)
+//   - `prisma/schema.prisma` (column-doc comment listing valid values)
+//   - `prisma/migrations/20260506100000_deductions_policy/migration.sql`
+//     (seeded `PayrollDeductionType.rateSource` for APSAA + APSAA_PUNJAB)
+// Aligning those requires a coordinated migration (data backfill of existing
+// PayrollDeductionEntry/Type rows) and a types.ts edit — out of this lane.
+// `ResolvedDeduction.rateSource` accepts `RateSource | string`, so emitting
+// the new label here is type-safe and the runtime value just becomes the new
+// label on entries written from this point on.
 export async function resolveApsaa(
   db: DbClient,
   ctx: ResolverContext
 ): Promise<ResolvedDeduction> {
   if (!isWorkflowRuleEnabled("deductions.applyApsaaBranchRate")) {
-    return zero("APSAA", "CLIENT_BRANCH_RATE", "APSAA auto-apply disabled by workflow rule")
+    return zero("APSAA", "BRANCH_RATE", "APSAA auto-apply disabled by workflow rule")
   }
 
   const breakdown: DeductionBreakdownLine[] = []
@@ -96,7 +112,7 @@ export async function resolveApsaa(
 
   return {
     code: "APSAA",
-    rateSource: "CLIENT_BRANCH_RATE",
+    rateSource: "BRANCH_RATE",
     computedAmount: round2(total),
     rateRowId: firstRateRowId,
     breakdown,
@@ -142,27 +158,29 @@ export async function resolveCwf(
 // ─────────────────────────────────────────────────────────────────────────────
 // APSAA Punjab — flat global rate, applied only if any deployment branch in Punjab
 // ─────────────────────────────────────────────────────────────────────────────
+// rateSource label: "BRANCH_RATE" — same reasoning as resolveApsaa above.
+// See the TODO comment on resolveApsaa for the out-of-lane label cleanup.
 export async function resolveApsaaPunjab(
   db: DbClient,
   ctx: ResolverContext
 ): Promise<ResolvedDeduction> {
   if (!isWorkflowRuleEnabled("deductions.applyApsaaPunjabOnEnrollment")) {
-    return zero("APSAA_PUNJAB", "CLIENT_BRANCH_RATE", "APSAA Punjab disabled by workflow rule")
+    return zero("APSAA_PUNJAB", "BRANCH_RATE", "APSAA Punjab disabled by workflow rule")
   }
   if (!ctx.deployedInPunjab) {
-    return zero("APSAA_PUNJAB", "CLIENT_BRANCH_RATE")
+    return zero("APSAA_PUNJAB", "BRANCH_RATE")
   }
   const lookup = await resolveApsaaPunjabRate(db, ctx.monthStart)
   if (!lookup) {
     return zero(
       "APSAA_PUNJAB",
-      "CLIENT_BRANCH_RATE",
+      "BRANCH_RATE",
       `MISSING_RATE: no active APSAA Punjab rate in ${ctx.monthStart.toISOString().slice(0, 7)}`
     )
   }
   return {
     code: "APSAA_PUNJAB",
-    rateSource: "CLIENT_BRANCH_RATE",
+    rateSource: "BRANCH_RATE",
     computedAmount: round2(lookup.amount),
     rateRowId: lookup.rateRowId,
     breakdown: [{ scope: "PUNJAB", rate: lookup.amount, rateRowId: lookup.rateRowId }],

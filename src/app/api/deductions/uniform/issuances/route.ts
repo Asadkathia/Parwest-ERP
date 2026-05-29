@@ -13,6 +13,7 @@
  */
 
 import { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import {
@@ -69,6 +70,19 @@ export async function POST(request: NextRequest) {
     const issuer = (session.user as { id?: string; name?: string }) ?? {}
 
     const result = await prisma.$transaction(async (trx) => {
+      // Idempotency precheck — natural key: (guardId, issuedOn, uniformPlanId).
+      // A retried POST for the same guard + issuance date + plan version must
+      // return the existing issuance, not spawn a parallel installment schedule.
+      // TODO(hardening): replace with @@unique([guardId, issuedOn, uniformPlanId])
+      // on UniformIssuance per audit "Top #4 — Non-idempotent issuance triggers"
+      // (docs/audits/deductions-pipeline-dead-legacy-conflict-audit.md).
+      const existing = await trx.uniformIssuance.findFirst({
+        where: { guardId, issuedOn, uniformPlanId: plan.id },
+      })
+      if (existing) {
+        return existing
+      }
+
       const issuance = await trx.uniformIssuance.create({
         data: {
           guardId,
@@ -105,7 +119,7 @@ export async function POST(request: NextRequest) {
       }
 
       return issuance
-    })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     return ok(result, 201)
   } catch (err) {
