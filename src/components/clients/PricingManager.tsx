@@ -305,7 +305,7 @@ function AddRateModal({
                 <div className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
                     <div>
                         <p className="text-sm font-medium text-[var(--text)]">Mark as Current Rate</p>
-                        <p className="text-xs text-[var(--text-muted)]">Deactivates previous current rate for this ex-service + scope</p>
+                        <p className="text-xs text-[var(--text-muted)]">Deactivates the previous current rate for this scope</p>
                     </div>
                     <button
                         type="button"
@@ -848,9 +848,21 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
     }
 
     function onRateAdded(contractId: string, rate: ContractRate) {
-        setContracts((prev) => prev.map((c) =>
-            c.id === contractId ? { ...c, rates: [...c.rates, rate] } : c
-        ))
+        // Mirror the server's demote-before-create: when the new rate is current,
+        // flip any existing current rate in the SAME scope to non-current so the
+        // table doesn't show two "Current" rows until a reload.
+        const sameScope = (a: ContractRate, b: ContractRate) =>
+            a.scopeLevel === b.scopeLevel &&
+            (a.scopeBranchId ?? null) === (b.scopeBranchId ?? null) &&
+            (a.scopeRegionId ?? null) === (b.scopeRegionId ?? null) &&
+            (a.scopeProvince ?? null) === (b.scopeProvince ?? null)
+        setContracts((prev) => prev.map((c) => {
+            if (c.id !== contractId) return c
+            const existing = rate.isCurrentRate
+                ? c.rates.map((r) => (sameScope(r, rate) ? { ...r, isCurrentRate: false } : r))
+                : c.rates
+            return { ...c, rates: [...existing, rate] }
+        }))
     }
 
     function onRatesUpdated(contractId: string, rates: ContractRate[]) {
