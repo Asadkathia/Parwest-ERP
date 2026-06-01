@@ -1,23 +1,41 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, ChevronRight, FileText, Tag, CheckCircle2, Pencil } from "lucide-react"
+import { Plus, ChevronRight, FileText, Tag, CheckCircle2, Pencil, Users } from "lucide-react"
+import { useRegions } from "@/lib/hooks/useRegions"
+import { PROVINCE_VALUES } from "@/lib/geo/province-constants"
 
 // ── Static data ────────────────────────────────────────────────────────────────
 const CONTRACT_TYPE_OPTIONS = ["GENERAL", "SPECIAL", "RENEWAL"]
+const BILLING_MODE_OPTIONS = ["MANUAL", "DYNAMIC"] as const
+
+const SCOPE_LEVEL_OPTIONS = ["BRANCH", "REGION", "PROVINCE", "GLOBAL"] as const
+type ScopeLevel = (typeof SCOPE_LEVEL_OPTIONS)[number]
+type BillingMode = "MANUAL" | "DYNAMIC"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type ContractRate = {
     id: string
-    province: string | null
-    city: string | null
-    guardType: string
+    scopeLevel: ScopeLevel
+    scopeBranchId: string | null
+    scopeRegionId: string | null
+    scopeProvince: string | null
+    guardType: string | null
     exService: string | null
     rate: number
     extraHourRate: number | null
     isCurrentRate: boolean
     rateStartDate: string | null
     rateEndDate: string | null
+}
+
+type GuardRate = {
+    guardId: string
+    parwestId: string
+    name: string
+    rate: number
+    extraHourRate: number | null
+    contractGuardRateId: string | null
 }
 
 type Contract = {
@@ -27,6 +45,7 @@ type Contract = {
     branch: { id: string; name: string; province: string | null; city: string | null } | null
     name: string
     type: string
+    billingMode: BillingMode
     startDate: string | null
     endDate: string | null
     isActive: boolean
@@ -44,8 +63,12 @@ type Props = {
     clientName: string
     branches: Branch[]
     isBranchless: boolean
-    operationalProvinces: string | null
-    regionName: string | null
+    /**
+     * When rendered embedded on a single branch's page, lock the manager to that
+     * branch: the contract list defaults to (and stays on) this branch's
+     * contracts, and new contracts are fixed to it.
+     */
+    lockedBranchId?: string
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -87,11 +110,13 @@ const inputCls = "w-full rounded-lg border border-[var(--border)] bg-card px-3 p
 
 // ── Add / Edit Contract Modal ──────────────────────────────────────────────────
 function ContractFormModal({
-    clientId, branches, isBranchless, existing, onClose, onSaved,
+    clientId, branches, isBranchless, lockedBranchId, existing, onClose, onSaved,
 }: {
     clientId: string
     branches: Branch[]
     isBranchless: boolean
+    /** When set, a new contract is fixed to this branch and the picker is hidden. */
+    lockedBranchId?: string
     existing?: Contract
     onClose: () => void
     onSaved: (c: Contract) => void
@@ -100,9 +125,10 @@ function ContractFormModal({
     const [form, setForm] = useState({
         name: existing?.name ?? "",
         type: existing?.type ?? "GENERAL",
+        billingMode: (existing?.billingMode ?? "MANUAL") as BillingMode,
         startDate: toInputDate(existing?.startDate),
         endDate: toInputDate(existing?.endDate),
-        branchId: existing?.branchId ?? "",
+        branchId: existing?.branchId ?? lockedBranchId ?? "",
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -125,13 +151,18 @@ function ContractFormModal({
                     type: form.type,
                     startDate: form.startDate || null,
                     endDate: form.endDate || null,
-                    ...(!isEdit && { branchId: form.branchId || null }),
+                    // billingMode is only set on create — editing the mode is out of scope.
+                    ...(!isEdit && { branchId: form.branchId || null, billingMode: form.billingMode }),
                 }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                let msg = "Failed to save contract."
+                try { const d = await res.json(); if (d?.message) msg = d.message } catch { /* non-JSON */ }
+                throw new Error(msg)
+            }
             onSaved(await res.json())
-        } catch {
-            setError("Failed to save contract.")
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to save contract.")
         } finally {
             setLoading(false)
         }
@@ -140,7 +171,7 @@ function ContractFormModal({
     return (
         <Modal title={isEdit ? "Edit Contract" : "Add New Contract"} onClose={onClose}>
             <div className="space-y-4">
-                {!isEdit && !isBranchless && (
+                {!isEdit && !isBranchless && !lockedBranchId && (
                     <Field label="Branch (leave empty for client-level contract)">
                         <select value={form.branchId} onChange={(e) => set("branchId", e.target.value)} className={inputCls}>
                             <option value="">— Client-level contract —</option>
@@ -159,7 +190,17 @@ function ContractFormModal({
                             {CONTRACT_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </Field>
-                    <div />
+                    <Field label="Billing Mode">
+                        {isEdit ? (
+                            <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>{form.billingMode}</div>
+                        ) : (
+                            <select value={form.billingMode} onChange={(e) => set("billingMode", e.target.value)} className={inputCls}>
+                                {BILLING_MODE_OPTIONS.map((m) => (
+                                    <option key={m} value={m}>{m === "MANUAL" ? "Manual (scoped rates)" : "Dynamic (per-guard rates)"}</option>
+                                ))}
+                            </select>
+                        )}
+                    </Field>
                     <Field label="Start Date">
                         <input type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} className={inputCls} />
                     </Field>
@@ -179,26 +220,31 @@ function ContractFormModal({
     )
 }
 
-// ── Add Rate Modal ─────────────────────────────────────────────────────────────
+// ── Add Rate Modal (MANUAL billing — scope-based) ────────────────────────────────
 function AddRateModal({
-    clientId, contractId, branch, operationalProvinces, regionName, guardTypes, exServiceTypes, onClose, onCreated,
+    clientId, contractId, branch, branchId, guardTypes, exServiceTypes, onClose, onCreated,
 }: {
     clientId: string
     contractId: string
     branch: { province: string | null; city: string | null } | null
-    operationalProvinces: string | null
-    regionName: string | null
+    branchId: string | null
     guardTypes: string[]
     exServiceTypes: string[]
     onClose: () => void
     onCreated: (r: ContractRate) => void
 }) {
-    // Province/city are derived (server is authoritative); shown read-only here.
-    const isBranchContract = !!branch
-    const derivedProvince = (isBranchContract ? branch?.province : operationalProvinces) || "—"
-    const derivedCity = (isBranchContract ? branch?.city : regionName) || "—"
+    const { regions, loading: regionsLoading } = useRegions()
+    // A contract bound to a branch may target the BRANCH scope; client-level
+    // contracts (no branch) cannot, so we drop BRANCH from the options.
+    const hasBranchContext = !!branchId
+    const scopeLevels = hasBranchContext
+        ? SCOPE_LEVEL_OPTIONS
+        : SCOPE_LEVEL_OPTIONS.filter((l) => l !== "BRANCH")
 
     const [form, setForm] = useState({
+        scopeLevel: (scopeLevels[0] ?? "GLOBAL") as ScopeLevel,
+        scopeRegionId: "",
+        scopeProvince: PROVINCE_VALUES[0] as string,
         guardType: guardTypes[0] ?? "",
         exServiceYes: false,
         exServiceType: exServiceTypes[0] ?? "",
@@ -213,14 +259,23 @@ function AddRateModal({
     async function submit() {
         if (!form.guardType) { setError("Guard type is required."); return }
         if (form.exServiceYes && !form.exServiceType) { setError("Select an ex-service type."); return }
+        if (form.scopeLevel === "REGION" && !form.scopeRegionId) { setError("Select a region for REGION scope."); return }
+        if (form.scopeLevel === "PROVINCE" && !form.scopeProvince) { setError("Select a province for PROVINCE scope."); return }
+        if (form.scopeLevel === "BRANCH" && !branchId) { setError("No branch context for BRANCH scope."); return }
         if (!form.rate || isNaN(Number(form.rate))) { setError("A valid rate is required."); return }
         setLoading(true); setError("")
         try {
             const exService = form.exServiceYes ? form.exServiceType : "CIVILIAN"
+            const scopeFields: Record<string, string> = {}
+            if (form.scopeLevel === "BRANCH" && branchId) scopeFields.scopeBranchId = branchId
+            if (form.scopeLevel === "REGION") scopeFields.scopeRegionId = form.scopeRegionId
+            if (form.scopeLevel === "PROVINCE") scopeFields.scopeProvince = form.scopeProvince
             const res = await fetch(`/api/clients/${clientId}/contracts/${contractId}/rates`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    scopeLevel: form.scopeLevel,
+                    ...scopeFields,
                     guardType: form.guardType,
                     exService,
                     rate: Number(form.rate),
@@ -230,10 +285,14 @@ function AddRateModal({
                     rateEndDate: form.rateEndDate || null,
                 }),
             })
-            if (!res.ok) throw new Error(await res.text())
+            if (!res.ok) {
+                let msg = "Failed to add rate."
+                try { const d = await res.json(); if (d?.message) msg = d.message } catch { /* non-JSON */ }
+                throw new Error(msg)
+            }
             onCreated(await res.json())
-        } catch {
-            setError("Failed to add rate.")
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to add rate.")
         } finally {
             setLoading(false)
         }
@@ -246,7 +305,7 @@ function AddRateModal({
                 <div className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
                     <div>
                         <p className="text-sm font-medium text-[var(--text)]">Mark as Current Rate</p>
-                        <p className="text-xs text-[var(--text-muted)]">Deactivates previous current rate for this ex-service + location</p>
+                        <p className="text-xs text-[var(--text-muted)]">Deactivates previous current rate for this ex-service + scope</p>
                     </div>
                     <button
                         type="button"
@@ -257,14 +316,40 @@ function AddRateModal({
                     </button>
                 </div>
 
-                {/* Derived location (read-only) */}
+                {/* Scope picker */}
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Province (auto)">
-                        <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>{derivedProvince}</div>
+                    <Field label="Scope Level *">
+                        <select value={form.scopeLevel} onChange={(e) => set("scopeLevel", e.target.value)} className={inputCls}>
+                            {scopeLevels.map((l) => <option key={l} value={l}>{l}</option>)}
+                        </select>
                     </Field>
-                    <Field label={isBranchContract ? "City (branch, auto)" : "City (region, auto)"}>
-                        <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>{derivedCity}</div>
-                    </Field>
+                    {form.scopeLevel === "REGION" && (
+                        <Field label="Region *">
+                            <select value={form.scopeRegionId} onChange={(e) => set("scopeRegionId", e.target.value)} className={inputCls}>
+                                <option value="">{regionsLoading ? "Loading regions…" : "— Select region —"}</option>
+                                {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                        </Field>
+                    )}
+                    {form.scopeLevel === "PROVINCE" && (
+                        <Field label="Province *">
+                            <select value={form.scopeProvince} onChange={(e) => set("scopeProvince", e.target.value)} className={inputCls}>
+                                {PROVINCE_VALUES.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </Field>
+                    )}
+                    {form.scopeLevel === "BRANCH" && (
+                        <Field label="Branch (this contract)">
+                            <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>
+                                {branch?.city ? `${branch.city}${branch.province ? `, ${branch.province}` : ""}` : "This branch"}
+                            </div>
+                        </Field>
+                    )}
+                    {form.scopeLevel === "GLOBAL" && (
+                        <Field label="Scope Target">
+                            <div className={`${inputCls} bg-muted text-[var(--text-muted)]`}>All locations (global)</div>
+                        </Field>
+                    )}
                 </div>
 
                 {/* Ex-service yes/no + type */}
@@ -321,22 +406,165 @@ function AddRateModal({
     )
 }
 
+// ── Guard Rates Modal (DYNAMIC billing — per-guard) ──────────────────────────────
+function GuardRatesModal({
+    clientId, contractId, onClose,
+}: {
+    clientId: string
+    contractId: string
+    onClose: () => void
+}) {
+    const [rows, setRows] = useState<GuardRate[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState("")
+    const [savingId, setSavingId] = useState<string | null>(null)
+
+    const load = useCallback(async () => {
+        setLoading(true); setError("")
+        try {
+            const res = await fetch(`/api/clients/${clientId}/contracts/${contractId}/guard-rates`)
+            if (!res.ok) {
+                let msg = "Failed to load guard rates."
+                try { const d = await res.json(); if (d?.message) msg = d.message } catch { /* non-JSON */ }
+                throw new Error(msg)
+            }
+            const data = await res.json() as GuardRate[]
+            setRows(data)
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to load guard rates.")
+        } finally {
+            setLoading(false)
+        }
+    }, [clientId, contractId])
+
+    useEffect(() => { load() }, [load])
+
+    const setRow = (guardId: string, k: "rate" | "extraHourRate", v: number | null) =>
+        setRows((prev) => prev.map((r) => r.guardId === guardId ? { ...r, [k]: v } : r))
+
+    async function save(row: GuardRate) {
+        if (row.rate == null || isNaN(Number(row.rate))) { setError("Enter a valid rate before saving."); return }
+        setSavingId(row.guardId); setError("")
+        try {
+            const res = await fetch(`/api/clients/${clientId}/contracts/${contractId}/guard-rates`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    guardId: row.guardId,
+                    rate: Number(row.rate),
+                    extraHourRate: row.extraHourRate != null ? Number(row.extraHourRate) : null,
+                }),
+            })
+            if (!res.ok) {
+                let msg = "Failed to save guard rate."
+                try { const d = await res.json(); if (d?.message) msg = d.message } catch { /* non-JSON */ }
+                throw new Error(msg)
+            }
+            const saved = await res.json() as GuardRate
+            setRows((prev) => prev.map((r) => r.guardId === saved.guardId ? saved : r))
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to save guard rate.")
+        } finally {
+            setSavingId(null)
+        }
+    }
+
+    return (
+        <Modal title="Per-Guard Rates (Dynamic)" onClose={onClose}>
+            <div className="space-y-4">
+                {error && <p className="text-xs text-red-600">{error}</p>}
+                {loading ? (
+                    <div className="px-2 py-8 text-center text-sm text-[var(--text-muted)]">Loading guards…</div>
+                ) : rows.length === 0 ? (
+                    <div className="px-2 py-8 text-center text-sm text-[var(--text-muted)]">
+                        No guards enrolled on this contract yet.
+                    </div>
+                ) : (
+                    <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-[var(--border)]">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-[var(--border)] bg-muted">
+                                    {["Guard", "Rate (PKR)", "Extra/Hr (PKR)", ""].map((h) => (
+                                        <th key={h} className="px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((row) => (
+                                    <tr key={row.guardId} className="border-b border-[var(--border)] last:border-0">
+                                        <td className="px-3 py-2">
+                                            <div className="text-sm font-medium text-[var(--text)]">{row.name}</div>
+                                            <div className="text-xs text-[var(--text-muted)]">{row.parwestId}</div>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <input
+                                                type="number"
+                                                value={row.rate ?? ""}
+                                                onChange={(e) => setRow(row.guardId, "rate", e.target.value === "" ? null : Number(e.target.value))}
+                                                placeholder="e.g. 40000"
+                                                className={`${inputCls} !py-1.5`}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <input
+                                                type="number"
+                                                value={row.extraHourRate ?? ""}
+                                                onChange={(e) => setRow(row.guardId, "extraHourRate", e.target.value === "" ? null : Number(e.target.value))}
+                                                placeholder="e.g. 500"
+                                                className={`${inputCls} !py-1.5`}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <button
+                                                onClick={() => save(row)}
+                                                disabled={savingId === row.guardId}
+                                                className="ui-btn ui-btn-primary !py-1.5 !px-3 !text-xs"
+                                            >
+                                                {savingId === row.guardId ? "…" : "Save"}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                    <button onClick={onClose} className="ui-btn ui-btn-secondary">Close</button>
+                </div>
+            </div>
+        </Modal>
+    )
+}
+
 // ── Contract Card ──────────────────────────────────────────────────────────────
+function scopeLabel(rate: ContractRate, regionsById: Map<string, string>): string {
+    switch (rate.scopeLevel) {
+        case "BRANCH": return "Branch"
+        case "REGION": return `Region: ${rate.scopeRegionId ? (regionsById.get(rate.scopeRegionId) ?? rate.scopeRegionId) : "—"}`
+        case "PROVINCE": return `Province: ${rate.scopeProvince ?? "—"}`
+        case "GLOBAL": return "Global"
+        default: return "—"
+    }
+}
+
 function ContractCard({
-    contract, clientId, operationalProvinces, regionName, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
+    contract, clientId, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
 }: {
     contract: Contract
     clientId: string
-    operationalProvinces: string | null
-    regionName: string | null
     guardTypes: string[]
     exServiceTypes: string[]
     onContractUpdated: (c: Contract) => void
     onRateAdded: (contractId: string, rate: ContractRate) => void
     onRatesUpdated: (contractId: string, rates: ContractRate[]) => void
 }) {
+    const { regions } = useRegions()
+    const regionsById = new Map(regions.map((r) => [r.id, r.name]))
+    const isDynamic = contract.billingMode === "DYNAMIC"
     const [expanded, setExpanded] = useState(false)
     const [showAddRate, setShowAddRate] = useState(false)
+    const [showGuardRates, setShowGuardRates] = useState(false)
     const [showEditContract, setShowEditContract] = useState(false)
     const [markingCurrentId, setMarkingCurrentId] = useState<string | null>(null)
 
@@ -371,6 +599,9 @@ function ContractCard({
                             <FileText className="h-4 w-4 text-blue-500" />
                             <span className="text-sm font-semibold text-[var(--text)]">{contract.name}</span>
                             <span className="rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">{contract.type}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isDynamic ? "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300" : "bg-teal-100 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300"}`}>
+                                {isDynamic ? "Dynamic" : "Manual"}
+                            </span>
                             {contract.branch ? (
                                 <span className="rounded-full bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">{contract.branch.name}</span>
                             ) : (
@@ -382,7 +613,9 @@ function ContractCard({
                         </div>
                         <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                             {fmt(contract.startDate)} → {fmt(contract.endDate)}
-                            {" · "}{contract.rates.length} rate{contract.rates.length !== 1 ? "s" : ""}
+                            {" · "}{isDynamic
+                                ? "Per-guard rates"
+                                : `${contract.rates.length} rate${contract.rates.length !== 1 ? "s" : ""}`}
                         </p>
                     </div>
                 </button>
@@ -393,19 +626,32 @@ function ContractCard({
                     >
                         <Pencil className="h-3 w-3" /> Edit
                     </button>
-                    <button
-                        onClick={() => { setExpanded(true); setShowAddRate(true) }}
-                        className="ui-btn ui-btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
-                    >
-                        <Plus className="h-3 w-3" /> Add Rate
-                    </button>
+                    {isDynamic ? (
+                        <button
+                            onClick={() => setShowGuardRates(true)}
+                            className="ui-btn ui-btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                        >
+                            <Users className="h-3 w-3" /> Manage Guard Rates
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => { setExpanded(true); setShowAddRate(true) }}
+                            className="ui-btn ui-btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                        >
+                            <Plus className="h-3 w-3" /> Add Rate
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Rates table */}
+            {/* Rates body */}
             {expanded && (
                 <div className="overflow-x-auto">
-                    {contract.rates.length === 0 ? (
+                    {isDynamic ? (
+                        <div className="px-5 py-8 text-center text-sm text-[var(--text-muted)]">
+                            This contract uses <strong>dynamic per-guard rates</strong>. Click <strong>Manage Guard Rates</strong> to set a rate for each enrolled guard.
+                        </div>
+                    ) : contract.rates.length === 0 ? (
                         <div className="px-5 py-8 text-center text-sm text-[var(--text-muted)]">
                             No rates added yet. Click <strong>Add Rate</strong> to configure guard rates for this contract.
                         </div>
@@ -413,7 +659,7 @@ function ContractCard({
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-[var(--border)] bg-muted">
-                                    {["Province","City","Guard Type","Ex-Service","Rate (PKR)","Extra/Hr (PKR)","Rate Period","Current","Action"].map((h) => (
+                                    {["Scope","Guard Type","Ex-Service","Rate (PKR)","Extra/Hr (PKR)","Rate Period","Current","Action"].map((h) => (
                                         <th key={h} className="px-4 py-2.5 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
                                     ))}
                                 </tr>
@@ -424,11 +670,10 @@ function ContractCard({
                                         key={rate.id}
                                         className={`border-b border-[var(--border)] transition-colors ${rate.isCurrentRate ? "bg-green-50 dark:bg-green-950/30" : "hover:bg-muted"}`}
                                     >
-                                        <td className="px-4 py-2.5 text-[var(--text)]">{rate.province || "—"}</td>
-                                        <td className="px-4 py-2.5 text-[var(--text)]">{rate.city || "—"}</td>
+                                        <td className="px-4 py-2.5 text-[var(--text)]">{scopeLabel(rate, regionsById)}</td>
                                         <td className="px-4 py-2.5">
                                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-                                                <Tag className="h-3 w-3" />{rate.guardType}
+                                                <Tag className="h-3 w-3" />{rate.guardType || "—"}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5 text-[var(--text)]">{rate.exService || "—"}</td>
@@ -473,12 +718,18 @@ function ContractCard({
                     clientId={clientId}
                     contractId={contract.id}
                     branch={contract.branch ? { province: contract.branch.province, city: contract.branch.city } : null}
-                    operationalProvinces={operationalProvinces}
-                    regionName={regionName}
+                    branchId={contract.branchId}
                     guardTypes={guardTypes}
                     exServiceTypes={exServiceTypes}
                     onClose={() => setShowAddRate(false)}
                     onCreated={(rate) => { onRateAdded(contract.id, rate); setShowAddRate(false) }}
+                />
+            )}
+            {showGuardRates && (
+                <GuardRatesModal
+                    clientId={clientId}
+                    contractId={contract.id}
+                    onClose={() => setShowGuardRates(false)}
                 />
             )}
             {showEditContract && (
@@ -496,11 +747,12 @@ function ContractCard({
 }
 
 // ── Main PricingManager ────────────────────────────────────────────────────────
-export default function PricingManager({ clientId, clientName, branches, isBranchless, operationalProvinces, regionName }: Props) {
+export default function PricingManager({ clientId, clientName, branches, isBranchless, lockedBranchId }: Props) {
     const [contracts, setContracts] = useState<Contract[]>([])
     const [loading, setLoading] = useState(true)
     const [showAddContract, setShowAddContract] = useState(false)
-    const [filterBranchId, setFilterBranchId] = useState<string>("all")
+    // When locked to a branch, default the filter to it and keep it pinned.
+    const [filterBranchId, setFilterBranchId] = useState<string>(lockedBranchId ?? "all")
     const [guardTypes, setGuardTypes] = useState<string[]>(["GUARD", "SUPERVISOR", "CPO", "ARMED GUARD", "UNARMED GUARD"])
     const [exServiceTypes, setExServiceTypes] = useState<string[]>(["ARMY", "POLICE", "RANGERS", "MUJAHID", "OTHER"])
 
@@ -560,7 +812,7 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    {!isBranchless && (
+                    {!isBranchless && !lockedBranchId && (
                         <select
                             value={filterBranchId}
                             onChange={(e) => setFilterBranchId(e.target.value)}
@@ -614,8 +866,6 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                             key={contract.id}
                             contract={contract}
                             clientId={clientId}
-                            operationalProvinces={operationalProvinces}
-                            regionName={regionName}
                             guardTypes={guardTypes}
                             exServiceTypes={exServiceTypes}
                             onContractUpdated={onContractUpdated}
@@ -631,6 +881,7 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                     clientId={clientId}
                     branches={branches}
                     isBranchless={isBranchless}
+                    lockedBranchId={lockedBranchId}
                     onClose={() => setShowAddContract(false)}
                     onSaved={onContractCreated}
                 />

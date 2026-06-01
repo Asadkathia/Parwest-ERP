@@ -24,7 +24,7 @@ export async function GET(
             where: { clientId },
             include: {
                 branch: { select: { id: true, name: true, province: true, city: true } },
-                rates: { orderBy: [{ province: "asc" }, { city: "asc" }, { guardType: "asc" }] },
+                rates: { orderBy: [{ scopeLevel: "asc" }, { createdAt: "asc" }] },
             },
             orderBy: { createdAt: "desc" },
         })
@@ -76,6 +76,20 @@ export async function POST(
             }
         }
 
+        // Validate billingMode — only "MANUAL" and "DYNAMIC" are accepted.
+        // Absent/null → default to "MANUAL". Any other explicit value is a bad request.
+        const VALID_BILLING_MODES = ["MANUAL", "DYNAMIC"] as const
+        type BillingMode = typeof VALID_BILLING_MODES[number]
+        const rawBillingMode = body?.billingMode
+        let billingMode: BillingMode = "MANUAL"
+        if (rawBillingMode !== undefined && rawBillingMode !== null) {
+            const normalised = String(rawBillingMode).toUpperCase()
+            if (!VALID_BILLING_MODES.includes(normalised as BillingMode)) {
+                return badRequest(`billingMode must be one of: ${VALID_BILLING_MODES.join(", ")}.`)
+            }
+            billingMode = normalised as BillingMode
+        }
+
         // SECURITY: when branchId is supplied, verify the branch belongs to this
         // client to prevent attaching a client-level contract to another client's
         // branch (mirrors advance-payments POST guard).
@@ -96,6 +110,7 @@ export async function POST(
                 branchId,
                 name,
                 type: body?.type ? String(body.type).toUpperCase() : "GENERAL",
+                billingMode,
                 startDate,
                 endDate,
                 isActive: true,

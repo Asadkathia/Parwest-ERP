@@ -69,8 +69,6 @@ export async function GET(request: NextRequest) {
                 rate: true,
                 extraHourRate: true,
                 rateStartDate: true,
-                province: true,
-                city: true,
               },
             },
           },

@@ -654,8 +654,6 @@ export default async function ClientDetailPage({
               clientName={client.name}
               branches={client.branches.map((b) => ({ id: b.id, name: b.name }))}
               isBranchless={client.isBranchless}
-              operationalProvinces={client.operationalProvinces ?? null}
-              regionName={client.region?.name ?? null}
             />
           </CardContent>
         </Card>

@@ -1,5 +1,7 @@
+import type { BillingMode } from "@prisma/client"
 import { prisma } from "@/lib/db"
-import { selectContractRate, type CandidateRate } from "@/lib/invoicing/rateSelection"
+import { type ScopedRate } from "@/lib/invoicing/rateSelection"
+import { type GuardRate } from "@/lib/invoicing/guardRate"
 
 export type RateLookup = {
   dailyRate: number
@@ -10,42 +12,86 @@ export type RateLookup = {
 
 const NONE: RateLookup = { dailyRate: 0, overtimeHourly: 0, source: "NONE" }
 
+export type ContractRateContext = {
+  billingMode: BillingMode
+  contractId: string | null
+  contractBranchId: string | null
+  /** Populated for MANUAL contracts; empty otherwise. */
+  scopedRates: ScopedRate[]
+  /** Populated for DYNAMIC contracts; empty otherwise. */
+  guardRates: GuardRate[]
+}
+
+const EMPTY_CONTEXT: ContractRateContext = {
+  billingMode: "MANUAL",
+  contractId: null,
+  contractBranchId: null,
+  scopedRates: [],
+  guardRates: [],
+}
+
 /**
- * Resolve the single applicable contract for a (client, branch) and return its
- * candidate rates. A branch-specific active contract overrides the client-level
- * one; the client-level contract is the fallback. Returns empty when neither
- * exists.
+ * Resolve the single applicable contract for a (client, branch) and load the
+ * rate set that matches its billing mode. A branch-specific active contract
+ * overrides the client-level one; the client-level contract is the fallback.
+ *
+ * - MANUAL  → scoped `ClientContractRate` rows (resolved by most-specific scope).
+ * - DYNAMIC → per-guard `ContractGuardRate` rows.
+ *
+ * Returns an empty MANUAL context when no contract exists.
  */
 export async function resolveContractRateContext(args: {
   clientId: string
   branchId: string | null
-}): Promise<{ rates: CandidateRate[]; contractId: string | null; contractBranchId: string | null }> {
-  let contract: { id: string; branchId: string | null } | null = null
+}): Promise<ContractRateContext> {
+  let contract: { id: string; branchId: string | null; billingMode: BillingMode } | null = null
 
   if (args.branchId) {
     contract = await prisma.clientContract.findFirst({
       where: { clientId: args.clientId, branchId: args.branchId, isActive: true },
       orderBy: { createdAt: "desc" },
-      select: { id: true, branchId: true },
+      select: { id: true, branchId: true, billingMode: true },
     })
   }
   if (!contract) {
     contract = await prisma.clientContract.findFirst({
       where: { clientId: args.clientId, branchId: null, isActive: true },
       orderBy: { createdAt: "desc" },
-      select: { id: true, branchId: true },
+      select: { id: true, branchId: true, billingMode: true },
     })
   }
-  if (!contract) return { rates: [], contractId: null, contractBranchId: null }
+  if (!contract) return EMPTY_CONTEXT
 
-  const rates = await prisma.clientContractRate.findMany({
+  if (contract.billingMode === "DYNAMIC") {
+    const guardRates = await prisma.contractGuardRate.findMany({
+      where: { contractId: contract.id },
+      select: {
+        id: true,
+        guardId: true,
+        rate: true,
+        extraHourRate: true,
+        isCurrentRate: true,
+        rateStartDate: true,
+        rateEndDate: true,
+      },
+    })
+    return {
+      billingMode: "DYNAMIC",
+      contractId: contract.id,
+      contractBranchId: contract.branchId,
+      scopedRates: [],
+      guardRates,
+    }
+  }
+
+  const scopedRows = await prisma.clientContractRate.findMany({
     where: { contractId: contract.id },
-    orderBy: [{ rateStartDate: "desc" }, { isCurrentRate: "desc" }, { id: "asc" }],
     select: {
       id: true,
-      exService: true,
-      province: true,
-      city: true,
+      scopeLevel: true,
+      scopeBranchId: true,
+      scopeRegionId: true,
+      scopeProvince: true,
       rate: true,
       extraHourRate: true,
       isCurrentRate: true,
@@ -53,11 +99,35 @@ export async function resolveContractRateContext(args: {
       rateEndDate: true,
     },
   })
-  return { rates, contractId: contract.id, contractBranchId: contract.branchId }
+  // Only rows with an explicit scope participate in MANUAL scope resolution.
+  const scopedRates: ScopedRate[] = scopedRows
+    .filter((r): r is typeof r & { scopeLevel: NonNullable<typeof r.scopeLevel> } => r.scopeLevel != null)
+    .map((r) => ({
+      id: r.id,
+      scopeLevel: r.scopeLevel,
+      scopeBranchId: r.scopeBranchId,
+      scopeRegionId: r.scopeRegionId,
+      scopeProvince: r.scopeProvince,
+      rate: r.rate,
+      extraHourRate: r.extraHourRate,
+      isCurrentRate: r.isCurrentRate,
+      rateStartDate: r.rateStartDate,
+      rateEndDate: r.rateEndDate,
+    }))
+  return {
+    billingMode: "MANUAL",
+    contractId: contract.id,
+    contractBranchId: contract.branchId,
+    scopedRates,
+    guardRates: [],
+  }
 }
 
-/** Map a selected candidate rate to the billing RateLookup shape. */
-export function toRateLookup(rate: CandidateRate | null, contractId: string | null): RateLookup {
+/** Map a selected rate (scoped or per-guard) to the billing RateLookup shape. */
+export function toRateLookup(
+  rate: { rate: number; extraHourRate: number | null } | null,
+  contractId: string | null,
+): RateLookup {
   if (!rate) return NONE
   return {
     dailyRate: Number(rate.rate ?? 0),
@@ -67,27 +137,3 @@ export function toRateLookup(rate: CandidateRate | null, contractId: string | nu
   }
 }
 
-/**
- * Single-shot lookup: resolve the contract for the (client, branch) and select
- * the rate for the given exService + geo as of a date.
- */
-export async function fromContract(args: {
-  clientId: string
-  branchId: string | null
-  exService: string
-  province: string | null
-  city: string | null
-  asOf: Date
-}): Promise<RateLookup> {
-  const { rates, contractId } = await resolveContractRateContext({
-    clientId: args.clientId,
-    branchId: args.branchId,
-  })
-  const selected = selectContractRate(rates, {
-    exService: args.exService,
-    province: args.province,
-    city: args.city,
-    asOf: args.asOf,
-  })
-  return toRateLookup(selected, contractId)
-}

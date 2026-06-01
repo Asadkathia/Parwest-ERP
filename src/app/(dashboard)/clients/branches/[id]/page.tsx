@@ -6,11 +6,13 @@ import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { hasAction } from "@/lib/api/permissions"
 import Link from "next/link"
-import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
+import { ArrowLeft, Edit, Building, MapPin, Phone, Mail, User, Calendar, FileText } from "lucide-react"
 import { deriveBranchModel } from "@/lib/branches/model"
 import BranchDeleteButton from "@/components/clients/BranchDeleteButton"
 import BranchDeactivateDialog from "@/components/clients/BranchDeactivateDialog"
 import { CAPACITY_USAGE_RULES, countDeploymentsForRule } from "@/lib/branches/capacity"
+import PricingManager from "@/components/clients/PricingManager"
+import { PermissionGate } from "@/components/shadcn/permission-gate"
 
 export default async function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -280,6 +282,26 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
               <p className="mt-4 text-xs text-[var(--text-muted)]">
                 EXTRA deployments are not counted toward the limit — they exist precisely because the cap was reached.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-[var(--text)] inline-flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Contracts &amp; Pricing
+              </h3>
+            </CardHeader>
+            <CardContent>
+              <PermissionGate module="CLIENTS" action="CREATE" mode="disable">
+                <PricingManager
+                  clientId={branch.clientId}
+                  clientName={branch.client.name}
+                  branches={[{ id: branch.id, name: branch.name }]}
+                  isBranchless={false}
+                  lockedBranchId={branch.id}
+                />
+              </PermissionGate>
             </CardContent>
           </Card>
 

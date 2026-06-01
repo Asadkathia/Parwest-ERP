@@ -5,7 +5,9 @@ import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { resolveContractRateContext, toRateLookup } from "@/lib/invoicing/rates"
-import { resolveBillingExService, resolveBillingGeo, selectContractRate } from "@/lib/invoicing/rateSelection"
+import { selectManualScopedRate } from "@/lib/invoicing/rateSelection"
+import { selectGuardRate } from "@/lib/invoicing/guardRate"
+import { provinceForBranch, type Province } from "@/lib/geo/province"
 
 function parseMonthStart(month: string) {
   const value = `${month}-01T00:00:00.000Z`
@@ -142,47 +144,56 @@ export async function POST(request: NextRequest) {
       if (oh > 0) agg.overtimeHoursTotal += oh
     }
 
-    const { rates, contractId, contractBranchId } = await resolveContractRateContext({ clientId, branchId })
-    const clientGeo = await prisma.client.findUnique({
-      where: { id: clientId },
-      select: { operationalProvinces: true, region: { select: { name: true } } },
-    })
-    const usingBranchContract = contractBranchId != null
-    const branchGeo = usingBranchContract && branchId
-      ? await prisma.branch.findUnique({ where: { id: branchId }, select: { province: true, city: true } })
-      : null
-    const geo = resolveBillingGeo({
-      hasBranch: usingBranchContract,
-      branch: branchGeo,
-      client: {
-        operationalProvinces: clientGeo?.operationalProvinces ?? null,
-        regionName: clientGeo?.region?.name ?? null,
-      },
-    })
+    // Resolve the applicable contract + its rate set once, then dispatch per-guard
+    // by billing mode. MANUAL bills by location scope (branch → region → province
+    // → global); DYNAMIC bills the deployed guard's own per-guard rate.
+    const ctx = await resolveContractRateContext({ clientId, branchId })
 
-    for (const agg of byGuard.values()) {
+    // MANUAL location scope is identical for every guard on this (client, branch),
+    // so resolve the branch's region id + province once.
+    let regionId: string | null = null
+    let province: Province | null = null
+    if (ctx.billingMode === "MANUAL" && ctx.contractId) {
+      const branchRow = branchId
+        ? await prisma.branch.findUnique({
+            where: { id: branchId },
+            select: { regionalOfficeId: true },
+          })
+        : null
+      const regionalOfficeId = branchRow?.regionalOfficeId ?? null
+      // Region precedence: regional office's region → client's region.
+      // (Branch has no direct regionId; its region is held by its regional office.)
+      const office = regionalOfficeId
+        ? await prisma.regionalOffice.findUnique({
+            where: { id: regionalOfficeId },
+            select: { regionId: true },
+          })
+        : null
+      regionId = office?.regionId ?? client.regionId ?? null
+      province = await provinceForBranch(prisma, {
+        regionalOfficeId,
+        clientId,
+      })
+    }
+
+    for (const [guardId, agg] of byGuard.entries()) {
       const dayCount = agg.days.size
-      const exService = resolveBillingExService({
-        isExService: agg.guard.isExService,
-        exServiceType: agg.guard.exServiceType,
-      })
-      if (exService === null) {
-        warnings.push(
-          `Ex-service type missing for ${agg.guard.name} (${agg.guard.parwestId}) — cannot resolve a contract rate.`,
-        )
-        continue
-      }
-      const selected = selectContractRate(rates, {
-        exService,
-        province: geo.province,
-        city: geo.city,
-        asOf: agg.latestDeploymentDate,
-      })
-      const rate = toRateLookup(selected, contractId)
+      const selected =
+        ctx.billingMode === "DYNAMIC"
+          ? selectGuardRate(ctx.guardRates, guardId, agg.latestDeploymentDate)
+          : selectManualScopedRate(ctx.scopedRates, {
+              branchId,
+              regionId,
+              province,
+              asOf: agg.latestDeploymentDate,
+            })
+      const rate = toRateLookup(selected, ctx.contractId)
 
       if (rate.dailyRate <= 0) {
         warnings.push(
-          `No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — exService "${exService}", ${geo.province ?? "?"}/${geo.city ?? "?"}.`,
+          ctx.billingMode === "DYNAMIC"
+            ? `No per-guard rate for ${agg.guard.name} (${agg.guard.parwestId}) on this contract.`
+            : `No contract rate for ${agg.guard.name} (${agg.guard.parwestId}) — ${province ?? "?"}/${regionId ?? "?"}.`,
         )
         continue
       }
@@ -211,7 +222,7 @@ export async function POST(request: NextRequest) {
           })
         } else {
           warnings.push(
-            `Overtime hours present for ${agg.guard.name} but no overtime rate for exService "${exService}".`,
+            `Overtime hours present for ${agg.guard.name} (${agg.guard.parwestId}) but the applicable contract rate has no overtime rate.`,
           )
         }
       }

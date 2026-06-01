@@ -204,11 +204,34 @@ model UserStatusHistory {
 // ORGANIZATIONAL STRUCTURE
 // ============================================
 
+enum Province {
+  PUNJAB
+  SINDH
+  KPK
+  BALOCHISTAN
+  ICT
+  AJK
+  GILGIT_BALTISTAN
+}
+
+enum BillingMode {
+  MANUAL
+  DYNAMIC
+}
+
+enum RateScopeLevel {
+  BRANCH
+  REGION
+  PROVINCE
+  GLOBAL
+}
+
 model Region {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(cuid())
+  name      String    @unique
+  province  Province?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   regionalOffices RegionalOffice[]
   users           User[]
@@ -388,6 +411,9 @@ model Guard {
   // Age approval flags
   ageApprovalRequired Boolean @default(false)
   ageApprovalStatus   String? // PENDING | APPROVED | REJECTED
+
+  // Contract billing relations
+  contractGuardRates ContractGuardRate[]
 
   @@index([parwestId])
   @@index([cnic])
@@ -983,20 +1009,22 @@ model Branch {
 }
 
 model ClientContract {
-  id        String    @id @default(cuid())
-  clientId  String
-  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  branchId  String? // null = client-level; set = branch-specific contract
-  branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  name      String
-  type      String    @default("GENERAL") // GENERAL, SPECIAL, etc.
-  startDate DateTime?
-  endDate   DateTime?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String      @id @default(cuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branchId    String? // null = client-level; set = branch-specific contract
+  branch      Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name        String
+  type        String      @default("GENERAL") // GENERAL, SPECIAL, etc.
+  billingMode BillingMode @default(MANUAL)
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  rates ClientContractRate[]
+  rates      ClientContractRate[]
+  guardRates ContractGuardRate[]
 
   @@index([clientId])
   @@index([branchId])
@@ -1038,22 +1066,44 @@ model InvoiceAdvanceApplication {
 }
 
 model ClientContractRate {
-  id            String         @id @default(cuid())
+  id            String          @id @default(cuid())
   contractId    String
-  contract      ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  province      String?
-  city          String?
+  contract      ClientContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
   guardType     String // GUARD, SUPERVISOR, CPO, etc.
   exService     String? // ARMY, POLICE, RANGERS, MUJAHID, OTHER, CIVILIAN
   rate          Float
   extraHourRate Float?
-  isCurrentRate Boolean        @default(false)
+  isCurrentRate Boolean         @default(false)
+  rateStartDate DateTime?
+  rateEndDate   DateTime?
+  // Explicit scope columns (required; legacy province/city dropped 2026-05-30)
+  scopeLevel    RateScopeLevel
+  scopeBranchId String?
+  scopeRegionId String?
+  scopeProvince Province?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([contractId])
+}
+
+model ContractGuardRate {
+  id            String         @id @default(cuid())
+  contractId    String
+  contract      ClientContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  guardId       String
+  guard         Guard          @relation(fields: [guardId], references: [id], onDelete: Cascade)
+  rate          Float
+  extraHourRate Float?
+  isCurrentRate Boolean        @default(true)
   rateStartDate DateTime?
   rateEndDate   DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  @@unique([contractId, guardId])
   @@index([contractId])
+  @@index([guardId])
 }
 
 // TODO(prisma-migration): drop this model — write-dead after 2026-05-26.

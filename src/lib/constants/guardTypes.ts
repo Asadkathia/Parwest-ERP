@@ -5,8 +5,8 @@
  * and `DeploymentRate.guardType` (schema.prisma:505) carry a categorical label
  * for the role a guard fills on a posting. Per `src/lib/invoicing/rateSelection.ts`
  * the value is display-only and never participates in rate selection — invoicing
- * resolves rates via `ClientContractRate` (province/city/exService/effective-date),
- * not via the deployment's `guardType` string.
+ * resolves rates via `ClientContractRate` (scope: branch/region/province/global,
+ * most-specific wins), not via the deployment's `guardType` string.
  *
  * **Workflow rule (product-owner clarified):** a Deployment is created BEFORE its
  * branch ClientContract exists, so the deploy-time `guardType` value CANNOT be
