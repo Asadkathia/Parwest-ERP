@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
+import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { checkClientScope } from "@/lib/clients/access"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -115,5 +115,51 @@ export async function PATCH(
     } catch (error) {
         console.error("Error updating contract:", error)
         return internalServerError("Failed to update contract")
+    }
+}
+
+export async function DELETE(
+    _request: NextRequest,
+    { params }: { params: Promise<{ id: string; contractId: string }> }
+) {
+    try {
+        const session = await auth()
+        if (!session) return unauthorized()
+        if (!hasAction(session, "CLIENTS", "DELETE")) return forbidden("Access denied.")
+        const { id: clientId, contractId } = await params
+
+        const scope = await checkClientScope(clientId, session)
+        if (scope === "not_found") return notFound("Client not found.")
+        if (scope === "forbidden") return forbidden("Access denied.")
+
+        const rawActorId = session.user?.id || null
+        const actorName = session.user?.name || session.user?.email || rawActorId || "Unknown"
+        const actorId = rawActorId
+            ? (await prisma.user.findUnique({ where: { id: rawActorId }, select: { id: true } }))?.id ?? null
+            : null
+
+        // SECURITY: bind contract lookup to the path clientId (IDOR) before deleting.
+        const contract = await prisma.clientContract.findFirst({
+            where: { id: contractId, clientId },
+            select: { id: true, name: true },
+        })
+        if (!contract) return notFound("Contract not found")
+
+        // Cascades to ClientContractRate + ContractGuardRate (both onDelete: Cascade).
+        await prisma.clientContract.delete({ where: { id: contractId } })
+
+        await safeAuditLog({
+            userId: actorId,
+            event: "CONTRACT_DELETED",
+            module: "CLIENTS",
+            description: `Contract "${contract.name}" (${contractId}) deleted for client ${clientId}. By: ${actorName}`,
+            targetEntityType: "Client",
+            targetEntityId: clientId,
+        })
+
+        return ok({ message: "Contract deleted." })
+    } catch (error) {
+        console.error("Error deleting contract:", error)
+        return internalServerError("Failed to delete contract")
     }
 }

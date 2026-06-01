@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, ChevronRight, FileText, Tag, CheckCircle2, Pencil, Users } from "lucide-react"
+import { Plus, ChevronRight, FileText, Tag, CheckCircle2, Pencil, Users, Trash2 } from "lucide-react"
 import { useRegions } from "@/lib/hooks/useRegions"
 import { PROVINCE_VALUES } from "@/lib/geo/province-constants"
 
@@ -549,7 +549,7 @@ function scopeLabel(rate: ContractRate, regionsById: Map<string, string>): strin
 }
 
 function ContractCard({
-    contract, clientId, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated,
+    contract, clientId, guardTypes, exServiceTypes, onContractUpdated, onRateAdded, onRatesUpdated, onContractDeleted,
 }: {
     contract: Contract
     clientId: string
@@ -558,6 +558,7 @@ function ContractCard({
     onContractUpdated: (c: Contract) => void
     onRateAdded: (contractId: string, rate: ContractRate) => void
     onRatesUpdated: (contractId: string, rates: ContractRate[]) => void
+    onContractDeleted: (contractId: string) => void
 }) {
     const { regions } = useRegions()
     const regionsById = new Map(regions.map((r) => [r.id, r.name]))
@@ -567,6 +568,30 @@ function ContractCard({
     const [showGuardRates, setShowGuardRates] = useState(false)
     const [showEditContract, setShowEditContract] = useState(false)
     const [markingCurrentId, setMarkingCurrentId] = useState<string | null>(null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleting, setDeleting] = useState(false)
+    const [deleteError, setDeleteError] = useState("")
+
+    async function deleteContract() {
+        setDeleting(true)
+        setDeleteError("")
+        let succeeded = false
+        try {
+            const res = await fetch(`/api/clients/${clientId}/contracts/${contract.id}`, { method: "DELETE" })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                setDeleteError(data?.message || "Failed to delete contract.")
+                return
+            }
+            succeeded = true
+        } catch {
+            setDeleteError("Failed to delete contract.")
+        } finally {
+            setDeleting(false)
+        }
+        // Call last: this unmounts the card, so do it after local state cleanup.
+        if (succeeded) onContractDeleted(contract.id)
+    }
 
     async function markAsCurrent(rateId: string) {
         setMarkingCurrentId(rateId)
@@ -625,6 +650,12 @@ function ContractCard({
                         className="ui-btn ui-btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
                     >
                         <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                    <button
+                        onClick={() => { setDeleteError(""); setShowDeleteConfirm(true) }}
+                        className="ui-btn ui-btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 !text-red-600 dark:!text-red-400"
+                    >
+                        <Trash2 className="h-3 w-3" /> Delete
                     </button>
                     {isDynamic ? (
                         <button
@@ -742,6 +773,29 @@ function ContractCard({
                     onSaved={(updated) => { onContractUpdated(updated); setShowEditContract(false) }}
                 />
             )}
+            {showDeleteConfirm && (
+                <Modal title="Delete Contract" onClose={() => !deleting && setShowDeleteConfirm(false)}>
+                    <div className="space-y-4">
+                        <p className="text-sm text-[var(--text)]">
+                            Delete contract <strong>{contract.name}</strong>? This permanently removes the contract and{" "}
+                            <strong>
+                                {isDynamic
+                                    ? "all its per-guard rates"
+                                    : `${contract.rates.length} rate${contract.rates.length !== 1 ? "s" : ""}`}
+                            </strong>. This cannot be undone.
+                        </p>
+                        {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
+                        <div className="flex justify-end gap-2">
+                            <button className="ui-btn ui-btn-secondary !py-1.5 !px-3 !text-xs" disabled={deleting} onClick={() => setShowDeleteConfirm(false)}>
+                                Cancel
+                            </button>
+                            <button className="ui-btn ui-btn-danger !py-1.5 !px-3 !text-xs flex items-center gap-1.5" disabled={deleting} onClick={deleteContract}>
+                                <Trash2 className="h-3 w-3" /> {deleting ? "Deleting…" : "Delete Contract"}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     )
 }
@@ -787,6 +841,10 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
 
     function onContractUpdated(updated: Contract) {
         setContracts((prev) => prev.map((c) => c.id === updated.id ? { ...updated, rates: c.rates } : c))
+    }
+
+    function onContractDeleted(contractId: string) {
+        setContracts((prev) => prev.filter((c) => c.id !== contractId))
     }
 
     function onRateAdded(contractId: string, rate: ContractRate) {
@@ -871,6 +929,7 @@ export default function PricingManager({ clientId, clientName, branches, isBranc
                             onContractUpdated={onContractUpdated}
                             onRateAdded={onRateAdded}
                             onRatesUpdated={onRatesUpdated}
+                            onContractDeleted={onContractDeleted}
                         />
                     ))}
                 </div>
