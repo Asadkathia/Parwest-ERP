@@ -33,8 +33,14 @@ export async function GET(
             }
         }
 
+        // Optional region-office scoping: the deploy flow selects a regional office first,
+        // so it passes ?regionalOfficeId= to show only this client's branches in that office
+        // (Branch.regionalOfficeId is the office link; region/province derive from it). Other
+        // callers omit the param and get all of the client's branches. (Ticket #59)
+        const regionalOfficeId = request.nextUrl.searchParams.get("regionalOfficeId")?.trim() || null
+
         const branches = await prisma.branch.findMany({
-            where: { clientId: id },
+            where: { clientId: id, ...(regionalOfficeId ? { regionalOfficeId } : {}) },
             orderBy: { name: "asc" },
             include: {
                 supervisorAssignments: {

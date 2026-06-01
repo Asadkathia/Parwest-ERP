@@ -416,8 +416,8 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
       setGuardType(DEFAULT_GUARD_TYPE)
       return
     }
-    loadBranches(selectedClient)
-  }, [selectedClient])
+    loadBranches(selectedClient, selectedRegionalOffice)
+  }, [selectedClient, selectedRegionalOffice])
 
   const loadClients = async (regionalOfficeId: string) => {
     try {
@@ -433,10 +433,13 @@ export default function DeployGuardForm({ lockedRegionId = null, lockedRegionalO
     }
   }
 
-  const loadBranches = async (clientId: string) => {
+  const loadBranches = async (clientId: string, regionalOfficeId: string) => {
     setBranchesLoading(true)
     try {
-      const res = await fetch(`/api/clients/${clientId}/branches`)
+      // Scope branches to the selected regional office so only this client's
+      // branches in that office are deployable (Ticket #59).
+      const qs = regionalOfficeId ? `?regionalOfficeId=${encodeURIComponent(regionalOfficeId)}` : ""
+      const res = await fetch(`/api/clients/${clientId}/branches${qs}`)
       const data = await res.json()
       setBranches(Array.isArray(data) ? data : [])
     } catch {

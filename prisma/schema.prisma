@@ -2257,6 +2257,19 @@ model GuardDesignationType {
   updatedAt DateTime @updatedAt
 }
 
+// Admin-managed reference catalog of guard status labels (display/lookup only).
+// NOT wired to the canonical guard lifecycle state machine (`lifecycleStatus`)
+// or its derived `Guard.status` shadow — those remain coded logic. See ticket #58.
+model GuardStatusOption {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("gray")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model GuardWalletType {
   id        String   @id @default(cuid())
   name      String   @unique

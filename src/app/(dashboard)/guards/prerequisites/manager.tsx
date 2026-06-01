@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/shadcn/alert"
 import { Card, CardContent } from "@/components/shadcn/card"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, X as XIcon, Check, CheckCircle2, AlertCircle } from "lucide-react"
+import { GUARD_STATUS_COLORS } from "@/lib/guards/statusColors"
 type Region = {
   id: string
   name: string
@@ -38,28 +39,9 @@ type Props = {
   regions: Region[]
 }
 
-const guardStatuses = [
-  { serial: 1, name: "present", color: "green" },
-  { serial: 2, name: "absent", color: "yellow" },
-  { serial: 3, name: "on-training", color: "red" },
-  { serial: 4, name: "default", color: "blue" },
-  { serial: 5, name: "resigned", color: "brown" },
-  { serial: 6, name: "Long Leave", color: "orange" },
-  { serial: 7, name: "Inactive", color: "light" },
-  { serial: 8, name: "Pending", color: "teal" },
-]
-
 const salaryCategories = [
   { id: 1, name: "A", limit: "35000" },
   { id: 2, name: "B", limit: "50000" },
-]
-
-const documentTypes = [
-  { name: "CLASS 4TH CERT", number: 10, status: "ACTIVATE" },
-  { name: "CNIC ORIGINAL", number: 15, status: "ACTIVATE" },
-  { name: "DMC", number: 17, status: "ACTIVATE" },
-  { name: "EYE HEALTH CERT", number: 21, status: "ACTIVATE" },
-  { name: "SERVICE EXPERIENCE NOTES", number: 23, status: "ACTIVATE" },
 ]
 
 const allowancesAndDeductions = [
@@ -100,6 +82,20 @@ export default function PrerequisitesManager({ regions }: Props) {
   const [editingDesignationType, setEditingDesignationType] = useState<DesignationType | null>(null)
   const [editDesignationTypeName, setEditDesignationTypeName] = useState("")
   const [confirmDeleteDesignationType, setConfirmDeleteDesignationType] = useState<DesignationType | null>(null)
+
+  // Guard Status Options — admin-managed reference catalog (display/lookup only; ticket #58)
+  type StatusOption = { id: string; name: string; color: string; isActive: boolean; sortOrder: number }
+  const [statusOptions, setStatusOptions] = useState<StatusOption[]>([])
+  const [statusOptionsLoading, setStatusOptionsLoading] = useState(true)
+  const [statusOptionsError, setStatusOptionsError] = useState("")
+  const [showAddStatusOption, setShowAddStatusOption] = useState(false)
+  const [newStatusOptionName, setNewStatusOptionName] = useState("")
+  const [newStatusOptionColor, setNewStatusOptionColor] = useState("gray")
+  const [savingStatusOption, setSavingStatusOption] = useState(false)
+  const [editingStatusOption, setEditingStatusOption] = useState<StatusOption | null>(null)
+  const [editStatusOptionName, setEditStatusOptionName] = useState("")
+  const [editStatusOptionColor, setEditStatusOptionColor] = useState("gray")
+  const [confirmDeleteStatusOption, setConfirmDeleteStatusOption] = useState<StatusOption | null>(null)
 
   // Ex-Service types
   type ExServiceType = { id: string; name: string; isActive: boolean; sortOrder: number }
@@ -266,6 +262,91 @@ export default function PrerequisitesManager({ regions }: Props) {
       await loadDesignationTypes()
     } catch {
       setDesignationTypesError("Failed to delete designation type")
+    }
+  }
+
+  const loadStatusOptions = useCallback(async () => {
+    setStatusOptionsLoading(true)
+    setStatusOptionsError("")
+    try {
+      const res = await fetch("/api/guard-status-options?activeOnly=false")
+      if (!res.ok) throw new Error()
+      setStatusOptions(await res.json())
+    } catch {
+      setStatusOptionsError("Failed to load guard statuses")
+    } finally {
+      setStatusOptionsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadStatusOptions() }, [loadStatusOptions])
+
+  const handleAddStatusOption = async () => {
+    const name = newStatusOptionName.trim()
+    if (!name) return
+    setSavingStatusOption(true)
+    setStatusOptionsError("")
+    try {
+      const res = await fetch("/api/guard-status-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color: newStatusOptionColor }),
+      })
+      if (!res.ok) { const d = await res.json(); setStatusOptionsError(d.message || "Failed"); return }
+      setNewStatusOptionName("")
+      setNewStatusOptionColor("gray")
+      setShowAddStatusOption(false)
+      await loadStatusOptions()
+    } catch {
+      setStatusOptionsError("Failed to add guard status")
+    } finally {
+      setSavingStatusOption(false)
+    }
+  }
+
+  const handleEditStatusOption = async () => {
+    if (!editingStatusOption) return
+    const name = editStatusOptionName.trim()
+    if (!name) return
+    setSavingStatusOption(true)
+    try {
+      const res = await fetch(`/api/guard-status-options/${editingStatusOption.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color: editStatusOptionColor }),
+      })
+      if (!res.ok) { const d = await res.json(); setStatusOptionsError(d.message || "Failed"); return }
+      setEditingStatusOption(null)
+      setEditStatusOptionName("")
+      setEditStatusOptionColor("gray")
+      await loadStatusOptions()
+    } catch {
+      setStatusOptionsError("Failed to update guard status")
+    } finally {
+      setSavingStatusOption(false)
+    }
+  }
+
+  const handleToggleStatusOption = async (so: StatusOption) => {
+    try {
+      await fetch(`/api/guard-status-options/${so.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !so.isActive }),
+      })
+      await loadStatusOptions()
+    } catch {
+      setStatusOptionsError("Failed to update guard status")
+    }
+  }
+
+  const handleDeleteStatusOption = async (so: StatusOption) => {
+    try {
+      await fetch(`/api/guard-status-options/${so.id}`, { method: "DELETE" })
+      setConfirmDeleteStatusOption(null)
+      await loadStatusOptions()
+    } catch {
+      setStatusOptionsError("Failed to delete guard status")
     }
   }
 
@@ -993,16 +1074,6 @@ export default function PrerequisitesManager({ regions }: Props) {
 
       <Card>
         <CardContent className="space-y-4">
-          <HeaderWithAdd title="All Guard&apos;s Document Types" />
-          <SimpleTable
-            headers={["NAME", "DOCUMENT #", "ACTION", "STATUS"]}
-            rows={documentTypes.map((row) => [row.name, row.number, "✎", row.status])}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-4">
           <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Allowances &amp; Deductions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Reference values — configurable via system settings."}</p></div></div>
           <SimpleTable
             headers={["FACTOR NAME", "AMOUNT"]}
@@ -1579,18 +1650,149 @@ export default function PrerequisitesManager({ regions }: Props) {
         </CardContent>
       </Card>
 
+      {/* ── Guard Statuses (admin-managed reference catalog; ticket #58) ── */}
       <Card>
-        <CardContent className="space-y-5">
-          <div className="space-y-4">
-            <HeaderWithAdd title="Guard Statuses" />
-            <SimpleTable
-              headers={["SERIAL NUMBER", "NAME", "COLOR", "ACTION"]}
-              rows={guardStatuses.map((row) => [row.serial, row.name, row.color, "✎"])}
-            />
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Guard Statuses"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Manage the list of guard status labels and their badge colors. Reference catalog only — does not change guard lifecycle behavior."}</p></div></div>
+            </div>
+            <Button onClick={() => { setShowAddStatusOption((p) => !p); setNewStatusOptionName(""); setNewStatusOptionColor("gray") }} className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Status
+            </Button>
           </div>
 
+          {statusOptionsError ? <Alert className="border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 [&>svg]:text-rose-600 dark:[&>svg]:text-rose-300"><AlertCircle className="h-4 w-4" /><AlertDescription>{statusOptionsError}</AlertDescription></Alert> : null}
+
+          {showAddStatusOption && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Status Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newStatusOptionName}
+                  onChange={(e) => setNewStatusOptionName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddStatusOption() }}
+                  placeholder="e.g., On Leave, Suspended"
+                  className="ui-input"
+                />
+              </div>
+              <div className="min-w-[140px]">
+                <label className="block text-sm text-[var(--text-muted)] mb-1">Color</label>
+                <select value={newStatusOptionColor} onChange={(e) => setNewStatusOptionColor(e.target.value)} className="ui-input">
+                  {GUARD_STATUS_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <Button onClick={handleAddStatusOption} disabled={savingStatusOption || !newStatusOptionName.trim()}>
+                {savingStatusOption ? "Saving..." : "Save"}
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowAddStatusOption(false); setNewStatusOptionName(""); setNewStatusOptionColor("gray") }}>Cancel</Button>
+            </div>
+          )}
+
+          {statusOptionsLoading ? (
+            <p className="text-center text-sm text-[var(--text-muted)] py-4">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    {["#", "NAME", "COLOR", "STATUS", "ACTIONS"].map((h) => (
+                      <th key={h} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {statusOptions.length === 0 ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--text-muted)]">No statuses yet — defaults will be created on first use</td></tr>
+                  ) : statusOptions.map((so, idx) => (
+                    <tr key={so.id} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
+                      <td className="px-4 py-2 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-[var(--text)]">{so.name}</td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusColorClass(so.color)}`}>
+                          {so.color}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${so.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                          {so.isActive ? "ACTIVE" : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setEditingStatusOption(so); setEditStatusOptionName(so.name); setEditStatusOptionColor(so.color) }}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleToggleStatusOption(so)}
+                            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${so.isActive ? "text-orange-700 hover:bg-orange-50" : "text-green-700 hover:bg-green-50"}`}
+                          >
+                            {so.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteStatusOption(so)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Edit guard status modal */}
+      {editingStatusOption ? (
+        <ConfirmDialog
+          title="Edit Guard Status"
+          customContent={
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Status Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={editStatusOptionName}
+                  onChange={(e) => setEditStatusOptionName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleEditStatusOption() }}
+                  className="ui-input"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-[var(--text-muted)]">Color</label>
+                <select value={editStatusOptionColor} onChange={(e) => setEditStatusOptionColor(e.target.value)} className="ui-input">
+                  {GUARD_STATUS_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+          }
+          onNo={() => { setEditingStatusOption(null); setEditStatusOptionName(""); setEditStatusOptionColor("gray") }}
+          onYes={handleEditStatusOption}
+          yesText={savingStatusOption ? "Saving..." : "Save"}
+          noText="Cancel"
+        />
+      ) : null}
+
+      {/* Delete guard status confirm */}
+      {confirmDeleteStatusOption ? (
+        <ConfirmDialog
+          title="Delete Guard Status"
+          message={`Are you sure you want to delete "${confirmDeleteStatusOption.name}"? This cannot be undone.`}
+          onNo={() => setConfirmDeleteStatusOption(null)}
+          onYes={() => handleDeleteStatusOption(confirmDeleteStatusOption)}
+          yesText="Delete"
+          noText="Cancel"
+        />
+      ) : null}
 
       {/* Edit Doc Type Modal */}
       {editingDocType ? (
@@ -1690,16 +1892,19 @@ export default function PrerequisitesManager({ regions }: Props) {
   )
 }
 
-function HeaderWithAdd({ title }: { title: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-      <Button variant="secondary" className="inline-flex items-center gap-2">
-        <Plus className="h-4 w-4" />
-        Add
-      </Button>
-    </div>
-  )
+function statusColorClass(color: string): string {
+  switch (color) {
+    case "green": return "bg-green-100 text-green-800"
+    case "yellow": return "bg-yellow-100 text-yellow-800"
+    case "red": return "bg-red-100 text-red-800"
+    case "blue": return "bg-blue-100 text-blue-800"
+    case "brown": return "bg-amber-100 text-amber-900"
+    case "orange": return "bg-orange-100 text-orange-800"
+    case "teal": return "bg-teal-100 text-teal-800"
+    case "purple": return "bg-purple-100 text-purple-800"
+    case "pink": return "bg-pink-100 text-pink-800"
+    default: return "bg-gray-100 text-gray-700"
+  }
 }
 
 function SimpleTable({
