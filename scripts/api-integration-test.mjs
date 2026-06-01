@@ -420,6 +420,7 @@ async function run() {
         const seedLifecycleGuard = await api('POST', '/api/guards', {
             name: `Deployment Guard ${deploymentTs}`,
             cnic: generateCnic(deploymentTs + 31),
+            dateOfBirth: '1990-01-01',
             status: 'ACTIVE',
             regionId,
             regionalOfficeId: officeId,
@@ -1005,6 +1006,7 @@ async function run() {
       const payrollGuardSeed = await api('POST', '/api/guards', {
         name: `Payroll Guard ${Date.now()}`,
         cnic: generateCnic(Date.now() + 44),
+        dateOfBirth: '1990-01-01',
         status: 'ACTIVE',
         regionId,
         regionalOfficeId: officeId,
@@ -1818,6 +1820,7 @@ async function run() {
         const seedGuard = await api('POST', '/api/guards', {
             name: `Integration Scoped Guard ${scopeTs}`,
             cnic: cnicSeed,
+            dateOfBirth: '1990-01-01',
             status: 'ACTIVE',
             regionId,
             regionalOfficeId: officeId,
@@ -2024,6 +2027,7 @@ async function run() {
             const outScopeGuardCreate = await api('POST', '/api/guards', {
                 name: `Out Scope Guard ${scopeTs}`,
                 cnic: generateCnic(scopeTs + 11),
+                dateOfBirth: '1990-01-01',
                 status: 'ACTIVE',
                 regionId: scopedGuard.regionId,
                 regionalOfficeId: scopedGuard.regionalOfficeId,
@@ -2166,6 +2170,7 @@ async function run() {
             const inScopeGuardCreate = await api('POST', '/api/guards', {
                 name: `In Scope Guard ${scopeTs}`,
                 cnic: generateCnic(scopeTs + 22),
+                dateOfBirth: '1990-01-01',
                 status: 'ACTIVE',
                 regionId: scopedGuard.regionId,
                 regionalOfficeId: scopedGuard.regionalOfficeId,
@@ -2300,14 +2305,21 @@ async function run() {
 
     // =========== WORKFLOW PRESET PRECEDENCE ===========
     console.log('\n=== WORKFLOW PRESET PRECEDENCE ===');
+    // /api/workflow-rules now returns the ok() envelope: { success, data: { rules, presets, activePresetId } }.
+    // Unwrap to the inner body, tolerating the legacy raw shape too.
+    const wfBodyOf = (r) => {
+        const p = r?.data;
+        return (p && typeof p === 'object' && p.success === true && 'data' in p) ? p.data : p;
+    };
     const workflowGet = await api('GET', '/api/workflow-rules');
-    const workflowGetPass = workflowGet.status === 200 && Array.isArray(workflowGet.data?.rules);
+    const workflowGetBody = wfBodyOf(workflowGet);
+    const workflowGetPass = workflowGet.status === 200 && Array.isArray(workflowGetBody?.rules);
     check('GET /api/workflow-rules', workflowGetPass, `${workflowGet.status}`);
-    record('/api/workflow-rules GET', workflowGetPass ? 'PASS' : 'FAIL', '200 + rules[]', `${workflowGet.status} + rules=${Array.isArray(workflowGet.data?.rules)}`, workflowGet.data?.message);
+    record('/api/workflow-rules GET', workflowGetPass ? 'PASS' : 'FAIL', '200 + rules[]', `${workflowGet.status} + rules=${Array.isArray(workflowGetBody?.rules)}`, workflowGet.data?.message);
 
     let initialRuleMap = {};
-    if (Array.isArray(workflowGet.data?.rules)) {
-        initialRuleMap = workflowGet.data.rules.reduce((acc, row) => {
+    if (Array.isArray(workflowGetBody?.rules)) {
+        initialRuleMap = workflowGetBody.rules.reduce((acc, row) => {
             if (row?.key && typeof row?.value === 'boolean') acc[row.key] = row.value;
             return acc;
         }, {});
@@ -2315,7 +2327,7 @@ async function run() {
 
     if (workflowGetPass) {
         const workflowPresetRelaxed = await api('PATCH', '/api/workflow-rules', { presetId: 'relaxed' });
-        const presetRules = Array.isArray(workflowPresetRelaxed.data?.rules) ? workflowPresetRelaxed.data.rules : [];
+        const presetRules = Array.isArray(wfBodyOf(workflowPresetRelaxed)?.rules) ? wfBodyOf(workflowPresetRelaxed).rules : [];
         const relaxedSingleActive = presetRules.find((row) => row?.key === 'deployments.singleActivePerGuard')?.value;
         const relaxedTransition = presetRules.find((row) => row?.key === 'inventoryDemand.enforceTransitionMap')?.value;
         const workflowPresetRelaxedPass =
@@ -2336,7 +2348,7 @@ async function run() {
                 'deployments.singleActivePerGuard': true,
             },
         });
-        const manualRules = Array.isArray(workflowManualOverride.data?.rules) ? workflowManualOverride.data.rules : [];
+        const manualRules = Array.isArray(wfBodyOf(workflowManualOverride)?.rules) ? wfBodyOf(workflowManualOverride).rules : [];
         const manualSingleActive = manualRules.find((row) => row?.key === 'deployments.singleActivePerGuard')?.value;
         const manualTransition = manualRules.find((row) => row?.key === 'inventoryDemand.enforceTransitionMap')?.value;
         const workflowManualOverridePass =
