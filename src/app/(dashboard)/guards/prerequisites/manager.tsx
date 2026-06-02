@@ -39,17 +39,6 @@ type Props = {
   regions: Region[]
 }
 
-const salaryCategories = [
-  { id: 1, name: "A", limit: "35000" },
-  { id: 2, name: "B", limit: "50000" },
-]
-
-const allowancesAndDeductions = [
-  { factorName: "EOBI", amount: "2360" },
-  { factorName: "ESSI", amount: "1500" },
-  { factorName: "CWF", amount: "500" },
-]
-
 export default function PrerequisitesManager({ regions }: Props) {
   const router = useRouter()
   const [showRegionForm, setShowRegionForm] = useState(false)
@@ -1062,26 +1051,6 @@ export default function PrerequisitesManager({ regions }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Salary Categories"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Reference values — configurable via system settings."}</p></div></div>
-          <SimpleTable
-            headers={["ID#", "NAME", "LIMIT"]}
-            rows={salaryCategories.map((row) => [row.id, row.name, row.limit])}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold tracking-tight">{"Allowances &amp; Deductions"}</h2><p className="mt-1 text-sm text-muted-foreground">{"Reference values — configurable via system settings."}</p></div></div>
-          <SimpleTable
-            headers={["FACTOR NAME", "AMOUNT"]}
-            rows={allowancesAndDeductions.map((row) => [row.factorName, row.amount])}
-          />
-        </CardContent>
-      </Card>
-
       {/* ── Guard Designation Types ── */}
       <Card>
         <CardContent className="space-y-4">
@@ -1905,41 +1874,6 @@ function statusColorClass(color: string): string {
     case "pink": return "bg-pink-100 text-pink-800"
     default: return "bg-gray-100 text-gray-700"
   }
-}
-
-function SimpleTable({
-  headers,
-  rows,
-}: {
-  headers: string[]
-  rows: Array<Array<string | number | ReactNode>>
-}) {
-  return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-      <table className="min-w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="bg-[var(--surface-muted)] px-4 py-2 text-left text-xs font-semibold uppercase text-[var(--text-muted)]">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`row-${index}`} className="border-t border-[var(--border)] hover:bg-[var(--surface-muted)]">
-              {row.map((cell, cellIndex) => (
-                <td key={`cell-${index}-${cellIndex}`} className="px-4 py-2 text-[var(--text)]">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
 }
 
 function ConfirmDialog({

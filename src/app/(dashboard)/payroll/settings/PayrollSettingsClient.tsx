@@ -31,7 +31,7 @@ export default function PayrollSettingsClient({
       title="Payroll — Settings"
       subtitle="Regional payroll defaults, month init, limits."
       tabs={[
-        { id: "deductions", label: "Default Deductions" },
+        { id: "deductions", label: "Deduction Types" },
         { id: "month-init", label: "Month Initialise" },
         { id: "age-limit", label: "Guard Age Limit" },
         { id: "mental-health", label: "Mental Health Limit" },

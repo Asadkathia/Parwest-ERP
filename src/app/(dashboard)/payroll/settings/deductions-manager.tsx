@@ -174,10 +174,11 @@ export default function DeductionsManager({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold">Default Deductions</h3>
+          <h3 className="text-base font-semibold">Deduction Types</h3>
           <p className="text-xs text-[var(--text-muted)] mt-1">
             Admin-managed deduction types applied to payroll. Codes are stable identifiers used by
-            the calculation engine.
+            the calculation engine. Rate <em>amounts</em> (EOBI/ESSI/CWF/APSAA/uniform/night-call)
+            are managed separately under Settings → Deductions Policy.
           </p>
         </div>
         {canCreate && (
