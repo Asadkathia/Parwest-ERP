@@ -11,7 +11,8 @@ import ClientsListClient, {
   type ClientListRow,
 } from "@/components/clients/ClientsListClient"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
-import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function ClientsPage({
@@ -54,18 +55,36 @@ export default async function ClientsPage({
       ? scope?.regionId ?? undefined
       : requestedRegionId || scope?.regionId || undefined
 
+    // Branch-based scoping (B1): branchful clients are region-less and scope by
+    // their branches' regional office; branchless clients keep their own region.
+    // The topbar region filter narrows to that same branch-OR-branchless shape.
+    // Both the region filter and the scope filter use top-level `OR`, so compose
+    // every clause under `AND` to avoid one `OR` key clobbering another.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scopeClauses: Record<string, any>[] = []
+    if (activeRegionId) {
+      scopeClauses.push({
+        OR: [
+          { branches: { some: { regionalOffice: { regionId: activeRegionId } } } },
+          { isBranchless: true, regionId: activeRegionId },
+        ],
+      })
+    }
+    const scopeWhere = clientScopeWhere(scope)
+    if (Object.keys(scopeWhere).length > 0) scopeClauses.push(scopeWhere)
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {}
-    if (activeRegionId) where.regionId = activeRegionId
+    const andClauses = [...scopeClauses]
     if (statusParam) where.status = statusParam
     if (typeParam) where.type = typeParam
     if (q.trim()) {
-      where.OR = [
-        { name: { contains: q.trim(), mode: "insensitive" } },
-      ]
+      andClauses.push({ OR: [{ name: { contains: q.trim(), mode: "insensitive" } }] })
     }
+    if (andClauses.length > 0) where.AND = andClauses
 
-    const countWhere = activeRegionId ? { regionId: activeRegionId } : {}
+    const countWhere =
+      scopeClauses.length > 0 ? { AND: scopeClauses } : {}
 
     const [clientRows, total, active, inactive, totalBranches, clientTypes] = await Promise.all([
       prisma.client.findMany({
@@ -89,7 +108,7 @@ export default async function ClientsPage({
       prisma.client.count({ where: countWhere }),
       prisma.client.count({ where: { status: "ACTIVE", ...countWhere } }),
       prisma.client.count({ where: { status: "INACTIVE", ...countWhere } }),
-      prisma.branch.count({ where: activeRegionId ? { client: { regionId: activeRegionId } } : {} }),
+      prisma.branch.count({ where: activeRegionId ? { regionalOffice: { regionId: activeRegionId } } : {} }),
       prisma.clientType.findMany({
         orderBy: { label: "asc" },
         select: { name: true, label: true },
@@ -142,9 +161,8 @@ export default async function ClientsPage({
     console.error("ClientsPage query failed:", error)
   }
 
-  clients = applyManagerScope(clients, scope, {
-    regionId: (row) => row.regionId,
-  })
+  // Scoping is enforced in the query `where` (branch-based via clientScopeWhere),
+  // so no post-filter pass is needed here.
   if (scope) {
     dbWarning = dbWarning
       ? `${dbWarning} Scope: showing clients for your assigned region only.`

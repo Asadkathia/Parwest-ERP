@@ -29,7 +29,7 @@ const definition: ReportDefinition<typeof params> = {
         status: "ACTIVE",
         ...(clientId ? { clientId } : {}),
         ...(regionId
-          ? { OR: [{ guard: { regionId } }, { branch: { is: { client: { regionId } } } }] }
+          ? { OR: [{ guard: { regionId } }, { branch: { is: { regionalOffice: { regionId } } } }] }
           : {}),
         ...(scope?.regionId
           ? { guard: { regionId: scope.regionId } }

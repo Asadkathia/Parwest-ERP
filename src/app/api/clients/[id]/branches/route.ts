@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { cityForBranch } from "@/lib/geo/regionCity"
+import { provinceForBranch } from "@/lib/geo/province"
 
 export async function GET(
     request: NextRequest,
@@ -23,12 +25,14 @@ export async function GET(
         if (managerScope) {
             const client = await prisma.client.findUnique({
                 where: { id },
-                select: { regionId: true },
+                select: { id: true },
             })
             if (!client) {
                 return notFound("Client not found")
             }
-            if (managerScopeDenied(managerScope, { regionId: client.regionId })) {
+            // Branch-based scoping (B1): a client is in scope when it has a branch
+            // in the manager's region/office (or is a branchless client in it).
+            if (!(await clientInScope(id, managerScope))) {
                 return forbidden("Forbidden: client is outside your scope.")
             }
         }
@@ -94,22 +98,29 @@ export async function POST(
 
         const client = await prisma.client.findUnique({
             where: { id },
-            select: { id: true, regionId: true },
+            select: { id: true },
         })
         if (!client) {
             return notFound("Client not found")
         }
-        if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId })) {
-            return forbidden("Forbidden: client is outside your scope.")
+        // Branch-based scoping (B1): the branch's office IS the scope key, so a
+        // restricted manager must supply an in-scope office (a null office would
+        // both fail the guard open AND leave the branch unscopeable). Deny when
+        // absent or out of scope.
+        const branchOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        if (managerScope && (!branchOfficeId || managerScopeDenied(managerScope, { regionalOfficeId: branchOfficeId }))) {
+            return forbidden("Forbidden: a branch must be created in an office within your scope.")
         }
 
-        // Derive city from the region (branch regional office → branch region → owning
-        // client's region) — never trust a client-sent city, to avoid region/city drift.
-        const city = await cityForBranch(prisma, {
-            regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
+        // City + province are DERIVED from the branch's region (office → region) —
+        // never trust client-sent values, to avoid region/city/province drift.
+        const branchGeo = {
+            regionalOfficeId: branchOfficeId,
             regionId: body?.regionId ? String(body.regionId) : null,
             clientId: id,
-        })
+        }
+        const city = await cityForBranch(prisma, branchGeo)
+        const province = await provinceForBranch(prisma, branchGeo)
 
         const branch = await prisma.$transaction(async (tx) => {
             const created = await tx.branch.create({
@@ -119,7 +130,8 @@ export async function POST(
                     code: body?.code ? String(body.code).trim() : null,
                     address: body?.address ? String(body.address) : null,
                     city,
-                    province: body?.province ? String(body.province) : null,
+                    province,
+                    regionalOfficeId: branchOfficeId,
                     contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
                     contactPhone: body?.contactPhone ? String(body.contactPhone) : null,
                     contactEmail: body?.contactEmail ? String(body.contactEmail) : null,

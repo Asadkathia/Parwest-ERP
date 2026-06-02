@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
@@ -23,18 +24,34 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim() || undefined
     const status = searchParams.get("status") || undefined
     const guardType = searchParams.get("guardType") || undefined
-    const regionId = searchParams.get("regionId")
-    const regionalOfficeId = searchParams.get("regionalOfficeId")
+    const regionId = searchParams.get("regionId")?.trim() || null
+    const regionalOfficeId = searchParams.get("regionalOfficeId")?.trim() || null
 
-    if (managerScopeDenied(scope, { regionId, regionalOfficeId })) {
-      return forbidden("Forbidden: requested scope is outside your assigned region.")
+    // Branch-based scoping (B1): branchful clients scope by their branches'
+    // regional office; branchless keep their own region. Optional ?regionId=/
+    // ?regionalOfficeId= topbar filters narrow to that same branch-OR-branchless
+    // shape. Compose every clause under AND so the OR keys don't clobber.
+    const andClauses: Prisma.ClientWhereInput[] = []
+    const scopeWhere = clientScopeWhere(scope)
+    if (Object.keys(scopeWhere).length > 0) andClauses.push(scopeWhere)
+    if (regionalOfficeId) {
+      andClauses.push({
+        OR: [
+          { branches: { some: { regionalOfficeId } } },
+          { isBranchless: true, regionalOfficeId },
+        ],
+      })
+    } else if (regionId) {
+      andClauses.push({
+        OR: [
+          { branches: { some: { regionalOffice: { regionId } } } },
+          { isBranchless: true, regionId },
+        ],
+      })
     }
 
-    const scopeWhere = scope ? buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }) : {}
-    const where: Prisma.ClientWhereInput = {
-      ...(regionId ? { regionId } : {}),
-      ...scopeWhere,
-    }
+    const where: Prisma.ClientWhereInput = {}
+    if (andClauses.length > 0) where.AND = andClauses
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

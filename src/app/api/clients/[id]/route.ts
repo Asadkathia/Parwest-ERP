@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { cityForRegionId } from "@/lib/geo/regionCity"
@@ -38,6 +39,11 @@ export async function PUT(
             return unauthorized()
         }
         if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden("Access denied.")
+        // Editing the client RECORD itself (vs. its branches) is a GLOBAL-only action
+        // now that clients are region-less — only a SuperAdmin may mutate it. (B1)
+        if (!isSuperAdmin(session)) {
+            return forbidden("Forbidden: editing the client record requires global access.")
+        }
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
@@ -50,12 +56,9 @@ export async function PUT(
         if (!existingClient) {
             return notFound("Client not found")
         }
-        if (managerScope && managerScopeDenied(managerScope, { regionId: existingClient.regionId })) {
+        // Branch-aware scope guard (branchful → by branches, branchless → own region).
+        if (managerScope && !(await clientInScope(id, managerScope))) {
             return forbidden("Forbidden: client is outside your scope.")
-        }
-        const bodyRegionId = body?.regionId ? String(body.regionId) : null
-        if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
-            return forbidden("Forbidden: cannot move client outside your scope.")
         }
 
         // Reserve % override — accept null/blank or a decimal between 0 and 1.
@@ -106,14 +109,19 @@ export async function PUT(
         if (has("enrollmentDate")) {
             newData.enrollmentDate = body.enrollmentDate ? new Date(body.enrollmentDate) : existingClient.enrollmentDate
         }
-        // Region drives city — Region.name IS the operating city. Derive city only
-        // when regionId is sent, and never trust a client-sent city (drift guard).
-        if (has("regionId")) {
-            const nextRegionId = body.regionId || null
-            newData.regionId = nextRegionId
-            newData.city = await cityForRegionId(prisma, nextRegionId)
+        // Geo (region/office/city/operationalProvinces) lives on the client record
+        // ONLY for branchless clients (B1). For branchful clients geo lives on the
+        // branches, so these writes are skipped entirely — the columns stay region-less.
+        if (existingClient.isBranchless) {
+            // Region drives city — Region.name IS the operating city. Derive city only
+            // when regionId is sent, and never trust a client-sent city (drift guard).
+            if (has("regionId")) {
+                const nextRegionId = body.regionId || null
+                newData.regionId = nextRegionId
+                newData.city = await cityForRegionId(prisma, nextRegionId)
+            }
+            if (has("regionalOfficeId")) newData.regionalOfficeId = body.regionalOfficeId || null
         }
-        if (has("regionalOfficeId")) newData.regionalOfficeId = body.regionalOfficeId || null
         if (has("status")) newData.status = body.status || "ACTIVE"
         if (has("isBranchless")) newData.isBranchless = body.isBranchless === true || body.isBranchless === "true"
         if (has("headOfficeAddress")) newData.headOfficeAddress = body.headOfficeAddress || null
@@ -134,23 +142,25 @@ export async function PUT(
         if (has("introducerContactNumber")) newData.introducerContactNumber = body.introducerContactNumber || null
         if (has("introducerAddress")) newData.introducerAddress = body.introducerAddress || null
         if (has("introducerCnicNumber")) newData.introducerCnic = body.introducerCnicNumber || null
-        // Operational
-        if (has("operationalProvinces")) {
-            newData.operationalProvinces = (body.operationalProvinces ? String(body.operationalProvinces).trim() : "") || null
-        }
+        // Operational — branchless only (branchful clients are region-less, B1).
+        if (existingClient.isBranchless) {
+            if (has("operationalProvinces")) {
+                newData.operationalProvinces = (body.operationalProvinces ? String(body.operationalProvinces).trim() : "") || null
+            }
 
-        // Province ↔ region consistency: when region or province is being edited,
-        // enforce that the home Region stays within its operational province. (#47)
-        if (has("regionId") || has("operationalProvinces")) {
-            const effectiveRegionId = has("regionId") ? (body.regionId || null) : existingClient.regionId
-            const effectiveProvince = has("operationalProvinces")
-                ? (body.operationalProvinces ? String(body.operationalProvinces).trim() : "")
-                : (existingClient.operationalProvinces ?? "")
-            const provinceCheck = await checkRegionWithinProvince(prisma, {
-                regionId: effectiveRegionId,
-                operationalProvince: effectiveProvince,
-            })
-            if (!provinceCheck.ok) return badRequest(provinceCheck.message)
+            // Province ↔ region consistency: when region or province is being edited,
+            // enforce that the home Region stays within its operational province. (#47)
+            if (has("regionId") || has("operationalProvinces")) {
+                const effectiveRegionId = has("regionId") ? (body.regionId || null) : existingClient.regionId
+                const effectiveProvince = has("operationalProvinces")
+                    ? (body.operationalProvinces ? String(body.operationalProvinces).trim() : "")
+                    : (existingClient.operationalProvinces ?? "")
+                const provinceCheck = await checkRegionWithinProvince(prisma, {
+                    regionId: effectiveRegionId,
+                    operationalProvince: effectiveProvince,
+                })
+                if (!provinceCheck.ok) return badRequest(provinceCheck.message)
+            }
         }
         // Assigned
         if (has("assignedManagerId")) newData.assignedManagerId = body.assignedManagerId || null
@@ -205,6 +215,10 @@ export async function PATCH(
         const session = await auth()
         if (!session) return unauthorized()
         if (!hasAction(session, "CLIENTS", "UPDATE")) return forbidden("Access denied.")
+        // Changing the client status is a GLOBAL-only action (region-less clients, B1).
+        if (!isSuperAdmin(session)) {
+            return forbidden("Forbidden: changing client status requires global access.")
+        }
         const managerScope = deriveManagerScope(session)
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
@@ -217,7 +231,8 @@ export async function PATCH(
             select: { regionId: true, regionalOfficeId: true },
         })
         if (!existingClient) return notFound("Client not found")
-        if (managerScope && managerScopeDenied(managerScope, { regionId: existingClient.regionId, regionalOfficeId: existingClient.regionalOfficeId })) {
+        // Branch-aware scope guard (branchful → by branches, branchless → own region).
+        if (managerScope && !(await clientInScope(id, managerScope))) {
             return forbidden("Forbidden: client is outside your scope.")
         }
 

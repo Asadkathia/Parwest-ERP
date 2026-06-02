@@ -21,15 +21,17 @@ export default async function DeploymentDetailPage({ params }: { params: Promise
     include: {
       guard: true,
       client: true,
-      branch: true,
+      branch: { include: { regionalOffice: { select: { regionId: true } } } },
     },
   })
 
   if (!deployment) notFound()
 
   const scope = deriveManagerScope(session)
+  // Clients are region-less (branchful); geo lives on the branch's office and the
+  // guard. Scope the gate by the guard's region (or the branch office's region).
   if (managerScopeDenied(scope, {
-    regionId: deployment.client.regionId ?? deployment.guard.regionId,
+    regionId: deployment.guard.regionId ?? deployment.branch?.regionalOffice?.regionId ?? null,
     regionalOfficeId: deployment.regionalOfficeId ?? deployment.guard.regionalOfficeId,
   })) {
     notFound()

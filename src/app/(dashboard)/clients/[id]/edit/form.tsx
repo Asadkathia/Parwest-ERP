@@ -562,7 +562,16 @@ export default function ClientEditForm({
                                         <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden">
                                             <button
                                                 type="button"
-                                                onClick={() => field.onChange(false)}
+                                                onClick={() => {
+                                                    field.onChange(false)
+                                                    // Branchful clients carry no client-level
+                                                    // province/region (geo lives on branches) —
+                                                    // clear the now-hidden fields so they don't
+                                                    // submit a stale value.
+                                                    form.setValue("operationalProvinces", "", { shouldDirty: true })
+                                                    form.setValue("regionId", "", { shouldDirty: true })
+                                                    form.setValue("regionalOfficeId", "", { shouldDirty: true })
+                                                }}
                                                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                                                     !field.value
                                                         ? "bg-[var(--brand)] text-white"
@@ -847,7 +856,11 @@ export default function ClientEditForm({
                     </CardContent>
                 </Card>
 
-                {/* Operational Territory */}
+                {/* Operational Territory + Region & Assignment — branchless only.
+                    Branchful clients hold no client-level province/region; their
+                    geo lives on each branch. */}
+                {isBranchless && (
+                <>
                 <Card>
                     <CardHeader>
                         <CardTitle>Operational Territory</CardTitle>
@@ -1026,6 +1039,8 @@ export default function ClientEditForm({
                         </div>
                     </CardContent>
                 </Card>
+                </>
+                )}
 
                 {/* Tax & Legal */}
                 <Card>

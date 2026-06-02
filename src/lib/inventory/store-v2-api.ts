@@ -7,6 +7,7 @@ import { forbidden, notFound, unauthorized, type ApiEnvelope } from "@/lib/api/r
 import { getInventoryV2Flags } from "@/lib/inventory/v2-flags"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { deriveManagerScope, managerScopeDenied, type ManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 
 type SessionUser = {
   id?: string
@@ -176,7 +177,10 @@ export async function ensureGuardInScope(
 }
 
 /**
- * Verify a Client's regionalOffice/region matches the user's scope.
+ * Verify a Client is within the user's scope. Branch-aware: branchful clients
+ * are region-less and scope via their branches' offices, branchless clients via
+ * their own region — both handled by the shared `clientInScope` SoT
+ * (`src/lib/clients/access.ts`). Unrestricted/SuperAdmin (null scope) passes.
  */
 export async function ensureClientInScope(
   clientId: string | null | undefined,
@@ -184,21 +188,10 @@ export async function ensureClientInScope(
 ): Promise<Response | null> {
   const id = clientId?.trim()
   if (!id || !scope) return null
-  const client = await prisma.client.findUnique({
-    where: { id },
-    select: { regionalOfficeId: true, regionId: true },
-  })
-  if (!client) return notFound("Client not found.")
-  if (scope.regionalOfficeIds.length > 0) {
-    if (!client.regionalOfficeId || !scope.regionalOfficeIds.includes(client.regionalOfficeId)) {
-      return forbidden("Forbidden: client is outside your assigned regional office.")
-    }
-    return null
-  }
-  if (scope.regionId) {
-    if (client.regionId !== scope.regionId) {
-      return forbidden("Forbidden: client is outside your assigned region.")
-    }
+  const exists = await prisma.client.findUnique({ where: { id }, select: { id: true } })
+  if (!exists) return notFound("Client not found.")
+  if (!(await clientInScope(id, scope))) {
+    return forbidden("Forbidden: client is outside your assigned region.")
   }
   return null
 }

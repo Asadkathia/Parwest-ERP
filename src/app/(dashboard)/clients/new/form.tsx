@@ -667,6 +667,13 @@ export default function ClientEnrollmentForm({
                                                     field.onChange(false)
                                                     setLatManual("")
                                                     setLngManual("")
+                                                    // Branchful clients carry no client-level
+                                                    // province/region (geo lives on branches) —
+                                                    // clear the now-hidden fields so they don't
+                                                    // submit a stale value.
+                                                    form.setValue("operationalProvinces", "", { shouldDirty: true })
+                                                    form.setValue("regionId", "", { shouldDirty: true })
+                                                    form.setValue("regionalOfficeId", "", { shouldDirty: true })
                                                 }}
                                                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                                                     !field.value
@@ -972,7 +979,11 @@ export default function ClientEnrollmentForm({
                     </CardContent>
                 </Card>
 
-                {/* Operational Territory */}
+                {/* Operational Territory + Region & Assignment — branchless only.
+                    Branchful clients hold no client-level province/region; their
+                    geo lives on each branch (set in the default-branch section). */}
+                {isBranchless && (
+                <>
                 <Card>
                     <CardHeader>
                         <CardTitle>Operational Territory</CardTitle>
@@ -1165,15 +1176,11 @@ export default function ClientEnrollmentForm({
                                 </>
                             )}
 
-                            {!isBranchless && (
-                                <p className="md:col-span-2 text-sm text-[var(--text-muted)] bg-[var(--surface-muted)] rounded-[var(--radius-md)] px-4 py-3 border border-[var(--border)]">
-                                    Manager and supervisor will be assigned per branch. Use the branch form below or
-                                    the branch wizard after saving.
-                                </p>
-                            )}
                         </div>
                     </CardContent>
                 </Card>
+                </>
+                )}
 
                 {/* ── Default branch wizard (branchless only — kept legacy DOM-managed) ── */}
                 <input

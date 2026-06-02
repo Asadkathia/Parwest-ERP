@@ -3,12 +3,13 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { mockClientsList } from "@/lib/mockData/clients"
-import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { cityForBranch, cityForRegionId } from "@/lib/geo/regionCity"
-import { checkRegionWithinProvince } from "@/lib/geo/province"
+import { provinceForBranch } from "@/lib/geo/province"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 export async function GET(request: NextRequest) {
@@ -25,15 +26,37 @@ export async function GET(request: NextRequest) {
         const regionalOfficeId = searchParams.get("regionalOfficeId")
         const status = searchParams.get("status")
 
-        const where: Prisma.ClientWhereInput = {}
-        if (regionId) where.regionId = regionId
-        if (regionalOfficeId) where.regionalOfficeId = regionalOfficeId
-        if (status) where.status = status
-        Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
+        // Each filter is its own branch-OR-branchless block; they AND together so a
+        // region param and the manager scope both apply without clobbering each other.
+        const filters: Prisma.ClientWhereInput[] = []
+        if (status) filters.push({ status })
+        // Topbar region/office URL params narrow with the SAME branch-OR-branchless
+        // shape used for scoping: a client matches a region if it has a branch in
+        // that region, OR it is branchless and its own region matches. (B1)
+        if (regionId) {
+            filters.push({
+                OR: [
+                    { branches: { some: { regionalOffice: { regionId } } } },
+                    { isBranchless: true, regionId },
+                ],
+            })
+        }
+        if (regionalOfficeId) {
+            filters.push({
+                OR: [
+                    { branches: { some: { regionalOfficeId } } },
+                    { isBranchless: true, regionalOfficeId },
+                ],
+            })
+        }
+        // Regional-manager scoping (branch-OR-branchless); `{}` when unrestricted.
+        const scopeWhere = clientScopeWhere(managerScope)
+        if (Object.keys(scopeWhere).length > 0) filters.push(scopeWhere)
+        const where: Prisma.ClientWhereInput = filters.length > 0 ? { AND: filters } : {}
 
         if (isRuntimeMockEnabled()) {
             const clients = mockClientsList
-                .filter((client) => (where.status ? client.status === where.status : true))
+                .filter((client) => (status ? client.status === status : true))
                 .filter((client) =>
                     applyManagerScope([client], managerScope, {
                         regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
@@ -92,9 +115,22 @@ export async function POST(request: NextRequest) {
         const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
-        const bodyRegionId = body?.regionId ? String(body.regionId) : null
-        if (managerScope && managerScopeDenied(managerScope, { regionId: bodyRegionId })) {
-            return forbidden("Forbidden: cannot create client outside your scope.")
+        // Branchful clients are region-less (geo lives on branches), so they scope by
+        // the default branch's office; branchless clients keep their own region. (B1)
+        const isBranchlessClient = body.isBranchless === true || body.isBranchless === "true"
+        if (managerScope) {
+            // A restricted (regional) creator MUST anchor the new client inside their
+            // scope: a branchful client needs an in-scope default-branch office, a
+            // branchless client an in-scope region. A missing value is NOT a free pass
+            // (managerScopeDenied fails open on null) — it would create an unscopeable
+            // record invisible even to the creator. Deny when the anchor is absent. (B1)
+            const branchOffice = body.branchRegionalOfficeId || body.regionalOfficeId || null
+            const denied = isBranchlessClient
+                ? (!body.regionId || managerScopeDenied(managerScope, { regionId: String(body.regionId) }))
+                : (!branchOffice || managerScopeDenied(managerScope, { regionalOfficeId: String(branchOffice) }))
+            if (denied) {
+                return forbidden("Forbidden: cannot create client outside your scope.")
+            }
         }
 
         if (isRuntimeMockEnabled()) {
@@ -116,10 +152,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(mock, { status: 201 })
         }
 
-        // The client form sends this as a JS boolean after merging state into
-        // the POST body; older callers may still send the string "true". Accept
-        // both so branchless clients aren't silently stored with isBranchless=false.
-        const isBranchless = body.isBranchless === true || body.isBranchless === "true"
+        // The client form sends isBranchless as a JS boolean after merging state into
+        // the POST body; older callers may still send the string "true". Resolved above
+        // as `isBranchlessClient` — alias for the data writes below.
+        const isBranchless = isBranchlessClient
         // For branchless clients the form sends "__branchless_default__" as a sentinel;
         // we store it as "Default Branch" so the record is identifiable but treated as branchless.
         const rawBranchName = body.defaultBranchName ? String(body.defaultBranchName).trim() : ""
@@ -127,19 +163,17 @@ export async function POST(request: NextRequest) {
             ? "Default Branch"
             : rawBranchName
 
-        // Resolve regionId and regionalOfficeId
-        const regionId = body.regionId || body.locationRegionalOffice || null
-        const regionalOfficeId = body.regionalOfficeId || null
-
-        // Province ↔ region consistency: the home Region must lie within the
-        // selected operational province (e.g. KPK cannot host the Lahore region). (#47)
-        const operationalProvince = body.operationalProvinces ? String(body.operationalProvinces).trim() : ""
-        const provinceCheck = await checkRegionWithinProvince(prisma, { regionId, operationalProvince })
-        if (!provinceCheck.ok) return badRequest(provinceCheck.message)
-
-        // Derive city from the region — Region.name IS the operating city.
-        // Ignore any client-sent city/clientLocation to prevent region/city drift.
-        const city = await cityForRegionId(prisma, regionId)
+        // Branchful clients are region-less (B1): geo lives on their branches, so the
+        // client's own region/office/province/city are stored NULL. Branchless clients
+        // keep their region/office/operationalProvinces/city since they have no branch.
+        const regionId = isBranchless ? (body.regionId || body.locationRegionalOffice || null) : null
+        const regionalOfficeId = isBranchless ? (body.regionalOfficeId || null) : null
+        const operationalProvince = isBranchless
+            ? (body.operationalProvinces ? String(body.operationalProvinces).trim() : "")
+            : ""
+        // Derive city from the region — Region.name IS the operating city. Ignore any
+        // client-sent city to prevent region/city drift. NULL for branchful clients.
+        const city = isBranchless ? await cityForRegionId(prisma, regionId) : null
 
         // Resolve GPS — prefer manual override over map picker
         const latitude  = parseFloat(body.latitudeManual  || body.latitude  || "") || null
@@ -148,12 +182,16 @@ export async function POST(request: NextRequest) {
         // Parse numeric capacities
         const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
 
-        // Derive the default branch's city from its own region (may differ from the client's region).
-        const branchCity = await cityForBranch(prisma, {
+        // Derive the default branch's city AND province from its own region (mirrors
+        // api/branches/route.ts). Province is NEVER trusted from the client-sent value
+        // so a branch can't sit in a province its region doesn't belong to. (#47/#64)
+        const branchGeo = {
             regionalOfficeId: body.branchRegionalOfficeId || regionalOfficeId || null,
             regionId: body.branchRegionId || regionId || null,
             clientId: null,
-        })
+        }
+        const branchCity = await cityForBranch(prisma, branchGeo)
+        const branchProvince = await provinceForBranch(prisma, branchGeo)
 
         // Supervisor assignments are created atomically with the client below.
         const supervisorId = body.assignedSupervisorId ? String(body.assignedSupervisorId).trim() : ""
@@ -232,7 +270,7 @@ export async function POST(request: NextRequest) {
                             contactPhone:  body.branchContactPhone  || body.contactNumber  || null,
                             // branch-specific fields from the expanded branch section
                             code:                     body.branchCode                    || null,
-                            province:                 body.branchProvince                || null,
+                            province:                 branchProvince,
                             contactPersonDesignation: body.branchContactPersonDesignation || null,
                             contactPersonCnic:        body.branchContactPersonCnic        || null,
                             contactPersonPhone:       body.branchContactPersonPhone       || null,

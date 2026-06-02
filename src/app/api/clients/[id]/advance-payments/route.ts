@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -23,10 +24,12 @@ export async function GET(
     const { id: clientId } = await params
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      select: { id: true, regionId: true },
+      select: { id: true },
     })
     if (!client) return notFound("Client not found.")
-    if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId })) {
+    // Branch-based scoping (B1): in-scope = has a branch in the manager's
+    // region/office (or branchless client in it).
+    if (!(await clientInScope(clientId, managerScope))) {
       return forbidden("Forbidden: client is outside your scope.")
     }
 
@@ -67,10 +70,12 @@ export async function POST(
 
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      select: { id: true, regionId: true },
+      select: { id: true },
     })
     if (!client) return notFound("Client not found.")
-    if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId })) {
+    // Branch-based scoping (B1): in-scope = has a branch in the manager's
+    // region/office (or branchless client in it).
+    if (!(await clientInScope(clientId, managerScope))) {
       return forbidden("Forbidden: client is outside your scope.")
     }
 
