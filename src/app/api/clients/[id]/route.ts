@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { deriveManagerScope } from "@/lib/access/scope"
-import { clientInScope } from "@/lib/clients/access"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -44,7 +42,8 @@ export async function PUT(
         if (!isSuperAdmin(session)) {
             return forbidden("Forbidden: editing the client record requires global access.")
         }
-        const managerScope = deriveManagerScope(session)
+        // Past the SuperAdmin gate the actor is unrestricted, so no further scope
+        // check is needed (region-less clients are global at the record level). (B1)
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
 
@@ -55,10 +54,6 @@ export async function PUT(
 
         if (!existingClient) {
             return notFound("Client not found")
-        }
-        // Branch-aware scope guard (branchful → by branches, branchless → own region).
-        if (managerScope && !(await clientInScope(id, managerScope))) {
-            return forbidden("Forbidden: client is outside your scope.")
         }
 
         // Reserve % override — accept null/blank or a decimal between 0 and 1.
@@ -219,7 +214,7 @@ export async function PATCH(
         if (!isSuperAdmin(session)) {
             return forbidden("Forbidden: changing client status requires global access.")
         }
-        const managerScope = deriveManagerScope(session)
+        // Past the SuperAdmin gate the actor is unrestricted — no further scope check.
         const actorId = session.user?.id || null
         const actorName = session.user?.name || session.user?.email || actorId || "Unknown"
 
@@ -231,10 +226,6 @@ export async function PATCH(
             select: { regionId: true, regionalOfficeId: true },
         })
         if (!existingClient) return notFound("Client not found")
-        // Branch-aware scope guard (branchful → by branches, branchless → own region).
-        if (managerScope && !(await clientInScope(id, managerScope))) {
-            return forbidden("Forbidden: client is outside your scope.")
-        }
 
         const status = body?.status ? String(body.status) : null
         if (!status || !["ACTIVE", "INACTIVE"].includes(status)) {

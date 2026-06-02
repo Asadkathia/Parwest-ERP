@@ -192,6 +192,10 @@ export default function ClientEnrollmentForm({
     const [, setLngManual] = useState("")
 
     // Branch-mode state (rendered when isBranchless=false — out of scope per brief)
+    // Default-branch province gates its region(city) list: province → region → office. (#47)
+    const [branchProvince, setBranchProvince] = useState(
+        isRegionalViewer ? (regions.find((r) => r.id === viewerRegionId)?.province ?? "") : "",
+    )
     const [branchRegionId, setBranchRegionId] = useState(isRegionalViewer ? (viewerRegionId ?? "") : "")
     const [branchRegionalOfficeId, setBranchRegionalOfficeId] = useState(lockedRegionalOffice ?? "")
     const [branchRegionalOffices, setBranchRegionalOffices] = useState<{ id: string; name: string }[]>([])
@@ -1273,18 +1277,41 @@ export default function ClientEnrollmentForm({
                                 </CardContent>
                             </Card>
 
-                            {/* Branch Region/Office/City — legacy state */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Branch Province → Region(city) → Office cascade — legacy state */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div>
+                                    <label className="block text-sm text-[var(--text-muted)] mb-1">Select Province</label>
+                                    <select
+                                        className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
+                                        value={branchProvince}
+                                        onChange={(e) => {
+                                            setBranchProvince(e.target.value)
+                                            // Province gates the city list — clear an out-of-province selection.
+                                            if (!isRegionalViewer) {
+                                                setBranchRegionId("")
+                                                setBranchRegionalOfficeId("")
+                                            }
+                                        }}
+                                        disabled={isRegionalViewer}
+                                    >
+                                        <option value="">— Select Province —</option>
+                                        {PROVINCE_OPTIONS.map((p) => (
+                                            <option key={p.value} value={p.value}>
+                                                {p.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="block text-sm text-[var(--text-muted)] mb-1">Select Region</label>
                                     <select
                                         className="ui-input disabled:opacity-50 disabled:cursor-not-allowed"
                                         value={branchRegionId}
                                         onChange={(e) => setBranchRegionId(e.target.value)}
-                                        disabled={isRegionalViewer}
+                                        disabled={isRegionalViewer || !branchProvince}
                                     >
-                                        <option value="">— Select Region —</option>
-                                        {regions.map((r) => (
+                                        <option value="">{branchProvince ? "— Select Region —" : "— Select Province First —"}</option>
+                                        {regions.filter((r) => r.province === branchProvince).map((r) => (
                                             <option key={r.id} value={r.id}>
                                                 {r.name}
                                             </option>
