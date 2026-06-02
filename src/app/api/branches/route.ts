@@ -7,6 +7,7 @@ import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { cityForBranch } from "@/lib/geo/regionCity"
+import { provinceForBranch } from "@/lib/geo/province"
 
 export async function GET(request: NextRequest) {
     try {
@@ -108,11 +109,16 @@ export async function POST(request: NextRequest) {
         const branch = await prisma.$transaction(async (tx) => {
             // Derive city from the branch's region — Region.name IS the operating city.
             // Ignore any client-sent city to prevent region/city drift.
-            const city = await cityForBranch(tx, {
+            const branchGeo = {
                 regionalOfficeId: body?.regionalOfficeId ? String(body.regionalOfficeId) : null,
                 regionId: body?.regionId ? String(body.regionId) : null,
                 clientId,
-            })
+            }
+            const city = await cityForBranch(tx, branchGeo)
+            // Province is DERIVED from the branch's region (never the client-sent
+            // value), exactly like `city` — so a branch can't sit in a province its
+            // region doesn't belong to (KPK can't host the Lahore region). (#47/#64)
+            const province = await provinceForBranch(tx, branchGeo)
 
             const created = await tx.branch.create({
                 data: {
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
                     code: body?.code ? String(body.code).trim() : null,
                     address: body?.address ? String(body.address) : null,
                     city,
-                    province: body?.province ? String(body.province) : null,
+                    province,
                     contactPerson: body?.contactPerson ? String(body.contactPerson) : null,
                     contactPersonDesignation: body?.contactPersonDesignation ? String(body.contactPersonDesignation) : null,
                     contactPhone: body?.contactPhone ? String(body.contactPhone) : null,

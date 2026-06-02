@@ -617,25 +617,34 @@ export default async function ClientDetailPage({
                       <TableHead>City</TableHead>
                       <TableHead>Address</TableHead>
                       <TableHead>Contact Person</TableHead>
+                      <TableHead className="text-right">Day Guards <span className="font-normal text-muted-foreground">(allotted/cap)</span></TableHead>
+                      <TableHead className="text-right">Night Guards <span className="font-normal text-muted-foreground">(allotted/cap)</span></TableHead>
                       <TableHead className="text-right">Active Deployments</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredBranches.map((branch) => (
-                      <TableRow key={branch.id}>
-                        <TableCell className="font-medium">
-                          <Link href={`/clients/branches/${branch.id}`} className="text-primary hover:underline">
-                            {branch.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{branch.city || "—"}</TableCell>
-                        <TableCell>{branch.address || "—"}</TableCell>
-                        <TableCell>{branch.contactPerson || "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {(branch.deployments || []).filter((d) => d.status === "ACTIVE").length}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredBranches.map((branch) => {
+                      // Allotted = ACTIVE deployments on that shift (BOTH counts for day+night);
+                      // capacity = the branch's per-shift guard requirement. (#62)
+                      const active = (branch.deployments || []).filter((d) => d.status === "ACTIVE")
+                      const dayAllotted = active.filter((d) => ["DAY", "BOTH"].includes(normalizeShift(d.shiftType))).length
+                      const nightAllotted = active.filter((d) => ["NIGHT", "BOTH"].includes(normalizeShift(d.shiftType))).length
+                      return (
+                        <TableRow key={branch.id}>
+                          <TableCell className="font-medium">
+                            <Link href={`/clients/branches/${branch.id}`} className="text-primary hover:underline">
+                              {branch.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{branch.city || "—"}</TableCell>
+                          <TableCell>{branch.address || "—"}</TableCell>
+                          <TableCell>{branch.contactPerson || "—"}</TableCell>
+                          <TableCell className="text-right tabular-nums">{dayAllotted} / {branch.dayGuardCapacity ?? 0}</TableCell>
+                          <TableCell className="text-right tabular-nums">{nightAllotted} / {branch.nightGuardCapacity ?? 0}</TableCell>
+                          <TableCell className="text-right tabular-nums">{active.length}</TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>

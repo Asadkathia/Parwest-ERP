@@ -26,7 +26,7 @@ import { toast } from "sonner"
 import { ArrowLeft, Save, X, Plus } from "lucide-react"
 
 import SearchSelect from "@/components/ui/SearchSelect"
-import { PROVINCE_OPTIONS } from "@/lib/geo/province-constants"
+import { PROVINCE_OPTIONS, type ProvinceValue } from "@/lib/geo/province-constants"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
@@ -56,7 +56,7 @@ import {
     FormMessage,
 } from "@/components/shadcn/form"
 
-type Region = { id: string; name: string }
+type Region = { id: string; name: string; province?: ProvinceValue | null }
 
 type Props = {
     clientId: string
@@ -146,7 +146,11 @@ export default function BranchForm({
             enrollmentDate: new Date().toISOString().slice(0, 10),
             address: "",
             city: "",
-            province: "",
+            // Regional viewers are pinned to one region — derive its province so the
+            // province→region(city)→office cascade stays consistent. (#47/#64)
+            province: isRegionalViewer
+                ? (regions.find((r) => r.id === viewerRegionId)?.province ?? "")
+                : "",
             latitudeManual: "",
             longitudeManual: "",
             regionId: selectedRegionId,
@@ -165,6 +169,9 @@ export default function BranchForm({
             supervisorContact: "",
         },
     })
+
+    // Province gates the region(city) list — see the filtered Region select below. (#47/#64)
+    const watchedProvince = form.watch("province")
 
     // Mirror city from selected region (Region.name IS the operating city).
     useEffect(() => {
@@ -471,7 +478,16 @@ export default function BranchForm({
                                                     options={PROVINCE_OPTIONS}
                                                     defaultValue={field.value || ""}
                                                     placeholder="Select province"
-                                                    onChange={(v) => field.onChange(v)}
+                                                    disabled={isRegionalViewer}
+                                                    onChange={(v) => {
+                                                        field.onChange(v)
+                                                        // Province drives region(city)→office — clear an
+                                                        // out-of-province selection. Viewers are pinned. (#47/#64)
+                                                        if (!isRegionalViewer) {
+                                                            setSelectedRegionId("")
+                                                            setSelectedRegionalOfficeId("")
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                         </FormControl>
@@ -573,8 +589,9 @@ export default function BranchForm({
                                         <SelectValue placeholder="— Select Region —" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__NONE__">— Select Region —</SelectItem>
-                                        {regions.map((r) => (
+                                        <SelectItem value="__NONE__">{watchedProvince ? "— Select Region —" : "— Select Province First —"}</SelectItem>
+                                        {/* Only cities within the selected province (#47/#64). */}
+                                        {regions.filter((r) => !watchedProvince || r.province === watchedProvince).map((r) => (
                                             <SelectItem key={r.id} value={r.id}>
                                                 {r.name}
                                             </SelectItem>

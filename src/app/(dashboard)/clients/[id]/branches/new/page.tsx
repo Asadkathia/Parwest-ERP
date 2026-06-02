@@ -22,7 +22,7 @@ export default async function NewBranchPage({ params }: { params: Promise<{ id: 
         }),
         prisma.region.findMany({
             where: viewerRegionId ? { id: viewerRegionId } : undefined,
-            select: { id: true, name: true },
+            select: { id: true, name: true, province: true },
             orderBy: { name: "asc" },
         }).catch(() => []),
     ])
