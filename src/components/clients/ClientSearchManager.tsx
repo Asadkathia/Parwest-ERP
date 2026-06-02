@@ -22,10 +22,8 @@ import { buttonVariants } from "@/components/shadcn/button"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import DataTable from "@/components/shared/DataTable"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import { useCanAccess } from "@/components/shadcn/permission-gate"
 
-type RegionOption = { id: string; name: string }
 
 type ClientRow = {
   id: string
@@ -45,11 +43,9 @@ const CLIENT_TYPE_OPTIONS = ["bank", "manufacturer", "other"]
 type Props = {
   title: string
   subtitle: string
-  regions?: RegionOption[]
-  locked?: boolean
 }
 
-export default function ClientSearchManager({ title, subtitle, regions = [], locked = false }: Props) {
+export default function ClientSearchManager({ title, subtitle }: Props) {
   const searchParams = useSearchParams()
   const canUpdate = useCanAccess("CLIENTS", "UPDATE")
   const urlRegionId = searchParams?.get("regionId") || ""
@@ -59,7 +55,6 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
 
   const [name, setName] = useState("")
   const [clientType, setClientType] = useState("")
-  const [city, setCity] = useState("")
   const [rowsPerPage, setRowsPerPage] = useState("10")
   const [tableSearch, setTableSearch] = useState("")
   const [selectDate, setSelectDate] = useState("")
@@ -119,29 +114,16 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlRegionId])
 
-  // Derive the City filter options from rows actually returned by the API.
-  // The API is region-scoped server-side, so this list automatically respects
-  // the user's locked region (no leak of out-of-region cities) and updates
-  // when a SuperAdmin changes the URL regionId.
-  const cityOptions = useMemo(() => {
-    const set = new Set<string>()
-    for (const row of rows) {
-      const c = (row.city || "").trim()
-      if (c) set.add(c)
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [rows])
-
+  // Clients are region-less now (geo lives on branches), so no region/city filters.
   const filtered = useMemo(() => {
     return rows.filter((row) => {
       if (name && !row.name.toLowerCase().includes(name.toLowerCase())) return false
       if (clientType && row.type.toLowerCase() !== clientType.toLowerCase()) return false
-      if (city && city !== "All Cities" && !(row.city || "").toLowerCase().includes(city.toLowerCase())) return false
-      if (tableSearch && !`${row.name} ${row.type} ${row.city || ""}`.toLowerCase().includes(tableSearch.toLowerCase())) return false
+      if (tableSearch && !`${row.name} ${row.type}`.toLowerCase().includes(tableSearch.toLowerCase())) return false
       if (selectDate && row.createdAt && new Date(row.createdAt).toISOString().slice(0, 10) !== selectDate) return false
       return true
     })
-  }, [rows, name, clientType, city, tableSearch, selectDate])
+  }, [rows, name, clientType, tableSearch, selectDate])
 
   const pageSize = useMemo(() => {
     const parsed = Number.parseInt(rowsPerPage, 10)
@@ -160,11 +142,6 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
       <Card>
         <CardContent className="space-y-4 p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <RegionUrlPicker
-            regions={regions}
-            locked={locked}
-            includeGlobalOption={!locked}
-          />
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Name</label>
             <input
@@ -180,17 +157,6 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
             <select name="Select Client Type" value={clientType} onChange={(e) => setClientType(e.target.value)} className="ui-select">
               <option value="">--Select Client Type--</option>
               {CLIENT_TYPE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Select City</label>
-            <select name="Select City" value={city} onChange={(e) => setCity(e.target.value)} className="ui-select">
-              <option value="">--Select City--</option>
-              {cityOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -237,7 +203,6 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
             onClick={() => {
               setName("")
               setClientType("")
-              setCity("")
               setRowsPerPage("10")
               setTableSearch("")
               setSelectDate("")
@@ -271,7 +236,6 @@ export default function ClientSearchManager({ title, subtitle, regions = [], loc
             sortable: true,
           },
           { key: "type", header: "Type", sortable: true },
-          { key: "city", header: "City", render: (row) => row.city || "—", sortable: true },
           { key: "isBranchless", header: "Is Branchless", render: (row) => (row.isBranchless ? "Yes" : "No") },
           {
             key: "status",

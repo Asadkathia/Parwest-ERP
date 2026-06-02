@@ -3,17 +3,12 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/shadcn/card"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
-
-type RegionOption = { id: string; name: string }
 
 type PricingRow = {
   id: string
   name: string
   type: string
-  city: string | null
   status: string
-  regionName: string | null
   contractCount: number
   branchContractCount: number
   clientLevelContractCount: number
@@ -25,13 +20,7 @@ type PricingRow = {
   }[]
 }
 
-export default function PricingClient({
-  regions = [],
-  locked = false,
-}: {
-  regions?: RegionOption[]
-  locked?: boolean
-} = {}) {
+export default function PricingClient() {
   const [rows, setRows] = useState<PricingRow[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -104,15 +93,10 @@ export default function PricingClient({
 
       <Card>
         <CardContent className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <RegionUrlPicker
-            regions={regions}
-            locked={locked}
-            includeGlobalOption={!locked}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
-            placeholder="Search client name or city…"
+            placeholder="Search client name…"
             className="ui-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -150,12 +134,6 @@ export default function PricingClient({
                 Client
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">
-                City
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">
-                Region
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] uppercase">
@@ -172,14 +150,14 @@ export default function PricingClient({
           <tbody className="divide-y divide-[var(--border)]">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--text-muted)]">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--text-muted)]">
                   No clients found.
                 </td>
               </tr>
@@ -187,8 +165,6 @@ export default function PricingClient({
             {rows.map((r) => (
               <tr key={r.id} className="hover:bg-[var(--surface-muted)]">
                 <td className="px-4 py-3 text-sm font-medium">{r.name}</td>
-                <td className="px-4 py-3 text-sm">{r.city ?? "—"}</td>
-                <td className="px-4 py-3 text-sm">{r.regionName ?? "—"}</td>
                 <td className="px-4 py-3 text-sm">
                   <span
                     className={`px-2 py-0.5 rounded text-xs ${

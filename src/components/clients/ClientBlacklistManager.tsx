@@ -17,9 +17,6 @@ import {
 } from "@/components/shadcn/alert-dialog"
 import { useCanAccess } from "@/components/shadcn/permission-gate"
 import DataTable from "@/components/shared/DataTable"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
-
-type RegionOption = { id: string; name: string }
 
 type Row = {
   id: string
@@ -36,13 +33,7 @@ type ApiBlacklistRow = {
   updatedAt?: string | null
 }
 
-export default function ClientBlacklistManager({
-  regions = [],
-  locked = false,
-}: {
-  regions?: RegionOption[]
-  locked?: boolean
-} = {}) {
+export default function ClientBlacklistManager() {
   const canCreate = useCanAccess("CLIENTS", "CREATE")
   const canDelete = useCanAccess("CLIENTS", "DELETE")
   const [rows, setRows] = useState<Row[]>([])
@@ -159,12 +150,7 @@ export default function ClientBlacklistManager({
 
       <Card>
         <CardContent className="space-y-4 p-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <RegionUrlPicker
-            regions={regions}
-            locked={locked}
-            includeGlobalOption={!locked}
-          />
+        <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm text-[var(--text-muted)] mb-1">Email</label>
             <input

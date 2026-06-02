@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Shield, Plus, Pencil, Trash2, X, Check, Loader2 } from "lucide-react"
-import RegionUrlPicker from "@/components/access/RegionUrlPicker"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +14,6 @@ import {
   AlertDialogTitle,
 } from "@/components/shadcn/alert-dialog"
 import { useCanAccess } from "@/components/shadcn/permission-gate"
-
-type RegionOption = { id: string; name: string }
 
 type RegionalOffice = { id: string; name: string }
 type Client = { id: string; name: string }
@@ -43,13 +40,7 @@ function formatDate(val: string | null | undefined) {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
 }
 
-export default function ClientInsuranceSettingsClient({
-  regions = [],
-  locked = false,
-}: {
-  regions?: RegionOption[]
-  locked?: boolean
-} = {}) {
+export default function ClientInsuranceSettingsClient() {
   const searchParams = useSearchParams()
   const urlRegionId = searchParams?.get("regionId") || ""
   const canCreate = useCanAccess("CLIENTS", "CREATE")
@@ -229,11 +220,6 @@ export default function ClientInsuranceSettingsClient({
         <h2 className="text-sm font-semibold text-[var(--text)] mb-4 uppercase tracking-widest">CLIENTS INSURANCE</h2>
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <RegionUrlPicker
-              regions={regions}
-              locked={locked}
-              includeGlobalOption={!locked}
-            />
             {/* Regional Office */}
             <div>
               <label className="block text-xs font-medium text-[var(--text-muted)] mb-1 uppercase tracking-wide">Regional Office</label>

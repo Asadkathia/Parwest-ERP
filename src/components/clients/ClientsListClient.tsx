@@ -12,7 +12,6 @@ import { Card, CardContent } from "@/components/shadcn/card"
 import { DataTable } from "@/components/shadcn/data-table"
 import { Input } from "@/components/shadcn/input"
 import { PermissionGate } from "@/components/shadcn/permission-gate"
-import { RegionSelector } from "@/components/shadcn/region-selector"
 import {
   Select,
   SelectContent,
@@ -20,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/shadcn/select"
-import { useRegions } from "@/lib/hooks/useRegions"
 
 export type ClientListRow = {
   id: string
@@ -90,12 +88,6 @@ export default function ClientsListClient({
   const [search, setSearch] = React.useState(searchParams.get("q") ?? "")
   const status = searchParams.get("status") ?? ""
   const type = searchParams.get("type") ?? ""
-  const regionParam = searchParams.get("regionId") ?? null
-  const regionValue: string | null =
-    !regionParam || regionParam === "all" || regionParam === "__GLOBAL__"
-      ? null
-      : regionParam
-  const { regions } = useRegions()
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const pushParam = React.useCallback(
@@ -138,18 +130,6 @@ export default function ClientsListClient({
     })
   }
 
-  const handleRegion = (next: string | null) => {
-    pushParam((p) => {
-      if (next === null) p.delete("regionId")
-      else p.set("regionId", next)
-      // Clear region-dependent params so we don't fetch stale office/branch
-      // data under a different region (mirrors the topbar contract).
-      p.delete("regionalOfficeId")
-      p.delete("officeId")
-      p.delete("branchId")
-      p.delete("clientId")
-    })
-  }
 
   const columns = React.useMemo<ColumnDef<ClientListRow>[]>(
     () => [
@@ -175,11 +155,6 @@ export default function ClientsListClient({
         cell: ({ row }) => (
           <Badge variant="outline">{row.original.type}</Badge>
         ),
-      },
-      {
-        accessorKey: "regionName",
-        header: "Region",
-        cell: ({ row }) => row.original.regionName || "—",
       },
       {
         accessorKey: "branchCount",
@@ -235,11 +210,6 @@ export default function ClientsListClient({
           ),
       },
       {
-        accessorKey: "city",
-        header: "City",
-        cell: ({ row }) => row.original.city || "—",
-      },
-      {
         id: "actions",
         header: "",
         enableHiding: false,
@@ -262,19 +232,9 @@ export default function ClientsListClient({
 
   return (
     <div className="space-y-4">
-      {/* Filter toolbar — plain Tailwind grid (no FilterBar wrapper). */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div>
-          <label className="mb-1 block text-sm text-muted-foreground">
-            Region
-          </label>
-          <RegionSelector
-            regions={regions}
-            value={regionValue}
-            onChange={handleRegion}
-            className="w-full"
-          />
-        </div>
+      {/* Filter toolbar — plain Tailwind grid (no FilterBar wrapper). Clients are
+          region-less now (geo lives on branches), so there's no client Region filter. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm text-muted-foreground">
             Search

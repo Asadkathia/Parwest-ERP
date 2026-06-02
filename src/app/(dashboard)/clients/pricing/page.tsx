@@ -1,24 +1,16 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/db"
-import { deriveManagerScope } from "@/lib/access/scope"
 import PricingClient from "./PricingClient"
 
 export default async function ClientsPricingPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const scope = deriveManagerScope(session)
-  const regions = await prisma.region
-    .findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
-    .catch(() => [] as { id: string; name: string }[])
-  const pickerRegions = scope?.regionId
-    ? regions.filter((r) => r.id === scope.regionId)
-    : regions
-
+  // Clients are region-less (scoped by their branches server-side via
+  // clientScopeWhere), so the pricing overview no longer needs a region picker.
   return (
     <div className="space-y-6">
-      <PricingClient regions={pickerRegions} locked={Boolean(scope?.regionId)} />
+      <PricingClient />
     </div>
   )
 }

@@ -34,12 +34,14 @@ export default async function BranchesPage({
         ? scope?.regionId ?? undefined
         : params.regionId || scope?.regionId || undefined
 
+    // Region scope is the BRANCH's own region (office → region), not the client's —
+    // clients are region-less now (geo lives on branches). Filtering by client.regionId
+    // would match nothing for branchful clients. (B1)
     const branches = await prisma.branch.findMany({
-        where: activeRegionId ? { client: { is: { regionId: activeRegionId } } } : {},
+        where: activeRegionId ? { regionalOffice: { is: { regionId: activeRegionId } } } : {},
         include: {
-            client: {
-                include: { region: { select: { name: true } } },
-            },
+            client: { select: { name: true, type: true } },
+            regionalOffice: { include: { region: { select: { name: true } } } },
             deployments: {
                 where: { status: "ACTIVE" },
             },
@@ -66,7 +68,7 @@ export default async function BranchesPage({
             address: branch.address,
             city: branch.city,
             province: branch.province,
-            regionName: branch.client?.region?.name ?? null,
+            regionName: branch.regionalOffice?.region?.name ?? null,
             branchModel: deriveBranchModel(branch.client?.type) as "CONVENTIONAL" | "ISLAMIC",
             deploymentCount: branch.deployments?.length ?? 0,
             isHeadOffice: branch.isHeadOffice,
