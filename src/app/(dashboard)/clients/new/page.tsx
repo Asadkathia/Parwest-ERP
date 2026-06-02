@@ -7,6 +7,7 @@ import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { deriveManagerScope } from "@/lib/access/scope"
 import ClientEnrollmentForm from "./form"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
+import type { ProvinceValue } from "@/lib/geo/province-constants"
 
 export default async function NewClientPage({
     searchParams,
@@ -24,12 +25,13 @@ export default async function NewClientPage({
     const viewerRegionId = scope?.regionId ?? null
     const viewerRegionalOfficeId = scope?.regionalOfficeIds.length === 1 ? scope.regionalOfficeIds[0] : null
 
-    let regions: Array<{ id: string; name: string }> = []
+    let regions: Array<{ id: string; name: string; province: ProvinceValue | null }> = []
     let dbWarning = ""
     try {
         regions = await prisma.region.findMany({
             where: viewerRegionId ? { id: viewerRegionId } : undefined,
             orderBy: { name: "asc" },
+            select: { id: true, name: true, province: true },
         })
     } catch (error) {
         if (isPrismaMissingSchemaError(error)) {

@@ -8,6 +8,7 @@ import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { cityForBranch, cityForRegionId } from "@/lib/geo/regionCity"
+import { checkRegionWithinProvince } from "@/lib/geo/province"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 export async function GET(request: NextRequest) {
@@ -130,6 +131,12 @@ export async function POST(request: NextRequest) {
         const regionId = body.regionId || body.locationRegionalOffice || null
         const regionalOfficeId = body.regionalOfficeId || null
 
+        // Province ↔ region consistency: the home Region must lie within the
+        // selected operational province (e.g. KPK cannot host the Lahore region). (#47)
+        const operationalProvince = body.operationalProvinces ? String(body.operationalProvinces).trim() : ""
+        const provinceCheck = await checkRegionWithinProvince(prisma, { regionId, operationalProvince })
+        if (!provinceCheck.ok) return badRequest(provinceCheck.message)
+
         // Derive city from the region — Region.name IS the operating city.
         // Ignore any client-sent city/clientLocation to prevent region/city drift.
         const city = await cityForRegionId(prisma, regionId)
@@ -191,7 +198,7 @@ export async function POST(request: NextRequest) {
                 introducerCnic:          body.introducerCnicNumber    || null,
 
                 // Operational
-                operationalProvinces: body.operationalProvinces || null,
+                operationalProvinces: operationalProvince || null,
 
                 // Assigned users
                 assignedManagerId: body.assignedManagerId || null,

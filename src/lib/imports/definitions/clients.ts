@@ -42,6 +42,7 @@ import { z } from "zod"
 
 import { prisma } from "@/lib/db"
 import { cityForRegionId } from "@/lib/geo/regionCity"
+import { provinceForBranch } from "@/lib/geo/province"
 import { registerImport } from "@/lib/imports/registry"
 import {
   memoizedResolver,
@@ -254,6 +255,10 @@ registerImport({
     // POST /api/clients does at line 135 and is the structural guarantee the
     // rest of the module depends on: a Client's `city` is NEVER user-supplied.
     const city = await cityForRegionId(ctx.tx, regionId)
+    // Operational province is DERIVED from the home region (never the free-text
+    // CSV cell), mirroring how `city` is handled — this keeps bulk imports within
+    // the province↔region invariant enforced on the interactive paths (#47).
+    const operationalProvince = await provinceForBranch(ctx.tx, { regionId })
 
     // Sentinel-safe optional pass-through. Optional columns survive zod as
     // their raw strings (or "" when blank); we coerce empty/sentinel → null
@@ -276,7 +281,7 @@ registerImport({
         headOfficeAddress: r.headOfficeAddress,
         ntn: opt(r.ntn),
         strn: opt(r.strn),
-        operationalProvinces: opt(r.operationalProvinces),
+        operationalProvinces: operationalProvince,
         introducerName: opt(r.introducerName),
         introducerAddress: opt(r.introducerAddress),
         introducerCnic: opt(r.introducerCnic),

@@ -24,6 +24,7 @@ import {
 } from "@/components/shadcn/table"
 import { TabStatusBadge } from "@/components/guards/tabs/status-badge"
 import { ParwestCurrency } from "@/components/shadcn/parwest-currency"
+import { provinceLabel } from "@/lib/geo/province-constants"
 type TabKey =
   | "general-information"
   | "assigned-guards"
@@ -394,7 +395,7 @@ export default async function ClientDetailPage({
                 <InfoCell label="ASSIGNED MANAGER" value={assignedManager?.name || assignedManager?.email || "—"} />
                 <InfoCell label="BRANCHLESS CLIENT" value={client.isBranchless ? "Yes" : "No"} />
                 <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
-                <InfoCell label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
+                <InfoCell label="OPERATIONAL PROVINCES" value={provinceLabel(client.operationalProvinces)} />
                 <InfoCell label="NTN" value={client.ntn || "—"} />
                 <InfoCell label="STRN" value={client.strn || "—"} />
               </div>
@@ -934,7 +935,7 @@ export default async function ClientDetailPage({
                 <FieldDisplay label="SUPERVISOR NAME" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
                 <FieldDisplay label="SUPERVISOR EMAIL" value={client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
                 <FieldDisplay label="BRANCHLESS" value={client.isBranchless ? "Yes" : "No"} />
-                <FieldDisplay label="OPERATIONAL PROVINCES" value={client.operationalProvinces || "—"} />
+                <FieldDisplay label="OPERATIONAL PROVINCES" value={provinceLabel(client.operationalProvinces)} />
               </div>
             </CardContent>
           </Card>

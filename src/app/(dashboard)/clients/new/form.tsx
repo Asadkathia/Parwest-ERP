@@ -38,6 +38,7 @@ import Link from "next/link"
 
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
+import { PROVINCE_OPTIONS, type ProvinceValue } from "@/lib/geo/province-constants"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
@@ -69,15 +70,8 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const PROVINCE_OPTIONS = [
-    { value: "Punjab", label: "Punjab" },
-    { value: "Sindh", label: "Sindh" },
-    { value: "KPK", label: "KPK" },
-    { value: "Balochistan", label: "Balochistan" },
-    { value: "All Pakistan", label: "All Pakistan" },
-]
 
-type Region = { id: string; name: string }
+type Region = { id: string; name: string; province?: ProvinceValue | null }
 
 type Props = {
     regions: Region[]
@@ -159,7 +153,11 @@ export default function ClientEnrollmentForm({
             introducerAddress: "",
             introducerCnicNumber: "",
 
-            operationalProvinces: "",
+            // Regional viewers are pinned to one region — derive their operational
+            // province from it so the province↔region pair is always consistent. (#47)
+            operationalProvinces: isRegionalViewer
+                ? (regions.find((r) => r.id === viewerRegionId)?.province ?? "")
+                : "",
 
             regionId: isRegionalViewer ? (viewerRegionId ?? "") : "",
             regionalOfficeId: lockedRegionalOffice ?? "",
@@ -993,7 +991,16 @@ export default function ClientEnrollmentForm({
                                                 options={PROVINCE_OPTIONS}
                                                 defaultValue={field.value || ""}
                                                 placeholder="Select Operational Territory"
-                                                onChange={(v) => field.onChange(v)}
+                                                disabled={isRegionalViewer}
+                                                onChange={(v) => {
+                                                    field.onChange(v)
+                                                    // Province gates the city list — clear a now-out-of-province
+                                                    // region/office selection. Regional viewers are pinned. (#47)
+                                                    if (!isRegionalViewer) {
+                                                        form.setValue("regionId", "", { shouldDirty: true })
+                                                        form.setValue("regionalOfficeId", "", { shouldDirty: true })
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     </FormControl>
@@ -1037,7 +1044,8 @@ export default function ClientEnrollmentForm({
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                {regions.map((r) => (
+                                                {/* Only cities within the selected operational province (#47). */}
+                                                {regions.filter((r) => r.province === watchedProvince).map((r) => (
                                                     <SelectItem key={r.id} value={r.id}>
                                                         {r.name}
                                                     </SelectItem>

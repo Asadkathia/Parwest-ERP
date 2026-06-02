@@ -11,8 +11,8 @@ import { deriveManagerScope } from "@/lib/access/scope"
 // their assigned region thanks to `deriveManagerScope` filtering below.
 
 const MOCK_REGIONS = [
-    { id: "mock-region-lahore", name: "Lahore", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
-    { id: "mock-region-karachi", name: "Karachi", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
+    { id: "mock-region-lahore", name: "Lahore", province: "PUNJAB", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
+    { id: "mock-region-karachi", name: "Karachi", province: "SINDH", createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
 ]
 
 export async function GET() {

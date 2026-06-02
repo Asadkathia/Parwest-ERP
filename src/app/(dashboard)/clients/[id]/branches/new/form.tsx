@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { ArrowLeft, Save, X, Plus } from "lucide-react"
 
 import SearchSelect from "@/components/ui/SearchSelect"
+import { PROVINCE_OPTIONS } from "@/lib/geo/province-constants"
 import LocationPickerMap from "@/components/ui/LocationPickerMap"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
@@ -74,13 +75,6 @@ const OFFICE_TYPE_OPTIONS = [
     "Field Office", "Cash Office", "ATM Site", "Warehouse", "Checkpoint", "Other",
 ].map((t) => ({ value: t, label: t }))
 
-const PROVINCE_OPTIONS = [
-    { value: "Punjab", label: "Punjab" },
-    { value: "Sindh", label: "Sindh" },
-    { value: "KPK", label: "Khyber Pakhtunkhwa" },
-    { value: "Balochistan", label: "Balochistan" },
-    { value: "Islamabad", label: "Islamabad Capital Territory" },
-]
 
 
 const BRANCH_MODEL_OPTIONS = [

@@ -26,6 +26,7 @@ import { ArrowLeft, Save, Plus, X } from "lucide-react"
 
 import OcrUploadPanel from "@/components/ocr/OcrUploadPanel"
 import SearchSelect from "@/components/ui/SearchSelect"
+import { PROVINCE_OPTIONS, type ProvinceValue } from "@/lib/geo/province-constants"
 import CnicInput from "@/components/ui/CnicInput"
 import PhoneInput from "@/components/ui/PhoneInput"
 import { isValidPhone } from "@/lib/validation/formats"
@@ -66,13 +67,6 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const PROVINCE_OPTIONS = [
-    { value: "Punjab", label: "Punjab" },
-    { value: "Sindh", label: "Sindh" },
-    { value: "KPK", label: "KPK" },
-    { value: "Balochistan", label: "Balochistan" },
-    { value: "All Pakistan", label: "All Pakistan" },
-]
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Client = {
@@ -105,7 +99,7 @@ type Client = {
     reservePct: number | null
 }
 
-type Region = { id: string; name: string }
+type Region = { id: string; name: string; province?: ProvinceValue | null }
 
 type Props = {
     client: Client
@@ -215,6 +209,7 @@ export default function ClientEditForm({
     }
 
     const watchedRegionId = useWatch({ control: form.control, name: "regionId" })
+    const watchedProvince = useWatch({ control: form.control, name: "operationalProvinces" })
     const isBranchless = useWatch({ control: form.control, name: "isBranchless" }) ?? true
 
     // Derive: city always mirrors the selected region's name.
@@ -871,7 +866,16 @@ export default function ClientEditForm({
                                                 options={PROVINCE_OPTIONS}
                                                 defaultValue={field.value || ""}
                                                 placeholder="Select Operational Territory"
-                                                onChange={(v) => field.onChange(v)}
+                                                disabled={isRegionalViewer}
+                                                onChange={(v) => {
+                                                    field.onChange(v)
+                                                    // Province gates the city list — clear an out-of-province
+                                                    // region/office. Regional viewers are pinned. (#47)
+                                                    if (!isRegionalViewer) {
+                                                        form.setValue("regionId", "", { shouldDirty: true })
+                                                        form.setValue("regionalOfficeId", "", { shouldDirty: true })
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     </FormControl>
@@ -909,7 +913,8 @@ export default function ClientEditForm({
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                {regions.map((r) => (
+                                                {/* Only cities within the selected operational province (#47). */}
+                                                {regions.filter((r) => !watchedProvince || r.province === watchedProvince).map((r) => (
                                                     <SelectItem key={r.id} value={r.id}>
                                                         {r.name}
                                                     </SelectItem>

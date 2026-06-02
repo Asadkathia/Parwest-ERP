@@ -7,6 +7,7 @@ import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
 import { cityForRegionId } from "@/lib/geo/regionCity"
+import { checkRegionWithinProvince } from "@/lib/geo/province"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 /** Build a human-readable diff of changed fields for audit logs. */
@@ -134,7 +135,23 @@ export async function PUT(
         if (has("introducerAddress")) newData.introducerAddress = body.introducerAddress || null
         if (has("introducerCnicNumber")) newData.introducerCnic = body.introducerCnicNumber || null
         // Operational
-        if (has("operationalProvinces")) newData.operationalProvinces = body.operationalProvinces || null
+        if (has("operationalProvinces")) {
+            newData.operationalProvinces = (body.operationalProvinces ? String(body.operationalProvinces).trim() : "") || null
+        }
+
+        // Province ↔ region consistency: when region or province is being edited,
+        // enforce that the home Region stays within its operational province. (#47)
+        if (has("regionId") || has("operationalProvinces")) {
+            const effectiveRegionId = has("regionId") ? (body.regionId || null) : existingClient.regionId
+            const effectiveProvince = has("operationalProvinces")
+                ? (body.operationalProvinces ? String(body.operationalProvinces).trim() : "")
+                : (existingClient.operationalProvinces ?? "")
+            const provinceCheck = await checkRegionWithinProvince(prisma, {
+                regionId: effectiveRegionId,
+                operationalProvince: effectiveProvince,
+            })
+            if (!provinceCheck.ok) return badRequest(provinceCheck.message)
+        }
         // Assigned
         if (has("assignedManagerId")) newData.assignedManagerId = body.assignedManagerId || null
         // Reserve %
