@@ -2,25 +2,26 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import type { Session } from "next-auth"
 
 async function resolveScope(id: string, session: Session) {
   const managerScope = deriveManagerScope(session)
   if (!managerScope) return null
 
+  // Branch-aware (B1): scope by the client relation, not its (NULL for branchful)
+  // regionId — managerScopeDenied(client.regionId) would FAIL OPEN. Fetch the
+  // insurance's clientId and delegate to the branch-based clientInScope SoT.
   const insurance = await (prisma.clientInsurance as unknown as {
-    findUnique: (args: unknown) => Promise<{ client: { regionId: string | null; regionalOfficeId: string | null } } | null>
+    findUnique: (args: unknown) => Promise<{ clientId: string } | null>
   }).findUnique({
     where: { id },
-    select: { client: { select: { regionId: true, regionalOfficeId: true } } },
+    select: { clientId: true },
   })
 
   if (!insurance) return "not_found"
-  if (managerScopeDenied(managerScope, {
-    regionId: insurance.client.regionId,
-    regionalOfficeId: insurance.client.regionalOfficeId,
-  })) return "forbidden"
+  if (!(await clientInScope(insurance.clientId, managerScope))) return "forbidden"
 
   return null
 }

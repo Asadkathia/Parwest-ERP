@@ -66,10 +66,7 @@ export async function GET(request: NextRequest) {
                     id: client.id,
                     name: client.name,
                     type: client.type,
-                    city: client.city,
                     status: client.status,
-                    regionId: client.regionId,
-                    region: client.regionId ? { id: client.regionId, name: client.regionId } : null,
                 }))
             return NextResponse.json(clients)
         }
@@ -85,16 +82,13 @@ export async function GET(request: NextRequest) {
                 name: true,
                 type: true,
                 email: true,
-                city: true,
                 status: true,
                 isBranchless: true,
-                regionId: true,
                 regionalOfficeId: true,
                 contactPerson: true,
                 phone: true,
                 enrollmentDate: true,
                 createdAt: true,
-                region: { select: { id: true, name: true } },
             },
         })
 

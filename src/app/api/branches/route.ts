@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
@@ -37,13 +37,13 @@ export async function GET(request: NextRequest) {
             ]
         }
 
-        const clientScope = buildManagerScopeWhere(managerScope, { regionId: "regionId" })
-        const clientFilter = {
-            ...(regionId ? { regionId } : {}),
-            ...clientScope,
-        }
-        if (Object.keys(clientFilter).length > 0) {
-            where.client = { is: clientFilter }
+        // Region scope is the BRANCH's own office region, not the client's — branchful
+        // clients are region-less (client.regionId NULL), so filtering on the client
+        // would drop every branch. A restricted manager is pinned to their region; an
+        // optional in-scope ?regionId= narrows further (already validated above). (B2)
+        const scopeRegionId = regionId || managerScope?.regionId || null
+        if (scopeRegionId) {
+            where.regionalOffice = { is: { regionId: scopeRegionId } }
         }
 
         const branches = await prisma.branch.findMany({
@@ -87,17 +87,19 @@ export async function POST(request: NextRequest) {
         if (!clientId) {
             return badRequest("clientId is required.")
         }
-        if (managerScope && body?.clientId) {
-            const client = await prisma.client.findUnique({
-                where: { id: clientId },
-                select: { id: true, regionId: true },
-            })
-            if (!client) {
-                return notFound("Client not found")
-            }
-            if (managerScopeDenied(managerScope, { regionId: client.regionId })) {
-                return forbidden("Forbidden: cannot create branch outside your scope.")
-            }
+        const branchOfficeId = body?.regionalOfficeId ? String(body.regionalOfficeId) : null
+        const client = await prisma.client.findUnique({
+            where: { id: clientId },
+            select: { id: true, isBranchless: true },
+        })
+        if (!client) {
+            return notFound("Client not found")
+        }
+        // Branch-based scoping: the branch's office IS the scope key (the client is
+        // region-less). A restricted manager must supply an in-scope office; a null
+        // office is both unscopeable and fail-open, so deny. (B2)
+        if (managerScope && (!branchOfficeId || managerScopeDenied(managerScope, { regionalOfficeId: branchOfficeId }))) {
+            return forbidden("Forbidden: a branch must be created in an office within your scope.")
         }
 
         const toInt = (v: unknown) => { const n = parseInt(String(v ?? ""), 10); return isNaN(n) ? null : n }
@@ -188,6 +190,22 @@ export async function POST(request: NextRequest) {
                 await tx.clientSupervisorAssignment.create({
                     data: { clientId, branchId: created.id, supervisorId },
                 }).catch(() => { /* ignore if user not found */ })
+            }
+
+            // Branchless → branchful conversion: a client that gains a branch is no
+            // longer branchless and becomes region-less — geo now lives on its
+            // branches. Enforce "has ≥1 branch ⇒ branchful & region-less" atomically. (B2)
+            if (client.isBranchless) {
+                await tx.client.update({
+                    where: { id: clientId },
+                    data: {
+                        isBranchless: false,
+                        regionId: null,
+                        regionalOfficeId: null,
+                        city: null,
+                        operationalProvinces: null,
+                    },
+                })
             }
 
             return created

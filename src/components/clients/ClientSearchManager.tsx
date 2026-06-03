@@ -29,10 +29,8 @@ type ClientRow = {
   id: string
   name: string
   type: string
-  city: string | null
   isBranchless: boolean
   status: string
-  regionId?: string | null
   contactPerson?: string | null
   contactNumber?: string | null
   createdAt?: string

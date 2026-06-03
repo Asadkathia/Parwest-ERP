@@ -3,6 +3,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import {
     badRequest,
     conflict,
@@ -100,24 +101,33 @@ export async function PATCH(
 
         const existing = await prisma.branch.findUnique({
             where: { id },
-            include: { client: { select: { regionId: true } } },
+            include: {
+                client: { select: { regionId: true } },
+                regionalOffice: { select: { regionId: true } },
+            },
         })
         if (!existing) {
             return notFound("Branch not found")
         }
-        if (managerScope && managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null })) {
+        // Scope by the branch's OWN region (its office), not the client's — branchful
+        // clients are region-less so client.regionId is NULL and would fail OPEN. A
+        // branch with no office is unscopeable, so a restricted manager is denied. (B2)
+        const branchRegionId = existing.regionalOffice?.regionId ?? null
+        if (managerScope && (!branchRegionId || managerScopeDenied(managerScope, { regionId: branchRegionId }))) {
             return forbidden("Forbidden: branch is outside your scope.")
         }
 
         if (body.clientId) {
             const targetClient = await prisma.client.findUnique({
                 where: { id: body.clientId },
-                select: { regionId: true },
+                select: { id: true },
             })
             if (!targetClient) {
                 return notFound("Target client not found")
             }
-            if (managerScope && managerScopeDenied(managerScope, { regionId: targetClient.regionId })) {
+            // Re-parenting: the destination is a client — require it to be in the
+            // manager's branch-based scope (client.regionId is NULL for branchful). (B2)
+            if (managerScope && !(await clientInScope(body.clientId, managerScope))) {
                 return forbidden("Forbidden: cannot move branch outside your scope.")
             }
         }
@@ -294,7 +304,7 @@ export async function PATCH(
             description: `Updated branch ${id}`,
             targetEntityType: "Branch",
             targetEntityId: id,
-            targetRegionId: existing.client?.regionId ?? null,
+            targetRegionId: existing.regionalOffice?.regionId ?? existing.client?.regionId ?? null,
         })
 
         return NextResponse.json(branch, { status: 200 })
@@ -329,6 +339,9 @@ export async function DELETE(
                 client: {
                     select: { regionId: true },
                 },
+                regionalOffice: {
+                    select: { regionId: true },
+                },
                 deployments: {
                     where: { status: "ACTIVE" },
                 },
@@ -338,7 +351,10 @@ export async function DELETE(
         if (!branch) {
             return notFound("Branch not found")
         }
-        if (managerScope && managerScopeDenied(managerScope, { regionId: branch.client?.regionId || null })) {
+        // Scope by the branch's own office region (branchful client.regionId is NULL
+        // → fail-open). Unscopeable (no office) branch denies a restricted manager. (B2)
+        const branchRegionId = branch.regionalOffice?.regionId ?? null
+        if (managerScope && (!branchRegionId || managerScopeDenied(managerScope, { regionId: branchRegionId }))) {
             return forbidden("Forbidden: branch is outside your scope.")
         }
 
@@ -354,7 +370,7 @@ export async function DELETE(
             description: `Deleted branch ${id}`,
             targetEntityType: "Branch",
             targetEntityId: id,
-            targetRegionId: branch.client?.regionId ?? null,
+            targetRegionId: branch.regionalOffice?.regionId ?? branch.client?.regionId ?? null,
         })
 
         return ok({ message: "Branch deleted successfully" })

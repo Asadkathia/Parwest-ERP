@@ -66,9 +66,7 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         type: true,
-        city: true,
         status: true,
-        region: { select: { name: true } },
         contracts: {
           where: { isActive: true },
           select: {
@@ -108,9 +106,7 @@ export async function GET(request: NextRequest) {
         id: c.id,
         name: c.name,
         type: c.type,
-        city: c.city,
         status: c.status,
-        regionName: c.region?.name ?? null,
         contractCount: c.contracts.length,
         branchContractCount: c.contracts.filter((ct) => ct.branchId).length,
         clientLevelContractCount: c.contracts.filter((ct) => !ct.branchId).length,

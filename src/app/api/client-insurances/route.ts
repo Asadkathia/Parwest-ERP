@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientInScope, clientScopeWhere } from "@/lib/clients/access"
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,18 +26,30 @@ export async function GET(request: NextRequest) {
     if (clientId) where.clientId = clientId
     if (status) where.status = status
 
-    // Apply manager scope via client relation
-    const scopeWhere = managerScope
-      ? buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
-      : {}
-    const clientFilter = {
-      ...(regionId ? { regionId } : {}),
-      ...(regionalOfficeId ? { regionalOfficeId } : {}),
-      ...scopeWhere,
+    // Branch-based scoping (B1): branchful clients are region-less, so scope by
+    // their branches' regional office; branchless clients keep their own region.
+    // `managerScopeDenied({regionId: client.regionId})` would FAIL OPEN on a NULL
+    // branchful regionId — so go through clientScopeWhere instead. Optional
+    // ?regionId=/?regionalOfficeId= topbar filters narrow within the same shape.
+    const andClauses: Prisma.ClientWhereInput[] = []
+    const scopeWhere = clientScopeWhere(managerScope)
+    if (Object.keys(scopeWhere).length > 0) andClauses.push(scopeWhere)
+    if (regionalOfficeId) {
+      andClauses.push({
+        OR: [
+          { branches: { some: { regionalOfficeId } } },
+          { isBranchless: true, regionalOfficeId },
+        ],
+      })
+    } else if (regionId) {
+      andClauses.push({
+        OR: [
+          { branches: { some: { regionalOffice: { regionId } } } },
+          { isBranchless: true, regionId },
+        ],
+      })
     }
-    if (Object.keys(clientFilter).length > 0) {
-      where.client = clientFilter
-    }
+    where.client = andClauses.length ? { AND: andClauses } : undefined
 
     const insurances = await (prisma.clientInsurance as unknown as {
       findMany: (args: unknown) => Promise<unknown[]>
@@ -77,15 +91,16 @@ export async function POST(request: NextRequest) {
     if (!clientId) return badRequest("Client is required.")
     if (!insuranceName) return badRequest("Insurance name is required.")
 
-    // Scope check: verify the target client is within the manager's scope
+    // Scope check: verify the target client is within the manager's scope.
+    // Branch-aware (B1) — region-less branchful clients would FAIL OPEN under
+    // managerScopeDenied(client.regionId), so gate via clientInScope.
     if (managerScope) {
       const client = await prisma.client.findUnique({
         where: { id: clientId },
-        select: { regionId: true, regionalOfficeId: true },
+        select: { id: true },
       })
       if (!client) return notFound("Client not found.")
-      const { managerScopeDenied } = await import("@/lib/access/scope")
-      if (managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
+      if (!(await clientInScope(clientId, managerScope))) {
         return forbidden("Access denied: client is outside your scope.")
       }
     }

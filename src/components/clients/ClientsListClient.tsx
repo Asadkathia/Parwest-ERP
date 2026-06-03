@@ -24,10 +24,7 @@ export type ClientListRow = {
   id: string
   name: string
   type: string
-  city: string | null
   status: string
-  regionId: string | null
-  regionName: string | null
   branchCount: number
   contractCount: number
   currentRates: { guardType: string; rate: number }[]

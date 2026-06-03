@@ -92,7 +92,6 @@ export default async function ClientsPage({
         take: 200,
         orderBy: { createdAt: "desc" },
         include: {
-          region: { select: { name: true } },
           _count: { select: { branches: true, contracts: true } },
           contracts: {
             where: { isActive: true },
@@ -127,10 +126,7 @@ export default async function ClientsPage({
         id: c.id,
         name: c.name,
         type: c.type,
-        city: c.city,
         status: c.status,
-        regionId: c.regionId,
-        regionName: c.region?.name ?? null,
         branchCount: c._count.branches,
         contractCount: c._count.contracts,
         currentRates: Array.from(ratesByType.entries()).map(([guardType, rate]) => ({

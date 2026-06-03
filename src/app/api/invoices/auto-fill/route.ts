@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { resolveContractRateContext, toRateLookup } from "@/lib/invoicing/rates"
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, regionId: true },
     })
     if (!client) return notFound("Client not found.")
-    if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId })) {
+    if (managerScope && !(await clientInScope(client.id, managerScope))) {
       return forbidden("Forbidden: client is outside your scope.")
     }
 

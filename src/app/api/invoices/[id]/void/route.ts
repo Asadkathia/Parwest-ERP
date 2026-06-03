@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -23,11 +24,10 @@ export async function POST(
 
     const existing = await prisma.invoice.findUnique({
       where: { id },
-      include: { client: { select: { regionId: true } } },
     })
     if (!existing) return notFound("Invoice not found.")
 
-    if (managerScope && managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null })) {
+    if (managerScope && !(await clientInScope(existing.clientId, managerScope))) {
       return forbidden("Forbidden: invoice is outside your scope.")
     }
 

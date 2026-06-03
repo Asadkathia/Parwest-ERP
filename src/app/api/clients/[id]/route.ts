@@ -56,6 +56,24 @@ export async function PUT(
             return notFound("Client not found")
         }
 
+        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
+
+        // The branchless flag is mutable in this PUT, so geo writes below must gate on
+        // the EFFECTIVE post-edit value, not the stale stored one — otherwise toggling
+        // the mode silently drops region/city/province and skips the #47 guard. (B2)
+        const effectiveBranchless = has("isBranchless")
+            ? (body.isBranchless === true || body.isBranchless === "true")
+            : existingClient.isBranchless
+
+        // A client with branches cannot be marked branchless — geo lives on its
+        // branches and "has ≥1 branch ⇒ branchful" is an invariant. (B2)
+        if (effectiveBranchless && !existingClient.isBranchless) {
+            const branchCount = await prisma.branch.count({ where: { clientId: id } })
+            if (branchCount > 0) {
+                return conflict("Cannot mark a client branchless while it has branches. Remove its branches first.")
+            }
+        }
+
         // Reserve % override — accept null/blank or a decimal between 0 and 1.
         let reservePctValue: number | null | undefined = undefined
         if (Object.prototype.hasOwnProperty.call(body, "reservePct")) {
@@ -95,7 +113,6 @@ export async function PUT(
         // sent. (NOTE: flat contract* columns are intentionally never written —
         // contracts are canonical via the ClientContract model. contractUrl /
         // contractAttachments are handled elsewhere, not here.)
-        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
         const newData: Record<string, unknown> = {}
 
         if (has("name")) newData.name = body.name
@@ -105,9 +122,9 @@ export async function PUT(
             newData.enrollmentDate = body.enrollmentDate ? new Date(body.enrollmentDate) : existingClient.enrollmentDate
         }
         // Geo (region/office/city/operationalProvinces) lives on the client record
-        // ONLY for branchless clients (B1). For branchful clients geo lives on the
-        // branches, so these writes are skipped entirely — the columns stay region-less.
-        if (existingClient.isBranchless) {
+        // ONLY for branchless clients (B1) — gated on the EFFECTIVE branchless value.
+        // For branchful clients geo lives on the branches, so these writes are skipped.
+        if (effectiveBranchless) {
             // Region drives city — Region.name IS the operating city. Derive city only
             // when regionId is sent, and never trust a client-sent city (drift guard).
             if (has("regionId")) {
@@ -116,6 +133,13 @@ export async function PUT(
                 newData.city = await cityForRegionId(prisma, nextRegionId)
             }
             if (has("regionalOfficeId")) newData.regionalOfficeId = body.regionalOfficeId || null
+        } else if (existingClient.isBranchless) {
+            // Converting branchless → branchful: the client becomes region-less, so
+            // clear its own geo (it would otherwise keep stale region/city). (B2)
+            newData.regionId = null
+            newData.regionalOfficeId = null
+            newData.city = null
+            newData.operationalProvinces = null
         }
         if (has("status")) newData.status = body.status || "ACTIVE"
         if (has("isBranchless")) newData.isBranchless = body.isBranchless === true || body.isBranchless === "true"
@@ -138,7 +162,8 @@ export async function PUT(
         if (has("introducerAddress")) newData.introducerAddress = body.introducerAddress || null
         if (has("introducerCnicNumber")) newData.introducerCnic = body.introducerCnicNumber || null
         // Operational — branchless only (branchful clients are region-less, B1).
-        if (existingClient.isBranchless) {
+        // Gated on the effective value; the branchful conversion nulled it above.
+        if (effectiveBranchless) {
             if (has("operationalProvinces")) {
                 newData.operationalProvinces = (body.operationalProvinces ? String(body.operationalProvinces).trim() : "") || null
             }

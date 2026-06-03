@@ -7,6 +7,7 @@ import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { forbidden, internalServerError, notFound, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
+import { clientInScope } from "@/lib/clients/access"
 
 export async function DELETE(
   _request: NextRequest,
@@ -29,14 +30,13 @@ export async function DELETE(
         clientId: true,
         branchId: true,
         supervisorId: true,
-        client: { select: { regionId: true } },
         supervisor: { select: { regionId: true, regionalOfficeId: true } },
       },
     })
     if (!existing) throw new Error("REL_NOT_FOUND")
     if (
       managerScope &&
-      (managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null }) ||
+      (!(await clientInScope(existing.clientId, managerScope)) ||
         managerScopeDenied(managerScope, {
           regionId: existing.supervisor?.regionId || null,
           regionalOfficeId: existing.supervisor?.regionalOfficeId || null,

@@ -74,18 +74,20 @@ export async function POST(
       }
     }
 
-    // Scope check — load the branch's owning client region and deny if out of
-    // scope (mirrors the PATCH handler in ../route.ts).
+    // Scope by the branch's OWN office region, not the client's — branchful clients
+    // are region-less (client.regionId NULL → fail-open). A branch with no office is
+    // unscopeable, so a restricted manager is denied this destructive cascade. (B2)
     const existing = await prisma.branch.findUnique({
       where: { id },
-      include: { client: { select: { regionId: true } } },
+      include: { regionalOffice: { select: { regionId: true } } },
     })
     if (!existing) {
       return notFound("Branch not found")
     }
+    const branchRegionId = existing.regionalOffice?.regionId ?? null
     if (
       managerScope &&
-      managerScopeDenied(managerScope, { regionId: existing.client?.regionId || null })
+      (!branchRegionId || managerScopeDenied(managerScope, { regionId: branchRegionId }))
     ) {
       return forbidden("Forbidden: branch is outside your scope.")
     }

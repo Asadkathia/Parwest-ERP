@@ -98,7 +98,7 @@ export async function POST(
 
         const client = await prisma.client.findUnique({
             where: { id },
-            select: { id: true },
+            select: { id: true, isBranchless: true },
         })
         if (!client) {
             return notFound("Client not found")
@@ -142,14 +142,44 @@ export async function POST(
                 },
             })
 
+            // Branchless → branchful conversion: a client that gains a branch is no
+            // longer branchless and becomes region-less (geo lives on its branches).
+            // Enforce "has ≥1 branch ⇒ branchful & region-less" atomically. (B2)
+            if (client.isBranchless) {
+                await tx.client.update({
+                    where: { id },
+                    data: {
+                        isBranchless: false,
+                        regionId: null,
+                        regionalOfficeId: null,
+                        city: null,
+                        operationalProvinces: null,
+                    },
+                })
+            }
+
             return created
         })
+
+        // Branch-level audit must carry the branch's OWN region (office → region),
+        // not the client's regionId (NULL for branchful clients), so the event
+        // stays visible under region-scoped audit filtering.
+        const branchRegionId = branchOfficeId
+            ? (await prisma.regionalOffice.findUnique({
+                  where: { id: branchOfficeId },
+                  select: { regionId: true },
+              }))?.regionId ?? null
+            : null
 
         await safeAuditLog({
             userId: actorId,
             event: "BRANCH_CREATED",
             module: "CLIENTS",
             description: `Created branch ${branch.id} for client ${id}`,
+            targetEntityType: "Branch",
+            targetEntityId: branch.id,
+            targetRegionId: branchRegionId,
+            targetRegionalOfficeId: branchOfficeId,
         })
 
         return NextResponse.json(branch, { status: 201 })

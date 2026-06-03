@@ -9,6 +9,7 @@ import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, una
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
+import { clientInScope, clientScopeWhere } from "@/lib/clients/access"
 
 const MOCK_ROWS = [
   {
@@ -43,14 +44,8 @@ export async function GET(request: NextRequest) {
       return ok(rows)
     }
 
-    if (managerScope && clientId) {
-      const client = await prisma.client.findUnique({
-        where: { id: clientId },
-        select: { id: true, regionId: true },
-      })
-      if (client && managerScopeDenied(managerScope, { regionId: client.regionId })) {
-        return forbidden("Forbidden: client is outside your scope.")
-      }
+    if (managerScope && clientId && !(await clientInScope(clientId, managerScope))) {
+      return forbidden("Forbidden: client is outside your scope.")
     }
 
     if (managerScope && supervisorId) {
@@ -67,8 +62,11 @@ export async function GET(request: NextRequest) {
     if (clientId) where.clientId = clientId
     if (branchId) where.branchId = branchId
     if (supervisorId) where.supervisorId = supervisorId
-    if (managerScope?.regionId) {
-      where.client = { regionId: managerScope.regionId }
+    if (managerScope) {
+      const clientWhere = clientScopeWhere(managerScope)
+      if (Object.keys(clientWhere).length > 0) {
+        where.client = clientWhere
+      }
     }
     if (managerScope?.regionalOfficeIds.length) {
       where.supervisor = { regionalOfficeId: { in: managerScope.regionalOfficeIds } }
@@ -127,17 +125,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (managerScope) {
-      const [client, supervisor] = await Promise.all([
-        prisma.client.findUnique({
-          where: { id: clientId },
-          select: { id: true, regionId: true },
-        }),
-        prisma.user.findUnique({
-          where: { id: supervisorId },
-          select: { id: true, regionId: true, regionalOfficeId: true },
-        }),
-      ])
-      if (client && managerScopeDenied(managerScope, { regionId: client.regionId })) {
+      const supervisor = await prisma.user.findUnique({
+        where: { id: supervisorId },
+        select: { id: true, regionId: true, regionalOfficeId: true },
+      })
+      if (!(await clientInScope(clientId, managerScope))) {
         return forbidden("Forbidden: client is outside your scope.")
       }
       if (supervisor && managerScopeDenied(managerScope, { regionId: supervisor.regionId, regionalOfficeId: supervisor.regionalOfficeId })) {

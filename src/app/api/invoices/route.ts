@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientInScope, clientScopeWhere } from "@/lib/clients/access"
 import { badRequest, internalServerError, unauthorized, forbidden, notFound } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -70,13 +71,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const clientScope = buildManagerScopeWhere(managerScope, { regionId: "regionId" })
-    const clientFilter = {
-      ...(regionId ? { regionId } : {}),
-      ...clientScope,
+    // Branch-aware client scoping (B1): branchful clients scope by their
+    // branches' regional office; branchless keep their own region. Compose
+    // every clause under AND so the OR keys don't clobber each other.
+    const clientClauses: Prisma.ClientWhereInput[] = []
+    const scopeWhere = clientScopeWhere(managerScope)
+    if (Object.keys(scopeWhere).length > 0) clientClauses.push(scopeWhere)
+    if (regionId) {
+      clientClauses.push({
+        OR: [
+          { branches: { some: { regionalOffice: { regionId } } } },
+          { isBranchless: true, regionId },
+        ],
+      })
     }
-    if (Object.keys(clientFilter).length > 0) {
-      where.client = { is: clientFilter }
+    if (clientClauses.length > 0) {
+      where.client = { is: { AND: clientClauses } }
     }
 
     if (search) {
@@ -160,13 +170,13 @@ export async function POST(request: NextRequest) {
 
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      select: { id: true, regionId: true },
+      select: { id: true },
     })
     if (!client) {
       return notFound("Client not found.")
     }
 
-    if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId })) {
+    if (managerScope && !(await clientInScope(client.id, managerScope))) {
       return forbidden("Forbidden: cannot create invoice outside your scope.")
     }
 

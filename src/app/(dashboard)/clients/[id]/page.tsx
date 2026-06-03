@@ -1,7 +1,8 @@
 import { type ReactNode } from "react"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientInScope } from "@/lib/clients/access"
 import { hasAction } from "@/lib/api/permissions"
 import Image from "next/image"
 import { prisma } from "@/lib/db"
@@ -130,6 +131,7 @@ export default async function ClientDetailPage({
       regionalOffice: { select: { id: true, name: true } },
       branches: {
         include: {
+          regionalOffice: { include: { region: { select: { name: true } } } },
           deployments: {
             include: {
               guard: true,
@@ -160,9 +162,23 @@ export default async function ClientDetailPage({
   if (!client) notFound()
 
   const managerScope = deriveManagerScope(session)
-  if (managerScope && managerScopeDenied(managerScope, { regionId: client.regionId, regionalOfficeId: client.regionalOfficeId })) {
+  // Branch-based scoping (B1): a restricted manager may view this client when it
+  // has a branch in their region/office (or is a branchless client pinned there).
+  // The old managerScopeDenied(client.regionId) check failed OPEN for branchful
+  // clients (region-less → null), letting any region view them. (B2)
+  if (managerScope && !(await clientInScope(id, managerScope))) {
     notFound()
   }
+
+  // Geo on a branchful client lives on its branches, not the (now region-less)
+  // client record — derive a read-only summary from the branches for display. (B2)
+  const branchGeo = {
+    cities: [...new Set(client.branches.map((b) => b.city).filter(Boolean))] as string[],
+    provinces: [...new Set(client.branches.map((b) => b.province).filter(Boolean))] as string[],
+    regions: [...new Set(client.branches.map((b) => b.regionalOffice?.region?.name).filter(Boolean))] as string[],
+    offices: [...new Set(client.branches.map((b) => b.regionalOffice?.name).filter(Boolean))] as string[],
+  }
+  const joinOrDash = (xs: string[]) => (xs.length ? xs.join(", ") : "—")
 
   // Resolve assigned manager name (stored as plain ID, no relation)
   const assignedManager = client.assignedManagerId
@@ -387,15 +403,31 @@ export default async function ClientDetailPage({
                 <InfoCell label="CLIENT TYPE" value={client.type} />
                 <InfoCell label="EMAIL" value={client.email || "—"} />
                 <InfoCell label="STATUS" value={client.status} accent={client.status === "ACTIVE"} />
-                <InfoCell label="CITY" value={client.city || "—"} />
-                <InfoCell label="POSTAL CODE" value={client.postalCode || "—"} />
-                <InfoCell label="ENROLLMENT DATE" value={formatDate(client.enrollmentDate)} />
-                <InfoCell label="REGION" value={client.region?.name || "—"} />
-                <InfoCell label="REGIONAL OFFICE" value={(client as unknown as { regionalOffice?: { name: string } | null }).regionalOffice?.name || "—"} />
-                <InfoCell label="ASSIGNED MANAGER" value={assignedManager?.name || assignedManager?.email || "—"} />
-                <InfoCell label="BRANCHLESS CLIENT" value={client.isBranchless ? "Yes" : "No"} />
-                <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
-                <InfoCell label="OPERATIONAL PROVINCES" value={provinceLabel(client.operationalProvinces)} />
+                {client.isBranchless ? (
+                  <>
+                    <InfoCell label="CITY" value={client.city || "—"} />
+                    <InfoCell label="POSTAL CODE" value={client.postalCode || "—"} />
+                    <InfoCell label="ENROLLMENT DATE" value={formatDate(client.enrollmentDate)} />
+                    <InfoCell label="REGION" value={client.region?.name || "—"} />
+                    <InfoCell label="REGIONAL OFFICE" value={(client as unknown as { regionalOffice?: { name: string } | null }).regionalOffice?.name || "—"} />
+                    <InfoCell label="ASSIGNED MANAGER" value={assignedManager?.name || assignedManager?.email || "—"} />
+                    <InfoCell label="BRANCHLESS CLIENT" value="Yes" />
+                    <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
+                    <InfoCell label="OPERATIONAL PROVINCES" value={provinceLabel(client.operationalProvinces)} />
+                  </>
+                ) : (
+                  <>
+                    <InfoCell label="CITIES (BRANCHES)" value={joinOrDash(branchGeo.cities)} />
+                    <InfoCell label="POSTAL CODE" value={client.postalCode || "—"} />
+                    <InfoCell label="ENROLLMENT DATE" value={formatDate(client.enrollmentDate)} />
+                    <InfoCell label="REGIONS (BRANCHES)" value={joinOrDash(branchGeo.regions)} />
+                    <InfoCell label="REGIONAL OFFICES" value={joinOrDash(branchGeo.offices)} />
+                    <InfoCell label="ASSIGNED MANAGER" value={assignedManager?.name || assignedManager?.email || "—"} />
+                    <InfoCell label="BRANCHLESS CLIENT" value="No" />
+                    <InfoCell label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
+                    <InfoCell label="OPERATIONAL PROVINCES" value={joinOrDash(branchGeo.provinces.map((p) => provinceLabel(p)))} />
+                  </>
+                )}
                 <InfoCell label="NTN" value={client.ntn || "—"} />
                 <InfoCell label="STRN" value={client.strn || "—"} />
               </div>
@@ -876,9 +908,9 @@ export default async function ClientDetailPage({
                 <FieldDisplay label="CONTACT PERSON" value={client.contactPerson || "—"} />
                 <FieldDisplay label="PRIMARY PHONE" value={client.phone || "—"} />
                 <FieldDisplay label="HEAD OFFICE ADDRESS" value={client.headOfficeAddress || "—"} />
-                <FieldDisplay label="CITY" value={client.city || "—"} />
+                <FieldDisplay label={client.isBranchless ? "CITY" : "CITIES (BRANCHES)"} value={client.isBranchless ? (client.city || "—") : joinOrDash(branchGeo.cities)} />
                 <FieldDisplay label="POSTAL CODE" value={client.postalCode || "—"} />
-                <FieldDisplay label="REGION" value={client.region?.name || "—"} />
+                <FieldDisplay label={client.isBranchless ? "REGION" : "REGIONS (BRANCHES)"} value={client.isBranchless ? (client.region?.name || "—") : joinOrDash(branchGeo.regions)} />
               </div>
             </CardContent>
           </Card>
@@ -944,7 +976,7 @@ export default async function ClientDetailPage({
                 <FieldDisplay label="SUPERVISOR NAME" value={client.supervisorAssignments?.[0]?.supervisor?.name || "—"} />
                 <FieldDisplay label="SUPERVISOR EMAIL" value={client.supervisorAssignments?.[0]?.supervisor?.email || "—"} />
                 <FieldDisplay label="BRANCHLESS" value={client.isBranchless ? "Yes" : "No"} />
-                <FieldDisplay label="OPERATIONAL PROVINCES" value={provinceLabel(client.operationalProvinces)} />
+                <FieldDisplay label="OPERATIONAL PROVINCES" value={client.isBranchless ? provinceLabel(client.operationalProvinces) : joinOrDash(branchGeo.provinces.map((p) => provinceLabel(p)))} />
               </div>
             </CardContent>
           </Card>
