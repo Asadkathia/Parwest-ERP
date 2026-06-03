@@ -4,6 +4,15 @@ import { auth } from "@/lib/auth"
 import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope } from "@/lib/access/scope"
+import { PROVINCE_VALUES, type ProvinceValue } from "@/lib/geo/province-constants"
+
+/** Validate an optional province against the Province enum. Returns the canonical
+ *  value, `undefined` when absent/blank, or `"INVALID"` for a non-empty bad value. */
+function parseProvince(raw: unknown): ProvinceValue | undefined | "INVALID" {
+    if (raw == null || String(raw).trim() === "") return undefined
+    const p = String(raw).trim().toUpperCase()
+    return (PROVINCE_VALUES as readonly string[]).includes(p) ? (p as ProvinceValue) : "INVALID"
+}
 
 // GET is intentionally open to any authenticated user — regions drive the
 // global topbar picker and are not sensitive. Regional users still only see
@@ -41,9 +50,19 @@ export async function POST(request: NextRequest) {
             return badRequest("Region name is required.")
         }
 
+        // Province is the geo anchor for branches in this region — `provinceForBranch`
+        // derives a branch's province from `region.province`, and the #47 invariant
+        // depends on it. Persist it (validated against the Province enum); the POST
+        // previously dropped it, leaving API-created regions with a null province.
+        const province = parseProvince(body?.province)
+        if (province === "INVALID") {
+            return badRequest(`province must be one of: ${PROVINCE_VALUES.join(", ")}.`)
+        }
+
         const region = await prisma.region.create({
             data: {
                 name,
+                ...(province ? { province } : {}),
             },
         })
 
