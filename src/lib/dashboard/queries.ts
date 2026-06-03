@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import type { ManagerScope } from "@/lib/access/scope"
 import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import type { DashboardRole } from "./role"
 
 export type KpiSeries = {
@@ -110,7 +111,8 @@ export async function loadDashboardData(params: {
 }): Promise<DashboardData> {
   const { userId, scope, showFinance } = params
   const guardScope = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
-  const clientScope = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })
+  // Clients are region-less (B1): scope by branches (or own region when branchless).
+  const clientScope = clientScopeWhere(scope)
   const deploymentScope = buildManagerScopeWhere(scope, { regionalOfficeId: "regionalOfficeId" })
 
   const now = new Date()

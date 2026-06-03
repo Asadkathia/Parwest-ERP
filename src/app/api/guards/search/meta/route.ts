@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { forbidden, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 // Static options derived from schema definitions
 const GUARD_STATUSES = ["PENDING", "ACTIVE", "PRESENT", "DEFAULT", "INACTIVE", "TERMINATED"]
@@ -36,7 +38,23 @@ export async function GET(request: NextRequest) {
         // own scope (any URL value is ignored / rejected above).
         const activeRegionId = scope?.regionId ?? requestedRegionId ?? null
         const officeScopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "id" })
-        const clientScopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId" })
+
+        // Clients are region-less (B1): branchful clients scope by their branches'
+        // regional office, branchless by their own regionId. Compose under AND so
+        // the clientScopeWhere OR keys don't clobber the active-region narrowing.
+        const clientAndClauses: Prisma.ClientWhereInput[] = []
+        const clientScope = clientScopeWhere(scope)
+        if (Object.keys(clientScope).length > 0) clientAndClauses.push(clientScope)
+        if (activeRegionId) {
+            clientAndClauses.push({
+                OR: [
+                    { branches: { some: { regionalOffice: { regionId: activeRegionId } } } },
+                    { isBranchless: true, regionId: activeRegionId },
+                ],
+            })
+        }
+        const clientWhere: Prisma.ClientWhereInput =
+            clientAndClauses.length > 0 ? { AND: clientAndClauses } : {}
 
         const [docTypes, clients, offices, educations, religions] = await Promise.all([
             // Verification types — only VERIFICATION category doc types
@@ -48,13 +66,10 @@ export async function GET(request: NextRequest) {
                 })
                 .then((rows) => rows.map((r) => r.name)),
 
-            // Clients for filter — region-scoped
+            // Clients for filter — branch-aware region scope (B1)
             prisma.client
                 .findMany({
-                    where: {
-                        ...(activeRegionId ? { regionId: activeRegionId } : {}),
-                        ...clientScopeWhere,
-                    },
+                    where: clientWhere,
                     select: { id: true, name: true },
                     orderBy: { name: "asc" },
                     take: 200,
