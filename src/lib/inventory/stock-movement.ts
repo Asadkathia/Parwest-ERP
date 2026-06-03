@@ -25,17 +25,22 @@ export type StockBalanceLike = {
 /**
  * Canonical availability invariant.
  *
- * Stock that is held (reserved/"reusable") or already issued out is NOT freely
- * assignable. Availability is what remains after removing both:
+ * `quantityIssued` is disjoint from `quantityOnHand`: an assignment MOVES a unit out
+ * of on-hand into issued (`onHandDelta:-q, issuedDelta:+q`) and a return moves it back
+ * (`onHandDelta:+q, issuedDelta:-q`). Issued stock has therefore already left
+ * `quantityOnHand` — subtracting it again double-counts. `quantityHeld` is the opposite:
+ * a SUBSET of on-hand (reusable units are added to BOTH on receive), reserved and not
+ * freely assignable. So freely-assignable stock is on-hand minus the held portion:
  *
- *   available = quantityOnHand - quantityHeld - quantityIssued
+ *   available = quantityOnHand - quantityHeld
  *
- * All stock-sufficiency checks (assignments, demand allocation) must use this,
- * not raw `quantityOnHand`.
+ * (Previously this subtracted `quantityIssued` as well, which under-reported
+ * availability by the issued amount — e.g. receive 10 then assign 3 showed 4, not 7 —
+ * and made the assignment/demand sufficiency gate spuriously reject valid stock.)
  */
 export function availableQty(balance: StockBalanceLike | null | undefined): number {
   if (!balance) return 0
-  return (balance.quantityOnHand ?? 0) - (balance.quantityHeld ?? 0) - (balance.quantityIssued ?? 0)
+  return (balance.quantityOnHand ?? 0) - (balance.quantityHeld ?? 0)
 }
 
 export type ApplyStockMovementArgs = {

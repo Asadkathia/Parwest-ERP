@@ -7,6 +7,7 @@ import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import {
     transitionGuard,
+    canTransition,
     ActiveDeploymentTransitionError,
     TERMINATION_REASONS,
     type LifecycleStatus,
@@ -139,6 +140,15 @@ export async function PATCH(
                     returnedByUserId: session.user?.id ?? null,
                 },
             })
+        }
+
+        // Pre-check the static transition matrix so a disallowed transition returns a
+        // clean 409 instead of falling through transitionGuard's generic throw → 500.
+        // (The active-deployment precondition is still enforced inside transitionGuard
+        // and surfaced as ActiveDeploymentTransitionError below.)
+        const transitionCheck = canTransition(currentLifecycle, to)
+        if (!transitionCheck.ok) {
+            return conflict(transitionCheck.reason)
         }
 
         // Atomic transition: updates lifecycleStatus + legacy shadow, writes history.
