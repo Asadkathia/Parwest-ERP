@@ -490,15 +490,33 @@ export async function POST(request: NextRequest) {
             deployedByName,
         }
 
-        const deployment = await prisma.deployment.create({
-            data,
-            include: {
-                guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
-                client: { select: { id: true, name: true } },
-                branch: true,
-                regionalOffice: { select: { id: true, name: true } },
-            },
-        })
+        let deployment
+        try {
+            deployment = await prisma.deployment.create({
+                data,
+                include: {
+                    guard: { select: { id: true, name: true, cnic: true, parwestId: true, status: true } },
+                    client: { select: { id: true, name: true } },
+                    branch: true,
+                    regionalOffice: { select: { id: true, name: true } },
+                },
+            })
+        } catch (e: unknown) {
+            // The partial-unique index `Deployment_guard_active_shift_key` (one ACTIVE
+            // deployment per guard+shift) backstops the shift-conflict check against a
+            // concurrent double-submit that races past the app-level check. (QA-found)
+            // Gate on the index name so an unrelated future P2002 isn't mislabelled.
+            const code = (e as { code?: string })?.code
+            const target = String((e as { meta?: { target?: unknown } })?.meta?.target ?? "")
+            if (code === "P2002" && (target === "" || /guard_active_shift|guardId|shiftType/i.test(target))) {
+                const label = shiftType === "DAY" ? "day" : shiftType === "NIGHT" ? "night" : shiftType.toLowerCase()
+                return conflict(
+                    `Guard already has an active ${label}-shift deployment. ` +
+                    `A guard can only be double-deployed across non-overlapping shifts (DAY/NIGHT).`
+                )
+            }
+            throw e
+        }
 
         // ── Recompute legacy status shadow after deployment creation ──
         if (deploymentStatus === "ACTIVE") {
