@@ -20,7 +20,8 @@ import {
 } from "@/lib/branches/deactivate"
 
 const deactivateSchema = z.object({
-  reason: z.string().trim().min(1, "A reason is required to deactivate a branch."),
+  reason: z.string({ error: "A reason is required to deactivate a branch." })
+    .trim().min(1, "A reason is required to deactivate a branch."),
   // Optional in the wire format, defaulted to now() below if absent.
   effectiveDate: z.union([z.string(), z.number(), z.null(), z.undefined()]).optional(),
 })

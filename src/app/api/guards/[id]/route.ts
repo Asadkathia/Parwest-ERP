@@ -50,6 +50,11 @@ export async function PUT(
         if (payloadError) {
             return badRequest(payloadError.message)
         }
+        // Name is always required — UPDATE-mode validation is format-only, so guard
+        // against blanking the name on edit (create already rejects an empty name).
+        if (Object.prototype.hasOwnProperty.call(body, "name") && !String(body.name ?? "").trim()) {
+            return badRequest("Full name cannot be blank.")
+        }
 
         // Check if guard exists
         const existingGuard = await prisma.guard.findUnique({

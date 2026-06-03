@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { hasAction } from "@/lib/api/permissions"
+import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { recordGuardServiceEvent } from "@/lib/guards/service-history"
 import {
     transitionGuard,
@@ -42,9 +42,11 @@ export async function PATCH(
         if (!hasAction(session, "GUARDS", "UPDATE")) return forbidden("Access denied.")
         const managerScope = deriveManagerScope(session)
 
-        // Only admins can manually change guard status
+        // Only admins can manually change guard status. isSuperAdmin covers the
+        // "Super User" role (and unrestricted Admins) — checking role==="admin" alone
+        // wrongly locked Super Users out.
         const userRole = (session.user as { role?: string })?.role ?? ""
-        if (userRole.toLowerCase() !== "admin") {
+        if (!isSuperAdmin(session) && userRole.toLowerCase() !== "admin") {
             return forbidden("Only admins can manually change guard status.")
         }
 

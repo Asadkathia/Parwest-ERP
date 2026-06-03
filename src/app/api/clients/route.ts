@@ -7,7 +7,7 @@ import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/
 import { hasAction } from "@/lib/api/permissions"
 import type { Prisma } from "@prisma/client"
 import { cityForBranch, cityForRegionId } from "@/lib/geo/regionCity"
-import { provinceForBranch } from "@/lib/geo/province"
+import { provinceForBranch, checkRegionWithinProvince } from "@/lib/geo/province"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 
 export async function GET(request: NextRequest) {
@@ -90,6 +90,16 @@ export async function POST(request: NextRequest) {
         const managerScope = deriveManagerScope(session)
 
         const body = await request.json()
+
+        // Required-field + type validation (the POST previously accepted a blank name,
+        // 500'd on a missing type, and let arbitrary type strings through).
+        const name = String(body?.name || "").trim()
+        if (!name) return badRequest("Client name is required.")
+        const type = String(body?.type || "").trim()
+        if (!type) return badRequest("Client type is required.")
+        const validType = await prisma.clientType.findFirst({ where: { name: type }, select: { id: true } })
+        if (!validType) return badRequest(`Invalid client type "${type}".`)
+
         // Branchful clients are region-less (geo lives on branches), so they scope by
         // the default branch's office; branchless clients keep their own region. (B1)
         const isBranchlessClient = body.isBranchless === true || body.isBranchless === "true"
@@ -131,6 +141,17 @@ export async function POST(request: NextRequest) {
         // client-sent city to prevent region/city drift. NULL for branchful clients.
         const city = isBranchless ? await cityForRegionId(prisma, regionId) : null
 
+        // #47 province↔region invariant — a branchless client's operationalProvinces must
+        // equal its home Region's province (lenient when either is unset). This guard was
+        // present on PUT but missing on POST (lost in the region-less rewrite). (#47)
+        if (isBranchless) {
+            const provinceCheck = await checkRegionWithinProvince(prisma, {
+                regionId,
+                operationalProvince,
+            })
+            if (!provinceCheck.ok) return badRequest(provinceCheck.message)
+        }
+
         // Resolve GPS — prefer manual override over map picker
         const latitude  = parseFloat(body.latitudeManual  || body.latitude  || "") || null
         const longitude = parseFloat(body.longitudeManual || body.longitude || "") || null
@@ -160,9 +181,9 @@ export async function POST(request: NextRequest) {
           const created = await tx.client.create({
             data: {
                 // Core
-                name:             body.name,
+                name,
                 email:            body.email            || null,
-                type:             body.type,
+                type,
                 isBranchless,
                 headOfficeAddress: body.headOfficeAddress || null,
                 city,

@@ -72,6 +72,7 @@ export async function POST(
 
         const rate = parseFloat(String(body?.rate ?? ""))
         if (isNaN(rate)) return badRequest("Rate must be a number.")
+        if (rate < 0) return badRequest("Rate cannot be negative.")
 
         // guardType / exService are now OPTIONAL decorative labels — they do NOT
         // participate in scope identity. exService is nullable in the schema;
