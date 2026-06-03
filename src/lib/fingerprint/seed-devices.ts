@@ -1,3 +1,6 @@
+// Seed data used to initialize the file-backed fingerprint device store on first
+// run (data/fingerprint-devices.json). This is real seed data for the fingerprint
+// feature — NOT part of the removed "mock mode".
 export type FingerprintDeviceStatus = "ONLINE" | "OFFLINE" | "WARNING"
 
 export type FingerprintDevice = {
@@ -9,7 +12,7 @@ export type FingerprintDevice = {
   lastSyncAt: string
 }
 
-export const mockFingerprintDevices: FingerprintDevice[] = [
+export const seedFingerprintDevices: FingerprintDevice[] = [
   {
     id: "fp-1",
     name: "ZKTeco-LHR-01",

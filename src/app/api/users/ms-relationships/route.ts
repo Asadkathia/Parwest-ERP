@@ -3,21 +3,10 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
-
-const MOCK_ROWS = [
-  {
-    id: "mock-ms-1",
-    manager: { id: "mock-user-2", name: "Muhammad Nazir" },
-    supervisor: { id: "mock-user-3", name: "Muhammad Aslam" },
-    status: "ACTIVE",
-    notes: null,
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,15 +17,6 @@ export async function GET(request: NextRequest) {
     const managerId = searchParams.get("managerId") || undefined
     const supervisorId = searchParams.get("supervisorId") || undefined
     const managerScope = deriveManagerScope(session)
-
-    if (isRuntimeMockEnabled()) {
-      const rows = MOCK_ROWS.filter((row) => {
-        if (managerId && row.manager.id !== managerId) return false
-        if (supervisorId && row.supervisor.id !== supervisorId) return false
-        return true
-      })
-      return ok(rows)
-    }
 
     if (managerScope && managerId) {
       const manager = await prisma.user.findUnique({
@@ -101,19 +81,6 @@ export async function POST(request: NextRequest) {
 
     if (!managerId || !supervisorId) {
       return badRequest("managerId and supervisorId are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return ok(
-        {
-          id: `mock-ms-${Date.now()}`,
-          manager: { id: managerId, name: "Manager" },
-          supervisor: { id: supervisorId, name: "Supervisor" },
-          status: "ACTIVE",
-          notes,
-        },
-        201
-      )
     }
 
     if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId })) {

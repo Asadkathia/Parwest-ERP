@@ -2,7 +2,6 @@ import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
@@ -31,30 +30,6 @@ export async function GET(request: NextRequest) {
 
     if (!fromSupervisorId || !toSupervisorId) {
       return badRequest("fromSupervisorId and toSupervisorId are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      const rows: PreviewRow[] = [
-        {
-          id: "mock-switch-1",
-          guardId: "mock-guard-1",
-          parwestId: "PW-00001",
-          guardName: "Test Guard One",
-          fromSupervisorId,
-          toSupervisorId,
-          status: "PENDING",
-        },
-        {
-          id: "mock-switch-2",
-          guardId: "mock-guard-2",
-          parwestId: "PW-00002",
-          guardName: "Test Guard Two",
-          fromSupervisorId,
-          toSupervisorId,
-          status: "PENDING",
-        },
-      ]
-      return ok(rows)
     }
 
     if (managerScope) {
@@ -137,10 +112,6 @@ export async function POST(request: NextRequest) {
 
     if (fromSupervisorId === toSupervisorId) {
       return badRequest("From and to supervisors cannot be same.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return ok({ switchedCount: 2, reason, switchedBy: session.user.id })
     }
 
     if (managerScope) {

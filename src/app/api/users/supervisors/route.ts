@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 
 /**
@@ -27,10 +26,6 @@ export async function GET(request: NextRequest) {
     const managerScope = deriveManagerScope(session)
     if (managerScope && managerScopeDenied(managerScope, { regionId: regionId || null, regionalOfficeId: regionalOfficeId || null })) {
       return forbidden("Forbidden: cannot query supervisors outside your scope.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json([])
     }
 
     const where: Prisma.UserWhereInput = {

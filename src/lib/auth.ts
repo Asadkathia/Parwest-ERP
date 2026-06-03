@@ -4,7 +4,6 @@ import Credentials from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { authConfig } from "@/auth.config"
 import {
     resolveEffectivePermissions,
@@ -58,12 +57,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     return null
                 }
 
-                const passwordMatch = isRuntimeMockEnabled()
-                    ? credentials.password === "admin123@" || credentials.password === "admin"
-                    : await bcrypt.compare(
-                        credentials.password as string,
-                        user.password
-                    )
+                const passwordMatch = await bcrypt.compare(
+                    credentials.password as string,
+                    user.password
+                )
 
                 if (!passwordMatch) {
                     return null

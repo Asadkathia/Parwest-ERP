@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { isSuperAdmin } from "@/lib/payroll/state-permissions"
@@ -15,10 +14,6 @@ export async function GET(
     if (!session) return unauthorized()
     if (!hasAction(session, "TICKETING", "VIEW")) return forbidden("Access denied.")
     const { id } = await context.params
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, subject: "Mock Ticket", description: "Mock ticket description" })
-    }
 
     const ticket = await prisma.ticket.findUnique({
       where: { id },
@@ -81,10 +76,6 @@ export async function PATCH(
       if (existing.senderId !== userId && existing.assignedToId !== userId) {
         return forbidden("You do not have access to this ticket.")
       }
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, ...data })
     }
 
     const updated = await prisma.ticket.update({

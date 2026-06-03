@@ -3,15 +3,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { badRequest, internalServerError, notFound, unauthorized } from "@/lib/api/response"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { readFingerprintDevices, updateFingerprintDevices, type FingerprintDeviceStatus } from "@/lib/fingerprint/store"
 import { hasAction } from "@/lib/api/permissions"
 
 const VALID_STATUS: FingerprintDeviceStatus[] = ["ONLINE", "OFFLINE", "WARNING"]
-const MOCK_OFFICE_NAMES: Record<string, string> = {
-  "mock-office-lhr": "Lahore Head Office",
-  "mock-office-khi": "Karachi Office",
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,15 +54,10 @@ export async function POST(request: NextRequest) {
       return badRequest("status must be ONLINE, OFFLINE, or WARNING.")
     }
 
-    const office = isRuntimeMockEnabled()
-      ? (() => {
-          const officeName = MOCK_OFFICE_NAMES[officeId]
-          return officeName ? { id: officeId, name: officeName } : null
-        })()
-      : await prisma.regionalOffice.findUnique({
-          where: { id: officeId },
-          select: { id: true, name: true },
-        })
+    const office = await prisma.regionalOffice.findUnique({
+      where: { id: officeId },
+      select: { id: true, name: true },
+    })
     if (!office) {
       return notFound("Regional office not found.")
     }

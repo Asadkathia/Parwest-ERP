@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { badRequest, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
@@ -41,10 +40,6 @@ export async function PATCH(
     // 🔒 Self-role-change guard: a non-SuperAdmin cannot mutate their own roleId.
     if (data.roleId !== undefined && callerId && id === callerId && !callerIsSuperAdmin) {
       return forbidden("Cannot change your own role.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return ok({ id, ...data })
     }
 
     // Enforce role scope ↔ region consistency when role/region is being changed.

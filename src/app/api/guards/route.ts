@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { mockGuardsList } from "@/lib/mockData/guards"
-import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
@@ -45,32 +43,6 @@ export async function GET(request: NextRequest) {
             else if (statuses.length > 1) where.status = { in: statuses }
         }
         Object.assign(where, buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }))
-
-        if (isRuntimeMockEnabled()) {
-            const statusFilter = status ? status.split(",").map((s) => s.trim()) : null
-            const guards = mockGuardsList
-                .filter((guard) => (statusFilter ? statusFilter.includes(guard.status) : true))
-                .filter((guard) =>
-                    applyManagerScope([guard], managerScope, {
-                        regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
-                        regionalOfficeId: (row) => (row as Record<string, unknown>).regionalOfficeId as string | null | undefined,
-                    }).length > 0
-                )
-                .map((guard) => ({
-                    id: guard.id,
-                    parwestId: guard.parwestId,
-                    name: guard.name,
-                    cnic: guard.cnic,
-                    phone: guard.phone || null,
-                    email: guard.email || null,
-                    status: guard.status,
-                    regionId: null,
-                    regionalOfficeId: null,
-                    region: null,
-                    regionalOffice: null,
-                }))
-            return NextResponse.json(guards)
-        }
 
         const guards = await prisma.guard.findMany({
             where,
@@ -185,21 +157,6 @@ export async function POST(request: NextRequest) {
             }
         } catch (error) {
             if (!isPrismaMissingSchemaError(error)) throw error
-        }
-
-        if (isRuntimeMockEnabled()) {
-            const mock = {
-                id: `mock-guard-${Date.now()}`,
-                parwestId: `PW-${String(Date.now()).slice(-5)}`,
-                name: String(body.name || "Mock Guard"),
-                cnic,
-                phone: body.phone || null,
-                email: body.email || null,
-                status: body.status || "PENDING",
-                regionId: bodyRegionId,
-                regionalOfficeId: bodyRegionalOfficeId,
-            }
-            return NextResponse.json(mock, { status: 201 })
         }
 
         // CNIC re-enrollment gate (new-profile model) — shared with PUT and

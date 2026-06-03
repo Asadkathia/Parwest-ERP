@@ -2,7 +2,6 @@ import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { forbidden, internalServerError, notFound, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
@@ -18,8 +17,6 @@ export async function DELETE(
     if (!hasAction(session, "USERS", "DELETE")) return forbidden("Access denied.")
     const { id } = (await context.params) as { id: string }
     const managerScope = deriveManagerScope(session)
-
-    if (isRuntimeMockEnabled()) return ok({ deleted: true })
 
     const actorId = session.user?.id || null
     const existing = await prisma.managerSupervisorAssignment.findUnique({

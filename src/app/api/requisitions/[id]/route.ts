@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 
@@ -15,10 +14,6 @@ export async function GET(
     if (!session?.user?.id) return unauthorized()
     if (!hasAction(session, "REQUISITIONS", "REQUISITIONS")) return forbidden()
     const { id } = await context.params
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, title: "Mock Requisition", status: "PENDING", module: "General" })
-    }
 
     const req = await prisma.requisition.findUnique({
       where: { id },
@@ -64,10 +59,6 @@ export async function PATCH(
 
     if (Object.keys(data).length === 0) {
       return badRequest("No valid fields provided.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, ...data })
     }
 
     const updated = await prisma.requisition.update({

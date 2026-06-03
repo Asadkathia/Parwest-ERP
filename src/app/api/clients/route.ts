@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { mockClientsList } from "@/lib/mockData/clients"
-import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { clientScopeWhere } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
@@ -53,23 +51,6 @@ export async function GET(request: NextRequest) {
         const scopeWhere = clientScopeWhere(managerScope)
         if (Object.keys(scopeWhere).length > 0) filters.push(scopeWhere)
         const where: Prisma.ClientWhereInput = filters.length > 0 ? { AND: filters } : {}
-
-        if (isRuntimeMockEnabled()) {
-            const clients = mockClientsList
-                .filter((client) => (status ? client.status === status : true))
-                .filter((client) =>
-                    applyManagerScope([client], managerScope, {
-                        regionId: (row) => (row as Record<string, unknown>).regionId as string | null | undefined,
-                    }).length > 0
-                )
-                .map((client) => ({
-                    id: client.id,
-                    name: client.name,
-                    type: client.type,
-                    status: client.status,
-                }))
-            return NextResponse.json(clients)
-        }
 
         // Explicit select: list consumers only need these fields. Excludes heavy
         // base64 blobs (logoUrl) and legacy contract* columns / contractAttachments
@@ -125,25 +106,6 @@ export async function POST(request: NextRequest) {
             if (denied) {
                 return forbidden("Forbidden: cannot create client outside your scope.")
             }
-        }
-
-        if (isRuntimeMockEnabled()) {
-            const mock = {
-                id: `mock-client-${Date.now()}`,
-                name: String(body.name || "Mock Client"),
-                email: body.email || null,
-                type: body.type || "OTHER",
-                isBranchless: body.isBranchless === true || body.isBranchless === "true",
-                headOfficeAddress: body.headOfficeAddress || null,
-                city: body.city || null,
-                status: body.status || "ACTIVE",
-                logoUrl: body.logoUrl || null,
-                ntn: body.ntn || null,
-                strn: body.strn || null,
-                contractUrl: body.contractUrl || null,
-                regionId: body.regionId || null,
-            }
-            return NextResponse.json(mock, { status: 201 })
         }
 
         // The client form sends isBranchless as a JS boolean after merging state into

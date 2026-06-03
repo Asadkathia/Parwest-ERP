@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-
-const MOCK_ROLES = [
-  { id: "mock-role-admin", name: "Admin", description: "System administrator", scopeType: "REGIONAL" },
-  { id: "mock-role-manager", name: "Manager", description: "Regional manager", scopeType: "REGIONAL" },
-  { id: "mock-role-supervisor", name: "Supervisor", description: "Field supervisor", scopeType: "REGIONAL" },
-  { id: "mock-role-accountant", name: "Accountant", description: "Payroll and billing", scopeType: "REGIONAL" },
-]
 
 function parseScopeType(value: unknown): "GLOBAL" | "REGIONAL" | null {
   if (value === "GLOBAL" || value === "REGIONAL") return value
@@ -24,11 +16,6 @@ export async function GET() {
       return unauthorized()
     }
     if (!hasAction(session, "USERS", "VIEW")) return forbidden("Access denied.")
-
-    if (isRuntimeMockEnabled()) {
-      // TODO(consumer-unwrap): roles list is consumed by RolesManager / UserTypesManager / role pickers as raw array.
-      return NextResponse.json(MOCK_ROLES)
-    }
 
     const roles = await prisma.role.findMany({
       orderBy: { name: "asc" },
@@ -57,13 +44,6 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return badRequest("Role name is required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return ok(
-        { id: `mock-role-${Date.now()}`, name, description, scopeType, createdAt: new Date().toISOString() },
-        201
-      )
     }
 
     const role = await prisma.role.create({

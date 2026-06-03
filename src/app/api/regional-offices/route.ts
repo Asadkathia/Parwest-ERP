@@ -1,39 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, unauthorized, forbidden } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { deriveManagerScope, buildManagerScopeWhere, managerScopeDenied } from "@/lib/access/scope"
-
-const MOCK_OFFICES = [
-    {
-        id: "mock-office-lhr",
-        name: "Lahore Head Office",
-        seriesCode: "L",
-        officeHead: "Admin",
-        phone: "042-111",
-        mobile: "0300-0000000",
-        fax: "042-000",
-        regionId: "mock-region-lahore",
-        region: { id: "mock-region-lahore", name: "Lahore" },
-        createdAt: "2026-02-01T00:00:00.000Z",
-        updatedAt: "2026-02-01T00:00:00.000Z",
-    },
-    {
-        id: "mock-office-khi",
-        name: "Karachi Office",
-        seriesCode: "K",
-        officeHead: "Manager KHI",
-        phone: "021-111",
-        mobile: "0301-0000000",
-        fax: "021-000",
-        regionId: "mock-region-karachi",
-        region: { id: "mock-region-karachi", name: "Karachi" },
-        createdAt: "2026-02-01T00:00:00.000Z",
-        updatedAt: "2026-02-01T00:00:00.000Z",
-    },
-]
 
 export async function GET(request: NextRequest) {
     try {
@@ -52,16 +22,6 @@ export async function GET(request: NextRequest) {
             return forbidden("Forbidden: requested region is outside your assigned scope.")
         }
         const scopeWhere = buildManagerScopeWhere(scope, { regionId: "regionId", regionalOfficeId: "id" })
-
-        if (isRuntimeMockEnabled()) {
-            const filtered = MOCK_OFFICES.filter((o) => {
-                if (regionId && o.regionId !== regionId) return false
-                if (scope?.regionId && o.regionId !== scope.regionId) return false
-                if (scope?.regionalOfficeIds.length && !scope.regionalOfficeIds.includes(o.id)) return false
-                return true
-            })
-            return NextResponse.json(filtered, { status: 200 })
-        }
 
         const regionalOffices = await prisma.regionalOffice.findMany({
             where: {
@@ -115,25 +75,6 @@ export async function POST(request: NextRequest) {
         }
         if (longitude != null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
             return badRequest("Longitude must be between -180 and 180.")
-        }
-
-        if (isRuntimeMockEnabled()) {
-            return NextResponse.json(
-                {
-                    id: `mock-office-${Date.now()}`,
-                    name,
-                    seriesCode,
-                    officeHead,
-                    phone,
-                    mobile,
-                    fax,
-                    regionId,
-                    region: { id: regionId, name: "Region" },
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                },
-                { status: 201 }
-            )
         }
 
         const regionalOffice = await prisma.regionalOffice.create({

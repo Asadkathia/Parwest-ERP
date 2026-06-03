@@ -1,26 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-
-const MOCK_ROWS = [
-  {
-    id: "mock-holiday-1",
-    name: "Pakistan Day",
-    date: "2026-03-23T00:00:00.000Z",
-    dateFrom: "2026-03-23T00:00:00.000Z",
-    dateTo: "2026-03-23T00:00:00.000Z",
-    regionalOfficeId: null,
-    valueType: "FIXED_PER_DAY",
-    value: 1000,
-    status: "active",
-    comments: null,
-    notes: null,
-  },
-]
 
 const VALID_VALUE_TYPES = new Set(["FIXED_PER_DAY", "MULTIPLE_OF_RATE"])
 const VALID_APPLIES_TO = new Set([
@@ -34,8 +17,6 @@ export async function GET() {
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasAction(session, "PAYROLL", "VIEW")) return forbidden("Access denied.")
-
-    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.payrollHoliday.findMany({
       orderBy: [{ dateFrom: "desc" }, { date: "desc" }],
@@ -80,25 +61,6 @@ export async function POST(request: NextRequest) {
       return badRequest("Invalid date value.")
     }
     if (dateTo < dateFrom) return badRequest("dateTo must be >= dateFrom.")
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
-        {
-          id: `mock-holiday-${Date.now()}`,
-          name,
-          date: dateFrom.toISOString(),
-          dateFrom: dateFrom.toISOString(),
-          dateTo: dateTo.toISOString(),
-          regionalOfficeId,
-          valueType: valueTypeRaw,
-          value,
-          status,
-          comments,
-          appliesTo,
-        },
-        { status: 201 }
-      )
-    }
 
     const created = await prisma.payrollHoliday.create({
       data: {

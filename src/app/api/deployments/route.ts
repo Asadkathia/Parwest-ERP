@@ -3,9 +3,7 @@ import { Prisma, StoreInventoryAssignmentStatus } from "@prisma/client"
 import { z } from "zod"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { mockDeploymentsList } from "@/lib/mockData/deployments"
-import { applyManagerScope, buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { badRequest, conflict, forbidden, internalServerError, notFound, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { isWorkflowRuleEnabled } from "@/lib/workflows/policy"
@@ -54,23 +52,6 @@ export async function GET(request: NextRequest) {
             regionalOfficeId: regionalOfficeIdParam,
         })) {
             return forbidden("Forbidden: cannot query deployments outside your scope.")
-        }
-
-        if (isRuntimeMockEnabled()) {
-            return NextResponse.json(
-                applyManagerScope(mockDeploymentsList, managerScope, {
-                    regionalOfficeId: (row) => {
-                        const scoped = row as { regionalOfficeId?: string | null }
-                        return scoped.regionalOfficeId ?? null
-                    },
-                })
-                    .filter((row) => (guardIdParam ? row.guardId === guardIdParam : true))
-                    .filter((row) => (statusFilter ? row.status === statusFilter : true))
-                    .map((row) => ({
-                        ...row,
-                        deploymentDate: new Date(row.deploymentDate),
-                    }))
-            )
         }
 
         const deployments = await prisma.deployment.findMany({
@@ -138,35 +119,6 @@ export async function POST(request: NextRequest) {
 
         if (managerScope && managerScopeDenied(managerScope, { regionalOfficeId: bodyRegionalOfficeId })) {
             return forbidden("Forbidden: cannot create deployment outside your scope.")
-        }
-
-        if (isRuntimeMockEnabled()) {
-            const mockDeployment = {
-                id: `mock-deploy-${Date.now()}`,
-                guardId,
-                clientId,
-                branchId,
-                regionalOfficeId,
-                deploymentDate,
-                designation,
-                shiftType,
-                rate: parseOptionalNumber(body?.rate) ?? null,
-                status: "ACTIVE",
-                notes: body.notes || null,
-                guardType: body.guardType || null,
-                salary: parseOptionalNumber(body?.salary) ?? null,
-                overtime: parseOptionalNumber(body?.overtime) ?? null,
-                extraHours: parseOptionalNumber(body?.extraHours) ?? null,
-                postAllowance: parseOptionalNumber(body?.postAllowance) ?? null,
-                dayShiftStart: body.dayShiftStart || null,
-                dayShiftEnd: body.dayShiftEnd || null,
-                nightShiftStart: body.nightShiftStart || null,
-                nightShiftEnd: body.nightShiftEnd || null,
-                deploymentType: body.deploymentType || "REGULAR",
-                isExtraGuard: body.isExtraGuard === "on" || body.isExtraGuard === true,
-                comment: body.comment || null,
-            }
-            return NextResponse.json(mockDeployment, { status: 201 })
         }
 
         const [guard, client, office, branch] = await Promise.all([

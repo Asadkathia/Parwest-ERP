@@ -11,7 +11,6 @@ import GuardsListClient, {
 } from "@/components/guards/GuardsListClient"
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { applyManagerScope, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function GuardsPage({
   searchParams,
@@ -40,7 +39,6 @@ export default async function GuardsPage({
   let guards: GuardListRow[] = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, pending: 0, inactive: 0 }
-  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
   let offices: { id: string; name: string }[] = []
@@ -192,9 +190,6 @@ export default async function GuardsPage({
     stats.active = active
     stats.pending = pending
     stats.inactive = inactive
-    if (mockMode) {
-      dbWarning = "Mock mode enabled: showing guard data via runtime adapter."
-    }
   } catch (error) {
     guards = []
     stats.total = 0

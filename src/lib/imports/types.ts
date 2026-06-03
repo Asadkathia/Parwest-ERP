@@ -77,7 +77,7 @@ export type PersistFn<T> = (
 export type ImportRunContext = {
   prisma: PrismaClient
   jobId: string
-  /** Logged-in user id from the API session (null in mock mode). */
+  /** Logged-in user id from the API session (null if unauthenticated). */
   actorUserId: string | null
   /**
    * Region / regional-office scope of the actor — definitions should respect

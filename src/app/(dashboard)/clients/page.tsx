@@ -13,7 +13,6 @@ import ClientsListClient, {
 import { isPrismaMissingSchemaError, toErrorMessage } from "@/lib/prisma-errors"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { clientScopeWhere } from "@/lib/clients/access"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 
 export default async function ClientsPage({
   searchParams,
@@ -40,7 +39,6 @@ export default async function ClientsPage({
   let typeOptions: { value: string; label: string }[] = []
   let dbWarning = ""
   const stats = { total: 0, active: 0, inactive: 0, totalBranches: 0 }
-  const mockMode = isRuntimeMockEnabled()
   const scope = deriveManagerScope(session)
 
   try {
@@ -139,9 +137,6 @@ export default async function ClientsPage({
     stats.active = active
     stats.inactive = inactive
     stats.totalBranches = totalBranches
-    if (mockMode) {
-      dbWarning = "Mock mode enabled: showing client data via runtime adapter."
-    }
   } catch (error) {
     clients = []
     stats.total = 0

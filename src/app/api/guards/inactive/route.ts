@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
-import { mockInactiveGuards } from "@/lib/mockData/guards"
 import { forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
@@ -23,10 +21,6 @@ export async function GET(request: NextRequest) {
 
         if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
             return forbidden("Forbidden: requested scope is outside your assigned region.")
-        }
-
-        if (isRuntimeMockEnabled()) {
-            return NextResponse.json(mockInactiveGuards)
         }
 
         const scopeWhere = buildManagerScopeWhere(managerScope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" })

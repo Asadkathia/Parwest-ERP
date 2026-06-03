@@ -4,35 +4,11 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { badRequest, conflict, forbidden, internalServerError, ok, unauthorized } from "@/lib/api/response"
 import { hasAction, isSuperAdmin } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { checkPasswordStrength } from "@/lib/validation/formats"
-
-const MOCK_USERS = [
-  {
-    id: "mock-user-1",
-    name: "Admin User",
-    email: "admin@parwestgroup.com",
-    status: "ACTIVE",
-    role: { id: "mock-role-admin", name: "Admin" },
-    region: { id: "mock-region-lahore", name: "Lahore" },
-    regionalOffice: { id: "mock-office-lhr", name: "head office lahore" },
-    createdAt: "2026-01-11T00:00:00.000Z",
-  },
-  {
-    id: "mock-user-2",
-    name: "Muhammad Nazir",
-    email: "nazir@parwestgroup.com",
-    status: "ACTIVE",
-    role: { id: "mock-role-manager", name: "Manager" },
-    region: { id: "mock-region-lahore", name: "Lahore" },
-    regionalOffice: { id: "mock-office-lhr", name: "head office lahore" },
-    createdAt: "2026-01-14T00:00:00.000Z",
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,21 +27,6 @@ export async function GET(request: NextRequest) {
     const managerScope = deriveManagerScope(session)
     if (managerScope && managerScopeDenied(managerScope, { regionId: regionId || null, regionalOfficeId: regionalOfficeId || null })) {
       return forbidden("Forbidden: cannot query users outside your scope.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      const rows = MOCK_USERS.filter((user) => {
-        if (status && user.status !== status) return false
-        if (roleId && user.role.id !== roleId) return false
-        if (regionalOfficeId && user.regionalOffice.id !== regionalOfficeId) return false
-        if (search) {
-          const hay = `${user.name} ${user.email} ${user.role.name}`.toLowerCase()
-          if (!hay.includes(search.toLowerCase())) return false
-        }
-        return true
-      })
-      // TODO(consumer-unwrap): callers currently read raw array; switch to ok(rows) once consumers unwrap.
-      return NextResponse.json(rows)
     }
 
     const where: Prisma.UserWhereInput = {}
@@ -135,42 +96,23 @@ export async function POST(request: NextRequest) {
       return badRequest("Password is too weak: " + passwordCheck.issues.join(", "))
     }
 
-    if (!isRuntimeMockEnabled()) {
-      const role = await prisma.role.findUnique({
-        where: { id: roleId },
-        select: { scopeType: true, name: true },
-      })
-      if (!role) return badRequest("Invalid roleId.")
-      // 🔒 Privilege-escalation guard: only SuperAdmin may assign a GLOBAL-scoped role.
-      if (role.scopeType === "GLOBAL" && !isSuperAdmin(session)) {
-        return forbidden("Only SuperAdmin may assign a GLOBAL-scoped role.")
-      }
-      if (role.scopeType === "REGIONAL") {
-        if (!regionId || !regionalOfficeId) {
-          return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
-        }
-      } else {
-        if (regionId || regionalOfficeId) {
-          return badRequest(`Role "${role.name}" is global — it cannot be assigned to a region or office.`)
-        }
-      }
+    const role = await prisma.role.findUnique({
+      where: { id: roleId },
+      select: { scopeType: true, name: true },
+    })
+    if (!role) return badRequest("Invalid roleId.")
+    // 🔒 Privilege-escalation guard: only SuperAdmin may assign a GLOBAL-scoped role.
+    if (role.scopeType === "GLOBAL" && !isSuperAdmin(session)) {
+      return forbidden("Only SuperAdmin may assign a GLOBAL-scoped role.")
     }
-
-    if (isRuntimeMockEnabled()) {
-      return ok(
-        {
-          id: `mock-user-${Date.now()}`,
-          name,
-          email,
-          status,
-          contactNumber,
-          role: { id: roleId, name: "Role" },
-          region: regionId ? { id: regionId, name: "Region" } : null,
-          regionalOffice: regionalOfficeId ? { id: regionalOfficeId, name: "Office" } : null,
-          createdAt: new Date().toISOString(),
-        },
-        201
-      )
+    if (role.scopeType === "REGIONAL") {
+      if (!regionId || !regionalOfficeId) {
+        return badRequest(`Role "${role.name}" is regional — regionId and regionalOfficeId are required.`)
+      }
+    } else {
+      if (regionId || regionalOfficeId) {
+        return badRequest(`Role "${role.name}" is global — it cannot be assigned to a region or office.`)
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)

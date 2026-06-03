@@ -41,9 +41,8 @@ src/
       audit/             # Activity logs
     api/                 # Route handlers (Next.js API routes)
   lib/
-    db.ts                # Prisma client singleton (supports mock mode)
+    db.ts                # Prisma client singleton (real Postgres only)
     auth.ts              # Full NextAuth config (server only, Prisma adapter)
-    runtime/             # Feature flags (mock mode)
   auth.config.ts         # Edge-compatible auth config (used by middleware only)
   middleware.ts          # JWT-based module permission enforcement
 ```
@@ -59,10 +58,6 @@ Permission model: users have a `role` + `permissions[]` array in the JWT.
 
 Module → permission mapping is in `middleware.ts` `MODULE_ROUTES`.
 
-## Mock Mode
-
-Set `NEXT_PUBLIC_USE_MOCKS=true` (or `USE_MOCKS=true`) to use in-memory mock data instead of a real database. Useful for UI work without a DB connection. Mock client lives in `src/lib/mockData/prismaMock.ts`.
-
 ## Database
 
 Prisma with `@prisma/adapter-pg` (uses `pg` Pool for connection pooling — not the default Prisma setup). Requires `DATABASE_URL` or `DATABASE_URL_UNPOOLED` env var. Schema: `prisma/schema.prisma`.
@@ -74,7 +69,6 @@ Prisma with `@prisma/adapter-pg` (uses `pg` Pool for connection pooling — not 
 | `DATABASE_URL` | Pooled Postgres connection |
 | `DATABASE_URL_UNPOOLED` | Unpooled Postgres (fallback) |
 | `AUTH_SECRET` / `NEXTAUTH_SECRET` | JWT signing secret |
-| `NEXT_PUBLIC_USE_MOCKS` | Enable mock DB mode |
 | `GEMINI_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | OCR vision providers |
 | `OCR_PROVIDER` | Force OCR provider: `gemini` / `openai` / `openrouter` (else auto-picks) |
 | `OCR_DEBUG` | `true` logs raw OCR model responses |
@@ -121,7 +115,8 @@ A cross-module audit + fix pass added canonical helpers. Route new code through 
 - **Contract billing modes (2026-05-30, branch `feat/scoped-contract-rates`).** `ClientContract.billingMode` = `MANUAL | DYNAMIC`. **MANUAL** = scoped standard rates: `ClientContractRate` keyed by explicit `scopeLevel BRANCH|REGION|PROVINCE|GLOBAL` (+ `scopeBranchId/scopeRegionId/scopeProvince`), resolved most-specific-wins by `selectManualScopedRate` (`src/lib/invoicing/rateSelection.ts`; sort = rateStartDate desc → isCurrentRate → id); one-current enforced by **four per-scope partial-unique indexes** `ClientContractRate_current_{branch,region,province,global}_key` (one per scopeLevel — deliberately NOT one COALESCE index, because casting the `Province` enum→text in an index expr isn't IMMUTABLE → PG 42P17); legacy `province`/`city` columns DROPPED. **DYNAMIC** = per-enrolled-guard rates in new `ContractGuardRate` (`@@unique[contractId,guardId]`), resolved by `selectGuardRate` (`src/lib/invoicing/guardRate.ts`); route `…/contracts/[contractId]/guard-rates`. `guardType`/`exService` are **decorative labels only** (never selection keys). Invoicing dispatches by `billingMode` in `resolveContractRateContext` (`src/lib/invoicing/rates.ts`) — both `buildLines.ts` and `invoices/auto-fill` callers; bills `days × rate` monthly. **Province** is an enum on the `Region` entity (`provinceForBranch` in `src/lib/geo/province.ts`; client-safe `PROVINCE_VALUES` in `src/lib/geo/province-constants.ts` — never import `@/lib/geo/province` into a client component, it pulls `@prisma/client`). `Branch` has NO `regionId` — derive region via `regionalOfficeId → regionalOffice.regionId → client.regionId`. Spec/plan: `docs/superpowers/{specs,plans}/2026-05-*`. **Migration state:** `20260530120000_province_tier` + `…121000_contract_billing_mode_and_scope` (incl. data-migrate → 4 BRANCH/2 REGION/1 GLOBAL rows, 0 NULL) **APPLIED to prod 2026-05-30**; `…122000_contract_rate_scope_constraints` (CHECK + per-scope index swap + **DROP `province`/`city`** + defensive demotion) applies automatically on the next deploy — **`scripts/vercel-build.mjs` runs `prisma migrate deploy` as part of every Vercel build**, so migrations + code ship atomically (you do NOT apply prod migrations by hand; a broken migration fails the build). Read-only state check: `scripts/inspect-migration-state.mjs`; dry-run a migration safely with a BEGIN/ROLLBACK harness like `scripts/validate-122000.mjs`. Gotchas fixed live: (1) Postgres `UPDATE…FROM` can't reference the target table in a JOIN ON (use comma-join + WHERE) — 121000; (2) enum→text cast is not IMMUTABLE so it can't go in an index expr — use per-scope partial indexes — 122000.
 - **Workflow-rules**: `RULE_DESCRIPTIONS` in `WorkflowRulesManager.tsx` is now an exhaustive `Record<WorkflowRuleKey,string>` (a new key fails compilation until documented).
 - **Deferred Prisma migrations** (code refs already removed; drop pending prod-data check): `Inventory*`, `PayrollDefault`, `PricingConfig` models; `@@unique` on issuance tables; drop `UNPAID` from `PAYROLL_UNPAID_SALARY_STATUSES`; move workflow-rules + fingerprint config off flat-file → DB.
-- **Tests**: `npm run test:integration` (Node, hits `localhost:3000`, mock-mode capable but partly stale) + Playwright `e2e/` (needs DB + browser). `npm run ci:quality` = lint:json + lint:guard + tsc (the static gate).
+- **Tests**: `npm run test:integration` (Node, hits `localhost:3000`, needs a real DB) + Playwright `e2e/` (needs DB + browser). `npm run ci:quality` = lint:json + lint:guard + tsc (the static gate).
+- **No mock mode** (removed 2026-06-03): mock mode (`NEXT_PUBLIC_USE_MOCKS`/`isRuntimeMockEnabled`/`src/lib/mockData/`) was deleted system-wide — it had drifted from real logic and caused bugs (e.g. stale region scoping). `db.ts` always uses real Postgres (`DATABASE_URL` required); routes have no mock short-circuits; auth always bcrypt-compares. The fingerprint device seed (the one legit non-mock consumer) lives at `src/lib/fingerprint/seed-devices.ts`.
 
 ## Design System v1.1
 

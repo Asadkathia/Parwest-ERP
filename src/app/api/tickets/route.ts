@@ -2,25 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { isSuperAdmin } from "@/lib/payroll/state-permissions"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-
-const MOCK_TICKETS = [
-  {
-    id: "mock-ticket-1",
-    subject: "Attendance sync issue",
-    description: "Attendance rows are delayed for one branch.",
-    sender: { id: "mock-user-1", name: "Admin User" },
-    assignedTo: { id: "mock-user-2", name: "Muhammad Nazir" },
-    category: { id: "mock-cat-1", name: "General" },
-    priority: { id: "mock-priority-2", name: "High" },
-    status: { id: "mock-status-1", name: "New" },
-    createdAt: "2026-02-24T10:00:00.000Z",
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,20 +26,6 @@ export async function GET(request: NextRequest) {
 
     if (managerScopeDenied(managerScope, { regionId, regionalOfficeId })) {
       return forbidden("Forbidden: requested scope is outside your assigned region.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      const rows = MOCK_TICKETS.filter((ticket) => {
-        if (statusId && ticket.status.id !== statusId) return false
-        if (priorityId && ticket.priority.id !== priorityId) return false
-        if (categoryId && ticket.category.id !== categoryId) return false
-        if (search) {
-          const hay = `${ticket.subject} ${ticket.description || ""}`.toLowerCase()
-          if (!hay.includes(search.toLowerCase())) return false
-        }
-        return true
-      })
-      return NextResponse.json(rows)
     }
 
     const where: Prisma.TicketWhereInput = {}
@@ -133,23 +104,6 @@ export async function POST(request: NextRequest) {
 
     if (!subject || !categoryId || !priorityId || !statusId) {
       return badRequest("subject, categoryId, priorityId, and statusId are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
-        {
-          id: `mock-ticket-${Date.now()}`,
-          subject,
-          description,
-          sender: { id: session.user.id, name: session.user.name || "Current User" },
-          assignedTo: assignedToId ? { id: assignedToId, name: "Assigned User" } : null,
-          category: { id: categoryId, name: "Category" },
-          priority: { id: priorityId, name: "Priority" },
-          status: { id: statusId, name: "Status" },
-          createdAt: new Date().toISOString(),
-        },
-        { status: 201 }
-      )
     }
 
     const created = await prisma.ticket.create({

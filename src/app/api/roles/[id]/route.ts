@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { conflict, forbidden, internalServerError, notFound, ok, unauthorized } from "@/lib/api/response"
 import { isSuperAdmin } from "@/lib/api/permissions"
 
@@ -20,10 +19,6 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     }
 
     const { id } = await params
-
-    if (isRuntimeMockEnabled()) {
-      return ok({ deleted: true, message: "Role deleted (mock)." })
-    }
 
     // Check the role exists
     const role = await prisma.role.findUnique({ where: { id } })

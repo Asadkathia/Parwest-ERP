@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, internalServerError, notFound, unauthorized, forbidden } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
@@ -21,10 +20,6 @@ export async function PATCH(
 
     if (!name) {
       return badRequest("Region name is required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id, name, updatedAt: new Date().toISOString() })
     }
 
     const updated = await prisma.region.update({
@@ -56,10 +51,6 @@ export async function DELETE(
     }
     if (!hasAction(session, "SETTINGS", "DELETE")) return forbidden()
     const { id } = await context.params
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ success: true })
-    }
 
     await prisma.region.delete({ where: { id } })
     return NextResponse.json({ success: true })

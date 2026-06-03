@@ -3,23 +3,8 @@ import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { hasAction } from "@/lib/api/permissions"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, serviceUnavailable, unauthorized } from "@/lib/api/response"
-
-const MOCK_ROWS = [
-  {
-    id: "mock-req-1",
-    title: "Uniform restock request",
-    description: "Need 20 uniforms for Lahore office.",
-    module: "INVENTORY",
-    priority: "HIGH",
-    status: "PENDING",
-    requester: { id: "mock-user-2", name: "Muhammad Nazir" },
-    approver: null,
-    createdAt: "2026-02-24T10:30:00.000Z",
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,17 +16,6 @@ export async function GET(request: NextRequest) {
     const moduleName = searchParams.get("module") || undefined
     const priority = searchParams.get("priority") || undefined
     const search = searchParams.get("search") || undefined
-
-    if (isRuntimeMockEnabled()) {
-      const rows = MOCK_ROWS.filter((row) => {
-        if (status && row.status !== status) return false
-        if (moduleName && row.module !== moduleName) return false
-        if (priority && row.priority !== priority) return false
-        if (search && !`${row.title} ${row.description || ""}`.toLowerCase().includes(search.toLowerCase())) return false
-        return true
-      })
-      return NextResponse.json(rows)
-    }
 
     const where: Prisma.RequisitionWhereInput = {}
     if (status) where.status = status
@@ -86,23 +60,6 @@ export async function POST(request: NextRequest) {
 
     if (!title || !moduleName) {
       return badRequest("title and module are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
-        {
-          id: `mock-req-${Date.now()}`,
-          title,
-          description,
-          module: moduleName,
-          priority,
-          status: "PENDING",
-          requester: { id: session.user.id, name: session.user.name || "Current User" },
-          approver: null,
-          createdAt: new Date().toISOString(),
-        },
-        { status: 201 }
-      )
     }
 
     const created = await prisma.requisition.create({

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, conflict, internalServerError, notFound, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
@@ -24,8 +23,6 @@ export async function PATCH(
       data.name = name
     }
     if (Object.keys(data).length === 0) return badRequest("No fields provided.")
-
-    if (isRuntimeMockEnabled()) return NextResponse.json({ id, ...data })
 
     const updated = await prisma.guardBankName.update({
       where: { id },
@@ -50,8 +47,6 @@ export async function DELETE(
     if (!session) return unauthorized()
     if (!hasAction(session, "GUARDS", "DELETE")) return Response.json({ success: false, message: "Forbidden", code: "FORBIDDEN" }, { status: 403 })
     const { id } = await context.params
-
-    if (isRuntimeMockEnabled()) return NextResponse.json({ success: true, id })
 
     await prisma.guardBankName.delete({
       where: { id },

@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import {
   badRequest,
@@ -14,26 +13,10 @@ import {
 } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 
-const MOCK_ROWS = [
-  {
-    id: "mock-doc-1",
-    name: "CNIC",
-    description: "National ID document",
-    createdAt: "2026-02-24T00:00:00.000Z",
-  },
-  {
-    id: "mock-doc-2",
-    name: "Matric Certificate",
-    description: "Academic certificate",
-    createdAt: "2026-02-24T00:00:00.000Z",
-  },
-]
-
 export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
-    if (isRuntimeMockEnabled()) return ok(MOCK_ROWS)
 
     const rows = await prisma.guardPledgeableDocument.findMany({
       orderBy: { name: "asc" },
@@ -55,13 +38,6 @@ export async function POST(request: NextRequest) {
     const name = String(body?.name || "").trim()
     const description = body?.description ? String(body.description) : null
     if (!name) return badRequest("Name is required.")
-
-    if (isRuntimeMockEnabled()) {
-      return ok(
-        { id: `mock-doc-${Date.now()}`, name, description, createdAt: new Date().toISOString() },
-        201
-      )
-    }
 
     const created = await prisma.guardPledgeableDocument.create({
       data: { name, description },

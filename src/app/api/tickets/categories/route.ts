@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, conflict, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
-
-const MOCK_ROWS = [
-  // eslint-disable-next-line no-restricted-syntax -- mock DB seed data, persisted color value not UI styling
-  { id: "mock-cat-1", name: "General", description: "General requests", color: "#3B82F6" },
-  // eslint-disable-next-line no-restricted-syntax -- mock DB seed data, persisted color value not UI styling
-  { id: "mock-cat-2", name: "Server", description: "Server issues", color: "#EF4444" },
-]
 
 export async function GET() {
   try {
     const session = await auth()
     if (!session) return unauthorized()
     if (!hasAction(session, "TICKETING", "VIEW")) return forbidden("Access denied.")
-
-    if (isRuntimeMockEnabled()) return NextResponse.json(MOCK_ROWS)
 
     const rows = await prisma.ticketCategory.findMany({
       orderBy: { name: "asc" },
@@ -42,10 +32,6 @@ export async function POST(request: NextRequest) {
     const color = body?.color ? String(body.color) : null
 
     if (!name) return badRequest("name is required.")
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json({ id: `mock-cat-${Date.now()}`, name, description, color }, { status: 201 })
-    }
 
     const created = await prisma.ticketCategory.create({
       data: { name, description, color },

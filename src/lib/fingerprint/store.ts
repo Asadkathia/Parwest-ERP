@@ -1,6 +1,6 @@
 import { promises as fs } from "fs"
 import path from "path"
-import { mockFingerprintDevices } from "@/lib/mockData/fingerprint"
+import { seedFingerprintDevices } from "@/lib/fingerprint/seed-devices"
 
 export type FingerprintDeviceStatus = "ONLINE" | "OFFLINE" | "WARNING"
 
@@ -19,7 +19,7 @@ export type FingerprintDeviceRecord = {
 const DATA_DIR = path.join(process.cwd(), "data")
 const STORE_FILE = path.join(DATA_DIR, "fingerprint-devices.json")
 
-function toSeedRecord(device: (typeof mockFingerprintDevices)[number]): FingerprintDeviceRecord {
+function toSeedRecord(device: (typeof seedFingerprintDevices)[number]): FingerprintDeviceRecord {
   const now = new Date().toISOString()
   return {
     ...device,
@@ -34,7 +34,7 @@ async function ensureStoreFile() {
   try {
     await fs.access(STORE_FILE)
   } catch {
-    const seed = mockFingerprintDevices.map(toSeedRecord)
+    const seed = seedFingerprintDevices.map(toSeedRecord)
     await fs.writeFile(STORE_FILE, JSON.stringify(seed, null, 2), "utf8")
   }
 }

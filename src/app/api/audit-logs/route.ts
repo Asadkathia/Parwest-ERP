@@ -1,33 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { buildManagerScopeWhere, deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
 import { GLOBAL_REGION_VALUE } from "@/components/access/region-sentinels"
 import type { Prisma } from "@prisma/client"
-
-const MOCK_AUDIT_LOGS = [
-  {
-    id: "mock-audit-1",
-    event: "CREATED",
-    module: "GUARDS",
-    ipAddress: "127.0.0.1",
-    description: "Created guard profile",
-    createdAt: "2026-02-24T08:00:00.000Z",
-    user: { id: "mock-user-1", name: "Admin User", email: "admin@parwestgroup.com" },
-  },
-  {
-    id: "mock-audit-2",
-    event: "UPDATED",
-    module: "CLIENTS",
-    ipAddress: "127.0.0.1",
-    description: "Updated branch billing settings",
-    createdAt: "2026-02-24T09:15:00.000Z",
-    user: { id: "mock-user-2", name: "Muhammad Nazir", email: "nazir@parwestgroup.com" },
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,22 +40,6 @@ export async function GET(request: NextRequest) {
       })
     ) {
       return forbidden("Forbidden: cannot query audit logs outside your scope.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      let rows = [...MOCK_AUDIT_LOGS]
-      if (moduleFilter) rows = rows.filter((row) => row.module === moduleFilter)
-      if (eventFilter) rows = rows.filter((row) => row.event === eventFilter)
-      if (userId) rows = rows.filter((row) => row.user?.id === userId)
-      if (search) {
-        const q = search.toLowerCase()
-        rows = rows.filter((row) =>
-          `${row.module} ${row.event} ${row.description || ""} ${row.user?.name || ""}`
-            .toLowerCase()
-            .includes(q)
-        )
-      }
-      return NextResponse.json(rows)
     }
 
     const where: Prisma.AuditLogWhereInput = {
@@ -152,21 +114,6 @@ export async function POST(request: NextRequest) {
 
     if (!event || !moduleName) {
       return badRequest("event and module are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return NextResponse.json(
-        {
-          id: `mock-audit-${Date.now()}`,
-          event,
-          module: moduleName,
-          description,
-          ipAddress,
-          createdAt: new Date().toISOString(),
-          user: { id: session.user?.id, name: session.user?.name, email: session.user?.email },
-        },
-        { status: 201 }
-      )
     }
 
     const created = await prisma.auditLog.create({

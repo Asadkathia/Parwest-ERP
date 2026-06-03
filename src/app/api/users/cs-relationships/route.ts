@@ -3,25 +3,12 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
-import { isRuntimeMockEnabled } from "@/lib/runtime/mock-mode"
 import { getPrismaCode, isPrismaMissingSchemaError } from "@/lib/prisma-errors"
 import { badRequest, forbidden, internalServerError, ok, serviceUnavailable, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
 import { assignSupervisor } from "@/lib/clients/supervisorAssignment"
 import { clientInScope, clientScopeWhere } from "@/lib/clients/access"
-
-const MOCK_ROWS = [
-  {
-    id: "mock-cs-1",
-    client: { id: "mock-client-1", name: "National Bank of Pakistan" },
-    branch: { id: "mock-branch-1", name: "NBP Head Office" },
-    supervisor: { id: "mock-user-3", name: "Muhammad Aslam" },
-    effectiveDate: "2026-02-01T00:00:00.000Z",
-    status: "ACTIVE",
-    notes: null,
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,16 +20,6 @@ export async function GET(request: NextRequest) {
     const branchId = searchParams.get("branchId") || undefined
     const supervisorId = searchParams.get("supervisorId") || undefined
     const managerScope = deriveManagerScope(session)
-
-    if (isRuntimeMockEnabled()) {
-      const rows = MOCK_ROWS.filter((row) => {
-        if (clientId && row.client.id !== clientId) return false
-        if (branchId && row.branch?.id !== branchId) return false
-        if (supervisorId && row.supervisor.id !== supervisorId) return false
-        return true
-      })
-      return ok(rows)
-    }
 
     if (managerScope && clientId && !(await clientInScope(clientId, managerScope))) {
       return forbidden("Forbidden: client is outside your scope.")
@@ -107,21 +84,6 @@ export async function POST(request: NextRequest) {
 
     if (!clientId || !supervisorId) {
       return badRequest("clientId and supervisorId are required.")
-    }
-
-    if (isRuntimeMockEnabled()) {
-      return ok(
-        {
-          id: `mock-cs-${Date.now()}`,
-          client: { id: clientId, name: "Client" },
-          branch: branchId ? { id: branchId, name: "Branch" } : null,
-          supervisor: { id: supervisorId, name: "Supervisor" },
-          effectiveDate: effectiveDate.toISOString(),
-          status: "ACTIVE",
-          notes,
-        },
-        201
-      )
     }
 
     if (managerScope) {
