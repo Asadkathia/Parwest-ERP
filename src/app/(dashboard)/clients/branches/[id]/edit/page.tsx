@@ -12,6 +12,7 @@ export default async function EditBranchPage({ params }: { params: Promise<{ id:
         where: { id },
         include: {
             client: true,
+            regionalOffice: { select: { regionId: true } },
         },
     })
 
@@ -54,7 +55,7 @@ export default async function EditBranchPage({ params }: { params: Promise<{ id:
                 branch={branch}
                 activeDeploymentCount={activeDeploymentCount}
                 currentSupervisorId={currentSupervisor?.supervisorId ?? null}
-                clientRegionId={branch.client?.regionId ?? null}
+                branchRegionId={branch.regionalOffice?.regionId ?? branch.client?.regionId ?? null}
                 initialUsers={initialUsers.map((u) => ({ id: u.id, name: u.name ?? "" }))}
             />
         </div>

@@ -62,13 +62,15 @@ export async function deactivateBranchWithCascade(
   const cascadeInventory = isWorkflowRuleEnabled("branches.cascadeOnDeactivate")
 
   return prisma.$transaction(async (tx) => {
-    // 1. Load the branch (+ owning client's region for scope/audit enrichment).
+    // 1. Load the branch (+ its own office region for audit enrichment — the
+    //    branchful client is region-less, so client.regionId is null). (region-less)
     const branch = await tx.branch.findUnique({
       where: { id: branchId },
       select: {
         id: true,
         clientId: true,
         status: true,
+        regionalOffice: { select: { regionId: true } },
         client: { select: { regionId: true } },
       },
     })
@@ -82,7 +84,7 @@ export async function deactivateBranchWithCascade(
       )
     }
 
-    const regionId = branch.client?.regionId ?? null
+    const regionId = branch.regionalOffice?.regionId ?? branch.client?.regionId ?? null
 
     // 2. Find the ACTIVE deployments at this branch so we know which guards are
     //    affected, then end them in bulk.

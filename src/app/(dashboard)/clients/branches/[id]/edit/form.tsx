@@ -127,7 +127,7 @@ type Props = {
     branch: Branch
     activeDeploymentCount?: number
     currentSupervisorId?: string | null
-    clientRegionId?: string | null
+    branchRegionId?: string | null
     initialUsers?: { id: string; name: string }[]
 }
 
@@ -152,7 +152,7 @@ export default function BranchEditForm({
     branch,
     activeDeploymentCount = 0,
     currentSupervisorId = null,
-    clientRegionId = null,
+    branchRegionId = null,
     initialUsers = [],
 }: Props) {
     const router = useRouter()
@@ -199,8 +199,8 @@ export default function BranchEditForm({
     // Load managers/supervisors for the branch's region. Filter mirrors the
     // create form: User.role.name == "Manager" / "Supervisor" (case-insensitive).
     useEffect(() => {
-        const url = clientRegionId
-            ? `/api/users?limit=500&regionId=${clientRegionId}`
+        const url = branchRegionId
+            ? `/api/users?limit=500&regionId=${branchRegionId}`
             : "/api/users?limit=500"
         let cancelled = false
         fetch(url)
@@ -225,7 +225,7 @@ export default function BranchEditForm({
         return () => {
             cancelled = true
         }
-    }, [clientRegionId, initialUsers])
+    }, [branchRegionId, initialUsers])
 
     const onSubmit = async (values: BranchEditForm) => {
         // Pre-flight: matches the server-side workflow rule

@@ -1,5 +1,5 @@
 import { registerInsight } from "@/lib/insights/registry"
-import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
@@ -25,10 +25,9 @@ registerInsight({
     const warnDays = Number(ctx.thresholds.warnDays ?? 7)
     const from = new Date(ctx.now.getTime() - windowDays * 24 * 60 * 60 * 1000)
 
-    const clientWhere = buildManagerScopeWhere(ctx.scope, {
-      regionId: "regionId",
-      regionalOfficeId: "regionalOfficeId",
-    })
+    // Branch-aware: branchful clients are region-less, so scope invoices via the
+    // client's branches (clientScopeWhere), not the now-null Client.regionId. (region-less)
+    const clientWhere = clientScopeWhere(ctx.scope)
 
     const invoices = await ctx.prisma.invoice.findMany({
       where: {

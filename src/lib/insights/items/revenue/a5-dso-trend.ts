@@ -1,5 +1,5 @@
 import { registerInsight } from "@/lib/insights/registry"
-import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 registerInsight({
   key: "dso-trend",
@@ -23,10 +23,9 @@ registerInsight({
     const currStart = new Date(ctx.now.getTime() - windowDays * day)
     const prevStart = new Date(ctx.now.getTime() - 2 * windowDays * day)
 
-    const clientWhere = buildManagerScopeWhere(ctx.scope, {
-      regionId: "regionId",
-      regionalOfficeId: "regionalOfficeId",
-    })
+    // Branch-aware: branchful clients are region-less, so scope invoices via the
+    // client's branches (clientScopeWhere), not the now-null Client.regionId. (region-less)
+    const clientWhere = clientScopeWhere(ctx.scope)
 
     const invoices = await ctx.prisma.invoice.findMany({
       where: {
