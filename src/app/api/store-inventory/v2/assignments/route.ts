@@ -223,17 +223,29 @@ export async function POST(request: NextRequest) {
         }),
         prisma.client.findUnique({
           where: { id: assignedToClientId },
-          select: { regionalOfficeId: true, name: true },
+          select: {
+            name: true,
+            regionalOfficeId: true,
+            isBranchless: true,
+            branches: { select: { regionalOfficeId: true } },
+          },
         }),
       ])
       if (!assignClient) return badRequest("Client not found.")
-      const reason = rejectCrossOffice(
-        assignStore?.regionalOfficeId,
-        assignClient.regionalOfficeId,
-        assignClient.name,
-        "client",
-      )
-      if (reason) return badRequest(reason)
+      // A branchful client is region-less: its office footprint IS the set of offices
+      // its branches sit in (client.regionalOfficeId is NULL). The store's office must
+      // match one of them. Branchless clients keep their own single office. (region-less)
+      const storeOfficeId = assignStore?.regionalOfficeId ?? null
+      const clientOfficeIds = (
+        assignClient.isBranchless
+          ? [assignClient.regionalOfficeId]
+          : assignClient.branches.map((b) => b.regionalOfficeId)
+      ).filter((x): x is string => Boolean(x))
+      if (!storeOfficeId || !clientOfficeIds.includes(storeOfficeId)) {
+        return badRequest(
+          `Cross-region assignment not allowed: store and client "${assignClient.name}" must belong to the same regional office.`,
+        )
+      }
     }
     if (assignedToType === StoreInventoryAssignmentTargetType.EMPLOYEE && assignedToUserId) {
       const [assignStore, assignUser] = await Promise.all([

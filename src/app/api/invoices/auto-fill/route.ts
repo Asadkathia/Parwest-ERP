@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         guardId: true,
+        branchId: true,
         deploymentDate: true,
         extraHours: true,
         guard: { select: { id: true, name: true, parwestId: true, isExService: true, exServiceType: true } },
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
       days: Set<string>
       latestDeploymentId: string
       latestDeploymentDate: Date
+      latestBranchId: string | null
       overtimeHoursTotal: number
     }
 
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
           days: new Set(),
           latestDeploymentId: d.id,
           latestDeploymentDate: d.deploymentDate,
+          latestBranchId: d.branchId,
           overtimeHoursTotal: 0,
         }
         byGuard.set(d.guardId, agg)
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
       if (d.deploymentDate > agg.latestDeploymentDate) {
         agg.latestDeploymentDate = d.deploymentDate
         agg.latestDeploymentId = d.id
+        agg.latestBranchId = d.branchId
       }
       const oh = Number(d.extraHours ?? 0)
       if (oh > 0) agg.overtimeHoursTotal += oh
@@ -150,40 +154,65 @@ export async function POST(request: NextRequest) {
     // → global); DYNAMIC bills the deployed guard's own per-guard rate.
     const ctx = await resolveContractRateContext({ clientId, branchId })
 
-    // MANUAL location scope is identical for every guard on this (client, branch),
-    // so resolve the branch's region id + province once.
-    let regionId: string | null = null
-    let province: Province | null = null
-    if (ctx.billingMode === "MANUAL" && ctx.contractId) {
-      const branchRow = branchId
+    // MANUAL location scope (branch → region → province → global) is a property of
+    // WHERE each guard is deployed, not of the contract. A branchful client is
+    // region-less, so resolving region/province once from `branchId` collapses to
+    // NULL for a client-level invoice (branchId null) and silently bypasses every
+    // BRANCH/REGION/PROVINCE-scoped rate → GLOBAL-or-nothing. Resolve per the guard's
+    // own deployment branch instead, memoized by branchId. (region-less billing fix)
+    const branchScopeCache = new Map<string, { regionId: string | null; province: Province | null }>()
+    async function resolveBranchScope(
+      branchScopeId: string | null,
+    ): Promise<{ regionId: string | null; province: Province | null }> {
+      const key = branchScopeId ?? "__none__"
+      const cached = branchScopeCache.get(key)
+      if (cached) return cached
+      const branchRow = branchScopeId
         ? await prisma.branch.findUnique({
-            where: { id: branchId },
+            where: { id: branchScopeId },
             select: { regionalOfficeId: true },
           })
         : null
       const regionalOfficeId = branchRow?.regionalOfficeId ?? null
-      // Region precedence: regional office's region → client's region.
-      // (Branch has no direct regionId; its region is held by its regional office.)
+      // Region precedence: the branch office's region → (only when there is no branch
+      // context at all, i.e. a branchless client) the client's own region.
       const office = regionalOfficeId
         ? await prisma.regionalOffice.findUnique({
             where: { id: regionalOfficeId },
             select: { regionId: true },
           })
         : null
-      regionId = office?.regionId ?? client.regionId ?? null
-      province = await provinceForBranch(prisma, {
-        regionalOfficeId,
-        clientId,
-      })
+      let scopeRegionId = office?.regionId ?? null
+      if (!scopeRegionId && !branchScopeId) {
+        const clientRow = await prisma.client.findUnique({
+          where: { id: clientId },
+          select: { regionId: true },
+        })
+        scopeRegionId = clientRow?.regionId ?? null
+      }
+      const scopeProvince = await provinceForBranch(prisma, { regionalOfficeId, clientId })
+      const result = { regionId: scopeRegionId, province: scopeProvince }
+      branchScopeCache.set(key, result)
+      return result
     }
 
     for (const [guardId, agg] of byGuard.entries()) {
       const dayCount = agg.days.size
+      // For a branch-level invoice use that branch; for a client-level invoice resolve
+      // each guard's scope from its own deployment branch (not the null client region).
+      const guardBranchId = branchId ?? agg.latestBranchId
+      let regionId: string | null = null
+      let province: Province | null = null
+      if (ctx.billingMode === "MANUAL" && ctx.contractId) {
+        const s = await resolveBranchScope(guardBranchId)
+        regionId = s.regionId
+        province = s.province
+      }
       const selected =
         ctx.billingMode === "DYNAMIC"
           ? selectGuardRate(ctx.guardRates, guardId, agg.latestDeploymentDate)
           : selectManualScopedRate(ctx.scopedRates, {
-              branchId,
+              branchId: guardBranchId,
               regionId,
               province,
               asOf: agg.latestDeploymentDate,

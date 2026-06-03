@@ -26,6 +26,7 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
     where: { id },
     include: {
       client: true,
+      regionalOffice: { select: { regionId: true } },
       deployments: {
         include: {
           guard: true,
@@ -38,7 +39,10 @@ export default async function BranchDetailPage({ params }: { params: Promise<{ i
   if (!branch) notFound()
 
   const managerScope = deriveManagerScope(session)
-  if (managerScope && managerScopeDenied(managerScope, { regionId: branch.client?.regionId ?? null })) {
+  // Scope branchful clients by the BRANCH's own office region (clients are
+  // region-less). Fail CLOSED on a null office region for restricted managers.
+  const branchRegionId = branch.regionalOffice?.regionId ?? null
+  if (managerScope && (!branchRegionId || managerScopeDenied(managerScope, { regionId: branchRegionId }))) {
     notFound()
   }
 

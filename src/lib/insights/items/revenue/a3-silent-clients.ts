@@ -1,5 +1,5 @@
 import { registerInsight } from "@/lib/insights/registry"
-import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 registerInsight({
   key: "silent-clients",
@@ -18,16 +18,14 @@ registerInsight({
     const silentDays = Number(ctx.thresholds.silentDays ?? 30)
     const cutoff = new Date(ctx.now.getTime() - silentDays * 24 * 60 * 60 * 1000)
 
-    const clientWhere = buildManagerScopeWhere(ctx.scope, {
-      regionId: "regionId",
-      regionalOfficeId: "regionalOfficeId",
-    })
+    const clientWhere = clientScopeWhere(ctx.scope)
 
     const clients = await ctx.prisma.client.findMany({
       where: {
-        status: "ACTIVE",
-        contracts: { some: { isActive: true } },
-        ...clientWhere,
+        AND: [
+          { status: "ACTIVE", contracts: { some: { isActive: true } } },
+          clientWhere,
+        ],
       },
       select: {
         id: true,

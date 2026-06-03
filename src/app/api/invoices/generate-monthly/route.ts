@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { deriveManagerScope, managerScopeDenied } from "@/lib/access/scope"
+import { deriveManagerScope } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { badRequest, forbidden, internalServerError, unauthorized } from "@/lib/api/response"
 import { hasAction } from "@/lib/api/permissions"
 import { safeAuditLog } from "@/lib/audit/safeAuditLog"
@@ -50,15 +52,19 @@ export async function POST(request: NextRequest) {
       taxRate = tr
     }
 
-    // Find clients with deployments in the month (scoped)
-    const clientWhere = requestedClientIds?.length ? { id: { in: requestedClientIds } } : {}
+    // Find clients with deployments in the month. Scope is branch-aware (clients
+    // are region-less): clientScopeWhere returns {} for SuperAdmin, otherwise a
+    // branch-OR-branchless filter — never a fail-open per-row check on a NULL
+    // client.regionId. Compose with any explicit clientIds filter under AND.
+    const scopeWhere = clientScopeWhere(managerScope)
+    const andClauses: Prisma.ClientWhereInput[] = []
+    if (requestedClientIds?.length) andClauses.push({ id: { in: requestedClientIds } })
+    if (Object.keys(scopeWhere).length > 0) andClauses.push(scopeWhere)
     const candidates = await prisma.client.findMany({
-      where: clientWhere,
-      select: { id: true, name: true, regionId: true },
+      where: andClauses.length > 0 ? { AND: andClauses } : {},
+      select: { id: true, name: true },
     })
-    const inScope = candidates.filter((c) =>
-      !managerScope || !managerScopeDenied(managerScope, { regionId: c.regionId })
-    )
+    const inScope = candidates
 
     const created: { clientId: string; branchId: string | null; invoiceNumber: string; amount: number }[] = []
     const skipped: { clientId: string; branchId: string | null; reason: string }[] = []

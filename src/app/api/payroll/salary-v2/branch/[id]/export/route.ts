@@ -34,14 +34,18 @@ export async function GET(
 
         const branch = await prisma.branch.findUnique({
             where: { id: branchId },
-            include: { client: { select: { name: true, regionId: true } } },
+            include: {
+                client: { select: { name: true } },
+                regionalOffice: { select: { regionId: true } },
+            },
         })
         if (!branch) return notFound("Branch not found.")
 
         const scope = deriveManagerScope(session)
+        // Clients are region-less; scope the branch by its OWN office region.
         if (
             managerScopeDenied(scope, {
-                regionId: branch.client?.regionId ?? null,
+                regionId: branch.regionalOffice?.regionId ?? null,
                 regionalOfficeId: branch.regionalOfficeId ?? null,
             })
         ) {

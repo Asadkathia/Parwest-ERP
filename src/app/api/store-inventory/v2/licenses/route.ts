@@ -3,7 +3,7 @@ import { badRequest, conflict, internalServerError, ok } from "@/lib/api/respons
 import { getPrismaCode } from "@/lib/prisma-errors"
 import { prisma } from "@/lib/db"
 import { asText, emitInventoryV2Audit, ensureClientInScope, readScopedRegionParams, requireInventorySession, requireV2WriteEnabled } from "@/lib/inventory/store-v2-api"
-import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import type { Prisma } from "@prisma/client"
 
 function parseDate(value: unknown): Date | null {
@@ -22,16 +22,33 @@ export async function GET(request: NextRequest) {
 
   // Licenses scope through Client (the model has clientId only with no relation),
   // so resolve scoped client IDs first then filter via clientId in (...).
-  // Layer URL-supplied filters on top of session scope so a regional-office user
-  // sees only their office's clients, and SuperAdmin can narrow via the picker.
-  const clientWhere: Prisma.ClientWhereInput = {
-    ...buildManagerScopeWhere(session.scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
-    ...(scopeParams.regionalOfficeId ? { regionalOfficeId: scopeParams.regionalOfficeId } : {}),
-    ...(scopeParams.regionId && !scopeParams.regionalOfficeId ? { regionId: scopeParams.regionId } : {}),
+  // Clients are region-less (B1): scope branch-aware via clientScopeWhere
+  // (branchful → by their branches' office region; branchless → own region).
+  // Layer URL-supplied filters on top of session scope (branch-aware too) so a
+  // regional-office user sees only their office's clients, and SuperAdmin can
+  // narrow via the picker. Compose under AND so the OR clauses don't clobber.
+  const scopeWhere = clientScopeWhere(session.scope)
+  const andClauses: Prisma.ClientWhereInput[] = []
+  if (Object.keys(scopeWhere).length > 0) andClauses.push(scopeWhere)
+  if (scopeParams.regionalOfficeId) {
+    andClauses.push({
+      OR: [
+        { branches: { some: { regionalOfficeId: scopeParams.regionalOfficeId } } },
+        { isBranchless: true, regionalOfficeId: scopeParams.regionalOfficeId },
+      ],
+    })
+  } else if (scopeParams.regionId) {
+    andClauses.push({
+      OR: [
+        { branches: { some: { regionalOffice: { regionId: scopeParams.regionId } } } },
+        { isBranchless: true, regionId: scopeParams.regionId },
+      ],
+    })
   }
+  const clientWhere: Prisma.ClientWhereInput = andClauses.length > 0 ? { AND: andClauses } : {}
 
   let clientIdFilter: { clientId: { in: string[] } } | Record<string, never> = {}
-  if (Object.keys(clientWhere).length > 0) {
+  if (andClauses.length > 0) {
     const scopedClients = await prisma.client.findMany({
       where: clientWhere,
       select: { id: true },

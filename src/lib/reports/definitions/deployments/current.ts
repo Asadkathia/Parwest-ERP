@@ -32,7 +32,7 @@ const definition: ReportDefinition<typeof params> = {
           ? { OR: [{ guard: { regionId } }, { branch: { is: { regionalOffice: { regionId } } } }] }
           : {}),
         ...(scope?.regionId
-          ? { guard: { regionId: scope.regionId } }
+          ? { regionalOffice: { is: { regionId: scope.regionId } } }
           : {}),
       },
       select: {

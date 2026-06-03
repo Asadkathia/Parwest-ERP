@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { registerReport } from "../../registry"
 import type { ReportDefinition } from "../../types"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 const params = z.object({
   from: z.coerce.date(),
@@ -25,9 +26,20 @@ const definition: ReportDefinition<typeof params> = {
   async run({ from, to, regionId }, { prisma, scope }) {
     const rows = await prisma.client.findMany({
       where: {
-        enrollmentDate: { gte: from, lte: to },
-        ...(regionId ? { regionId } : {}),
-        ...(scope?.regionId ? { regionId: scope.regionId } : {}),
+        AND: [
+          { enrollmentDate: { gte: from, lte: to } },
+          ...(regionId
+            ? [
+                {
+                  OR: [
+                    { branches: { some: { regionalOffice: { regionId } } } },
+                    { isBranchless: true, regionId },
+                  ],
+                },
+              ]
+            : []),
+          clientScopeWhere(scope),
+        ],
       },
       select: {
         name: true,
@@ -35,6 +47,10 @@ const definition: ReportDefinition<typeof params> = {
         status: true,
         enrollmentDate: true,
         region: { select: { name: true } },
+        branches: {
+          select: { regionalOffice: { select: { region: { select: { name: true } } } } },
+          take: 1,
+        },
       },
       orderBy: { enrollmentDate: "desc" },
     })
@@ -42,7 +58,8 @@ const definition: ReportDefinition<typeof params> = {
       name: c.name,
       type: c.type,
       status: c.status,
-      regionName: c.region?.name ?? "",
+      regionName:
+        c.region?.name ?? c.branches[0]?.regionalOffice?.region?.name ?? "—",
       enrolledOn: c.enrollmentDate,
     }))
   },

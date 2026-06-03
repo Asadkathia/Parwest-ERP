@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { registerReport } from "../../registry"
 import type { ReportDefinition } from "../../types"
+import { clientScopeWhere } from "@/lib/clients/access"
 
 const params = z.object({
   status: z.enum(["ACTIVE", "INACTIVE", "BLACKLISTED"]).optional(),
@@ -23,15 +24,30 @@ const definition: ReportDefinition<typeof params> = {
   async run({ status, regionId }, { prisma, scope }) {
     const rows = await prisma.client.findMany({
       where: {
-        ...(status ? { status } : {}),
-        ...(regionId ? { regionId } : {}),
-        ...(scope?.regionId ? { regionId: scope.regionId } : {}),
+        AND: [
+          ...(status ? [{ status }] : []),
+          ...(regionId
+            ? [
+                {
+                  OR: [
+                    { branches: { some: { regionalOffice: { regionId } } } },
+                    { isBranchless: true, regionId },
+                  ],
+                },
+              ]
+            : []),
+          clientScopeWhere(scope),
+        ],
       },
       select: {
         name: true,
         status: true,
         enrollmentDate: true,
         region: { select: { name: true } },
+        branches: {
+          select: { regionalOffice: { select: { region: { select: { name: true } } } } },
+          take: 1,
+        },
         _count: { select: { branches: true } },
       },
       orderBy: { name: "asc" },
@@ -39,7 +55,8 @@ const definition: ReportDefinition<typeof params> = {
     return rows.map((c) => ({
       name: c.name,
       status: c.status,
-      regionName: c.region?.name ?? "",
+      regionName:
+        c.region?.name ?? c.branches[0]?.regionalOffice?.region?.name ?? "—",
       branchCount: c._count.branches,
       enrolledOn: c.enrollmentDate,
     }))

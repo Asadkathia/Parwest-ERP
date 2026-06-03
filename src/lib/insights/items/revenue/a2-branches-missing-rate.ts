@@ -1,5 +1,5 @@
 import { registerInsight } from "@/lib/insights/registry"
-import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { formatShortMoney } from "@/lib/dashboard/queries"
 
 registerInsight({
@@ -11,16 +11,12 @@ registerInsight({
   defaultSeverity: "MEDIUM",
   thresholdDocs: {},
   compute: async (ctx) => {
-    const clientWhere = buildManagerScopeWhere(ctx.scope, {
-      regionId: "regionId",
-      regionalOfficeId: "regionalOfficeId",
-    })
+    const clientWhere = clientScopeWhere(ctx.scope)
 
     // Pull clients in scope with their contracts + rate counts + branches.
     const clients = await ctx.prisma.client.findMany({
       where: {
-        status: "ACTIVE",
-        ...clientWhere,
+        AND: [{ status: "ACTIVE" }, clientWhere],
       },
       select: {
         id: true,

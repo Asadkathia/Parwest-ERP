@@ -1,5 +1,6 @@
 import { registerInsight } from "@/lib/insights/registry"
 import { buildManagerScopeWhere } from "@/lib/access/scope"
+import { clientScopeWhere } from "@/lib/clients/access"
 import { formatShortMoney } from "@/lib/dashboard/queries"
 
 type RateRow = {
@@ -31,15 +32,13 @@ registerInsight({
   compute: async (ctx) => {
     const minDeviationPct = Number(ctx.thresholds.minDeviationPct ?? 1)
 
-    const clientWhere = {
-      ...buildManagerScopeWhere(ctx.scope, { regionId: "regionId", regionalOfficeId: "regionalOfficeId" }),
-    }
+    const clientWhere = clientScopeWhere(ctx.scope)
 
-    // Load active client contracts with rates, scoped by client region if applicable.
+    // Load active client contracts with rates, scoped by client (branch-aware) if applicable.
     const contracts = await ctx.prisma.clientContract.findMany({
       where: {
         isActive: true,
-        client: Object.keys(clientWhere).length > 0 ? clientWhere : undefined,
+        client: Object.keys(clientWhere).length > 0 ? { is: clientWhere } : undefined,
       },
       select: {
         id: true,

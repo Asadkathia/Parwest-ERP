@@ -137,7 +137,12 @@ export async function calculateGuardPayroll(
         },
       },
       branch: {
-        select: { id: true, name: true, province: true },
+        select: {
+          id: true,
+          name: true,
+          province: true,
+          regionalOffice: { select: { reservePct: true } },
+        },
       },
     },
   })
@@ -164,8 +169,13 @@ export async function calculateGuardPayroll(
     if (existing) {
       existing.weight += amount
     } else {
+      // Reserve % precedence: client-level override → the office of the branch this
+      // guard is deployed at → (branchless client) the client's own office → default.
+      // Branchful clients are region-less, so `client.regionalOffice` is null; the
+      // office-level default must come from the DEPLOYMENT's branch office. (region-less)
       const pct =
         dep.client?.reservePct ??
+        dep.branch?.regionalOffice?.reservePct ??
         dep.client?.regionalOffice?.reservePct ??
         DEFAULT_RESERVE_PCT
       clientWeights.set(cid, {
